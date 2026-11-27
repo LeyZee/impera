@@ -78,8 +78,8 @@ function headline(
     return { text: `Les chatteurs de ${name} ont les brouillons, sans la fiche du fan.`, tone: 'on' };
   return {
     text: switches.fanCard
-      ? `Dans l’extension, brouillons éteints\u00a0: les chatteurs de ${name} écrivent seuls, avec la fiche du fan.`
-      : `Dans l’extension, rien d’allumé\u00a0: les chatteurs de ${name} n’ont ni fiche ni brouillon.`,
+      ? `Brouillons éteints\u00a0: les chatteurs de ${name} écrivent seuls, avec la fiche du fan.`
+      : `Rien d’allumé\u00a0: les chatteurs de ${name} n’ont ni fiche ni brouillon.`,
     tone: 'off',
   };
 }

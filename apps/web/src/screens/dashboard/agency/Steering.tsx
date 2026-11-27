@@ -89,7 +89,7 @@ function dayVerdict(daily: SteeringDaily): {
   if (daily.targetMinor === null)
     return {
       tag: null,
-      text: 'Pas encore d’objectif ce mois-ci : fixe-le plus bas, dans « Objectifs du mois ». Celui du jour en découle.',
+      text: 'Pas encore d’objectif ce mois-ci. Fixe-le dans « Objectifs du mois », plus bas sur cette page : celui du jour en découle.',
       tone: 'neutral',
     };
   if (daily.todayMinor >= daily.targetMinor)
