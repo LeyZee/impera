@@ -145,16 +145,12 @@ describe('her native scripts as the agent decides on them (ADR 0098)', () => {
       language: 'french',
       family: linear.ours?.preparedScriptId,
     });
-    // The fields come with the scripts' versions (#1029): a copy that carries them is read as it is.
-    const inEnglish = { ...ours, language: 'english', versionOf: 'prepared-source' };
+    // A version in English (ADR 0169) is read as it is, its family its source. A language outside the list cannot reach
+    // here: the contract and the base hold it to `LANGUAGES`.
+    const source = PreparedScriptIdSchema.parse(newId(PreparedScriptIdSchema));
+    const inEnglish = { ...ours, language: 'english' as const, versionOf: source };
     const english = script('seq-en', linearSteps, { ours: inEnglish });
-    expect(agentScriptViewOf(english)).toMatchObject({ language: 'english', family: 'prepared-source' });
-    const isoCode = { ...ours, language: 'en', versionOf: null };
-    const unreadable = script('seq-xx', linearSteps, { ours: isoCode });
-    expect(agentScriptViewOf(unreadable)).toMatchObject({
-      language: 'french',
-      family: ours.preparedScriptId,
-    });
+    expect(agentScriptViewOf(english)).toMatchObject({ language: 'english', family: source });
   });
 
   it('gives no moment to a script of ours played day and night, so it is offered at either (ADR 0112 § 27)', () => {
