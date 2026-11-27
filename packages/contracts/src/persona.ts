@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { KYC_SLOT_LABELS, KycSlotSchema, type KycSlot } from './fans';
+import { MEETING_TIER_MAX } from './meeting-tiers';
 import { normaliseWords } from './normalise';
 
 /**
@@ -540,7 +541,23 @@ export type SampleReply = z.infer<typeof SampleReplySchema>;
  * The strict rules of « Réglages de l'agent » (ADR 0079 § 4): her limits as lists of words, and the emojis she never
  * uses. Guards load them; the sheet's free answers (« Zones interdites ») are only read by the model.
  */
-export const PersonaAgentRulesSchema = PersonaLimitsSchema.extend({ emojis_forbidden: emojiList });
+export const CLOSE_ONLY_WORD_GROUPS_MAX = 20;
+
+/**
+ * Words she keeps for fans close to her (Charles 26/11, ADR 0158 § O): written to a fan whose meeting tier is below
+ * `min_tier`, her answer is refused (guard `close_only_word`). Read as the other guard words: normalised, whole word.
+ */
+export const CloseOnlyWordsSchema = z.strictObject({
+  words: entries(120, 50, guardWord).min(1),
+  min_tier: z.int().min(1).max(MEETING_TIER_MAX),
+});
+export type CloseOnlyWords = z.infer<typeof CloseOnlyWordsSchema>;
+
+export const PersonaAgentRulesSchema = PersonaLimitsSchema.extend({
+  emojis_forbidden: emojiList,
+  /** Absent or empty: no word of hers is kept for close fans. */
+  close_only_words: z.array(CloseOnlyWordsSchema).max(CLOSE_ONLY_WORD_GROUPS_MAX).optional(),
+});
 export type PersonaAgentRules = z.infer<typeof PersonaAgentRulesSchema>;
 
 /** How much of each block she filled, from 0 to 1: a block counts by the share of its fields that hold something. */

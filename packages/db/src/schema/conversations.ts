@@ -258,6 +258,10 @@ export const messages = pgTable(
     check('messages_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     unique('messages_platform_message_unique').on(t.platformAccountId, t.platformMessageId),
     index('messages_conversation_created_idx').on(t.conversationId, t.platformCreatedAt.desc()),
+    // Whether a fan wrote to an account lately (ADR 0094 § 1, « compte sans personne »): his messages only.
+    index('messages_account_fan_recent_idx')
+      .on(t.platformAccountId, t.platformCreatedAt.desc())
+      .where(sql`${t.direction} = 'inbound'`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],
