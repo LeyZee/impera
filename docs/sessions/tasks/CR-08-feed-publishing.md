@@ -5,7 +5,7 @@ Dépend de : CR-06, la capture Reveal du 16/11 (faite, formes dans l'ADR 0136 §
 Branche : task/cr-08<lot>-<slug> (une branche et une PR par lot)
 
 ## Objectif
-Chaque dimanche, le code prépare la semaine : au moins trois publications du feed, une séance entière chacune et réservées aux abonnés, plus une story publique par jour. Le propriétaire les valide, puis elles partent seules, avec un droit de retrait jusqu'à 1 h avant.
+Chaque dimanche, le code prépare la semaine : au moins trois publications du feed, une séance entière chacune et réservées aux abonnés, plus une story par jour qui reprend la vidéo du feed vidéo (ADR 0136 § 11). Le propriétaire les valide, puis elles partent seules, avec un droit de retrait jusqu'à 1 h avant.
 
 ## Contexte à lire
 `docs/adr/0136-feed-and-stories-published-on-their-own.md` (tout), `docs/adr/0044-content-drops-feed-and-mass-dm.md` (§ 3, § 4, § 6), ADR 0055 (catégorie `reveal_story`), 0083 (descriptions), 0145 (rôle des dossiers), 0140 (semaine de la créatrice, demandes « Déposer »), 0126 (lives), 0018, 0003, `docs/architecture/connectors.md`, `docs/reference/fake-reveal.md`, les gardes de voix (ADR 0021).
@@ -18,12 +18,12 @@ Chaque dimanche, le code prépare la semaine : au moins trois publications du fe
 
 ## Lot b : le plan et les gardes (fil « Publier posts et stories automatiquement » ; « OK sur <sha> » du fil Médias sur ce qui touche `content-drops`)
 - [ ] Plan pur, construit le dimanche à 18 h : feed ≥ 3 par semaine, au plus 1 par jour, réglable de 3 à 7, jours étalés ; une story par jour (au plus 2, 4 h d'écart). Heures par défaut 20 h (feed) et 12 h 30 (stories), dans le fuseau de la créatrice ; rien pendant un live (ADR 0126).
-- [ ] Une séance = une publication. Les stories viennent seulement des dépôts `reveal_story` ; stock vide = aucune story et alerte ambre.
-- [ ] Visibilité : feed `isPublic false` toujours ; stories publiques ; publication publique seulement à la main par le propriétaire.
-- [ ] Marque « publié » par hash et identifiant Reveal ; garde du code : un média publié (même fichier ou même média du coffre) ne se vend jamais, et un média de vente ne se publie jamais. Une story ne prend jamais un média du feed (ADR 0145).
+- [ ] Une séance = une publication. La story du jour reprend la vidéo du feed vidéo (ADR 0136 § 11), avec sa propre légende ; un jour sans vidéo, pas de story et pas d'alerte. Les drapeaux Reveal de chaque sortie et le rythme des vidéos sont à vérifier avec Charles avant ce lot, qui vient après l'ouverture du 1er décembre.
+- [ ] Visibilité : séance photo `isPublic false` toujours ; feed vidéo public (ADR 0136 § 11) ; autre publication publique seulement à la main par le propriétaire.
+- [ ] Marque « publié » par hash et identifiant Reveal ; garde du code : un média publié (même fichier ou même média du coffre) ne se vend jamais, et un média de vente ne se publie jamais. La story ne prend que la vidéo du feed vidéo, jamais un média d'une séance réservée aux abonnés.
 - [ ] Légende : prompt versionné, écrite depuis les descriptions validées (ADR 0083), récit court et question ouverte qui invite en DM ; gardes du code sur la longueur, une question présente, aucun prix, lien ou rendez-vous, garde `ai_disclosure`, jamais répétée. Schéma Zod.
 - [ ] Modes « À valider » (obligatoire les deux premières semaines) et « Automatique » (propriétaire seul, journalisé) ; retrait par le propriétaire ou la créatrice jusqu'à 1 h avant ; le manager est exclu du plan et de ses médias.
-- [ ] Seuils de stock : 7 jours de feed, 4 jours de stories (réglages de l'agence) ; alerte quand une validation manque moins de 48 h avant le créneau ; effacement des originaux 30 jours après la publication réelle.
+- [ ] Seuils de stock : 7 jours de feed (séances et vidéos), plus de seuil propre aux stories (ADR 0136 § 11) ; alerte quand une validation manque moins de 48 h avant le créneau ; effacement des originaux 30 jours après la publication réelle.
 - [ ] Bloc `<her_posts>` pour l'agent : les 3 dernières publications et la story du jour, une fois publiées seulement (fil Agent pour l'entrée dans le prompt).
 - [ ] Mesure : likes, et abonnés silencieux qui réécrivent dans les 48 h.
 
@@ -45,3 +45,4 @@ La stratégie du feed public (à décider avec Charles) ; le Mass DM (CR-11) ; I
 ## Notes de session
 - 03/11/2026 : l'ADR 0055 (proposée) ajoute la story Reveal au plan, et l'ADR 0057 (proposée) y ajoute Instagram et Telegram ; le plan devient multi-sorties, une sortie par catégorie.
 - 17/11/2026 : fiche réécrite après l'ADR 0136 (fusionnée avec #824) : capture faite, découpée en quatre lots ; « une publication par jour » et « acceptation humaine obligatoire » remplacées par l'ADR 0136.
+- 27/11/2026 : avenant ADR 0136 § 11 (décision de Charles) : la story reprend la vidéo du feed vidéo, plus de dépôt ni de stock de stories ; lot b après l'ouverture du 1er décembre.
