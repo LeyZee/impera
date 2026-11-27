@@ -304,6 +304,10 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(within(anna).getByText(/^depuis 14\sh\s05, un humain répond$/u)).toBeDefined();
     expect(within(anna).queryByText('IA active · Copilote')).toBeNull();
     expect(anna.querySelector('.ai-switch__dot--outage')).not.toBeNull();
+    // Its label is red by its state (switch.css), as the pill's.
+    expect(anna.querySelector(".ai-switch[data-state='outage'] .ai-switch__label")?.textContent).toBe(
+      'IA indisponible',
+    );
     // Cut by someone: still said as such during the outage.
     const bea = await cardOf('Bea');
     expect(within(bea).getByText('IA coupée')).toBeDefined();

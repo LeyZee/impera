@@ -661,11 +661,9 @@ describe('TrackingPage', () => {
     expect(within(queue).getAllByRole('listitem')[0]?.textContent).toContain('IA indisponible · 2 fans');
     expect(screen.queryByText(/IA de retour/u)).toBeNull();
     expect(screen.queryByRole('button', { name: /Rendre la main à l’agent \(/u })).toBeNull();
-    // The header no longer promises the copilot's drafts: no draft comes during the outage.
-    expect(
-      screen.getByText('IA indisponible : l’agent n’écrit plus, chaque fan attend une réponse humaine.'),
-    ).toBeDefined();
+    // Nothing under the title: the mode's promise would be false, and the banner says the outage once.
     expect(screen.queryByText(/En copilote/u)).toBeNull();
+    expect(screen.getAllByText(/IA indisponible depuis/u)).toHaveLength(1);
   });
 
   it('narrows the list to the fans of a group on a click, and gives it back whole (recette 27/11, G14, PRO-10)', async () => {

@@ -63,6 +63,11 @@
   color: var(--nv-warning);
 }
 
+/* No model answers (recette 27/11, A9): red as Suivi's banner and the menu's pill, fans wait for a human now. */
+.ai-switch[data-state='outage'] .ai-switch__label {
+  color: var(--nv-danger);
+}
+
 .ai-switch__detail {
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);

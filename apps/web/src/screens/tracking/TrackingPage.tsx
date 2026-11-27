@@ -23,7 +23,6 @@ import {
   LIST_ORDER_LABELS,
   LIST_ORDERS,
   MODE_MEANINGS,
-  OUTAGE_MEANING,
   mergeConversations,
   onlyConversations,
   orderLines,
@@ -222,16 +221,8 @@ export function TrackingPage({
         title={nav === undefined ? 'Suivi' : screenLabel('/suivi')}
         // Only what the mode means: the panels say the rest themselves (D-03).
         // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
-        // During an outage no draft comes: the mode's promise would be false, the outage is said instead (A9).
-        lead={
-          offShift !== undefined
-            ? undefined
-            : aiOutage !== null
-              ? OUTAGE_MEANING
-              : mode === null
-                ? undefined
-                : MODE_MEANINGS[mode]
-        }
+        // During an outage no draft comes: the mode's promise would be false, and the banner below says it (A9).
+        lead={offShift !== undefined || aiOutage !== null || mode === null ? undefined : MODE_MEANINGS[mode]}
         tabs={nav}
       />
       {offShift?.(lines.length > 0)}

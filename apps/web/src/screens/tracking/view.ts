@@ -199,10 +199,6 @@ export const MODE_MEANINGS: Readonly<Record<ConversationMode, string>> = {
   auto: 'En automatique : l’agent répond seul.',
 };
 
-/** Suivi's line under its title while no model answers (recette 27/11, A9): no draft comes, whatever the mode. */
-export const OUTAGE_MEANING =
-  'IA indisponible : l’agent n’écrit plus, chaque fan attend une réponse humaine.';
-
 /** The emoji of a desire band that says something, before its word (D-03: a category is an emoji). */
 export const DESIRE_BAND_EMOJIS = { playful: '😏', hot: '🔥' } as const;
 
