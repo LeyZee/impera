@@ -170,7 +170,7 @@ export function ShiftPanel({
           ? `${clockOf(endMinute)} n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à ${clockOf(moved.end)}.`
           : null;
   // Who is dispo on these hours (ADR 0171 § 5, trou 16): the whole of them first, part of them after, with what their
-  // week covers at the agency's hour; nobody is chosen for the manager beyond the first of the list.
+  // week covers at the agency's hour; nobody is chosen for the manager unless only one can work.
   const weeks = useTeamAvailability(true);
   const place =
     hoursOk && dayOk && account !== null
@@ -199,7 +199,12 @@ export function ShiftPanel({
     return kind === 'full' ? 0 : kind === 'part' ? 1 : 2;
   };
   const eligible = mates.toSorted((a, b) => rank(a) - rank(b));
-  const chosen = eligible.find((member) => member.id === memberId) ?? eligible[0] ?? null;
+  // Never the first of the list by default: a quick tap would place the wrong person (recette 27/11, G15). Only the
+  // one member who can work on her is chosen for the reader.
+  const chosen =
+    eligible.find((member) => member.id === memberId) ??
+    (eligible.length === 1 ? eligible[0] : undefined) ??
+    null;
   const silent = dispos === null ? null : silentText(dispos.silent);
   // No shift before the member's first day (the server reads it in their zone, the panel in the agency's).
   const notJoined = chosen !== null && dayOk && day < chosen.joinedOn;
@@ -315,6 +320,8 @@ export function ShiftPanel({
               {fill === undefined ? 'Aucun membre actif' : 'Aucun autre membre actif'} ne travaille sur{' '}
               {account?.creatorName ?? 'cette créatrice'}.
             </span>
+          ) : chosen === null ? (
+            <span className="tm-hint">Choisis qui travaille sur ce shift.</span>
           ) : null}
         </fieldset>
 

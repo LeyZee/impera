@@ -1478,10 +1478,13 @@ describe('Équipe › Planning', () => {
     // Léa's account first, by name: Basile alone works on her.
     expect(who().map((one) => one.textContent)).toEqual(['Basile']);
     fireEvent.click(within(accounts).getByRole('radio', { name: /^Nora Vidal/u }));
+    // Two can work on Nora: nobody chosen for the reader, never the first by the alphabet (recette 27/11, G15).
     expect(who().map((one) => [one.textContent, one.getAttribute('aria-checked')])).toEqual([
-      ['Basile', 'true'],
+      ['Basile', 'false'],
       ['Théo', 'false'],
     ]);
+    expect(text(panel)).toContain('Choisis qui travaille sur ce shift.');
+    expect(within(panel).getByRole('button', { name: 'Ajouter' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(within(panel).getByRole('radio', { name: 'Théo' }));
     // « 29/10 » is the first 29 October from today on; what is not a day keeps the panel from saving.
     const day = within(panel).getByLabelText('Jour');

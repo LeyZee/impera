@@ -290,8 +290,11 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
     before.every((n) => n >= 0);
   const top = counts[0] ?? 0;
   const bought = traffic.firstPurchase;
-  // The answer first (Charles, 21/11: read at a glance): how many of the traffic end up paying.
-  const rate = top > 0 ? (bought / top) * 100 : null;
+  // The answer first (Charles, 21/11: read at a glance): how many of the traffic end up paying. Only when the
+  // buyers fit inside the traffic: more first buyers than new subscribers read means older subscribers bought too
+  // (or Reveal is read since a few days), and a share above 100 % would be a lie.
+  const nested = counts.every((count, i) => i === 0 || count <= (counts[i - 1] ?? 0));
+  const rate = top > 0 && bought <= top ? (bought / top) * 100 : null;
   return (
     <div className="nv-plate stg-traffic">
       <p className="stg-hero">
@@ -316,6 +319,12 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
         tip={tip}
       />
       <p className="stg-traffic__scale">Largeurs resserrées pour garder les petites étapes lisibles.</p>
+      {nested ? null : (
+        <p className="ins-note" role="note">
+          Une étape compte plus de fans que celle d’avant : ce ne sont pas les mêmes fans (des abonnés plus
+          anciens achètent aussi, ou Reveal n’est lu que depuis peu). Pas de taux entre ces deux étapes.
+        </p>
+      )}
       {traffic.wrote === null ? (
         <p className="ins-note" role="note">
           L’étape « Ont écrit » apparaîtra quand Impera lira les conversations (session Reveal capturée).
