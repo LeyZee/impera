@@ -401,6 +401,21 @@ describe('the system’s alerts', () => {
     expect(screen.getByText('Le fan demande si c’est un bot', { selector: '.al-line__name' })).toBeTruthy();
   });
 
+  it('says a creator without a persona has no words yet (recette navigation 27/11, G20)', async () => {
+    serve({
+      ...BASE,
+      'GET /v1/dashboard/setup/creators': ok({
+        creators: [
+          { creatorId: NORA, steps: [{ key: 'persona', state: 'done', note: null }] },
+          { creatorId: LEA, steps: [{ key: 'persona', state: 'todo', note: null }] },
+        ],
+      }),
+    });
+    renderSection();
+    expect(await screen.findByRole('link', { name: 'Léa : pas encore de persona' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Mots surveillés de Nora Vidal' })).toBeTruthy();
+  });
+
   it('keeps her persona’s words always on, with no switch', async () => {
     serve(BASE);
     renderSection();

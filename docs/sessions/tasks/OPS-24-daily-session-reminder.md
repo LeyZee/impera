@@ -1,4 +1,4 @@
-# OPS-23 Rappel quotidien de reconnexion Reveal
+# OPS-24 Rappel quotidien de reconnexion Reveal
 Statut : review
 Phase : exploitation
 Dépend de : TG-01 (alertes de l'agence en notifications Impera), OPS-22

@@ -59,10 +59,12 @@ import {
 import './alerts.css';
 
 import { useCreators } from '@/creators/api';
-import { Entries, Field, FormContext, SwitchRow, TextArea, TextInput } from '@/creators/persona/fields';
 import '@/creators/persona/persona.css';
+import { hasActivePersonaOf } from '@/creators/overview/model';
+import { Entries, Field, FormContext, SwitchRow, TextArea, TextInput } from '@/creators/persona/fields';
 import { creatorsSearch } from '@/creators/search';
 import { distinctNames } from '@/settings/names';
+import { useCreatorSetups } from '@/setup/api';
 import { Failure } from '@/shell/states';
 
 /**
@@ -748,6 +750,10 @@ function SystemLine({
   };
 
   const single = creators.length === 1 ? creators[0] : undefined;
+  // Recette navigation 27/11 (G20) : sans persona active, ses mots ne sont pas encore écrits ; le lien le dit.
+  const setups = useCreatorSetups(true).data;
+  const hasPersona = (creatorId: CreatorId): boolean | undefined =>
+    hasActivePersonaOf(setups?.find((one) => one.creatorId === creatorId));
   return (
     <li
       className="nv-plate al-line al-system nv-enter"
@@ -783,9 +789,13 @@ function SystemLine({
             <span key={creator.id}>
               {at === 0 ? null : ' · '}
               <Link to="/creatrices" search={creatorsSearch('persona', creator.id)} className="al-link">
-                {creators.length === 1
-                  ? 'Modifier les mots dans sa persona'
-                  : `Mots surveillés de ${creator.displayName}`}
+                {hasPersona(creator.id) === false
+                  ? creators.length === 1
+                    ? 'Pas encore de persona : écrire ses mots'
+                    : `${creator.displayName} : pas encore de persona`
+                  : creators.length === 1
+                    ? 'Modifier les mots dans sa persona'
+                    : `Mots surveillés de ${creator.displayName}`}
               </Link>
             </span>
           ))}

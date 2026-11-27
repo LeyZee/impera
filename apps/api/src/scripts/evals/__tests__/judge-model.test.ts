@@ -19,6 +19,24 @@ describe('evalsConfig', () => {
     expect(only.config.roles.judge.provider).toBe('xai');
   });
 
+  it('takes the judge a run names, and says when it shares the voice’s fallback (xAI out of quota, 27/11)', () => {
+    const keys = { LLM_XAI_API_KEY: 'x', LLM_MISTRAL_API_KEY: 'm', LLM_GOOGLE_API_KEY: 'g' };
+    const google = evalsConfig(DEFAULT_LLM_CONFIG, keys, 'google');
+    expect(google.config.roles.judge.provider).toBe('google');
+    expect(google.isIndependent).toBe(true);
+    const mistral = evalsConfig(DEFAULT_LLM_CONFIG, keys, 'mistral');
+    expect(mistral.config.roles.judge.provider).toBe('mistral');
+    expect(mistral.isIndependent).toBe(false);
+    // Unnamed, the judge stays the first other provider, as before.
+    expect(evalsConfig(DEFAULT_LLM_CONFIG, keys).config.roles.judge.provider).toBe('mistral');
+  });
+
+  it('refuses a named judge without its key rather than falling back on another', () => {
+    expect(() => evalsConfig(DEFAULT_LLM_CONFIG, { LLM_XAI_API_KEY: 'x' }, 'google')).toThrow(
+      /--judge google/,
+    );
+  });
+
   it('gives the judge more time in the evals, and only the judge (OPS-07)', () => {
     for (const credentials of [
       { LLM_XAI_API_KEY: 'x' },

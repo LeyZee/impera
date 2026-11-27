@@ -5,7 +5,8 @@ import {
   type ToAgencyMessageKind,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import { useLocation } from '@tanstack/react-router';
+import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
 import { readMineAgain, useMyMessages, writeToAgency } from './api';
 import { kindWords, messageLines } from './model';
@@ -14,19 +15,37 @@ import './to-agency.css';
 import { useGrowingArea } from '@/lib/growing-area';
 import { NOT_SENT } from '@/screens/agenda/api';
 
+/** The anchor « L'agence t'a répondu » opens on (`/aujourdhui#agence`, recette navigation 27/11, MOD-05). */
+export const TO_AGENCY_ANCHOR = 'agence';
+
 /**
  * « Écrire à l'agence » (Charles, 21/11, trous béants n° 13): a question, an idea or a worry, in her words; it waits
- * in the owner's « À faire » and his answer comes back here, under what she wrote.
+ * in the owner's « À faire » and his answer comes back here, under what she wrote. Opened from the notification of
+ * an answer, the card brings itself into view once her messages are there: the browser's own jump to the anchor
+ * comes too early, before the card exists.
  */
 export function ToAgencyCard(): JSX.Element | null {
   const client = useQueryClient();
   const read = useMyMessages();
   const [writing, setWriting] = useState(false);
   const [sent, setSent] = useState(false);
+  const card = useRef<HTMLElement>(null);
+  const aimed = useLocation({ select: (location) => location.hash === TO_AGENCY_ANCHOR });
+  const loaded = read.data !== undefined;
+  useEffect(() => {
+    if (!aimed || !loaded) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    card.current?.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+  }, [aimed, loaded]);
   if (read.data === undefined) return null;
   const lines = messageLines(read.data.messages);
   return (
-    <section className="nv-plate ta-card nv-enter" aria-labelledby="ta-title">
+    <section
+      ref={card}
+      id={TO_AGENCY_ANCHOR}
+      className="nv-plate ta-card nv-enter"
+      aria-labelledby="ta-title"
+    >
       <div className="ta-head">
         <h2 id="ta-title" className="nv-h2 sc-fans__title">
           Écrire à l’agence

@@ -1,5 +1,6 @@
 import type {
   ContentStock,
+  HerDay,
   DropCategory,
   StockCategory,
   StockDescriptionState,
@@ -23,7 +24,8 @@ export const STOCK_NAMES: Readonly<Record<DropCategory, string>> = {
   script: 'Scripts',
   whale_gift: 'Cadeaux baleines',
   voice_beep: 'Vocal du bip',
-  voice_real: 'Vocal « bien réelle »',
+  // Non-breaking spaces inside the quotes: the closing one never falls alone on a line (Design, 27/11).
+  voice_real: 'Vocal «\u00a0bien réelle\u00a0»',
   sale_video: 'Vidéos à vendre',
   instagram_post: 'Photos Insta',
   instagram_reel: 'Reels Insta',
@@ -37,7 +39,7 @@ export const STOCK_USES: Readonly<Record<DropCategory, string>> = {
   feed_shoot: 'Trois par semaine. Chaque séance nourrit les posts du feed, les relances et les cadeaux.',
   reveal_story: 'En bonus : sa story reprend la vidéo du feed, avec sa propre légende.',
   mass_dm: 'Les médias offerts des relances : jamais payants, trois par semaine et par fan au plus.',
-  script: 'Ce que l’IA vend. Il en faut trois jouables, plus un d’avance.',
+  script: 'Ce que l’IA vend. Il en faut trois prêts.',
   whale_gift: 'Courts, inédits, jamais de nu. Offerts aux gros fans, jamais revendus.',
   voice_beep: 'Sa vraie voix, « laisse-moi un message après le bip », pour le fan qui la croit un robot.',
   voice_real: 'Un ou deux vocaux « je suis bien réelle », la preuve quand le doute reste.',
@@ -46,6 +48,24 @@ export const STOCK_USES: Readonly<Record<DropCategory, string>> = {
   instagram_reel: 'Un Reel d’essai par jour, pour aller chercher de nouveaux abonnés.',
   instagram_story: 'Quatre par jour, dont une avec l’appel vers Reveal.',
   telegram_post: 'En bonus : la vidéo du feed part déjà le soir sur Telegram.',
+};
+
+/**
+ * The same, as she reads it on her own coffre: to her, never of her (recette MOD-11). What only the agency weighs stays
+ * in its words.
+ */
+export const HER_USES: Readonly<Record<DropCategory, string>> = {
+  ...STOCK_USES,
+  feed_video: 'Une vidéo courte par jour sur le fil public de Reveal : Impera la publie pour toi.',
+  feed_shoot: 'Trois par semaine. Chaque séance nourrit tes posts du feed, tes relances et tes cadeaux.',
+  reveal_story: 'En bonus : ta story reprend ta vidéo du feed, avec sa propre légende.',
+  mass_dm: 'Les médias offerts de tes relances : jamais payants, trois par semaine et par fan au plus.',
+  script: 'Ce que l’IA vend pour toi. Il en faut trois prêts.',
+  whale_gift: 'Courts, inédits, jamais de nu. Offerts à tes plus gros fans, jamais revendus.',
+  voice_beep: 'Ta vraie voix, « laisse-moi un message après le bip », pour le fan qui doute que ce soit toi.',
+  voice_real: 'Un ou deux vocaux « je suis bien réelle », la preuve quand le doute reste.',
+  sale_video: 'Des vidéos de côté, vendues hors scripts au prix de ta grille.',
+  telegram_post: 'En bonus : ta vidéo du feed part déjà le soir sur Telegram.',
 };
 
 /** The rule the code holds for it, said beside its card; none for the categories without one. */
@@ -119,9 +139,12 @@ export function paceOf(category: StockCategory): string {
   return week % 7 === 0 ? `${String(week / 7)} par jour` : `${String(week)} par semaine`;
 }
 
-/** How full its gauge is, from 0 to 100: the days against the target, or the count against its minimum. */
+/**
+ * How full its gauge is, from 0 to 100: the days against the target, or the count against its minimum. Without a
+ * target, full as soon as something is in, empty at nothing (recette MOD-11: never green at 0).
+ */
 export function fillOf(category: StockCategory): number {
-  if (category.target === null || category.target === 0) return 100;
+  if (category.target === null || category.target === 0) return category.stockUnits > 0 ? 100 : 0;
   const value = category.mode === 'days' ? (category.daysAhead ?? 0) : category.stockUnits;
   return Math.min(100, Math.round((value / category.target) * 100));
 }
@@ -318,32 +341,63 @@ export function durationLabel(ms: number | null): string | null {
 }
 
 /**
- * What leads her coffre (the model's): the one thing to drop today, without red, or that she is ahead; the rest is a
- * bonus. Her categories at a pace first, the weakest one; a category that asks a minimum after.
+ * What leads her coffre (the model's): her video of the day while her coffre has none for today, the one line of « Ma
+ * journée » it does, read from the same server answer as her Aujourd'hui (ADR 0140, avenant du 27/11); then what would
+ * give her advance for the week, the weakest first. It never says her day is done: Aujourd'hui alone counts her day.
+ * Scripts are asked by the agency, one request at a time: none asked, none is claimed of her (recette MOD-02).
  */
 export interface HerFocus {
+  /** Above the title: today's, the week's (a pace), or her coffre's (a minimum to hold). */
+  readonly when: 'today' | 'week' | 'stock' | null;
   readonly title: string;
   readonly lead: string;
   readonly category: DropCategory | null;
   readonly bonus: readonly StockCategory[];
 }
 
-export function herFocusOf(stock: ContentStock): HerFocus {
+/** What her coffre may ask of her: her tiles, and her scripts while one is asked. */
+const askable = (one: StockCategory, scriptsAsked: number): boolean =>
+  HER_CATEGORIES.has(one.category) &&
+  one.lacking > 0 &&
+  one.mode !== 'bonus' &&
+  (one.category !== 'script' || scriptsAsked > 0);
+
+export function herFocusOf(stock: ContentStock, day: HerDay | null, scriptsAsked: number): HerFocus {
   const lacking = stock.categories
-    .filter((one) => HER_CATEGORIES.has(one.category) && one.lacking > 0 && one.mode !== 'bonus')
+    .filter((one) => askable(one, scriptsAsked))
     .sort((a, b) => fillOf(a) - fillOf(b));
+  const videoLeft =
+    day !== null &&
+    day.day === day.today &&
+    day.lines.some((line) => line.source === 'drop' && line.done < line.target);
+  if (videoLeft)
+    return {
+      when: 'today',
+      title: 'Ta vidéo du jour',
+      lead: 'Dépose-la : Impera la publie pour toi sur Reveal.',
+      category: 'feed_video',
+      bonus: lacking.filter((one) => one.category !== 'feed_video').slice(0, 2),
+    };
   const [first, ...rest] = lacking;
   if (first === undefined)
     return {
+      when: null,
       title: 'Ton coffre est plein d’avance',
       lead: 'Tout ce que tu as déposé tient la semaine. Ce que tu ajoutes est du bonus.',
       category: null,
       bonus: [],
     };
-  const today = first.mode === 'days' ? Math.min(first.lacking, Math.ceil((first.perWeek ?? 7) / 7)) : 1;
+  // A pace asks a day's worth; a minimum, all it lacks, so that the title and her ring say the same count (Design, 27/11).
+  const count =
+    first.mode === 'days' ? Math.min(first.lacking, Math.ceil((first.perWeek ?? 7) / 7)) : first.lacking;
+  const target = first.target ?? 0;
   return {
-    title: `Encore ${unitsOf(first.category, today)}`,
-    lead: `${STOCK_NAMES[first.category]}, et ta journée est bouclée.`,
+    when: first.mode === 'days' ? 'week' : 'stock',
+    title: `Encore ${unitsOf(first.category, count)}`,
+    lead:
+      first.mode === 'days'
+        ? `${STOCK_NAMES[first.category]} : de l’avance pour ta semaine.`
+        : `${STOCK_NAMES[first.category]} : il en faut ${String(target)} ${target > 1 ? 'prêts' : 'prêt'}.`,
     category: first.category,
     bonus: rest.slice(0, 2),
   };
@@ -354,5 +408,6 @@ export function ringSub(category: StockCategory): string {
   // A bonus asks nothing of her: no « sur », only what she has.
   if (category.mode !== 'count' || category.target === null)
     return `${unitsOf(category.category, category.stockUnits)} en stock`;
-  return `${String(category.stockUnits)} sur ${String(category.target)} ${category.stockUnits > 1 ? 'prêts' : 'prêt'}`;
+  // « 0 prêt sur 3 », « 2 prêts sur 3 »: the word agrees with what she holds (recette F3).
+  return `${String(category.stockUnits)} ${category.stockUnits > 1 ? 'prêts' : 'prêt'} sur ${String(category.target)}`;
 }

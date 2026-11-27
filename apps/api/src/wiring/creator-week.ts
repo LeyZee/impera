@@ -2,7 +2,7 @@ import { ContentRequestIdSchema, JOB_PAYLOADS } from '@impera/contracts';
 import { withAdmin, withCreatorAccount, withTenantMember } from '@impera/db';
 
 import { defineTask } from '../jobs';
-import { weekArrivals, weekStockUnscoped } from '../modules/content-drops';
+import { feedVideoCover, weekArrivals, weekStockUnscoped } from '../modules/content-drops';
 import {
   dispoMinutesByWeekdayUnscoped,
   shootDaysOfWeekUnscoped,
@@ -60,6 +60,13 @@ export function wireCreatorWeek(
     // Her team's « Où elle en est »: the reader's own account and the team's RLS, the scope checked by the week's read.
     teamArrivals: (creatorId, userId, window, requestIds) =>
       withTenantMember(shared.db, creatorId, userId, (tx) => weekArrivals(tx, creatorId, window, requestIds)),
+    // Her video of the day (avenant du 27/11): read like her arrivals, in her account or her team's.
+    videos: (userId, window, timeZone) =>
+      withCreatorAccount(shared.db, userId, (tx, creatorId) =>
+        feedVideoCover(tx, creatorId, window, timeZone),
+      ),
+    teamVideos: (creatorId, userId, window, timeZone) =>
+      withTenantMember(shared.db, creatorId, userId, (tx) => feedVideoCover(tx, creatorId, window, timeZone)),
   };
   const module = createCreatorWeekModule({
     db: shared.db,

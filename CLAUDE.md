@@ -14,6 +14,7 @@ Impera est une plateforme d'exploitation pour créatrices de contenu. Premier mo
 6. **Typage strict, Zod aux frontières** (HTTP, jobs, LLM, fichiers). Pas de `any`, pas de `as` pour faire taire le compilateur.
 7. **Tests avec le code** : domaine en unitaire (Vitest), application en intégration (Testcontainers Postgres), connecteurs contre `FakeReveal`, qualité IA via `evals/` (`pnpm evals`). Pas de PR sans tests sur ce qu'elle change.
 8. **Aucun secret dans le dépôt.** `.env` est ignoré, `.env.example` documente. `gitleaks` tourne en pré-commit. Si tu vois un secret, tu t'arrêtes et tu le signales.
+8 bis. **Le dépôt est PUBLIC** (avenant du 27/11/2026, audit des contradictions). Rien de la méthode de vente de l'agence n'y entre : ni prix, ni seuil, ni pourcentage, ni durée, ni compte de la méthode écrits en dur, ni formulation réelle d'une créatrice, ni créatrice nommée, ni détail de faille. Un seuil ou un prix est un réglage que Charles saisit dans le CRM ; le code le lit, les tests utilisent des valeurs inventées. Un doute : tu demandes, et une faille se signale au fil Sécurité seulement.
 9. **Code en anglais, docs/UI/persona en français.** Le glossaire (`docs/glossary.md`) fixe les termes ; tu ne crées pas de synonymes, et un terme nouveau que ta tâche impose entre dans le glossaire dans la même PR.
 10. **Dépôt propre en permanence** : `docs/conventions/hygiene.md`. Le temporaire va dans `.scratch/` (ignoré par git). Avant de terminer, tu supprimes ce que tu as créé et qui ne sert plus, et tu ne supprimes rien d'autre sans la procédure décrite.
 11. **Une décision structurante = un ADR** (`docs/adr/`). Si ta tâche te pousse à contredire un ADR existant, tu t'arrêtes et tu demandes.
@@ -41,7 +42,7 @@ Prérequis : Node 22 (`.nvmrc`), pnpm 10, Docker (Postgres de dev et Testcontain
 
 ```
 pnpm install            # installe aussi les hooks git (lefthook)
-docker compose up -d    # Postgres 16 de dev (packages/db/docker/init.sql)
+docker compose up -d    # Postgres 17 de dev (packages/db/docker/init.sql)
 pnpm check              # statique : typecheck + lint (frontières) + prettier + knip + check-repo
 pnpm test               # tests unitaires
 pnpm test:integration   # Testcontainers Postgres (Docker requis)
@@ -51,14 +52,16 @@ pnpm db:migrate         # migrations Drizzle
 pnpm evals              # évaluations sur le vrai chemin de l’agent (clé xAI requise)
 ```
 
-`pnpm-lock.yaml` est commité et `pnpm check`, `pnpm test` et la CI sont verts depuis le 16/10 (seul `packages/design-system` a du code). Un rouge sur `main` est donc une anomalie à signaler.
+`pnpm-lock.yaml` est commité et `pnpm check`, `pnpm test` et la CI sont verts sur `main` (avenant du 27/11/2026 : l'ancienne phrase « depuis le 16/10, seul `packages/design-system` a du code » ne vaut plus, tout le produit est codé). Un rouge sur `main` est donc une anomalie à signaler.
 
 ## Fin de session (obligatoire)
 
 1. `pnpm check` vert, `git status` propre, aucun fichier parasite (voir hygiene.md).
 2. Fiche de tâche mise à jour (statut, ce qui reste).
 3. Entrée de journal dans son propre fichier `docs/sessions/log/<date>-<slug>.md` (format dans `docs/sessions/README.md`) ; le dossier est l'index, `docs/sessions/LOG.md` ne prend plus de ligne.
-4. Branche rebasée sur `origin/main`, PR ouverte par la session en brouillon avec le template `.github/pull_request_template.md`, passée en « prête » quand tout est vert. `main` ne change que par une PR verte fusionnée, jamais par un push direct (hook `protect-main`).
+4. Branche rebasée sur `origin/main`, PR ouverte par la session en brouillon avec le template `.github/pull_request_template.md`, passée en « prête » quand tout est vert. `main` ne change que par une PR verte fusionnée, jamais par un push direct (hook `protect-main`). *(Avenant du 27/11/2026 : `main` est ramené dans la branche par une fusion (`git merge origin/main`), jamais par un rebase.)*
+
+> Avenant du 27/11/2026 (audit des contradictions) : dans le projet Impera Studio, une session est un fil ; sa branche est celle que la session reçoit (souvent `claude/…`), une PR par fil, et c'est le fil Bilan qui fusionne, jamais Charles. Une fiche de tâche s'applique quand elle existe. Une branche n'est jamais supprimée (règle de Charles) ; fermer une PR est permis.
 
 ## Ce qu'on ne fait jamais
 

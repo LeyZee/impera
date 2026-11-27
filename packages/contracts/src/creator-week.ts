@@ -227,6 +227,11 @@ export const DayLineSchema = z.strictObject({
   done: z.number().int().min(0).max(DAY_TARGET_MAX),
   /** One of the essentials of the day: shown first. */
   essential: z.boolean(),
+  /**
+   * How it gets done: `tick`, she ticks it; `drop`, by what she dropped in Contenu, never ticked (Charles, 27/11 : « elle
+   * dépose, Impera planifie »).
+   */
+  source: z.enum(['tick', 'drop']),
 });
 export type DayLine = z.infer<typeof DayLineSchema>;
 

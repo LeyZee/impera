@@ -1,4 +1,4 @@
-# 2026-11-27 — OPS-23 Rappel quotidien de reconnexion Reveal — review
+# 2026-11-27 — OPS-24 Rappel quotidien de reconnexion Reveal — review
 Fait : réglage `session_reminder_minute` (migration 0290, 18 h par défaut) et sa route ; `connectors.sessions.clocks()` ; règle `sessionRemindersDue` (heure de l'agence, une heure après, 2 h avant la fin d'un jeton) ; job `alerts.remind_sessions` toutes les 5 minutes vers chaque propriétaire en `agency_alert` ; carte « Reconnexion Reveal » dans Réglages › Alertes › Pilotage ; avenant à l'ADR 0147, runbooks, glossaire.
 Fait aussi : alerte « Lecture Reveal coupée » aux propriétaires, même la nuit (coupe-circuit du relevé ouvert, avec sa cause, ou session expirée), et « rétablie » sans son.
 Fait aussi : voyant de lecture (maquette v4 validée) : l'orbe et le point « Agent » battent à chaque lecture, titre ambre en retard, rouge coupée avec cause, heure et geste, pastille « Reveal coupé », point rouge sur l'onglet du téléphone ; `reveal.outage` dans le Dashboard, lu par compte (session expirée ou coupe-circuit et ses événements).

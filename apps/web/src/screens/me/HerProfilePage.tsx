@@ -10,15 +10,28 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 import type { ScreenPath } from '@/shell/nav';
 import { screenLabel } from '@/shell/nav';
 
-/** Her other screens of Moi, each in one line: what she finds there (recette visuelle 16/11, CRE-03). */
-const HER_SCREENS: readonly { readonly to: ScreenPath; readonly line: string }[] = [
+/**
+ * Her other screens of Moi, each in one line: what she finds there (recette visuelle 16/11, CRE-03), in the order of
+ * the tabs, none left out (recette navigation 27/11, MOD-07: three tabs hide behind the arrow on a phone). Then her
+ * notifications, which her phone reaches nowhere else but through Préférences.
+ */
+const mine = (to: ScreenPath, line: string) => ({ to, label: screenLabel(to), line }) as const;
+const HER_SCREENS: readonly {
+  readonly to: ScreenPath | '/notifications';
+  readonly label: string;
+  readonly line: string;
+}[] = [
+  mine('/moi/persona', 'Ta fiche, telle que l’agence l’a écrite. Une erreur\u00a0? Propose une correction.'),
+  mine('/moi/liens', 'Tes liens à coller, chacun avec l’endroit où il va.'),
+  mine('/moi/trophees', 'Tes médailles, tes séries, et le prochain trophée.'),
+  mine('/moi/securite', 'Les appareils où ton compte est ouvert, et tes codes de secours.'),
+  mine('/moi/aide', 'Ce qu’il faut savoir, et les gestes difficiles pas à pas.'),
+  mine('/moi/preferences', 'L’apparence, les notifications, et la déconnexion.'),
   {
-    to: '/moi/persona',
-    line: 'Ta fiche, telle que l’agence l’a écrite. Une erreur\u00a0? Propose une correction.',
+    to: '/notifications',
+    label: 'Notifications',
+    line: 'Ce qui t’attend, ce qui sonne sur ton téléphone, et quand ça se tait.',
   },
-  { to: '/moi/trophees', line: 'Tes médailles, tes séries, et le prochain trophée.' },
-  { to: '/moi/securite', line: 'Les appareils où ton compte est ouvert, et tes codes de secours.' },
-  { to: '/moi/preferences', line: 'L’apparence, les notifications, et la déconnexion.' },
 ];
 
 /**
@@ -54,7 +67,7 @@ export function HerProfilePage({ user }: { user: Me }): JSX.Element {
               <li key={one.to}>
                 <Link to={one.to} className="me-her__link">
                   <span className="me-her__text">
-                    <b>{screenLabel(one.to)}</b>
+                    <b>{one.label}</b>
                     <span>{one.line}</span>
                   </span>
                   <span className="me-her__chevron" aria-hidden="true" />

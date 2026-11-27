@@ -46,7 +46,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // message to publish one event per account and créneau.
   // +1 for « chatteur pas là » (ADR 0094 § 1, lot b): its job reads the agency's delay and every creator's shifts begun
   // that long ago, never taken, to publish one event per shift; it writes nothing but the outbox.
-  // +1 for the daily reminder to reconnect the AI's sessions (OPS-23): its job reads the agency's hour and clock, one
+  // +1 for the daily reminder to reconnect the AI's sessions (OPS-24): its job reads the agency's hour and clock, one
   // row of settings, for no person.
   'modules/scheduling': 33,
   'modules/scripts': 11,

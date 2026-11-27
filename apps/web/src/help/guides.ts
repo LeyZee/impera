@@ -459,7 +459,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
           },
           {
             do: 'Envoie-lui son lien d’invitation.',
-            see: '« Invité » sur sa ligne, jusqu’à ce qu’il l’ouvre.',
+            see: '« Invitation envoyée » sur sa ligne, jusqu’à ce que le lien soit ouvert.',
           },
           {
             do: 'De son côté : son mot de passe, sa double authentification, son extension.',
@@ -567,7 +567,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
         a: 'Réglages › Bots Telegram, « Remplacer le jeton ».',
       },
       {
-        q: 'Pourquoi je suis déconnecté ?',
+        q: 'Pourquoi ma session s’est fermée ?',
         a: 'Toi, après 7 jours. Un chatteur après 12 h sans activité. Une créatrice après 30 jours, ou 7 jours sans ouvrir l’appli.',
       },
       {
@@ -1142,7 +1142,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
         a: 'Toi et le propriétaire seulement, jamais un manager. Tes coordonnées sont chiffrées.',
       },
       {
-        q: 'Pourquoi je suis déconnecté ?',
+        q: 'Pourquoi ma session s’est fermée ?',
         a: 'Après 12 h sans activité. Reconnecte-toi avec ton code à deux facteurs.',
       },
     ],
@@ -1150,8 +1150,11 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
   creator: {
     lead: 'Ton espace se lit en quelques secondes : ce qu’on te demande aujourd’hui, et ce que tu envoies.',
     day: [
-      { title: 'Ouvre Aujourd’hui', text: 'Une seule chose en gros : ce qu’il reste à faire.' },
-      { title: 'Dépose ton contenu', text: 'Contenu, « Déposer » : l’agence s’occupe du reste.' },
+      { title: 'Ouvre Aujourd’hui', text: 'En haut, ce qu’on attend de toi aujourd’hui, puis ta journée.' },
+      {
+        title: 'Dépose ton contenu',
+        text: 'Contenu : « Déposer » sur une demande, ou « Envoyer un contenu ».',
+      },
       { title: 'C’est tout', text: 'Le reste, l’agence s’en occupe.' },
     ],
     guides: [
