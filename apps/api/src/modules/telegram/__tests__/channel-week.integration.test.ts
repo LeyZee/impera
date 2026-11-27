@@ -265,7 +265,10 @@ describe('her channel’s week on Postgres', () => {
 
   it('sends a due post once, with its visual and its link; a replay sends nothing more', async () => {
     const week = await weekOf(nora, '2026-11-23');
-    const main = week.posts.find((post) => post.kind === 'main' && post.day === '2026-11-23');
+    // The one still planned: the gestures above may have removed the first and planned its replacement.
+    const main = week.posts.find(
+      (post) => post.kind === 'main' && post.day === '2026-11-23' && post.state === 'planned',
+    );
     if (main === undefined) throw new Error('no main post');
     now = new Date(new Date(main.at).getTime() + 30_000);
     await module.jobs.channelSend();

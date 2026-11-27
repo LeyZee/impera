@@ -119,5 +119,5 @@ export const ChannelGestureRefusalKindSchema = z.enum([
   'guarded',
 ]);
 export type ChannelGestureRefusalKind = z.infer<typeof ChannelGestureRefusalKindSchema>;
-export const TELEGRAM_CHANNEL_GESTURE_REFUSED = 'telegram_channel_gesture_refused';
+export const TELEGRAM_CHANNEL_GESTURE_REFUSED = 'telegram_channel_gesture_invalid';
 export const ChannelGestureRefusalBodySchema = refusalBodySchema(ChannelGestureRefusalKindSchema);
