@@ -12,6 +12,10 @@ export type AgentModeView =
       readonly automatic: AutomaticGate;
       /** Why nothing runs whatever the mode, or null when Reveal is read and a voice answers. */
       readonly stalled: string | null;
+      /** The read of Reveal for the bar's pill (27/11/2026): cut says itself in red, late in amber. */
+      readonly reveal: 'ok' | 'late' | 'cut';
+      /** Its last read: the pill's dot beats once at each one. */
+      readonly lastReadAt: string | null;
       /** Whose agent: the pill names her when the account follows several (DASH-03). */
       readonly creatorName: string;
     }
@@ -37,8 +41,11 @@ export function useAgentMode(shown: string | null = null): AgentModeView {
           : voice.keyMissing
             ? 'l’IA qui écrit attend sa clé'
             : 'l’IA qui écrit ne répond pas';
+    const cut = reveal.outage !== null || (!reveal.connected && reveal.lastReadAt !== null);
     return {
       source: 'live',
+      reveal: cut ? 'cut' : reveal.connected && reveal.late ? 'late' : 'ok',
+      lastReadAt: reveal.lastReadAt,
       mode: live.data.mode,
       automatic: live.data.automatic,
       stalled,

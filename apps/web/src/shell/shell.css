@@ -132,6 +132,10 @@
     background-color var(--nv-dur-fast),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
+/* The read of Reveal cut: said by the « Agent » pill on the rail, by this dot on the phone's bar only. */
+.nv-rail__cut {
+  display: none;
+}
 /* What waits behind a tab (ADR 0134 § 8): the design system's count, at the row's end. */
 .nv-rail__count {
   flex: none;
@@ -1688,6 +1692,14 @@
     font-size: 11px;
     font-weight: 600;
   }
+  /* The read of Reveal cut (27/11/2026): a still red dot on the Dashboard's tab, the bar having no « Agent » pill. */
+  .nv-rail__item .nv-rail__cut {
+    display: block;
+    position: absolute;
+    top: 4px;
+    left: calc(50% + 8px);
+    box-shadow: 0 0 0 2px var(--nv-surface-raised);
+  }
   /* The phone's bar: the count on the icon's corner, as on the icons-only rail. */
   .nv-rail__item .nv-rail__count {
     position: absolute;
@@ -2651,4 +2663,57 @@ label.nv-notif__row {
   display: grid;
   gap: 8px;
   padding: 8px 0 0;
+}
+/* Running: one ripple at each read of Reveal (27/11/2026), nothing in between. */
+.nv-rail__beat {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--_c);
+  opacity: 0;
+  animation: nv-rail-beat 1.4s var(--nv-ease-out) 1;
+}
+@keyframes nv-rail-beat {
+  0% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-rail__beat {
+    animation: none;
+  }
+}
+/* The read of Reveal cut (27/11/2026): red, a slow pulse on every screen; still under reduced motion. */
+.nv-rail__agent[data-reveal='cut'] {
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--nv-danger) 14%, transparent);
+}
+.nv-rail__agent[data-reveal='cut'] .nv-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--_c);
+  animation: nv-rail-alarm 2.4s var(--nv-ease-in-out) infinite;
+}
+@keyframes nv-rail-alarm {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-rail__agent[data-reveal='cut'] .nv-dot::after {
+    animation: none !important;
+  }
 }

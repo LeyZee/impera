@@ -35,7 +35,18 @@ export async function recordConnectorFailure(
   if (next.opened) {
     await accounts.publish(
       account.creatorId,
-      { type: 'error', payload: { code: `connector_${error.code}`, jobName, retryable: true } },
+      {
+        type: 'error',
+        payload: {
+          // A shape Reveal changed is said as such: the Dashboard names the cause of a read cut (27/11/2026).
+          code:
+            readDownReason(error) === 'format_changed'
+              ? 'connector_shape_changed'
+              : `connector_${error.code}`,
+          jobName,
+          retryable: true,
+        },
+      },
       meta,
     );
     if (readHealth !== undefined) {

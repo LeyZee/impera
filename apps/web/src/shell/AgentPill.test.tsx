@@ -14,6 +14,7 @@ import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentPill } from './AgentPill';
+import { RevealCutMark } from './RevealCutMark';
 
 import { apiDashboard, CREATOR, serveDashboard } from '@/test/fakes';
 
@@ -22,6 +23,7 @@ async function renderPill(at = '/suivi'): Promise<HTMLElement> {
     component: (): JSX.Element => (
       <>
         <AgentPill />
+        <RevealCutMark />
         <Outlet />
       </>
     ),
@@ -78,7 +80,7 @@ describe('AgentPill', () => {
       status: 200,
       body: apiDashboard({
         mode: 'copilot',
-        reveal: { connected: false, lastReadAt: null, late: false, conversations: 0 },
+        reveal: { connected: false, lastReadAt: null, late: false, outage: null, conversations: 0 },
       }),
     });
     const pill = await renderPill();
@@ -92,21 +94,32 @@ describe('AgentPill', () => {
     );
   });
 
-  it('says a session that read then dropped is disconnected, not « not linked yet »', async () => {
+  it('says in red a session that read then dropped, not « not linked yet » (27/11/2026)', async () => {
     serveDashboard({
       status: 200,
       body: apiDashboard({
         mode: 'copilot',
-        reveal: { connected: false, lastReadAt: '2026-10-19T11:00:00Z', late: false, conversations: 0 },
+        reveal: {
+          connected: false,
+          lastReadAt: '2026-10-19T11:00:00Z',
+          late: false,
+          outage: null,
+          conversations: 0,
+        },
       }),
     });
     const pill = await renderPill();
     await waitFor(() => {
       expect(pill.title).toBe(
-        'Agent : Copilote, mais rien ne tourne : la messagerie Reveal est déconnectée. Voir le Dashboard.',
+        'Agent : Copilote. La lecture de Reveal est coupée : l’IA ne lit plus les fans. Voir le Dashboard.',
       );
     });
-    expect(pill.dataset['tone']).toBe('unknown');
+    expect(pill.textContent).toBe('Reveal coupé');
+    expect(pill.dataset['tone']).toBe('bad');
+    expect(pill.dataset['reveal']).toBe('cut');
+    expect(pill.querySelector('.nv-rail__beat')).toBeNull();
+    // The phone's bar has no pill: a red dot on the Dashboard's tab says it there.
+    expect(screen.getByRole('img', { name: 'Lecture de Reveal coupée' })).not.toBeNull();
   });
 
   it('says the voice waits for its key, not that it is down', async () => {
@@ -206,20 +219,79 @@ describe('AgentPill', () => {
     });
   });
 
-  it('says Reveal is no longer read when the session holds but nothing reads it (recette 28/10, G8)', async () => {
+  it('says in amber a Reveal read late when the session holds (recette 28/10, G8; 27/11/2026)', async () => {
     serveDashboard({
       status: 200,
       body: apiDashboard({
         mode: 'copilot',
-        reveal: { connected: true, lastReadAt: '2026-10-19T11:00:00Z', late: true, conversations: 12 },
+        reveal: {
+          connected: true,
+          lastReadAt: '2026-10-19T11:00:00Z',
+          late: true,
+          outage: null,
+          conversations: 12,
+        },
       }),
     });
     const pill = await renderPill();
     await waitFor(() => {
-      expect(pill.title).toBe(
-        'Agent : Copilote, mais rien ne tourne : la messagerie Reveal n’est plus lue depuis plusieurs minutes. Voir le Dashboard.',
-      );
+      expect(pill.title).toBe('Agent : Copilote. Reveal est lu avec du retard. Voir le Dashboard.');
     });
-    expect(pill.dataset['tone']).toBe('unknown');
+    expect(pill.textContent).toBe('Reveal en retard');
+    expect(pill.dataset['tone']).toBe('warn');
+    expect(pill.dataset['reveal']).toBeUndefined();
+  });
+
+  it('says a read cut by Reveal itself in red, the session still held (27/11/2026)', async () => {
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({
+        mode: 'copilot',
+        reveal: {
+          connected: true,
+          lastReadAt: '2026-10-19T11:50:00Z',
+          late: false,
+          outage: { reason: 'format_changed', since: '2026-10-19T11:52:00Z' },
+          conversations: 12,
+        },
+      }),
+    });
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.textContent).toBe('Reveal coupé');
+    });
+    expect(pill.dataset['tone']).toBe('bad');
+  });
+
+  it('beats its dot once at each read of Reveal, never in a loop (27/11/2026)', async () => {
+    serveDashboard(live('copilot'));
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.querySelector('.nv-rail__beat')).not.toBeNull();
+    });
+    expect(pill.querySelector('.nv-dot--live')).toBeNull();
+    expect(screen.queryByRole('img', { name: 'Lecture de Reveal coupée' })).toBeNull();
+  });
+
+  it('says nothing of Reveal while the agent is stopped', async () => {
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({
+        mode: 'stop',
+        reveal: {
+          connected: true,
+          lastReadAt: '2026-10-19T11:50:00Z',
+          late: false,
+          outage: { reason: 'unreachable', since: '2026-10-19T11:52:00Z' },
+          conversations: 12,
+        },
+      }),
+    });
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.dataset['tone']).not.toBe('bad');
+    });
+    expect(pill.textContent).not.toContain('Reveal');
+    expect(screen.queryByRole('img', { name: 'Lecture de Reveal coupée' })).toBeNull();
   });
 });

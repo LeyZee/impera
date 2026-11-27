@@ -218,10 +218,19 @@ describe('fromApi', () => {
   it('says since when Reveal is disconnected, in the lead (DASH-18)', () => {
     const offline = fromApi(
       apiDashboard({
-        reveal: { connected: false, lastReadAt: '2026-10-19T11:13:00Z', late: false, conversations: 0 },
+        reveal: {
+          connected: false,
+          lastReadAt: '2026-10-19T11:13:00Z',
+          late: false,
+          outage: null,
+          conversations: 0,
+        },
       }),
     );
-    expect(offline.agent.lead).toMatch(/^Dernière lecture il y a \d+ (min|h|j)\. L’agent ne lit plus/u);
+    // The last read as a clock time, never a second duration beside the card's (Design, 27/11/2026).
+    expect(offline.agent.lead).toMatch(
+      /^La session Reveal de l’IA a expiré\. Dernière lecture à \d{1,2}\sh\s\d{2}\. /u,
+    );
   });
 
   it('writes a best fan’s line short enough for a phone (DASH-27)', () => {
@@ -231,7 +240,7 @@ describe('fromApi', () => {
   it('says a Reveal never linked is a step to come, in no colour, not an outage', () => {
     const unlinked = fromApi(
       apiDashboard({
-        reveal: { connected: false, lastReadAt: null, late: false, conversations: 0 },
+        reveal: { connected: false, lastReadAt: null, late: false, outage: null, conversations: 0 },
         voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 0 },
       }),
     );
@@ -260,7 +269,7 @@ describe('fromApi', () => {
     };
     const salesOnly = fromApi(
       apiDashboard({
-        reveal: { connected: false, lastReadAt: null, late: false, conversations: 0 },
+        reveal: { connected: false, lastReadAt: null, late: false, outage: null, conversations: 0 },
         revealSales: {
           platforms: ['reveal'],
           from: '2026-11-03',
@@ -305,7 +314,7 @@ describe('fromApi', () => {
     // Never linked and no key: Reveal leads, the key is said in the same lead.
     const both = fromApi(
       apiDashboard({
-        reveal: { connected: false, lastReadAt: null, late: false, conversations: 0 },
+        reveal: { connected: false, lastReadAt: null, late: false, outage: null, conversations: 0 },
         voice: { ok: false, keyMissing: true, medianWriteMs: null, outagesLast7d: 0 },
       }),
     );
@@ -366,7 +375,13 @@ describe('fromApi', () => {
   it('says a Reveal no longer read in amber, never « Connectée » (recette 28/10, G8)', () => {
     const late = fromApi(
       apiDashboard({
-        reveal: { connected: true, lastReadAt: '2026-10-19T11:30:00Z', late: true, conversations: 12 },
+        reveal: {
+          connected: true,
+          lastReadAt: '2026-10-19T11:30:00Z',
+          late: true,
+          outage: null,
+          conversations: 12,
+        },
       }),
     );
     expect(card('reveal', late)).toMatchObject({ tone: 'warn', value: 'Lecture en retard' });
@@ -374,11 +389,44 @@ describe('fromApi', () => {
     expect(late.agent).toMatchObject({
       tone: 'warn',
       stalled: true,
-      headline: 'La messagerie Reveal n’est **plus lue**',
+      headline: 'Reveal est lu **avec du retard**',
+      beat: { tone: 'warn', lastReadAt: '2026-10-19T11:30:00Z' },
     });
-    expect(late.agent.lead).toContain('la messagerie a été lue pour la dernière fois il y a 30 min');
+    expect(late.agent.lead).toBe(
+      'Dernière lecture il y a 30 min. Impera réessaie seul ; si ça dure, tu es prévenu.',
+    );
     expect(late.agent.foldSummary).toContain('Messagerie Reveal lue en retard');
     expect(card('reveal')).toMatchObject({ tone: 'ok', value: 'Connectée' });
+  });
+
+  it('says a read cut by Reveal itself, with nothing to repair but a chatter to check (décision du 27/11/2026)', () => {
+    const cut = (reason: 'format_changed' | 'unreachable') =>
+      fromApi(
+        apiDashboard({
+          reveal: {
+            connected: true,
+            lastReadAt: '2026-10-19T11:50:00Z',
+            late: false,
+            outage: { reason, since: '2026-10-19T11:52:00Z' },
+            conversations: 12,
+          },
+        }),
+      );
+    expect(cut('format_changed').agent).toMatchObject({
+      tone: 'bad',
+      headline: 'La lecture de Reveal est **coupée**',
+      action: 'Voir qui est en poste',
+      actionTo: '/equipe/planning',
+      beat: { tone: 'bad', lastReadAt: '2026-10-19T11:50:00Z', cutSince: '2026-10-19T11:52:00Z' },
+    });
+    expect(cut('format_changed').agent.actionStrong).toBeUndefined();
+    expect(cut('format_changed').agent.lead).toMatch(
+      /^Reveal a changé sa façon de répondre : l’IA ne lit plus les fans et ne leur répond plus\. Dernière lecture à .+\. Rien à réparer de ton côté : Impera s’en occupe\. Vérifie qu’un chatteur est en poste\.$/u,
+    );
+    expect(cut('unreachable').agent.lead).toMatch(/^Reveal ne répond plus : /u);
+    expect(card('reveal', cut('unreachable'))).toMatchObject({ tone: 'bad', value: 'Lecture coupée' });
+    // A good read beats the orb, in green.
+    expect(fromApi(apiDashboard()).agent.beat).toMatchObject({ tone: 'ok', cutSince: null });
   });
 
   it('names what « pas encore mesuré » is about in the summary (recette 28/10, M9)', () => {
@@ -390,13 +438,21 @@ describe('fromApi', () => {
 
   it('says first that Reveal is disconnected, then that the voice is down', () => {
     const offline = apiDashboard({
-      reveal: { connected: false, lastReadAt: '2026-10-19T11:00:00Z', late: false, conversations: 0 },
+      reveal: {
+        connected: false,
+        lastReadAt: '2026-10-19T11:00:00Z',
+        late: false,
+        outage: null,
+        conversations: 0,
+      },
     });
     expect(fromApi(offline).agent).toMatchObject({
       tone: 'bad',
-      headline: 'La messagerie Reveal est **déconnectée**',
+      headline: 'La lecture de Reveal est **coupée**',
       action: 'Reconnecter Reveal',
       actionTo: '/aide/reveal',
+      actionStrong: true,
+      beat: { tone: 'bad' },
     });
     const mute = apiDashboard({
       voice: { ok: false, keyMissing: false, medianWriteMs: null, outagesLast7d: 3 },

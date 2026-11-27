@@ -75,7 +75,9 @@ export interface AgentState {
    * Where the action leads, when it is a page and not the first todo (« Poser la clé » › Réglages, « Comment relier
    * Reveal » › its guide, ADM-18). Both are the owner's alone.
    */
-  readonly actionTo?: '/reglages/modeles-ia' | '/aide/reveal';
+  readonly actionTo?: '/reglages/modeles-ia' | '/aide/reveal' | '/equipe/planning';
+  /** The action is the screen's gesture, in the main button (a read of Reveal cut: « Reconnecter Reveal »). */
+  readonly actionStrong?: true;
   /** The lead read by whoever cannot open `actionTo` (Réglages is the owner's alone): who does it, and where. */
   readonly leadWithoutAction?: string;
   /**
@@ -87,6 +89,14 @@ export interface AgentState {
   readonly foldTitle: string;
   readonly foldSummary: string;
   readonly cards: readonly AgentCard[];
+  /** The read of Reveal at a glance, by the title (27/11/2026): its tone, its last read, since when it is cut. */
+  readonly beat?: RevealBeat;
+}
+
+export interface RevealBeat {
+  readonly tone: 'ok' | 'warn' | 'bad';
+  readonly lastReadAt: string | null;
+  readonly cutSince: string | null;
 }
 
 /** A figure the corpus says moves sales, against the period before. */

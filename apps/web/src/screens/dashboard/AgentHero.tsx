@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { Fragment, type JSX } from 'react';
 
+import { ago } from './live';
 import { foldOf, heroState, gaugeClass, litParts } from './logic';
 import type { AgentState, Todo } from './model';
 import { Chevron, TONE_COLOR, type FloatingTip } from './parts';
@@ -51,6 +52,7 @@ export function AgentHero({
   const shown = todos.slice(0, SHOWN);
   const more = todos.length - shown.length;
   const fold = foldOf(agent, stopped);
+  const beatRead = agent.beat?.lastReadAt ?? null;
   return (
     <section
       className="db-hero nv-enter"
@@ -60,7 +62,24 @@ export function AgentHero({
     >
       <span className="db-hero__glow" aria-hidden="true" />
       <div className="db-hero__top">
-        <span className={`nv-orb nv-tone--${hero.tone}`} aria-hidden="true" />
+        {/* The heart of the read of Reveal (Charles, 27/11/2026): calm, the orb beats once at each read, nothing on
+            the page grows; its tip says when. Cut, the title says it in red. */}
+        <span
+          className={`nv-orb nv-tone--${hero.tone}`}
+          {...(beatRead === null
+            ? { 'aria-hidden': true }
+            : {
+                tabIndex: 0,
+                ...tip.bind({
+                  title: 'Lecture de Reveal',
+                  rows: [['Dernière lecture', ago(beatRead, new Date())]],
+                }),
+              })}
+        >
+          {beatRead !== null && agent.beat?.tone === 'ok' ? (
+            <span key={beatRead} className="db-orb-beat" aria-hidden="true" />
+          ) : null}
+        </span>
         <div className="nv-swap" key={hero.headline}>
           <p className="nv-eyebrow">
             {MODE_LABEL[mode]} · {agent.eyebrow}
@@ -75,7 +94,10 @@ export function AgentHero({
           {hero.lead === '' ? null : <p className="db-hero__lead">{hero.lead}</p>}
         </div>
         {hero.action !== undefined && hero.actionTo !== undefined && !stopped ? (
-          <Link to={hero.actionTo} className="nv-btn nv-btn--soft nv-swap">
+          <Link
+            to={hero.actionTo}
+            className={`nv-btn ${hero.actionStrong === true ? 'nv-btn--neon' : 'nv-btn--soft'} nv-swap`}
+          >
             {hero.action}
           </Link>
         ) : hero.action === undefined || (stopped ? onResume === undefined : first === undefined) ? null : (
@@ -94,7 +116,10 @@ export function AgentHero({
 
       {/* An empty list says nothing more than a calm headline (« Rien ne t’attend. ») does: no plate under it (DASH-10).
         It is said only while the agent writes nothing, whose headline is its trouble. */}
-      {stopped || (todos.length === 0 && hero.tone === 'ok') ? null : todos.length === 0 ? (
+      {/* Reveal cut: nobody knows what waits, a calm line would say the contrary (Design, 27/11). */}
+      {stopped ||
+      (todos.length === 0 && hero.tone === 'ok') ||
+      agent.beat?.tone === 'bad' ? null : todos.length === 0 ? (
         <div className="nv-calm nv-swap">
           <span className="nv-dot nv-tone--ok" aria-hidden="true" />
           Rien à traiter pour l’instant.

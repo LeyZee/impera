@@ -972,3 +972,29 @@ div.db-fan {
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+
+/* The read of Reveal (27/11/2026): calm, the orb's ring plays once at each read, nothing in between. */
+.db-orb-beat {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--_c);
+  opacity: 0;
+  pointer-events: none;
+  animation: db-orb-beat 1.4s var(--nv-ease-out) 1;
+}
+@keyframes db-orb-beat {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .db-orb-beat {
+    animation: none;
+  }
+}

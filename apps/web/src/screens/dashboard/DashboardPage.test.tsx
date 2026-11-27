@@ -937,6 +937,39 @@ describe('DashboardPage, the fold of the agent', () => {
     );
   });
 
+  it('beats the orb once at each read of Reveal, never when the read is cut (27/11/2026)', async () => {
+    const body = apiDashboard({ todos: [] });
+    serveDashboard({ status: 200, body });
+    renderDashboard(true);
+    await waitFor(() => {
+      expect(document.querySelector('.db-orb-beat')).not.toBeNull();
+    });
+
+    cleanup();
+    serveDashboard({
+      status: 200,
+      body: {
+        ...body,
+        reveal: { ...body.reveal, outage: { reason: 'format_changed', since: '2026-10-19T11:59:50Z' } },
+      },
+    });
+    renderDashboard(true);
+    const gesture = await screen.findByRole('link', { name: 'Voir qui est en poste' });
+    expect(gesture.getAttribute('href')).toBe('/equipe/planning');
+    expect(gesture.className).not.toContain('nv-btn--neon');
+    expect(document.querySelector('.db-orb-beat')).toBeNull();
+    // Nobody knows what waits while Reveal is unread: no calm line.
+    expect(screen.queryByText('Rien à traiter pour l’instant.')).toBeNull();
+  });
+
+  it('makes « Reconnecter Reveal » the strong gesture when the AI’s session died (27/11/2026)', async () => {
+    const body = apiDashboard();
+    serveDashboard({ status: 200, body: { ...body, reveal: { ...body.reveal, connected: false } } });
+    renderDashboard(true);
+    const gesture = await screen.findByRole('link', { name: 'Reconnecter Reveal' });
+    expect(gesture.className).toContain('nv-btn--neon');
+  });
+
   it('shows an operator no AI budget of the agency, which he can set nothing of (recette visuelle 16/11, PIL-27)', async () => {
     serveDashboard({ status: 200, body: apiDashboard() });
     renderDashboard();

@@ -18,7 +18,7 @@ ADR 0147 et son avenant du 27/11, ADR 0176 § 3, `docs/runbooks/session-expired.
 - [x] Carte « Reconnexion Reveal » dans Réglages › Alertes › Pilotage.
 - [x] Avenant à l'ADR 0147, runbooks `session-expired.md` et `alerts.md`, glossaire.
 - [x] Lecture Reveal coupée (réponse de Charles du 27/11, 17 h 47 : elle peut le réveiller) : `connection_state_changed` service `reveal_read`, causes `format_changed`, `unreachable`, `session_expired`, en `agency_urgent` ; « rétablie » sans son à la première lecture réussie après un arrêt. Avenant (2) à l'ADR 0147.
-- [ ] Voyant « Lecture Reveal » qui pulse sur le Dashboard : maquette d'abord (Nuit/Jour, PC/téléphone), OK de Design, puis « ok maquette » de Charles ; code après.
+- [x] Voyant « Lecture Reveal » (maquette v4, OK de Design, « ok maquette » de Charles le 27/11) : aucun élément ajouté au Dashboard ; l'orbe et le point de la pastille « Agent » battent une fois à chaque lecture ; en retard, titre ambre ; coupée, titre rouge, cause en clair, heure de la dernière lecture et geste (« Reconnecter Reveal » si la session est morte, « Voir qui est en poste » sinon) ; pastille « Reveal coupé » rouge qui pulse, point rouge sur l'onglet Dashboard du téléphone. Le Dashboard reçoit `reveal.outage` (cause et depuis quand), tiré du compte de la créatrice : session expirée, ou coupe-circuit ouvert depuis la dernière lecture avec la cause de ses événements (`connector_shape_changed`).
 
 ## Critères d'acceptation
 - Tests unitaires de la règle (heure, relance, veille d'expiration, jour d'un rappel après minuit, textes et longueurs), du job (tous les propriétaires, un échec n'arrête pas les autres), de `clocks()` (sans session ni valeur de session) et de la carte.
