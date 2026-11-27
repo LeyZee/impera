@@ -220,6 +220,19 @@ function costumeOfAMinor(fanText: string): boolean {
   );
 }
 
+// His own child in an outfit he asks of her (Sécurité, #1054): « habille-toi comme ma fille ». A human takes over
+// (`minor_suspected`); no fantasy is read in it.
+const OUTFIT_ASKED =
+  /\b(?:habille toi|habille|deguise toi|deguise|mets|porte|enfile|sape toi|dress|wear|put on|vestiti|mettiti|vistete|ponte)\b/u;
+
+/** He asks her to dress like his own child, in one clause. */
+function dressedAsHisChild(fanText: string): boolean {
+  return normalise(fanText)
+    .split(/[,;:.!?\n]+/u)
+    .map((sentence) => normaliseWords(sentence))
+    .some((sentence) => OUTFIT_ASKED.test(sentence) && new RegExp(`\\b${HIS_CHILD}\\b`, 'u').test(sentence));
+}
+
 // His own child as the object of a sexual verb, or of his desire: the one case where his children count.
 const HIS_CHILD =
   '(?:ma|mon|my|mia|mio|mi|la mia|il mio) (?:fille|fils|petite fille|belle fille|daughter|son|stepdaughter|figlia|figlio|figliastra|hija|hijo|hijastra)';
@@ -297,7 +310,8 @@ export function safetySigns(fanText: string, now: Date = new Date(), herLastTurn
   )
     signs.push('minor_suspected');
   const realMinorInRole = costumeOfAMinor(fanText);
-  if (realMinorInRole && !signs.includes('minor_suspected')) signs.push('minor_suspected');
+  if ((realMinorInRole || dressedAsHisChild(fanText)) && !signs.includes('minor_suspected'))
+    signs.push('minor_suspected');
   if (realMinorInRole || minorFantasy(fanText)) signs.push('minor_fantasy');
   // Set phrases are no distress (Sécurité, #1043): « mourir de rire », « me tuer au boulot », « crever de chaud »,
   // « crever tellement t'es belle ». Everything else still alerts.

@@ -216,6 +216,13 @@ describe('the doubt on his age, completed (Sécurité, #1054)', () => {
       expect(safetySigns(text), text).not.toContain('minor_fantasy');
   });
 
+  it('hands « habille-toi comme ma fille » to a human, without reading a fantasy in it', () => {
+    for (const text of ['habille-toi comme ma fille', 'mets la robe de ma fille'])
+      expect(safetySigns(text), text).toEqual(['minor_suspected']);
+    for (const text of ['habille-toi en rouge ce soir', 'ma fille dort, mets ta robe noire'])
+      expect(safetySigns(text), text).toEqual([]);
+  });
+
   it('reads a birth year in four languages', () => {
     const now = new Date('2026-11-27T12:00:00Z');
     for (const text of ['nací en 2010', 'sono nato nel 2010', 'i was born in 2010', 'née en 2010'])
