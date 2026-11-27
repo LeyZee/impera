@@ -115,7 +115,7 @@ export interface GuardContext {
   readonly languages?: readonly Language[];
   /**
    * He asked for a refund or his money back in his last turns (`askedRefundLately`, ADR 0158 § 48, avenant du 27/11):
-   * she may then say it is done on Reveal. Absent, a refund she mentions is not read; a refund she promises always is.
+   * she may then send him to Reveal. Absent, he did not ask (closed by default, Sécurité on #1073).
    */
   readonly fanAskedRefund?: boolean;
 }
@@ -1459,12 +1459,12 @@ export function checkVoiceOutput(
 }
 
 /**
- * A refund in her answer (ADR 0158 § 48, avenant du 27/11): one she gives or decides herself blocks, whatever he asked
- * (money outside policy); one he did not ask for is soft, read in context: written once more, then blocked if still
- * there (`BLOCKED_AFTER_REWRITE`). Asked, « ça se fait sur Reveal » passes.
+ * A refund in her answer (ADR 0158 § 48, avenant du 27/11; `refundInDraft`): any sentence of it but one that sends him to
+ * Reveal to ask himself blocks, whatever he asked (money outside policy); one that does, unasked, is soft, read in
+ * context: written once more, then blocked if still there (`BLOCKED_AFTER_REWRITE`).
  */
 function refundViolations(bubbles: readonly string[], fanAskedRefund: boolean | undefined): GuardViolation[] {
-  const found = refundInDraft(bubbles, fanAskedRefund ?? true);
+  const found = refundInDraft(bubbles, fanAskedRefund ?? false);
   if (found === null) return [];
   return found.kind === 'promise'
     ? [{ code: 'refund_promise', severity: 'blocking', match: found.match }]

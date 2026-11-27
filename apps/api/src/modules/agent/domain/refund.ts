@@ -93,60 +93,144 @@ export function askedRefundLately(
   return turns.slice(0, REFUND_ASKED_TURNS).some((turn) => turn.some(asksForRefund));
 }
 
-// A refund in her words: the word itself, or his money given back.
+// A refund in her words: the word itself, or his money given back without it (« tu récupères ton argent », « je te
+// renvoie tes sous », « your money back », « recuperar tu dinero », « riavere i soldi »).
 const MENTIONS_REFUND = new RegExp(
   [
     '\\brembours\\w*',
-    "\\b(rend\\w*|redonn\\w*|recup\\w*) (ton|tes|son|ses|votre|l') ?(argent|fric|sous|thunes?)\\b",
+    "\\b(rend\\w*|redonn\\w*|recup\\w*|renvoi\\w*|renverr\\w*|recev\\w*|recoi\\w*) (ton|tes|son|ses|votre|vos|l'|de l') ?(argent|fric|sous|thunes?|tunes?|euros|balles)\\b",
     '\\b(refund\\w*|reimburs\\w*|charge ?back)',
     '\\b(your|the|his) money back\\b',
+    '\\b(get|give|send|return|recover)\\w* (you )?(your|the|his) money\\b',
     '\\breembols\\w*',
+    '\\breintegr\\w*',
     '\\bdevoluci\\w*',
-    '\\b(devolv\\w*|devuelv\\w*|recuperar) (tu|el|su) dinero\\b',
-    '\\b(tu|el) dinero de vuelta\\b',
+    '\\b(devolv\\w*|devuelv\\w*|recuper\\w*|recib\\w*) (tu|el|su) dinero\\b',
+    '\\b(tu|el|su) dinero de vuelta\\b',
     '\\brimbors\\w*',
-    '\\b(restitu\\w*|ridare|riavere) (i tuoi |i |il tuo )?(soldi|denaro)\\b',
+    '\\b(restitu\\w*|rid\\w*|riav\\w*|recuper\\w*|riceve\\w*|rimand\\w*) (i tuoi |i |il tuo )?(soldi|denaro)\\b',
     '\\bsoldi indietro\\b',
+    // The refund as a pronoun (« on te le rend », « they'll pay you back », « te lo devuelven », « ti li ridanno »).
+    '\\bte (le|les) (rend\\w*|renvoi\\w*|renverr\\w*)',
+    '\\b(give|send|pay) (it|you|it all) back\\b',
+    '\\bte (lo |la )?(devuelv\\w*|devolv\\w*|reembols\\w*)',
+    '\\bti (li |lo )?(ridanno|ridiamo|ridaranno|restitu\\w*|rimbors\\w*)',
   ].join('|'),
 );
 
-// She refunds him herself, or decides he will be: never hers to give (money outside policy).
-const PROMISES_REFUND = new RegExp(
+// Where he does the step himself, on Reveal: « ça se demande sur Reveal », « vois avec le support de Reveal », « ask
+// Reveal support », « se pide en Reveal », « si chiede su Reveal ».
+const HIS_STEP_ON_REVEAL =
+  /\bse (demande|fait|passe|reclame|voit)\b|\b(demande|demandes|demander|vois|voir|contacte|contacter|ecris|ecrire|passe par|passer par|reclame|reclamer|signale|signaler)\b|\b(ask|request|contact|reach out|check with|go through|talk to|write to)\b|\b(it|that)'?s done\b|\bse (pide|solicita|hace|reclama|gestiona)\b|\b(pide|pidelo|pedir|pedirlo|solicita|solicitar|contacta|contactar|escribe|escribir|habla|hablar|reclama|reclamar)\b|\bsi (chiede|richiede|fa)\b|\b(chiedi|chiedilo|chiedere|richiedi|richiedere|contatta|contattare|scrivi|scrivere|parla|parlare)\b/;
+
+// Reveal only as the place or the one he writes to, never as who acts: the word before it.
+const BEFORE_REVEAL = new Set([
+  'sur',
+  'a',
+  'au',
+  'de',
+  'du',
+  'avec',
+  'chez',
+  'par',
+  'via',
+  'on',
+  'through',
+  'with',
+  'to',
+  'from',
+  'at',
+  'en',
+  'con',
+  'del',
+  'al',
+  'su',
+  'di',
+  'da',
+  'tramite',
+  'ask',
+  'contact',
+  'contacte',
+  'contacta',
+  'contatta',
+  'aupres',
+]);
+
+// Someone who refunds him, a future, a delay or a certainty: never hers to say. Read on her sentence, closed by
+// default. « on » is a subject unless it is the English « on Reveal ».
+const REFUNDER_OR_PROMISE = new RegExp(
   [
-    // French: « je te rembourse », « je vais te rembourser », « je te rends ton argent », « tu seras remboursé ».
-    "\\bje (vais |peux |veux |te promets de )?(te |t'|vous )?rembourse\\w*",
-    "\\bje (vais |peux )?(te |vous )?(rends|rendrai|rendre|redonne|redonnerai|redonner) (ton|tes|votre|l') ?(argent|fric|sous)\\b",
-    "\\bje (t'|vous )?ai rembourse\\w*",
-    '\\bje (te |vous )?(fais|lance|declenche) (un |le |ton |votre )?remboursement\\b',
-    '\\b(tu seras|tu vas etre|vous serez) rembourse\\w*',
-    // English: « I'll refund you », « I'll give you your money back », « you'll be refunded ».
-    "\\bi('ll| will| can|'m going to|'m gonna| am going to| gonna)? (refund you|give you (your|the) money back)\\b",
-    "\\bi('ve)? refunded you\\b",
-    "\\byou('ll| will) (be|get) refunded\\b",
-    // Spanish: « te reembolso », « te devuelvo el dinero », « serás reembolsado ».
-    '\\bte (reembols\\w*|voy a reembolsar)',
-    '\\bte (devuelvo|devolvere|voy a devolver) (el |tu )?dinero\\b',
-    '\\b(seras|vas a ser) reembolsad[oa]\\b',
-    // Italian: « ti rimborso », « ti restituisco i soldi », « sarai rimborsato ».
-    '\\bti (rimborso|rimborsero|restituisco|ridaro|rido) ?(i |i tuoi )?(soldi)?',
-    '\\b(sarai|verrai) rimborsat[oa]\\b',
+    // Who refunds: French, English, Spanish, Italian subjects; Spanish and Italian clitics of a refund done to him.
+    "\\b(je|j'\\S*|nous|ils|elles|moi)\\b",
+    '\\bon (?!reveal\\b)',
+    "\\bi (will|can|could|would|am|have|get|give|send|refund|ask|take|make|do)\\b|\\bi'(ll|m|ve|d)\\b",
+    "\\b(we|we'll|we're|we've|they|they'll|they're|they've)\\b",
+    '\\b(yo|nosotros|nosotras|ellos|ellas|io|noi|loro)\\b',
+    '\\bte (van|vamos|voy|reembols\\w*|devuelv\\w*|devolv\\w*|mando|envio|doy)\\b',
+    '\\bti\\b',
+    '\\b(faccio|restituisco|rimborsiamo|ridiamo)\\b',
+    // A future.
+    '\\b(vais|vas|va|vont|allons|allez)\\b',
+    '\\b(rembourser|rendr|recuperer|recevr|renverr|ser|aur|pourr|devr|fer|ir)(ai|as|a|ons|ez|ont)\\b',
+    "\\b(will|shall|going to|gonna)\\b|'ll\\b",
+    '\\b(reembolsar|devolver|recuperar|tendr|recibir|podr)(a|as|e|emos|an)\\b',
+    '\\b(rimborser|restituir|avr|riavr|recuperer|ricever|sar|potr)(a|ai|o|emo|anno)\\b',
+    // A delay.
+    "\\b(demain|bientot|vite|rapidement|tout de suite|aujourd'hui|ce soir|d'ici|immediatement|direct)\\b",
+    '\\b(sous|dans|in|en|within|entro|tra|fra) \\d+',
+    '\\b\\d+ ?(h|heures?|jours?|j|hours?|days?|horas?|dias?|ore|giorni)\\b',
+    '\\b(tomorrow|soon|quickly|right away|asap|today|tonight|within|manana|pronto|enseguida|hoy|domani|presto|subito|oggi)\\b',
+    // A certainty.
+    "\\b(c'est sur|bien sur|pour sur|surement|promis|promets|garanti\\w*|forcement|certaine?|certainement|evidemment|sans souci|sans probleme|aucun doute)\\b",
+    '\\b(sure|surely|for sure|definitely|certainly|guarantee\\w*|promise\\w*|of course)\\b',
+    '\\b(seguro|seguramente|garantizad\\w*|prometo|claro|sicuro|sicuramente|garantit\\w*|prometto|certo)\\b',
   ].join('|'),
 );
+
+/** A refund she only echoes (« le remboursement ? », « pour le refund. »): read with the sentence after it. */
+const ECHO_WORDS = 3;
+
+const sentencesOf = (text: string): string[] => {
+  const sentences: string[] = [];
+  let carried = '';
+  for (const sentence of text.split(/[.!?\n]+/)) {
+    const joined = `${carried} ${sentence}`.trim();
+    if (joined === '') continue;
+    const words = joined.split(/\s+/).length;
+    carried = MENTIONS_REFUND.test(joined) && words <= ECHO_WORDS ? joined : '';
+    if (carried === '') sentences.push(joined);
+  }
+  if (carried !== '') sentences.push(carried);
+  return sentences;
+};
+
+/** Her sentence sends him to Reveal, where he asks himself, with no one who refunds, no future, delay or certainty. */
+function pointsHimToReveal(sentence: string): boolean {
+  const words = sentence.split(/\s+/);
+  const revealAt = words.flatMap((word, i) => (/^reveal\b/.test(word) ? [i] : []));
+  return (
+    revealAt.length > 0 &&
+    revealAt.every((i) => BEFORE_REVEAL.has((words[i - 1] ?? '').replace(/^\W+|\W+$/g, ''))) &&
+    HIS_STEP_ON_REVEAL.test(sentence) &&
+    !REFUNDER_OR_PROMISE.test(sentence)
+  );
+}
 
 /**
- * What a refund in her draft is (ADR 0158 § 48, avenant du 27/11): `promise` when she refunds him or decides it herself,
- * `unasked` when she speaks of one he did not ask for, `null` otherwise (no refund, or one he asked for, said as done on
- * Reveal).
+ * What a refund in her draft is (ADR 0158 § 48, avenant du 27/11, réserve de la Sécurité sur #1073), closed by default:
+ * a sentence that speaks of a refund passes only when it sends him to Reveal, where he does the step himself (« ça se
+ * demande sur Reveal »), with no one who refunds (je, on, nous, Reveal, ils…), no future, no delay and no certainty.
+ * Any other is a `promise` (« on te remboursera », « je te renvoie tes sous », « satisfait ou remboursé »). « Je te
+ * rembourse pas » is one too, on purpose: she decides a refund neither way. A sentence that passes is still `unasked`
+ * when he did not ask; `null`: no refund, or one he asked for, sent to Reveal.
  */
 export function refundInDraft(
   bubbles: readonly string[],
   fanAskedRefund: boolean,
 ): { readonly kind: 'promise' | 'unasked'; readonly match: string } | null {
-  const text = normalise(bubbles.join(' '));
-  // « je te rembourse » is first a promise; « je vais te dire » has no refund word and passes.
-  const promised = PROMISES_REFUND.exec(text);
-  if (promised !== null && MENTIONS_REFUND.test(promised[0])) return { kind: 'promise', match: promised[0] };
-  const mentioned = MENTIONS_REFUND.exec(text);
-  if (mentioned !== null && !fanAskedRefund) return { kind: 'unasked', match: mentioned[0] };
-  return null;
+  const mentioning = sentencesOf(normalise(bubbles.join('\n'))).filter((s) => MENTIONS_REFUND.test(s));
+  const promised = mentioning.find((sentence) => !pointsHimToReveal(sentence));
+  if (promised !== undefined) return { kind: 'promise', match: promised.trim() };
+  const mentioned = mentioning[0];
+  return mentioned !== undefined && !fanAskedRefund ? { kind: 'unasked', match: mentioned.trim() } : null;
 }

@@ -60,37 +60,70 @@ describe('he asks for a refund (ADR 0158 § 48, avenant du 27/11)', () => {
   });
 });
 
-describe('a refund in her answer (ADR 0158 § 48, avenant du 27/11)', () => {
-  it('lets her say it is done on Reveal when he asked, never unasked', () => {
-    const reveal = ['Ça se fait directement sur Reveal pour le remboursement'];
-    expect(refundInDraft(reveal, true)).toBeNull();
-    expect(refundInDraft(reveal, false)?.kind).toBe('unasked');
-    expect(refundInDraft(['Tu peux demander un refund on Reveal'], false)?.kind).toBe('unasked');
-    expect(refundInDraft(['Dis-moi ce qui ne t’a pas plu'], false)).toBeNull();
+describe('a refund in her answer, closed by default (ADR 0158 § 48, avenant du 27/11, Sécurité on #1073)', () => {
+  it.each([
+    'Ça se demande sur Reveal',
+    'Vois avec le support de Reveal',
+    'Pour le remboursement, ça se demande sur Reveal',
+    'Le remboursement ? Ça se demande sur Reveal',
+    'Ça se fait directement sur Reveal pour le remboursement',
+    'Tu peux demander un remboursement à Reveal',
+    'You can request a refund on Reveal',
+    'For the refund, ask Reveal support',
+    'El reembolso se pide en Reveal',
+    'Puedes pedir el reembolso al soporte de Reveal',
+    'Il rimborso si chiede su Reveal',
+    'Per il rimborso, contatta il supporto di Reveal',
+  ])('lets « %s » pass when he asked, and reads it unasked otherwise', (text) => {
+    expect(refundInDraft([text], true)).toBeNull();
+    const unasked = refundInDraft([text], false);
+    expect(unasked === null || unasked.kind === 'unasked').toBe(true);
   });
 
   it.each([
-    'Je te rembourse, promis',
-    'je vais te rembourser',
-    'je te rends ton argent',
+    'on te remboursera',
+    'on va te rembourser',
+    'we will refund you',
+    'te van a reembolsar',
+    'je vais te faire rembourser',
+    'ti faccio rimborsare',
+    'i’ll get you a refund',
+    'je vais voir pour te rembourser',
+    'je demande à Reveal de te rembourser',
+    'Reveal va te rembourser c’est sûr',
+    'je m’en occupe, tu récupères ton argent demain',
+    'je te renvoie tes sous',
+    'satisfait ou remboursé',
     'tu seras remboursé',
-    'I’ll refund you',
+    'Je te rembourse, promis',
+    'je te rends ton argent',
     'I will give you your money back',
     'te reembolso ahora',
     'te devuelvo el dinero',
     'ti rimborso subito',
     'sarai rimborsato',
+    'Reveal te rembourse',
+    'Demande sur Reveal, tu seras remboursé demain',
+    'Ask Reveal, they will refund you',
+    'Pídelo en Reveal, te lo devuelven seguro',
+    'Chiedi su Reveal, ti rimborsano entro 2 giorni',
+    'on te le rend',
+    'they’ll pay you back',
+    // She decides a refund neither way: « je te rembourse pas » is no answer of hers either.
+    'je te rembourse pas',
   ])('blocks « %s » as a promise, asked or not', (text) => {
     expect(refundInDraft([text], true)?.kind).toBe('promise');
     expect(refundInDraft([text], false)?.kind).toBe('promise');
   });
 
-  it.each(['je te rends fou', 'ti rido in faccia', 'je vais te dire un truc'])(
-    'reads « %s » as no refund',
-    (text) => {
-      expect(refundInDraft([text], false)).toBeNull();
-    },
-  );
+  it.each([
+    'je te rends fou',
+    'ti rido in faccia',
+    'je vais te dire un truc',
+    'Dis-moi ce qui ne t’a pas plu',
+  ])('reads « %s » as no refund', (text) => {
+    expect(refundInDraft([text], false)).toBeNull();
+  });
 
   it('is a soft guard first, rewritten, then blocks; a promise blocks at once', () => {
     const unasked = checkVoiceOutput(['Tu peux demander un remboursement à Reveal'], DEFAULT_GUARD_SETTINGS, {
@@ -107,14 +140,14 @@ describe('a refund in her answer (ADR 0158 § 48, avenant du 27/11)', () => {
       }).filter((v) => v.code.startsWith('refund')),
     ).toEqual([]);
     expect(
-      checkVoiceOutput(['Je te rembourse'], DEFAULT_GUARD_SETTINGS, { fanAskedRefund: true }),
+      checkVoiceOutput(['on te remboursera'], DEFAULT_GUARD_SETTINGS, { fanAskedRefund: true }),
     ).toContainEqual(expect.objectContaining({ code: 'refund_promise', severity: 'blocking' }));
-    // Without the fact, a mention is not read; a promise always is.
+    // Without the fact, he did not ask: closed by default.
     expect(
       checkVoiceOutput(['Ça se fait sur Reveal, le remboursement'], DEFAULT_GUARD_SETTINGS).map(
         (v) => v.code,
       ),
-    ).not.toContain('refund_unasked');
+    ).toContain('refund_unasked');
     expect(checkVoiceOutput(['Je te rembourse'], DEFAULT_GUARD_SETTINGS).map((v) => v.code)).toContain(
       'refund_promise',
     );
