@@ -180,5 +180,6 @@ Date : AAAA-MM-JJ
 | 0166 | Le départ d'un membre : une heure de fin, la coche Reveal, un espace de départ fermé | proposed (précise 0023, 0025 ; amende le refus de connexion du 28/10) |
 | 0168 | La langue du fan décidée par le code, donnée à la voix comme une consigne fixe ; couverture des langues par les gardes, fermée par défaut | accepted |
 | 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025 ; amendée le 26/11 : le retour léger) |
+| 0171 | Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre | proposed |
 | 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
 | 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |

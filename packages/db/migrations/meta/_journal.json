@@ -1485,6 +1485,13 @@
       "when": 1795753964642,
       "tag": "0280_member_departures",
       "breakpoints": true
+    },
+    {
+      "idx": 212,
+      "version": "7",
+      "when": 1795757554102,
+      "tag": "0281_member_availability",
+      "breakpoints": true
     }
   ]
 }
