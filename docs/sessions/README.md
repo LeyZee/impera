@@ -29,7 +29,7 @@ Le projet avance par sessions. Une session = un agent (Claude Opus 5.5 dans Clau
 3. Docs touchées par la tâche mises à jour (architecture, README de module, playbook).
 4. Fiche mise à jour : `status: done` ou `blocked` avec ce qui manque, et la section « Résultat ».
 5. Entrée de journal (format ci-dessous) dans son propre fichier ; rien d'autre à toucher, le dossier est l'index.
-6. Branche rebasée sur `origin/main`, PR ouverte par la session (en brouillon dès que ça compile, « prête » quand tout est vert) avec le template, titre = id + titre de la fiche. La PR décrit « avant / après » en français simple. Charles fusionne.
+6. Branche rebasée sur `origin/main`, PR ouverte par la session (en brouillon dès que ça compile, « prête » quand tout est vert) avec le template, titre = id + titre de la fiche. La PR décrit « avant / après » en français simple. ~~Charles fusionne.~~ Le fil Bilan fusionne, Charles jamais (avenant du 27/11/2026, audit des contradictions). *(Avenant du 27/11/2026 : `main` est ramené dans la branche par une fusion (`git merge origin/main`), jamais par un rebase.)*
 
 ## Format d'une entrée de journal
 

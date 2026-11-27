@@ -50,7 +50,7 @@ export function MySaleClaimsPanel(): JSX.Element | null {
   const zone = settings.data?.timeZone ?? null;
   if (claims.isError)
     return (
-      <Panel className="nv-enter py-claims" eyebrow="J’ai été décisif sur une vente">
+      <Panel className="nv-enter py-claims" eyebrow="Une vente grâce à moi">
         <Unreachable
           what="tes signalements"
           onRetry={() => {
@@ -64,11 +64,11 @@ export function MySaleClaimsPanel(): JSX.Element | null {
   const blocked = claimBlockedText(mine, shifts);
 
   return (
-    <Panel className="nv-enter py-claims" eyebrow="J’ai été décisif sur une vente">
+    <Panel className="nv-enter py-claims" eyebrow="Une vente grâce à moi">
       <div className="rp-sec">
         <p className="py-quiet">
-          Un fan a acheté pendant le shift d’un autre, mais c’est toi qui l’as convaincu ? Signale ton shift :
-          ton manager retrouve la vente et te la donne.
+          Un fan a acheté pendant le shift d’un autre, mais c’est toi qui lui as donné envie ? Signale ton
+          shift : ton manager retrouve la vente et te la donne.
         </p>
         <div className="py-claims__ask">
           <button
@@ -187,7 +187,7 @@ function ClaimDialog({
   return (
     <Dialog
       className="py-dialog"
-      title="J’ai été décisif sur une vente"
+      title="Une vente grâce à moi"
       lead="Choisis ton shift et dis à ton manager quel fan et ce qui s’est passé. Il retrouve la vente et décide."
       busy={busy}
       onClose={onClose}

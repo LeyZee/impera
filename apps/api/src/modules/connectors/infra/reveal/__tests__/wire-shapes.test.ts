@@ -210,3 +210,38 @@ describe('Reveal shapes of 2026-11-15', () => {
     expect(stats.lowestPriceMinor).toBeNull();
   });
 });
+
+describe('Reveal shapes of 2026-11-27', () => {
+  const messagesPage = (extra: Record<string, unknown>) => ({
+    data: [],
+    pageInfo: { hasNextPage: false, endCursor: null },
+    totalCount: 0,
+    memberLastReadAt: null,
+    ...extra,
+  });
+
+  it('reads the messages of a conversation with the translation settings Reveal now sends', () => {
+    const shape = REVEAL_ENDPOINTS['messages.list'].shape;
+    const parsed = shape.parse(
+      messagesPage({ translation: { teamLanguage: 'fr', memberLanguage: null, replyLanguage: null } }),
+    );
+    expect(parsed.translation).toEqual({ teamLanguage: 'fr', memberLanguage: null, replyLanguage: null });
+    expect(
+      shape.parse(
+        messagesPage({ translation: { teamLanguage: 'fr', memberLanguage: 'en', replyLanguage: 'en' } }),
+      ),
+    ).toBeDefined();
+    expect(shape.parse(messagesPage({})).translation).toBeUndefined();
+  });
+
+  it('still refuses an unknown key inside the translation settings', () => {
+    const shape = REVEAL_ENDPOINTS['messages.list'].shape;
+    expect(
+      shape.safeParse(
+        messagesPage({
+          translation: { teamLanguage: 'fr', memberLanguage: null, replyLanguage: null, auto: true },
+        }),
+      ).success,
+    ).toBe(false);
+  });
+});
