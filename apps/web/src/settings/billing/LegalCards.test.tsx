@@ -334,7 +334,7 @@ describe('Réglages › Facturation, régimes', () => {
       ),
     ).toBeTruthy();
     expect(card.textContent).toContain(
-      'Le texte d’un régime ne répète pas ce que le code imprime déjà : le badge « Autofacturation », le mandat, la catégorie de l’opération, la TVA et l’échéance.',
+      'Le texte d’un régime ne répète pas ce que le code imprime déjà\u00A0: le badge «\u00A0Autofacturation\u00A0», le mandat, la catégorie de l’opération, la TVA et l’échéance.',
     );
     fireEvent.click(within(card).getByRole('button', { name: 'Nouveau régime : Régimes de facturation' }));
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Écrire ce régime' }));

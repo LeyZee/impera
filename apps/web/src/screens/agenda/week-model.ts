@@ -22,6 +22,18 @@ export function nextDay(days: readonly HerShootDay[], today: string): HerShootDa
 /** Whether her week has anything to show: the agency sent it. */
 export const hasWeek = (week: CreatorWeek): boolean => week.shootDays.length > 0 || week.delivery !== null;
 
+/**
+ * Whether a suggestion of her agenda is one of the days of a week still to accept: then « Accepter ma semaine » is
+ * the only way to say yes, and the suggestion shows no « Accepter / Non merci » of its own (choice of 21/11, MOD-05).
+ */
+export function heldByWeek(week: CreatorWeek | undefined, suggestionId: string): boolean {
+  if (week?.toAccept !== true) return false;
+  return (
+    week.shootDays.some((day) => day.suggestionId === suggestionId) ||
+    week.delivery?.suggestionId === suggestionId
+  );
+}
+
 /** « 2 / 3 » of a shooting day: the lines shot, of all. */
 export function progressOf(day: HerShootDay): { readonly done: number; readonly total: number } {
   return { done: day.items.filter((item) => item.done).length, total: day.items.length };

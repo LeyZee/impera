@@ -1,5 +1,5 @@
 import type { CreatorId, CreatorSummary, PreparedScriptView } from '@impera/contracts';
-import { Link, useBlocker, useNavigate, useRouteContext } from '@tanstack/react-router';
+import { Link, useBlocker, useNavigate, useRouteContext, useSearch } from '@tanstack/react-router';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
@@ -18,6 +18,7 @@ import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
 import { useCreatorsOverview } from './overview/api';
+import { hasActivePersonaOf } from './overview/model';
 import { PersonaSection } from './persona/PersonaSection';
 import { Segment } from './persona/fields';
 import { ProfileSection } from './profile/ProfileSection';
@@ -28,10 +29,12 @@ import { PreparedScriptsView } from './scripts/prepared/PreparedScriptsView';
 import { ScriptsToCopyView } from './scripts/prepared/ScriptsToCopyView';
 import { usePreparedScripts } from './scripts/prepared/api';
 import {
+  CREATOR_GONE,
   CREATOR_TABS,
   accountCardId,
   creatorsSearch,
   rememberCreatorTab,
+  scriptSearch,
   sheetSearch,
   sheetsFor,
   tabOf,
@@ -43,11 +46,13 @@ import { VaultPage } from './vault/VaultPage';
 import './sheet.css';
 
 import { AgentSwitch } from '@/agent/AgentSwitch';
-import { canSwitch } from '@/agent/state';
+import { canSwitch, withPersona } from '@/agent/state';
 import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
+import { useCreatorSetups } from '@/setup/api';
 import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
+import { creatorSheetTitle } from '@/shell/nav';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 import { StockSection } from '@/stock/StockOverview';
 
@@ -133,6 +138,8 @@ export function CreatorsPage({
   const creators = query.data ?? [];
   const [adding, setAdding] = useState(false);
   const navigate = useNavigate();
+  // The script open in Scripts, from the address (PRO1-06).
+  const scriptId = useSearch({ strict: false, select: (search) => search.script ?? null });
   /** The persona, the hours or a card of Compte on screen holds changes not saved: which ones. */
   const [unsaved, setUnsaved] = useState<readonly string[]>([]);
   const dirty = unsaved.length > 0;
@@ -170,6 +177,18 @@ export function CreatorsPage({
   });
   const isOwner = user.role === 'owner';
   const current = creators.find((creator) => creator.id === creatorId);
+  // An address naming a creator the list does not hold (archived, or not the reader's) leads back to the list and says
+  // why, never a silent list (PRO1-16); read once the list is settled, so a creator just added is never sent away.
+  const gone = creatorId !== null && query.isSuccess && !query.isFetching && current === undefined;
+  useEffect(() => {
+    if (!gone) return;
+    void navigate({
+      to: '/creatrices',
+      search: creatorsSearch(tab, null),
+      replace: true,
+      state: { notice: CREATOR_GONE },
+    });
+  }, [gone, navigate, tab]);
   // Added from the list; with no creator yet, the owner is asked for one first: the persona needs her.
   const showForm = isOwner && current === undefined && (adding || (query.isSuccess && creators.length === 0));
   const selected = current?.id ?? null;
@@ -192,6 +211,13 @@ export function CreatorsPage({
   useEffect(() => {
     if (onSheet) rememberCreatorTab(shown);
   }, [onSheet, shown]);
+  // The browser tab names her and the tab of her sheet, after the shell's « Créatrices · Impera » (NAV-06).
+  const title = creatorSheetTitle(
+    current === undefined ? null : { tab: TAB_LABELS[shownTab], name: current.displayName },
+  );
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
 
   const leaving = blocker.status === 'blocked';
   const stay = (): void => {
@@ -317,6 +343,11 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           opening={opening}
+          scriptId={scriptId}
+          onScript={(id) => {
+            // Pushed: the browser's step back returns to the list, a reload reopens the script (PRO1-06).
+            void navigate({ to: '/creatrices', search: scriptSearch(current.id, id) });
+          }}
           onCopy={() => {
             setOpening(null);
             void navigate({ to: '/creatrices', search: creatorsSearch('copy', current.id) });
@@ -340,7 +371,7 @@ export function CreatorsPage({
           }
           onOpen={(script) => {
             setOpening(script);
-            void navigate({ to: '/creatrices', search: creatorsSearch('scripts', current.id) });
+            void navigate({ to: '/creatrices', search: scriptSearch(current.id, script.id) });
           }}
         />
       );
@@ -596,14 +627,17 @@ function CreatorAgentSwitch({
   user: { readonly role: string; readonly teamScope: string | null };
 }): JSX.Element | null {
   const overview = useCreatorsOverview();
+  // Her card says whether a persona is active for her, to every reader; the owner's « Mise en route » too (PRO1-03).
+  const setups = useCreatorSetups(user.role === 'owner');
   const card = overview.data?.find((one) => one.creatorId === creator.id);
   if (card === undefined) return null;
+  const setup = setups.data?.find((one) => one.creatorId === creator.id);
   return (
     <AgentSwitch
       creatorId={creator.id}
       creatorName={creator.displayName}
       zone={creator.timezone}
-      state={card}
+      state={withPersona(card, hasActivePersonaOf(setup))}
       read={overview.dataUpdatedAt}
       variant="header"
       readOnly={!canSwitch(user)}

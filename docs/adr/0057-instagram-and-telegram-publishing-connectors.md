@@ -1,5 +1,13 @@
 # 0057. Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0080 · Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM](0080-telegram-channel-posts-go-out-alone.md) : Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
+>
+> Toutes les décisions du même sujet : [`docs/regles/publication.md`](../regles/publication.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 03/11/2026, 10 h 14, « ok 0055 », « ok 0056 », « ok 0057 » et « ok 0058 » ; phrases des relectures Bilan, Extension et Agent acceptées à 10 h 25 (« fais ce que tu me recommanderais ») ; demande de Charles du 03/11/2026, 9 h 42 ; « ça serait bien du coup de faire les connecteurs Telegram et les connecteurs Instagram pour que ça publie automatiquement », 9 h 53 ; précisions sur Telegram, 9 h 58 ; fil « Repenser le workflow médias et scripts de la modèle »)
 Date : 2026-11-03
 Précise : l'ADR 0003 (un connecteur de publication est un adaptateur, comme un connecteur de plateforme), l'ADR 0044 § 3 et § 4 (le plan de la semaine et la mesure couvrent ces sorties), l'ADR 0055 (catégories `instagram_story`, `instagram_reel`, `instagram_post`, `telegram_post`), l'ADR 0016 (jetons scellés), l'ADR 0042 § 2 (droit de regard, renforcé ici pour Instagram).

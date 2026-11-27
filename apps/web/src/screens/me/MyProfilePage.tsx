@@ -10,7 +10,8 @@ import { percentText } from '@/reports/model';
 import { playsTheGame } from '@/rewards/api';
 import { cityOf, fullDay } from '@/scheduling/time';
 import { Loading, Unreachable } from '@/screens/pay/parts';
-import { useMembers } from '@/screens/team/api';
+import { useMembers, useRates } from '@/screens/team/api';
+import { rateAhead } from '@/screens/team/model';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
@@ -67,6 +68,9 @@ function Facts({ member }: { member: TeamMember }): JSX.Element {
     .map((creator) => creator.displayName)
     .toSorted((left, right) => left.localeCompare(right, 'fr'));
   const { commission } = member;
+  // A rate set ahead is his to know, as the owner reads it on his record (recette PRO2-05): any rate after the one in
+  // force, the nearest.
+  const ahead = rateAhead(useRates(member.id).data ?? [], commission?.effectiveFrom ?? '');
 
   return (
     <Panel className="nv-enter" title={member.displayName}>
@@ -109,6 +113,13 @@ function Facts({ member }: { member: TeamMember }): JSX.Element {
                 <span className="nv-num">{percentText(commission.rateBps)}</span>
                 <span className="tm-muted"> · depuis le {fullDay(commission.effectiveFrom)}</span>
               </>
+            )}
+            {ahead === null ? null : (
+              <span className="tm-muted">
+                {' · '}
+                <span className="nv-num">{percentText(ahead.rateBps)}</span> à partir du{' '}
+                {fullDay(ahead.effectiveFrom)}
+              </span>
             )}
           </dd>
         </div>

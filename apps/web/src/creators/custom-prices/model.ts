@@ -64,6 +64,19 @@ export function eurosOfMinor(minor: number | null): string {
 /** A price for a sentence: « 40 € », « 40,50 € ». */
 export const euros = (minor: number): string => `${eurosOfMinor(minor)} €`;
 
+/**
+ * What rounding the total to the euro added or took off the sum of its lines, so the detail adds up to the total
+ * (CODE-05): « −0,40 € », « +0,30 € »; `null` when the lines already make it.
+ */
+export function roundingLine(
+  totalMinor: number,
+  lines: readonly { readonly amountMinor: number }[],
+): string | null {
+  const gap = totalMinor - lines.reduce((sum, line) => sum + line.amountMinor, 0);
+  if (gap === 0) return null;
+  return `${gap < 0 ? '−' : '+'}${euros(Math.abs(gap))}`;
+}
+
 /** A whole number typed in a field (a percent, minutes), between `min` and `max`. Empty is none. */
 export function wholeOf(text: string, min: number, max: number): number | null | 'invalid' {
   const clean = text.replace(/\s|%/gu, '');
@@ -163,6 +176,9 @@ export function readDraft(draft: GridDraft): { grid: CustomPriceGrid | null; pro
     const extra = video ? percentOf(line.extraMinutePercent) : null;
     if (extra === 'invalid')
       problems.set(`${line.format}.extraMinutePercent`, `De 0 à ${String(CUSTOM_PERCENT_MAX)} %.`);
+    // A percent per minute beyond what is included says nothing without the minutes included (CODE-06).
+    if (video && typeof extra === 'number' && extra > 0 && included === null)
+      problems.set(`${line.format}.includedMinutes`, 'Dis combien de minutes sont comprises.');
     return {
       format: line.format,
       offered: line.offered,

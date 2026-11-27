@@ -22,7 +22,7 @@ import { ReportPanel } from '@/reports/ReportPanel';
 import { useReportsOf } from '@/reports/api';
 import { incidentsOf, periodAt } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
-import { AgencyLoad, AgentLabel, MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
+import { AgencyLoad, AgentLabel, ContinuesMark, MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
 import { useCalendar, useLeaves, usePlanning, useOnDuty, useSwaps, useTemplates } from '@/scheduling/api';
 import {
@@ -1334,7 +1334,7 @@ function ShiftChip({
         }}
       >
         <span className="sc-chip__name">{name}</span>
-        <span className="cal-chip__cont">suite</span>
+        <ContinuesMark />
       </button>
     );
   }

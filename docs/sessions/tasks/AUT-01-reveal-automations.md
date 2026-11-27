@@ -1,5 +1,5 @@
 # AUT-01 L'agent tient compte des automatisations de Reveal
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : exploitation
 Dépend de : ADR 0110
 Branche : claude/project-thread-3v86b0 (branche imposée par la session)

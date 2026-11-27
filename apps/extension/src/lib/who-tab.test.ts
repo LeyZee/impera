@@ -7,7 +7,7 @@ import {
   awayOf,
   awayTitle,
   firstNameOf,
-  initialsOf,
+  initialOf,
   kindLabel,
   kindOf,
   shortcutIconOf,
@@ -64,23 +64,25 @@ describe('who is signed in', () => {
     expect(watchesInstagram(kindOf(account))).toBe(watches);
   });
 
-  it('takes the initials of the first and last names', () => {
-    expect(initialsOf({ name: 'Alex de la Morel', email: 'a@exemple.fr' })).toBe('AM');
-    expect(initialsOf({ name: 'élise', email: 'a@exemple.fr' })).toBe('É');
-    expect(initialsOf({ name: '  ', email: 'zoe@exemple.fr' })).toBe('Z');
+  // EXT-08: the popup drew « CU » where the CRM's rail draws « C ».
+  it('takes the rail’s own initial', () => {
+    expect(initialOf({ name: 'Alex de la Morel', email: 'a@exemple.fr' })).toBe('A');
+    expect(initialOf({ name: 'élise', email: 'a@exemple.fr' })).toBe('É');
+    expect(initialOf({ name: '« Élodie »', email: 'a@exemple.fr' })).toBe('É');
+    expect(initialOf({ name: '  ', email: 'zoe@exemple.fr' })).toBe('Z');
   });
 
   it('greets by the first name', () => {
     expect(firstNameOf({ name: ' Alex Morel ' })).toBe('Alex');
   });
 
-  // Recette du 16/11, EXT-22: « 🌸 Lou 🌸 » gave « Bonsoir, 🌸. » and « 🌸🌸 ».
-  it('skips the words that hold no letter, in the name and the initials', () => {
+  // Recette du 16/11, EXT-22: « 🌸 Lou 🌸 » gave « Bonsoir, 🌸. » and « 🌸🌸 ». The avatar shows the rail's sign since
+  // EXT-08: one emoji, whole, as the CRM shows it.
+  it('skips the words that hold no letter in the greeting, and draws one sign only', () => {
     expect(firstNameOf({ name: '🌸 Lou 🌸' })).toBe('Lou');
-    expect(initialsOf({ name: '🌸 Lou 🌸', email: 'a@exemple.fr' })).toBe('L');
-    expect(initialsOf({ name: '🌸Lou Morel', email: 'a@exemple.fr' })).toBe('LM');
+    expect(initialOf({ name: '🌸 Lou 🌸', email: 'a@exemple.fr' })).toBe('🌸');
+    expect(initialOf({ name: '👍🏽 Lou', email: 'a@exemple.fr' })).toBe('👍🏽');
     expect(firstNameOf({ name: '🌸 🌸' })).toBe('');
-    expect(initialsOf({ name: '🌸 🌸', email: 'zoe@exemple.fr' })).toBe('Z');
   });
 
   // Recette du 16/11, EXT-10: a suspended chatter saw « Connecté » and the copilot.

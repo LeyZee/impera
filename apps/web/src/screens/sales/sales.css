@@ -70,6 +70,15 @@
   font-weight: 600;
   white-space: nowrap;
 }
+.vt-row__amount--none {
+  font-weight: 400;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.fi-wait-line {
+  margin-top: var(--nv-space-3);
+}
 .vt-more,
 .vt-older {
   align-self: center;
@@ -148,6 +157,7 @@
 @media (max-width: 899px) {
   .vt-page--reading .vt-list,
   .vt-page--reading .nv-page__head,
+  .vt-page--reading .fi-panel,
   .vt-page:not(.vt-page--reading) .vt-side {
     display: none;
   }

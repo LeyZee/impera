@@ -79,7 +79,7 @@ describe('TimeField', () => {
     expect(screen.getByRole('status').textContent).toBe('540');
   });
 
-  it('says the hour as the app writes it out of the field, and HH:MM while it is typed in (CHA-26)', () => {
+  it('says the hour as the app writes it out of the field, and HH:MM while it is typed in (CHA-26)', async () => {
     function Spoken(): JSX.Element {
       const [minute, setMinute] = useState(22 * 60);
       const times = useUnreadableTimes();
@@ -98,6 +98,10 @@ describe('TimeField', () => {
     expect(field).toHaveProperty('value', '22\u00a0h');
     fireEvent.focus(field);
     expect(field).toHaveProperty('value', '22:00');
+    // Chosen whole: « 23 » typed then replaces it, never « 22:200 » (MOD-07).
+    await new Promise((done) => requestAnimationFrame(done));
+    if (!(field instanceof HTMLInputElement)) throw new Error('no field');
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 5]);
     fireEvent.change(field, { target: { value: '830' } });
     fireEvent.blur(field);
     expect(field).toHaveProperty('value', '8\u00a0h\u00a030');

@@ -1,5 +1,5 @@
 # DSH-07 Le Dashboard de l'agence liste les remboursements un par un
-Statut : in-progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in-progress
 Phase : pilotage
 Dépend de : DSH-01 (ADR 0078), DSH-06
 Branche : claude/project-thread-v704ot

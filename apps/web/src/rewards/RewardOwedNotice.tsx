@@ -10,8 +10,15 @@ const REVEAL_SCREENS = ['/aujourdhui', '/commissions'] as const;
 /** Where the owed gain already shows, marked « Nouveau » and opened at a touch: Moi › Trophées (ADR 0108). */
 const SHOWN_SCREENS = ['/moi/trophees'] as const;
 
+/**
+ * Where the pill would cover the page's own actions on a phone: Commissions, whose invoices are accepted or contested
+ * from a button the pill sat on (recette MED-09), and whose first page plays the reveal anyway.
+ */
+const BUSY_SECTIONS = ['/commissions/'] as const;
+
 const isQuietScreen = (pathname: string): boolean =>
-  [...REVEAL_SCREENS, ...SHOWN_SCREENS].some((screen) => pathname === screen || pathname === `${screen}/`);
+  [...REVEAL_SCREENS, ...SHOWN_SCREENS].some((screen) => pathname === screen || pathname === `${screen}/`) ||
+  BUSY_SECTIONS.some((section) => pathname.startsWith(section));
 
 /**
  * A gain noted while the chatter is elsewhere, on a conversation above all: a small notice says so and « Voir » takes
@@ -27,7 +34,10 @@ export function RewardOwedNotice({ user, pathname }: { user: Me; pathname: strin
       {plays && owed > 0 && !isQuietScreen(pathname) ? (
         <p className="rw-owed nv-glass nv-glass--thick">
           <span className="rw-owed__dot" aria-hidden="true" />
-          <span>{owed === 1 ? 'Un gain t’attend.' : `${String(owed)} gains t’attendent.`}</span>
+          <span>
+            {/* What waits, said by its name (recette H-21). */}
+            {owed === 1 ? 'Un trophée à découvrir.' : `${String(owed)} trophées à découvrir.`}
+          </span>
           <Link to="/aujourdhui" className="nv-btn nv-btn--soft nv-btn--sm">
             Voir
           </Link>

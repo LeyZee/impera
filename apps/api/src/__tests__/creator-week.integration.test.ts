@@ -211,7 +211,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   // Each stage brings her week there from wherever the tests before left it, so that any test also runs alone (`-t`).
   /** Computed by the Sunday evening's job. */
   const computed = async () => {
-    if ((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode === 404)
+    if ((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode === 204)
       await app.modules.creatorWeek.jobs.plan(sundayEvening);
   };
   /** Validated by the owner, with his corrections. */
@@ -243,7 +243,8 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       outcomes: {},
       failed: [],
     });
-    expect((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode).toBe(404);
+    const none = await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner');
+    expect(none.statusCode).toBe(204);
     expect(await app.modules.creatorWeek.jobs.plan(sundayEvening)).toEqual({
       outcomes: { written: 2 },
       failed: [],
@@ -269,9 +270,8 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       label: 'Script « La bougie »',
       requestId,
     });
-    expect(
-      lines.filter((line) => line.need === 'reveal_story').reduce((sum, line) => sum + line.count, 0),
-    ).toBe(5);
+    // Never a story to shoot: her Reveal story is the feed's video (Charles, 27/11).
+    expect(lines.filter((line) => line.need === 'reveal_story')).toEqual([]);
     expect(computed.plan.deferred).toEqual([]);
     expect(computed.plan.dueAt).toBe(wallClockToInstant(addDays(week, 6), 23 * 60, PARIS).toISOString());
     // Replayed in the same evening: refreshed, never doubled.
@@ -464,7 +464,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       asked: 2,
       received: 0,
     });
-    expect(after?.lines.find((line) => line.need === 'reveal_story')?.received).toBe(0);
+    expect(after?.lines.find((line) => line.need === 'reveal_story')).toBeUndefined();
     expect(after?.delivered).toBe(false);
   });
   it('gives her her day to tick, today and yesterday only, kept to her own account', async () => {
@@ -482,11 +482,8 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     const fresh = await read('nora');
     expect(fresh.day).toBe(today);
     expect(fresh.today).toBe(today);
-    expect(fresh.lines.slice(0, 3).map((line) => line.item)).toEqual([
-      'reveal_story',
-      'reveal_video',
-      'insta_cta_story',
-    ]);
+    expect(fresh.lines.slice(0, 2).map((line) => line.item)).toEqual(['reveal_video', 'insta_cta_story']);
+    expect(fresh.lines.map((line) => line.item)).not.toContain('reveal_story');
     expect(fresh.lines.every((line) => line.done === 0)).toBe(true);
 
     const tick = (who: 'nora' | 'ines' | 'owner', day: string, item: string, done: number) =>
@@ -495,18 +492,18 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     // A replay, then a tap too many: counted up to what the line asks.
     expect((await tick('nora', today, 'insta_posts', 1)).statusCode).toBe(204);
     expect((await tick('nora', today, 'telegram_posts', 9)).statusCode).toBe(204);
-    expect((await tick('nora', addDays(today, -1), 'reveal_story', 1)).statusCode).toBe(204);
+    expect((await tick('nora', addDays(today, -1), 'reveal_video', 1)).statusCode).toBe(204);
     const ticked = await read('nora');
     expect(ticked.lines.find((line) => line.item === 'insta_posts')?.done).toBe(1);
     expect(ticked.lines.find((line) => line.item === 'telegram_posts')?.done).toBe(2);
     expect(
-      (await read('nora', addDays(today, -1))).lines.find((line) => line.item === 'reveal_story')?.done,
+      (await read('nora', addDays(today, -1))).lines.find((line) => line.item === 'reveal_video')?.done,
     ).toBe(1);
 
-    const late = await tick('nora', addDays(today, -2), 'reveal_story', 1);
+    const late = await tick('nora', addDays(today, -2), 'reveal_video', 1);
     expect(late.statusCode).toBe(422);
     expect(late.json()).toMatchObject({ error: { code: DAY_ITEM_LATE_UNPROCESSABLE } });
-    expect((await tick('nora', addDays(today, 1), 'reveal_story', 1)).statusCode).toBe(422);
+    expect((await tick('nora', addDays(today, 1), 'reveal_video', 1)).statusCode).toBe(422);
     expect((await tick('nora', today, 'tiktok', 1)).statusCode).toBe(400);
     expect((await tick('nora', today, 'insta_posts', 11)).statusCode).toBe(400);
 

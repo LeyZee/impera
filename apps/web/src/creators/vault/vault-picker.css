@@ -537,3 +537,12 @@
     transform: none;
   }
 }
+
+/* A folder's Day, Night or « À classer » (PRO1-04): a pill its own size, beside the name on the rail, under it here. */
+.vx-moment {
+  flex: none;
+  align-self: flex-start;
+}
+.vp-folder__name .vx-moment {
+  align-self: center;
+}

@@ -20,6 +20,7 @@ import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { useCreators } from './creators/api';
 import {
+  CREATOR_GONE,
   creatorsSearch,
   legacyCreatorsSearch,
   parseCreatorsSearch,
@@ -125,7 +126,7 @@ export interface RouterContext {
 export const NOT_YOURS = 'Cette page n’est pas dans ton espace.';
 
 /** What the shell says when an address of Entraîner has no screen yet and leads to the Playground (PIL-17). */
-export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur le Playground.';
+export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur Entraîner › Chatting.';
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   // A section outside the account's rail sends it to its first tab (ADR 0024); the server's 403 stays the barrier.
@@ -282,8 +283,13 @@ const creators = createRoute({
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
     // No tab named opens the persona; a member whose sheet opens elsewhere (an active manager) lands there instead.
+    // Only on her sheet: the list has no tab, and an address of the list never carries one (NAV-10).
     const landsElsewhere = search.onglet === undefined && first !== 'persona';
-    if (first !== undefined && (landsElsewhere || !sheets.includes(sheetOf(search)))) {
+    if (
+      first !== undefined &&
+      search.creatrice !== undefined &&
+      (landsElsewhere || !sheets.includes(sheetOf(search)))
+    ) {
       // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
       // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
       const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
@@ -343,7 +349,20 @@ const scriptStructures = createRoute({
       });
     }
   },
-  component: StructuresPage,
+  validateSearch: (search: Record<string, unknown>): { readonly vue?: 'files' } =>
+    search['vue'] === 'files' ? { vue: 'files' } : {},
+  component: function ScriptStructures() {
+    const { vue } = scriptStructures.useSearch();
+    const navigate = scriptStructures.useNavigate();
+    return (
+      <StructuresPage
+        queues={vue === 'files'}
+        onQueues={(queues) => {
+          void navigate({ search: queues ? { vue: 'files' } : {} });
+        }}
+      />
+    );
+  },
 });
 /**
  * Agence › Trafic (ADR 0134 § 5, ADR 0149 § 2): what brings fans to a creator, her redirect links first. The owner's
@@ -359,11 +378,23 @@ const traffic = createRoute({
   component: function Traffic() {
     const { user } = rootRoute.useRouteContext();
     const { creatrice } = traffic.useSearch();
+    const navigate = traffic.useNavigate();
+    const listed = useCreators();
+    // A link that names a creator the list does not hold (archived, or not the reader's) is said, never another
+    // creator's links in silence (PRO1-16).
+    const gone =
+      creatrice !== undefined &&
+      listed.isSuccess &&
+      !listed.isFetching &&
+      !listed.data.some((creator) => creator.id === creatrice);
+    useEffect(() => {
+      if (gone) void navigate({ search: {}, replace: true, state: { notice: CREATOR_GONE } });
+    }, [gone, navigate]);
     // A link that names a creator sets the selector on her, as on Suivi.
     const chooses = scopesCreators(user);
     useEffect(() => {
-      if (chooses && creatrice !== undefined) scopeTo(creatrice);
-    }, [chooses, creatrice]);
+      if (chooses && creatrice !== undefined && !gone) scopeTo(creatrice);
+    }, [chooses, creatrice, gone]);
     return <TrafficPage scoped={useScopedCreator(chooses)} canEdit={user.role === 'owner'} />;
   },
 });
@@ -419,7 +450,7 @@ const tracking = createRoute({
     };
     // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so; away, it says that (CHAT-09).
     return rail.kind === 'chatter' ? (
-      <ChatterTrackingPage {...props} away={myAwayOf(user)} />
+      <ChatterTrackingPage {...props} userId={user.id} away={myAwayOf(user)} />
     ) : (
       <TrackingPage {...props} only={scoped} nav={<SuiviNav fans={readsFans(user)} />} />
     );
@@ -960,8 +991,9 @@ const meInvoices = createRoute({
   beforeLoad: ({ context }) => {
     creatorAway({ context });
     if (context.user.teamScope !== 'agency') {
+      // His own page at another address, not someone else's: no notice (recette MED-10).
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/commissions/factures', replace: true, state: { notice: NOT_YOURS } });
+      throw redirect({ to: '/commissions/factures', replace: true });
     }
   },
   component: function MyOwnInvoices() {

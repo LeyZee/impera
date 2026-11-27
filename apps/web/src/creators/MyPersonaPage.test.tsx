@@ -162,6 +162,18 @@ describe('Moi › Persona (recette CREA-01)', () => {
     ]);
   });
 
+  it('leaves out an empty « Zones interdites » while Intimité holds her limits, line by line (MOD-04)', async () => {
+    sheet = {
+      ...sheetOf(DEMO),
+      intimacy: { ...DEMO.sheet.intimacy, no_go_zones: 'Ne fait jamais : a\nNe montre jamais : b' },
+      boundaries: { off_limits: null },
+    };
+    renderPage();
+    const intimacy = await screen.findByRole('region', { name: 'Intimité' });
+    expect(screen.queryByRole('region', { name: 'Zones interdites' })).toBeNull();
+    expect(intimacy.textContent).toContain('Ne montre jamais : b');
+  });
+
   it('sends a correction of one block to the agency, once, and shows it waiting there (CREA-01 b)', async () => {
     renderPage();
     const tastes = await screen.findByRole('region', { name: 'Préférences' });

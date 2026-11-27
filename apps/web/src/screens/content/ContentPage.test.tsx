@@ -7,6 +7,7 @@ import {
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -93,10 +94,11 @@ afterEach(() => {
 });
 
 describe('Contenu, the creator’s (CR-06 d)', () => {
-  it('hides every empty section but « Envoyer autre chose », whose tiles are Reveal’s, without Script', async () => {
+  it('hides every empty section but « Envoyer un contenu », whose tiles are Reveal’s, without Script', async () => {
     serve({ requests: [], drops: [] });
     show();
-    expect(await screen.findByRole('heading', { level: 2, name: 'Envoyer autre chose' })).toBeDefined();
+    // Nothing asked: « autre chose » than nothing would read wrong (MOD-09).
+    expect(await screen.findByRole('heading', { level: 2, name: 'Envoyer un contenu' })).toBeDefined();
     expect(screen.queryByRole('heading', { name: 'À tourner' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Publié' })).toBeNull();
@@ -105,6 +107,24 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(tiles).toHaveLength(8);
     expect(tiles.some((name) => name.includes('Script'))).toBe(false);
     expect(tiles.some((name) => name.includes('Insta'))).toBe(false);
+    // Each of Reveal's tiles carries the Agenda's mark and colour of its kind, never an emoji (choice of 21/11); the
+    // kinds the Agenda has no colour for keep theirs.
+    const marks = [...document.querySelectorAll('.ct-tile .ct-kind')].map((mark) =>
+      mark.getAttribute('data-need'),
+    );
+    expect(marks.slice(0, 4)).toEqual(['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm']);
+    expect(marks.slice(4)).toEqual([null, null, null, null]);
+    // Theirs sits on the same plate as the drawn marks, in neutral (Design, 27/11).
+    const plates = [...document.querySelectorAll('.ct-tile .ct-kind')].map((mark) =>
+      mark.classList.contains('wk-kind'),
+    );
+    expect(plates).toEqual(Array.from({ length: 8 }, () => true));
+    expect(document.querySelector('.ct-tile .ct-kind svg.wk-icon')).not.toBeNull();
+    expect(
+      document.querySelector<HTMLElement>('.ct-tile .ct-kind')?.style.getPropertyValue('--wk-feed_shoot'),
+    ).toBe('var(--wk-sw-rose)');
+    const reveal = [...document.querySelectorAll('.ct-tile')].slice(0, 4).map((tile) => tile.textContent);
+    expect(reveal.join(' ')).not.toMatch(/📸|🎬|✨|💌/u);
   });
 
   it('lists her requests, the nearest first, a late one in amber', async () => {
@@ -183,8 +203,26 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
         <ContentPage onOpenScript={openScript} asked={request.id} onAsked={onAsked} />
       </QueryClientProvider>,
     );
+    const sheet = await screen.findByRole('dialog');
+    // Forgotten as the sheet closes, not as it opens: drawn again meanwhile, the page opens it again (MOD-03).
+    expect(onAsked).not.toHaveBeenCalled();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Fermer' }));
+    expect(onAsked).toHaveBeenCalledOnce();
+  });
+
+  it('opens the sheet again when the page is drawn anew before it was closed (MOD-03)', async () => {
+    const request = requestOf({ dueOn: '2026-11-04', reason: 'La séance promise' });
+    serve({ requests: [request], drops: [] });
+    const page = (): JSX.Element => (
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ContentPage onOpenScript={openScript} asked={request.id} onAsked={vi.fn()} />
+      </QueryClientProvider>
+    );
+    render(page());
+    await screen.findByRole('dialog');
+    cleanup();
+    render(page());
     expect(await screen.findByRole('dialog')).toBeDefined();
-    expect(onAsked).toHaveBeenCalled();
   });
 
   it('begins a script asked with its version card by card, and opens it (SC-02 lot b2)', async () => {
@@ -338,7 +376,7 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(within(section).getByText(/Un fichier choisi n’est pas de ce dépôt/u)).toBeDefined();
     // Still to go up: « En route » comes before « Déposer » (CRE-09).
     const titles = [...document.querySelectorAll('h2')].map((title) => title.textContent);
-    expect(titles.indexOf('En route')).toBeLessThan(titles.indexOf('Envoyer autre chose'));
+    expect(titles.indexOf('En route')).toBeLessThan(titles.findIndex((one) => one.startsWith('Envoyer')));
   });
 
   it('tells a server that refuses from a cut network, with « Réessayer » (CRE-10)', async () => {
@@ -450,6 +488,97 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     });
     const drop = calls.find((call) => call.method === 'POST');
     expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
+  });
+
+  it('asks the type of a video to sell among the agency’s, and sends it with the drop (ADR 0163 § 7)', async () => {
+    const calls = serve(
+      { requests: [], drops: [] },
+      {
+        'GET /v1/creator-space/ready-videos': () =>
+          Response.json({
+            types: [
+              { id: 'rv_0000000a', label: 'Type A' },
+              { id: 'rv_0000000b', label: 'Type B' },
+            ],
+          }),
+      },
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Vidéos à vendre/u }));
+    const dialog = screen.getByRole('dialog');
+    const types = await within(dialog).findByRole('radiogroup', { name: 'Quel type de vidéo ?' });
+    expect(
+      within(types)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Type A', 'Type B']);
+    const input = dialog.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [fileWithHead('IMG_0042.MOV', 'mov', 0, 'video/quicktime')]);
+    // No type, no send: the reason beside the grey button.
+    await waitFor(() => {
+      expect(within(dialog).getByText('Choisis le type de la vidéo pour envoyer.')).toBeDefined();
+    });
+    expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', true);
+    fireEvent.click(within(types).getByRole('radio', { name: 'Type B' }));
+    expect(within(types).getByRole('radio', { name: 'Type B' }).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.method === 'POST')).toBe(true);
+    });
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      category: 'sale_video',
+      readyVideoId: 'rv_0000000b',
+    });
+  });
+
+  it('says so when the agency has no type of video yet, and never sends untyped', async () => {
+    serve(
+      { requests: [], drops: [] },
+      { 'GET /v1/creator-space/ready-videos': () => Response.json({ types: [] }) },
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Vidéos à vendre/u }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText(/L’agence n’a pas encore créé de types de vidéo/u)).toBeDefined();
+    expect(within(dialog).queryByRole('radiogroup')).toBeNull();
+    // Nothing to pick while no type can be given, and one way out.
+    expect(within(dialog).queryByRole('button', { name: 'Choisir dans ma galerie' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Envoyer' })).toBeNull();
+    expect(within(dialog).getByText('Fermer').className).toContain('nv-btn--soft');
+  });
+
+  it('offers to try again when the types do not load', async () => {
+    let tries = 0;
+    serve(
+      { requests: [], drops: [] },
+      {
+        'GET /v1/creator-space/ready-videos': () => {
+          tries += 1;
+          // Its own retry once, then her tap.
+          return tries <= 2
+            ? new Response('null', { status: 503 })
+            : Response.json({ types: [{ id: 'rv_0000000a', label: 'Type A' }] });
+        },
+      },
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Vidéos à vendre/u }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Réessayer' }, { timeout: 4000 }));
+    expect(await within(dialog).findByRole('radio', { name: 'Type A' })).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toBeDefined();
+  });
+
+  it('asks no type for any other drop', async () => {
+    const calls = serve({ requests: [], drops: [] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
+    expect(within(screen.getByRole('dialog')).queryByRole('radiogroup')).toBeNull();
+    expect(calls.some((call) => call.url.endsWith('/ready-videos'))).toBe(false);
   });
 
   it('replaces a medium the team asked again where it is, and says what does not fit (trou 7 du 21/11)', async () => {

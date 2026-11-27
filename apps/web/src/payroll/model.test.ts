@@ -449,10 +449,29 @@ describe('the money of a statement', () => {
     ).toEqual([
       'Ventes | 2 rapports | 200,00 $US',
       'En euros | 1 $ = 0,9217 € | 184,33 €',
-      'Hors TVA | sans TVA | 184,33 €',
       'Net d’OnlyFans | OnlyFans 20 % | 147,46 €',
       'Ta commission | 25 % | 36,87 €',
     ]);
+  });
+
+  it('says the VAT only when there is one: without it, the step would repeat the sales (CHAT-10)', () => {
+    const withVat = line({
+      vatBps: 2_000,
+      platformFeeBps: 2_000,
+      grossMinor: 12_000,
+      grossEurMinor: 12_000,
+      exclVatMinor: 10_000,
+      netMinor: 8_000,
+      commissionMinor: 2_000,
+    });
+    expect(
+      flowOf(withVat, 2_500, 'reveal', true).map((step) =>
+        plain(`${step.label} | ${step.op} | ${step.amount}`),
+      ),
+    ).toContain('Hors TVA | TVA 20 % | 100,00 €');
+    expect(flowOf({ ...withVat, vatBps: 0 }, 2_500, 'reveal', true).map((step) => step.label)).not.toContain(
+      'Hors TVA',
+    );
   });
 
   it('starts a line on the platform’s net from that net, the VAT and its commission already taken (CRM-03)', () => {
@@ -793,9 +812,9 @@ describe('the export of a period', () => {
     const [head, account, total] = csv.trimEnd().split('\r\n');
     expect(head?.split(';').slice(0, 3)).toEqual(['Membre', 'Compte', 'Devise']);
     expect(head?.split(';').at(-1)).toBe('Base');
-    expect(account).toBe('Théo;"Nora Vidal; @nora";EUR;120,00;120,00;100,00;85,00;21,25;;;;;;;;;;Rapports');
+    expect(account).toBe('Théo;"Nora Vidal; @nora";EUR;120,00;120,00;100,00;85,00;21,25;;;;;;;;;;;Rapports');
     expect(total).toBe(
-      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;21,25;0,00;0,00;21,25;À valider;',
+      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;0,00;21,25;0,00;0,00;21,25;À valider;',
     );
     // A final statement under zero: its written-off balance, positive as on the statement, so the row adds up.
     const [, , left] = statementsCsv(
@@ -815,7 +834,38 @@ describe('the export of a period', () => {
       () => 'Nora',
     ).split('\r\n');
     expect(left).toBe(
-      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;-33,25;-12,00;0,00;12,00;0,00;À valider;',
+      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;-33,25;-12,00;0,00;12,00;0,00;À valider;',
+    );
+  });
+
+  it('writes a manager’s team share, so that his total is the sum of its row (recette PRO2-02)', () => {
+    const period: PayrollPeriod = {
+      period: PERIOD,
+      window: WINDOW,
+      ended: true,
+      beforeFirstClosing: false,
+      ...UNREAD,
+      blocked: null,
+      closing: null,
+      statements: [
+        statement({
+          teamShare: { baseNetMinor: 65_840, bps: 1_000, amountMinor: 6_584 },
+          totalMinor: 8_709,
+          payableMinor: 8_709,
+        }),
+      ],
+      bonusTiers: null,
+      collectiveGoal: null,
+      settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null },
+    };
+    const [head, , total] = statementsCsv(
+      period,
+      () => 'Théo',
+      () => 'Nora',
+    ).split('\r\n');
+    expect(head?.split(';').slice(7, 10)).toEqual(['Commission', 'Part d’équipe', 'Primes']);
+    expect(total).toBe(
+      'Théo;Total du relevé;EUR;;;;85,00;21,25;65,84;0,00;0,00;0,00;0,00;87,09;0,00;0,00;87,09;À valider;',
     );
   });
 
@@ -848,7 +898,7 @@ describe('the export of a period', () => {
       () => 'Théo',
       () => 'Nora',
     ).split('\r\n');
-    expect(account).toBe('Théo;Nora;EUR;85,00;85,00;85,00;85,00;21,25;;;;;;;;;;Net de la plateforme');
+    expect(account).toBe('Théo;Nora;EUR;85,00;85,00;85,00;85,00;21,25;;;;;;;;;;;Net de la plateforme');
   });
 
   it('never lets a name start a formula, and keeps the minus sign of an amount', () => {
@@ -883,7 +933,7 @@ describe('the export of a period', () => {
       expect(account?.startsWith(`${written};${written};EUR;`), typed).toBe(true);
       expect(total?.split(';').slice(0, 2), typed).toEqual([written, 'Total du relevé']);
       // The penalties' column, an amount: its minus sign is the amount's, never a formula to neutralize.
-      expect(total?.split(';')[9], typed).toBe('-5,00');
+      expect(total?.split(';')[10], typed).toBe('-5,00');
     }
     // A carriage return is neutralized, and quoted with the name, so the line stays one.
     expect(lines('\rRetour')[1]?.startsWith(`"'\rRetour";"'\rRetour";EUR;`)).toBe(true);
@@ -1248,6 +1298,13 @@ describe('Primes et malus', () => {
     if (spread === undefined || cancelled === undefined) throw new Error('rows');
     const who = (): string => 'Charles';
     expect(entryByText(cancelled, PERIOD, who, 'Europe/Paris')).toBe('annulé par Charles le ven. 6 nov.');
+    // A prime is feminine (recette MAN-06).
+    expect(entryByText({ ...cancelled, kind: 'bonus' }, PERIOD, who, 'Europe/Paris')).toBe(
+      'annulée par Charles le ven. 6 nov.',
+    );
+    expect(entryByText({ ...spread, kind: 'bonus' }, PERIOD, who, 'Europe/Paris')).toMatch(
+      / · annulée par Charles le ven\. 20 nov\., .* : elle compte encore ici$/u,
+    );
     expect(entryByText(spread, PERIOD, who, 'Europe/Paris')).toBe(
       'par Charles le jeu. 5 nov. · annulé par Charles le ven. 20 nov., à partir de la quinzaine du 16 au 30 novembre : il compte encore ici',
     );

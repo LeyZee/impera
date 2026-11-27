@@ -150,7 +150,7 @@ describe('cardContent', () => {
     const card = cardContent(version, 'canape-lit');
     expect(card).toMatchObject({
       kind: 'bridge',
-      title: 'PONT 1 & 2',
+      title: 'PONT VERS L’ÉTAPE 2',
       quote: 'On passe à côté ?',
       access: 'GRATUIT',
     });

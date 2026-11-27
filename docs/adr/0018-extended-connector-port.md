@@ -1,5 +1,13 @@
 # 0018. Port connecteur étendu : scripts natifs, notes, coffre, médias, garde d'écriture
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0050 · Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste](0050-reveal-two-paths-crm-api-and-captured-session.md) : Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur » ; dans l'ADR 0043 § 5, la phrase « le rapport reste dû pour le commentaire, l'incident, les remontées et le contrôle ».
+>
+> Toutes les décisions du même sujet : [`docs/regles/reveal.md`](../regles/reveal.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 17/10, #39)
 Date : 2026-10-17
 

@@ -18,6 +18,7 @@ import {
   filteredMedia,
   folderCount,
   folderInLine,
+  goneFromReveal,
   importedFolders,
   mediaGroups,
   progressLine,
@@ -60,7 +61,16 @@ const chosen = (
   id: string,
   imported: boolean,
   description: VaultChoicesView['media'][number]['description'] = 'none',
-) => ({ platformAccountId: ACCOUNT, platformMediaId: id, imported, description, excerpt: null });
+) => ({
+  platformAccountId: ACCOUNT,
+  platformMediaId: id,
+  imported,
+  description,
+  excerpt: null,
+  descriptionId: null,
+  detailed: null,
+  validated: false,
+});
 
 describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
   it('reads a media’s choice, a media not listed yet following its folder’s tick', () => {
@@ -72,7 +82,11 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
     );
     const f1 = folder('f1', []);
     expect(choiceOf(index, f1, media('a')).imported).toBe(false);
-    expect(choiceOf(index, f1, media('new'))).toEqual({ imported: true, description: 'none', excerpt: null });
+    expect(choiceOf(index, f1, media('new'))).toMatchObject({
+      imported: true,
+      description: 'none',
+      excerpt: null,
+    });
     expect(choiceOf(index, folder('f2', []), media('other')).imported).toBe(false);
     expect(choiceOf(choiceIndex(undefined), f1, media('a')).imported).toBe(false);
   });
@@ -89,9 +103,9 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
   it('ticks a folder all, some or none on the media still listed; an empty folder says its own tick', () => {
     const f1 = folder('f1', [media('a'), media('b'), media('gone', 'image', true)]);
     const none = folderCount(choiceIndex(undefined), f1);
-    expect(none).toEqual({ tick: 'none', listed: 2, imported: 0, described: 0 });
+    expect(none).toEqual({ tick: 'none', listed: 2, imported: 0, described: 0, gone: false });
     const some = folderCount(choiceIndex(choices({ media: [chosen('a', true, 'described')] })), f1);
-    expect(some).toEqual({ tick: 'some', listed: 2, imported: 1, described: 1 });
+    expect(some).toEqual({ tick: 'some', listed: 2, imported: 1, described: 1, gone: false });
     const all = folderCount(choiceIndex(choices({ media: [chosen('a', true), chosen('b', true)] })), f1);
     expect(all.tick).toBe('all');
     const empty = folder('f9', []);
@@ -100,10 +114,17 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
       choices({ folders: [{ platformAccountId: ACCOUNT, folderRef: 'f9', imported: true }] }),
     );
     expect(folderCount(ticked, empty).tick).toBe('all');
+    // Reveal no longer lists any of its media: the folder is gone from Reveal (REV-07).
+    const gone = folder('f8', [media('x', 'image', true)]);
+    expect(goneFromReveal(gone)).toBe(true);
+    expect(goneFromReveal(f1)).toBe(false);
+    expect(goneFromReveal(empty)).toBe(false);
+    expect(folderCount(ticked, gone).gone).toBe(true);
   });
 
   it('says a folder in Impera by what it holds and what is described, and what stayed in Reveal', () => {
     expect(folderInLine({ imported: 0, described: 0 })).toBe('Vide');
+    expect(folderInLine({ imported: 0, described: 0, gone: true })).toBe('Retiré de Reveal');
     expect(folderInLine({ imported: 1, described: 0 })).toBe('1 média · aucun décrit');
     expect(folderInLine({ imported: 12, described: 3 })).toBe('12 médias · 3 décrits');
     expect(folderInLine({ imported: 12, described: 1 })).toBe('12 médias · 1 décrit');

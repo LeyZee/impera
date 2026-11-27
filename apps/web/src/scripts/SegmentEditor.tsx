@@ -65,7 +65,7 @@ export function SegmentEditor({
   onChange,
 }: {
   segment: ScriptSegment;
-  /** « Étape 2 », « Pont 2 & 3 ». */
+  /** « Étape 2 », « Pont vers l’étape 3 ». */
   title: string;
   variant: ScriptVariantLetter | null;
   onVariant: (letter: ScriptVariantLetter | null) => void;

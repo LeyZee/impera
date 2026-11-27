@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canOpen,
+  creatorSheetTitle,
   documentTitle,
   layoutRail,
   offRailSectionOf,
@@ -204,6 +205,16 @@ describe('documentTitle', () => {
 
   it('titles the extension guide, never « Page introuvable » (recette 07/11, EXT-04)', () => {
     expect(documentTitle('/aide/extension', null)).toBe('Installer l’extension · Impera');
+  });
+
+  it('titles the screens of Entraîner by their sub-tab (recette NAV-01)', () => {
+    expect(documentTitle('/entrainer/playground', '/entrainer')).toBe('Chatting · Entraîner · Impera');
+    expect(documentTitle('/entrainer/canal', '/entrainer')).toBe('Post du canal · Entraîner · Impera');
+  });
+
+  it('titles a creator’s sheet by its tab and her name, the list by Créatrices alone (recette NAV-06)', () => {
+    expect(creatorSheetTitle({ tab: 'Scripts', name: 'Anna' })).toBe('Scripts · Anna · Créatrices · Impera');
+    expect(creatorSheetTitle(null)).toBe('Créatrices · Impera');
   });
 
   it('titles a member’s file as its screen of Équipe', () => {

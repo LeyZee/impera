@@ -63,7 +63,7 @@ import {
 import type { PasswordBreachCheck } from './password-breaches';
 import { forgetCount } from './rate-limit-store';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
-import { LONGEST_IDLE_MS, sessionEnd } from './session-lifetime';
+import { ACTIVITY_REFRESH_MS, LONGEST_IDLE_MS, sessionEnd } from './session-lifetime';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -77,10 +77,10 @@ declare module 'fastify' {
 /**
  * Better Auth's own lifetime of a session without activity is the longest a role gets (the creator's 7 days,
  * `session-lifetime.ts`); the shorter ones of the other roles are ours to apply (`refuseEndedRefresh`, `sessionOf`).
- * Refreshed at most once an hour while in use.
+ * Refreshed at most once a minute while in use, its last activity read within the minute (PRO2-10).
  */
 const SESSION_SECONDS = LONGEST_IDLE_MS / 1000;
-const SESSION_REFRESH_SECONDS = 60 * 60;
+const SESSION_REFRESH_SECONDS = ACTIVITY_REFRESH_MS / 1000;
 /**
  * Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit, wide enough for a team behind one
  * address at a change of shift: ten sign-ins, password and code, and their pages (recette SEC-11).
@@ -419,7 +419,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
             await recordLogin(db, logger, session, context?.path);
           },
         },
-        // A refresh is the only write that carries `expiresAt` (Better Auth's `getSession`, once an hour of use).
+        // A refresh is the only write that carries `expiresAt` (Better Auth's `getSession`, once a minute of use).
         update: {
           before: (data, context) =>
             data.expiresAt === undefined ? Promise.resolve(undefined) : refuseEndedRefresh(db, context),
@@ -557,11 +557,22 @@ async function readSession(auth: Auth, db: Database, request: FastifyRequest, re
       void reply.header('set-cookie', cookies);
     return response;
   } catch (error) {
-    // The refresh of a session already over, refused and closed by `refuseEndedRefresh`.
-    if (isAPIError(error) && error.statusCode === 401) return null;
-    if (isAPIError(error) && error.statusCode >= 500) await db.execute(sql`select 1`);
-    throw error;
+    return sessionReadFailed(error, () => db.execute(sql`select 1`));
   }
+}
+
+/**
+ * Why Better Auth could not read a session. The refresh of a session already over (refused and closed by
+ * `refuseEndedRefresh`): no session. Its bare 500: `probe` (a `select 1`) throws the database's own error when it is
+ * down; when it passes, the database was only short of connections a moment (IA-09): 503 and retry, never 500.
+ */
+export async function sessionReadFailed(error: unknown, probe: () => Promise<unknown>): Promise<null> {
+  if (isAPIError(error) && error.statusCode === 401) return null;
+  if (isAPIError(error) && error.statusCode >= 500) {
+    await probe();
+    throw Object.assign(new Error('session read failed', { cause: error }), { statusCode: 503 });
+  }
+  throw error;
 }
 
 /**
