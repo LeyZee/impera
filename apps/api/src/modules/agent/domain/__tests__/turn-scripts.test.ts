@@ -200,6 +200,8 @@ describe('her scripts at a turn', () => {
     expect(scriptMayAct({ ...stops, workPhase: 'tease' })).toBe(false);
     expect(scriptMayAct({ ...stops, workPhase: 'may_start' })).toBe(true);
     expect(scriptMayAct({ ...stops, brief: { ...READING, desireSignals: ['close_to_coming'] } })).toBe(false);
+    // His own asking for a cam mid-script goes to the custom order, not swallowed by the script (Charles 27/11).
+    expect(scriptMayAct({ ...stops, customOrder: true })).toBe(false);
   });
 
   it('knows he bought her script out only when it ended this message', () => {

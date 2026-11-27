@@ -138,7 +138,7 @@ export function exportViewOf(status: BackupStatus, now: Date, timeZone?: string)
     tone: 'ok',
     title: `Sauvegardée le ${dayOf(status.lastSucceededAt, now, timeZone)} à ${clockOf(status.lastSucceededAt, timeZone)}`,
     // « Chaque nuit… » is the page's lede, just above: the block says only what it adds (REG-25).
-    text: `Chaque copie est gardée 30${NBSP}jours. Après ${String(status.overdueAfterHours)}${NBSP}h sans copie réussie, le Dashboard et Telegram te préviennent.`,
+    text: `Chaque copie est gardée 30${NBSP}jours. Après ${String(status.overdueAfterHours)}${NBSP}h sans copie réussie, le Dashboard et une notification te préviennent.`,
     lastRun,
   };
 }

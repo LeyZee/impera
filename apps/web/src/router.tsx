@@ -1,4 +1,10 @@
-import { ContentDropIdSchema, CreatorIdSchema, type CreatorId, type Me } from '@impera/contracts';
+import {
+  ContentDropIdSchema,
+  CreatorIdSchema,
+  type CreatorId,
+  type DropCategory,
+  type Me,
+} from '@impera/contracts';
 import {
   createRootRouteWithContext,
   createRoute,
@@ -36,6 +42,7 @@ import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { ContentPage } from './screens/content/ContentPage';
 import { ScriptPage } from './screens/content/ScriptPage';
+import { DROP_TILES } from './screens/content/model';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { AgencyPage } from './screens/dashboard/agency/AgencyPage';
 import {
@@ -102,7 +109,6 @@ import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
-import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
 import { scopesCreators } from './shell/CreatorScope';
 import { ErrorPage } from './shell/ErrorPage';
@@ -546,21 +552,29 @@ const sales = createRoute({
 const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
-  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01).
-  validateSearch: (search: Record<string, unknown>): { readonly demande?: string } => {
-    const { demande } = search;
-    return typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {};
+  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01); `?depot=`,
+  // the coffre's and her day's, on a tile of hers (recette MOD-06).
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { readonly demande?: string; readonly depot?: DropCategory } => {
+    const { demande, depot } = search;
+    const tile = DROP_TILES.find((category) => category === depot);
+    return {
+      ...(typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {}),
+      ...(tile === undefined ? {} : { depot: tile }),
+    };
   },
   component: function Content() {
     const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
-    const { demande } = content.useSearch();
+    const { demande, depot } = content.useSearch();
     return (
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
           onOpenStock={() => void navigate({ to: '/contenu/coffre' })}
           asked={demande ?? null}
+          tile={depot ?? null}
           onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
@@ -574,7 +588,7 @@ const contentStock = createRoute({
   path: '/contenu/coffre',
   component: function ContentStock() {
     const navigate = contentStock.useNavigate();
-    return <MyStockPage onDrop={() => void navigate({ to: '/contenu' })} />;
+    return <MyStockPage onDrop={(depot) => void navigate({ to: '/contenu', search: { depot } })} />;
   },
 });
 /** Her script, card by card (SC-02 lot b2): a drop of hers, by its id; any other address goes back to Contenu. */
@@ -1169,17 +1183,7 @@ const telegram = createRoute({
       throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
-  validateSearch: parseTelegramSearch,
-  component: function Telegram() {
-    const search = telegram.useSearch();
-    const navigate = telegram.useNavigate();
-    return (
-      <TelegramPage
-        tab={tabOfSearch(search)}
-        onTab={(tab) => void navigate({ search: searchOfTab(tab), replace: true })}
-      />
-    );
-  },
+  component: TelegramPage,
 });
 const alerts = createRoute({
   getParentRoute: () => settings,
@@ -1299,7 +1303,7 @@ const extensionHelp = createRoute({
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
     // The trend watch is the owner's alone (ADR 0024, amendement du 16/11): the team is shown the copilot instead.
-    return <ExtensionPage watches={user.role === 'owner'} />;
+    return <ExtensionPage watches={user.role === 'owner'} security={securityPathOf(user)} />;
   },
 });
 /**

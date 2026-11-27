@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useCanGoBack, useRouter } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
@@ -53,6 +53,8 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
 }
 
 export function ExtensionLinkPage(): JSX.Element {
+  const router = useRouter();
+  const canGoBack = useCanGoBack();
   // The popup's own words: a host in full, or this computer (ADR 0067, amendement du 19/11 § 3).
   const host = window.location.hostname;
   const local = host === 'localhost' || host === '127.0.0.1';
@@ -63,10 +65,23 @@ export function ExtensionLinkPage(): JSX.Element {
     <Page width="narrow">
       <PageHeader
         eyebrow={
-          // Reached from the guide: the way back is the guide (avis Design du 19/11), not the rail's.
-          <Link to="/aide/extension" className="nv-btn nv-btn--plain nv-btn--sm nv-offrail-back">
-            ← Extension
-          </Link>
+          // Reached from the guide: the way back is the guide (avis Design du 19/11), not the rail's. Going back in
+          // the history, so the guide's own « Retour » still leads where he came from (recette du 27/11, CH-05).
+          canGoBack ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm nv-offrail-back"
+              onClick={() => {
+                router.history.back();
+              }}
+            >
+              ← Extension
+            </button>
+          ) : (
+            <Link to="/aide/extension" className="nv-btn nv-btn--plain nv-btn--sm nv-offrail-back">
+              ← Extension
+            </Link>
+          )
         }
         title="Relier l’extension à ce CRM"
         lead="Clique sur l’icône Impera en haut à droite de ton navigateur."

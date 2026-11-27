@@ -146,6 +146,13 @@ export const NOTIFICATION_REASONS = [
    */
   'decision',
   /**
+   * An alert of the agency to its owners (decision « Telegram pour les canaux seulement », 27/11/2026): a service down,
+   * a backup or an invoice late, a security act… Held in the quiet hours, outside the daily cap.
+   */
+  'agency_alert',
+  /** The same, urgent (a provider refusing calls, an invoice overdue, a security act): it rings even at night. */
+  'agency_urgent',
+  /**
    * A member's « Où te verser » changed (ADR 0165 § 5), to his own devices: it rings even in the quiet hours and outside
    * the daily cap, so that a change he did not make is heard before a transfer.
    */

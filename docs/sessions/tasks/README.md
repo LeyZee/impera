@@ -56,7 +56,7 @@ Branche : task/<id>-<slug>
 | P6-02 | Après une offre : refus, achat, aide au paiement, relances de vente | 6 | todo | P6-01, P3-10 |
 | P3-04 | Vision des médias et protection contre les pièges | 3 | in_progress | P3-01 |
 | P3-05 | Boucle de calibrage dans le playground | 3 | in_progress | P3-04 |
-| P3-07 | Notifications Telegram : bots, groupes, routage, page Réglages › Telegram | 3 | in_progress | P0-05, P0-07b, P3-03 |
+| P3-07 | Notifications Telegram : bots, groupes, routage, page Réglages › Telegram | 3 | done (remplacée par ADR 0176, TG-01) | P0-05, P0-07b, P3-03 |
 | P3-08 | Recette du copilote dans Suivi, de bout en bout, avec FakeReveal | 3 | todo | PROPOSED-reveal-connector, PROPOSED-copilot-api, clé xAI |
 | P3-09 | Curseur de sexualisation, minimum de KYC et âge confirmé | 3 | done | P3-02 |
 | P3-10 | Relances : un fan n'est jamais laissé sans réponse | 3 | done | P0-05, P3-02 |
@@ -185,6 +185,7 @@ Branche : task/<id>-<slug>
 | EVAL-01 | Des fans simulés testent l'agent sur des semaines fictives | exploitation | in_progress | OPS-11, ADR 0103 |
 | OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
 | OPS-21 | Le prévisionnel du coût de l'IA | exploitation | review | OPS-08 |
+| OPS-22 | Un worker arrêté se voit de l'extérieur, et le compte de l'IA se corrige | exploitation | review | OPS-19 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -221,3 +222,4 @@ Branche : task/<id>-<slug>
 | FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |
 | IA-01 | L'IA d'une créatrice : interrupteur avec pause, heures en frise, exceptions datées, vue agence | agent | in_progress | ADR 0148, P3-14 |
 | BIO-01 | L'IA connaît la bio de la créatrice sur la plateforme | agent | done | ADR 0154 |
+| TG-01 | Telegram pour les canaux seulement : les alertes passent par les notifications d'Impera | exploitation | in_progress | ADR 0176 |

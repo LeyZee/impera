@@ -7,7 +7,7 @@ import type { CustomOrderDecision } from '../domain/custom-order';
 import { desireRestOf, desireScore, NO_MEASURE, restedDesire, type DesireReading } from '../domain/desire';
 import { meetingAnswer, relationshipTier, type MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
-import { inPauseAfterPurchase, offerSignals } from '../domain/policy';
+import { inPauseAfterPurchase, maySuggestCustom, offerSignals } from '../domain/policy';
 import type { SaleTroubleOutcome } from '../domain/sale-trouble';
 import type { ScriptTurn } from '../domain/script-turn';
 import {
@@ -314,6 +314,10 @@ export function decideTurn(
     boughtOut,
     hasScriptStep,
     customOrder: customOrder !== undefined,
+    customAllowed:
+      brief !== undefined &&
+      input.offer !== undefined &&
+      maySuggestCustom({ risks: brief.risks, flags: input.offer.flags }),
     desireMap,
     uncovered,
     degradingWords: persona.guardSettings.degradingWords ?? [],

@@ -30,7 +30,7 @@ import type { Logger } from './logger';
 import type { AccountingModule } from './modules/accounting';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
-import { createAlertRouter } from './modules/alerts';
+import { createAgencyAlerts, createAlertRouter } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
 import type {
   AvatarPorts,
@@ -403,7 +403,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const redirectLinks = wireRedirectLinks(shared, { detectLinks: connectors.module.detectedLinks });
   const customOrders = wireCustomOrders(shared);
   const telegram = await wireTelegram(shared, {
-    alerts: alerts.module,
     channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
     channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
   });
@@ -565,7 +564,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     conversations: conversations.module,
     payroll: payroll.module,
     scheduling: scheduling.module,
-    telegram: telegram.module,
+    pushOn: () => notifications.module.notify !== null,
     jobNames: () => Object.keys(tasks),
     salesFeeds: connectors.module.salesFeedStates,
   });
@@ -614,6 +613,24 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     telegram: telegram.module,
   };
 
+  /** The agency's alerts, or null (said once per run) while push is off: nothing else would ring. */
+  const agencyAlerts = (jobLogger: Logger): ReturnType<typeof createAgencyAlerts> | null => {
+    const notify = notifications.module.notify;
+    if (notify === null) {
+      jobLogger.warn('alerts: push is off, the agency’s alerts reach the Dashboard and the history only');
+      return null;
+    }
+    return createAgencyAlerts({
+      adminDb: adminDb.db,
+      agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+      onShift: (creatorId, at) => scheduling.module.onShift(creatorId, at),
+      notify,
+      onFailure: (step, error) => {
+        jobLogger.error({ err: error, step }, 'alerts: a step failed, the others went on');
+      },
+    });
+  };
+
   // Each job has exactly one task, registered by the wiring of the module named in it (ADR 0047 § 3).
   const tasks: Record<JobWithTask, Task> = {
     ...conversations.tasks,
@@ -638,7 +655,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...creatorWeek.tasks,
     ...trends.tasks,
     // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
-    // never waits for push: with push off the alerts reach Telegram only.
+    // never waits for push: with push off the alerts reach the history only.
     'owners.watch': defineTask(
       'owners.watch',
       JOB_PAYLOADS['owners.watch'],
@@ -664,7 +681,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       async (_payload, context) => {
         const notify = notifications.module.notify;
         if (notify === null) {
-          context.logger.warn('alerts: push is off, the alerts reach Telegram and the history only');
+          context.logger.warn('alerts: push is off, the alerts reach the history only');
           return;
         }
         const route = createAlertRouter({
@@ -680,6 +697,31 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
           },
         });
         context.logger.info({ asked: await route(new Date()) }, 'alerts: routed');
+      },
+    ),
+    // 27/11/2026 (Telegram back to the channels only): the agency's alerts to the owners, and the safety relays nobody
+    // took, rung again every 5 minutes for an hour. Nothing while push is off.
+    'alerts.agency': defineTask(
+      'alerts.agency',
+      JOB_PAYLOADS['alerts.agency'],
+      logger,
+      async (_payload, context) => {
+        const agency = agencyAlerts(context.logger);
+        if (agency === null) return;
+        context.logger.info({ asked: await agency.route(new Date()) }, 'alerts: agency alerts routed');
+      },
+    ),
+    'alerts.remind_safety': defineTask(
+      'alerts.remind_safety',
+      JOB_PAYLOADS['alerts.remind_safety'],
+      logger,
+      async (_payload, context) => {
+        const agency = agencyAlerts(context.logger);
+        if (agency === null) return;
+        context.logger.info(
+          { asked: await agency.remindSafety(new Date()) },
+          'alerts: safety relays reminded',
+        );
       },
     ),
     'rate_limit.purge': defineTask(
@@ -719,9 +761,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       createPasswordResetRoutes({
         auth,
         adminDb: adminDb.db,
-        config,
         passwordBreaches,
-        privateChat: telegram.module?.privateChat ?? null,
       }),
       createClientErrorRoutes({ requireRole, reporter: errorReporter }),
       createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),

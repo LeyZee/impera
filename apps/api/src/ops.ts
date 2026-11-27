@@ -8,6 +8,7 @@ import {
   KillSwitchIdSchema,
   KillSwitchScopeSchema,
   newId,
+  PlatformAccountIdSchema,
   queueNameFor,
   resumeRunAt,
   type KillSwitchScope,
@@ -255,5 +256,75 @@ export function reencryptPlatformSessions(
       details: { keyVersion: current, rewritten },
     });
     return rewritten;
+  });
+}
+
+/** A platform account as `pnpm ops:release-ai-account --list` shows it: never a session, only its state. */
+export interface PlatformAccountLine {
+  readonly id: string;
+  readonly platform: string;
+  readonly handle: string;
+  readonly creator: string;
+  readonly sessionState: string;
+  readonly hasSession: boolean;
+}
+
+/** Every platform account of the agency, for the operator to find the one to release. */
+export function listPlatformAccounts(adminDb: Database): Promise<readonly PlatformAccountLine[]> {
+  return withAdmin(adminDb, async (tx) => {
+    const rows = await tx
+      .select({
+        id: schema.platformAccounts.id,
+        platform: schema.platformAccounts.platform,
+        handle: schema.platformAccounts.handle,
+        creator: schema.creators.displayName,
+        sessionState: schema.platformAccounts.sessionState,
+        sealed: schema.platformAccounts.sessionCiphertext,
+      })
+      .from(schema.platformAccounts)
+      .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
+      .orderBy(schema.creators.displayName, schema.platformAccounts.handle);
+    return rows.map(({ sealed, ...row }) => ({ ...row, hasSession: sealed !== null }));
+  });
+}
+
+/**
+ * Forgets the session stored for one platform account, and with it the platform member it pinned (P2-02): the next
+ * « Sync » is a first one again, and pins whoever is logged in to the platform then. The way out when the first
+ * « Sync » was made with the wrong account (an owner's own, a chatter's) instead of the AI's member (audit de
+ * robustesse du 27/11). The account stops reading and writing until that « Sync »: nothing else is touched (messages,
+ * fans, sales, its breaker). `false` when the account does not exist; idempotent.
+ */
+export function releasePlatformSession(adminDb: Database, platformAccountId: string): Promise<boolean> {
+  const id = PlatformAccountIdSchema.parse(platformAccountId);
+  return withAdmin(adminDb, async (tx) => {
+    const [row] = await tx
+      .select({
+        creatorId: schema.platformAccounts.creatorId,
+        sessionState: schema.platformAccounts.sessionState,
+        sealed: schema.platformAccounts.sessionCiphertext,
+      })
+      .from(schema.platformAccounts)
+      .where(eq(schema.platformAccounts.id, id))
+      .for('update');
+    if (row === undefined) return false;
+    await tx
+      .update(schema.platformAccounts)
+      .set({
+        sessionCiphertext: null,
+        sessionOwner: null,
+        sessionState: 'none',
+        sessionUpdatedAt: new Date(),
+      })
+      .where(eq(schema.platformAccounts.id, id));
+    await tx.insert(schema.auditLog).values({
+      id: newId(AuditEntryIdSchema),
+      userId: null,
+      action: 'connector.session_released',
+      entity: 'platform_account',
+      entityId: id,
+      details: { from: row.sessionState, hadSession: row.sealed !== null },
+    });
+    return true;
   });
 }

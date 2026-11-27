@@ -119,7 +119,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
             see: '« 0 sur 10 » et l’étape suivante.',
           },
           {
-            do: 'Suis l’ordre : compte Reveal, persona, part de l’agence, son accès, règles de paie, groupe Telegram, heures de l’IA, shifts.',
+            do: 'Suis l’ordre : compte Reveal, persona, part de l’agence, son accès, règles de paie, alertes de nuit, heures de l’IA, shifts.',
             see: 'chaque ligne cochée par le serveur, pas par toi.',
           },
           {
@@ -264,7 +264,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
         ],
         steps: [
           {
-            do: 'Ouvre le lien de l’alerte (Telegram ou Suivi › Alertes).',
+            do: 'Ouvre la notification de l’alerte, ou Suivi › Alertes.',
             see: 'la conversation et la raison de l’alerte.',
           },
           {
@@ -563,8 +563,8 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
         a: 'Non. Le prix vient du code, dans la fourchette de la créatrice. « Réécrire avec une consigne » ne change que le ton et le contenu.',
       },
       {
-        q: 'Telegram n’envoie plus rien ?',
-        a: 'Réglages › Telegram, « Remplacer le jeton ».',
+        q: 'Son canal Telegram ne publie plus rien ?',
+        a: 'Réglages › Bots Telegram, « Remplacer le jeton ».',
       },
       {
         q: 'Pourquoi ma session s’est fermée ?',
@@ -688,7 +688,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
         why: 'L’IA s’arrête d’elle-même sur un fan sensible et attend un humain.',
         steps: [
           {
-            do: 'Ouvre l’alerte depuis Telegram ou Suivi › Alertes.',
+            do: 'Ouvre l’alerte depuis sa notification ou Suivi › Alertes.',
             see: 'la conversation et la raison.',
           },
           {

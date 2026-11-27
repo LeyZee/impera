@@ -16,6 +16,7 @@ import {
   schema,
   sql,
   withAdmin,
+  withTenantJob,
   withTenantMember,
   type Database,
   type Transaction,
@@ -81,8 +82,9 @@ const lockQueue = (tx: Transaction, creatorId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`scripts.queue:${creatorId}`}, 0))`);
 
 /**
- * Her cadence (SC-02): the routes as the signed-in account, under her RLS and the team's scopes; the hourly job as the
- * admin role, which alone writes what it found.
+ * Her cadence (SC-02): the routes as the signed-in account, under her RLS and the team's scopes; the hourly job in her
+ * creator under the app role (`withTenantJob`, `ask_scripts`, SEC-16), which alone writes what it found. The service
+ * role keeps the list of creators and the freeze of a version of the library, which belongs to no creator.
  */
 export function createDrizzleCadenceStore(db: Database, adminDb: Database): CadenceStore {
   const exists = async (tx: Transaction, creatorId: CreatorId): Promise<boolean> =>
@@ -92,6 +94,9 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
         .from(schema.creators)
         .where(eq(schema.creators.id, creatorId))
     ).length > 0;
+
+  const inCreator = <T>(creatorId: string, fn: (tx: Transaction) => Promise<T>): Promise<T> =>
+    withTenantJob(db, creatorId, 'ask_scripts', fn);
 
   return {
     // `creators` is out of RLS: only the owner and an active manager read a cadence, so anyone else gets the same 404
@@ -138,7 +143,7 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
       ),
 
     days: (creatorId) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(creatorId, async (tx) => {
         const [row] = await tx
           .select({ days: cadences.days })
           .from(cadences)
@@ -147,7 +152,7 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
       }),
 
     queue: (creatorId) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(creatorId, async (tx) => {
         const rows = await tx
           .select()
           .from(queue)
@@ -166,7 +171,7 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
       }),
 
     usable: (creatorId, structureId) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(creatorId, async (tx) => {
         const [row] = await tx
           .select()
           .from(structures)
@@ -207,7 +212,7 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
       }),
 
     dequeue: (creatorId, structureId, askedAt) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(creatorId, async (tx) => {
         await lockQueue(tx, creatorId);
         const [gone] = await tx
           .delete(queue)
@@ -234,7 +239,7 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
       }),
 
     record: (creatorId, outcome, skipped, now) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(creatorId, async (tx) => {
         await tx
           .insert(cadences)
           .values({ creatorId, outcome, skipped: [...skipped], checkedAt: now })

@@ -126,3 +126,43 @@ export async function weekArrivals(
     answered: new Set(answered.flatMap((row) => (row.requestId === null ? [] : [row.requestId]))),
   };
 }
+
+/**
+ * Her video of the day (ADR 0140, avenant du 27/11): the feed's videos that reached the agency each day of a window, in
+ * her zone, and those waiting in her coffre now (received, ready or scheduled, not exported). Read in the reader's own
+ * account (her RLS, or her team's); nothing written.
+ */
+export async function feedVideoCover(
+  tx: Transaction,
+  creatorId: string,
+  window: { readonly from: Date; readonly to: Date },
+  timeZone: string,
+): Promise<{ readonly byDay: ReadonlyMap<string, number>; readonly inStock: number }> {
+  const days = await tx
+    .select({
+      day: sql<string>`to_char((${contentDrops.createdAt} at time zone ${timeZone})::date, 'YYYY-MM-DD')`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(contentDrops)
+    .where(
+      and(
+        eq(contentDrops.creatorId, creatorId),
+        eq(contentDrops.category, 'feed_video'),
+        inArray(contentDrops.state, [...ARRIVED]),
+        sql`${contentDrops.createdAt} >= ${window.from} and ${contentDrops.createdAt} < ${window.to}`,
+      ),
+    )
+    .groupBy(sql`1`);
+  const [waiting] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(contentDrops)
+    .where(
+      and(
+        eq(contentDrops.creatorId, creatorId),
+        eq(contentDrops.category, 'feed_video'),
+        inArray(contentDrops.state, [...IN_STOCK]),
+        sql`${contentDrops.exportedAt} is null`,
+      ),
+    );
+  return { byDay: new Map(days.map((row) => [row.day, row.count])), inStock: waiting?.count ?? 0 };
+}

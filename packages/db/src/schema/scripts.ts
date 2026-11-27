@@ -35,6 +35,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  type PgColumn,
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
@@ -53,6 +54,14 @@ const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
 const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), '')`;
 const readsTeam: SQL = sql`${currentScope} in ('owner', 'agency')`;
 const isOwner: SQL = sql`${currentScope} = 'owner'`;
+/**
+ * The hourly job that asks her next script (`scripts.ask_scripts`, SC-02), under the app role and one creator at a time
+ * (`withTenantJob(…, 'ask_scripts', …)`, ADR 0087 lot c): it reads the library, reads and moves her queue, and writes
+ * what it found on her cadence. No account's session sets `app.job`.
+ */
+const isAskScriptsJob: SQL = sql`nullif(current_setting('app.job', true), '') = 'ask_scripts'`;
+const askScriptsJob = (creatorId: PgColumn): SQL =>
+  sql`${creatorId} = ${currentCreator} and ${isAskScriptsJob}`;
 
 /** A structure: what does not change from one version to the next. Archived, never deleted: a request keeps naming it. */
 export const scriptStructures = pgTable(
@@ -73,6 +82,11 @@ export const scriptStructures = pgTable(
       sql`${t.archivedAt} is null or ${t.archivedAt} >= ${t.createdAt}`,
     ),
     pgPolicy('team_read', { for: 'select', using: readsTeam }),
+    // The job reads the library from her creator: never a structure kept for another.
+    pgPolicy('job_read', {
+      for: 'select',
+      using: sql`${isAskScriptsJob} and (${t.reservedCreatorId} is null or ${t.reservedCreatorId} = ${currentCreator})`,
+    }),
     pgPolicy('owner_insert', {
       for: 'insert',
       withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser}`,
@@ -123,6 +137,12 @@ export const scriptStructureVersions = pgTable(
     check('script_structure_versions_color_check', sql`jsonb_typeof(${t.color}) = 'object'`),
     enumCheck('script_structure_versions', t.moment, SCRIPT_MOMENTS),
     pgPolicy('team_read', { for: 'select', using: readsTeam }),
+    // As its structure: the job reads the versions of what it may read from her creator.
+    pgPolicy('job_read', {
+      for: 'select',
+      using: sql`${isAskScriptsJob} and exists (select 1 from script_structures s where s.id = ${t.structureId}
+        and (s.reserved_creator_id is null or s.reserved_creator_id = ${currentCreator}))`,
+    }),
     pgPolicy('owner_insert', {
       for: 'insert',
       withCheck: sql`${isOwner} and ${t.updatedBy} = ${currentUser}`,
@@ -172,6 +192,14 @@ export const scriptStructureQueue = pgTable(
       for: 'delete',
       using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}`,
     }),
+    // The job takes out the structure it asked and moves the ones after it up: never a new one, never another's.
+    pgPolicy('job_read', { for: 'select', using: askScriptsJob(t.creatorId) }),
+    pgPolicy('job_delete', { for: 'delete', using: askScriptsJob(t.creatorId) }),
+    pgPolicy('job_update', {
+      for: 'update',
+      using: askScriptsJob(t.creatorId),
+      withCheck: askScriptsJob(t.creatorId),
+    }),
     closedToCreator(),
   ],
 );
@@ -217,6 +245,17 @@ export const scriptCadences = pgTable(
       for: 'update',
       using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}`,
       withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    // What the job last found, on her row or a new one that no account signed.
+    pgPolicy('job_read', { for: 'select', using: askScriptsJob(t.creatorId) }),
+    pgPolicy('job_insert', {
+      for: 'insert',
+      withCheck: sql`${askScriptsJob(t.creatorId)} and ${t.updatedBy} is null`,
+    }),
+    pgPolicy('job_update', {
+      for: 'update',
+      using: askScriptsJob(t.creatorId),
+      withCheck: askScriptsJob(t.creatorId),
     }),
     closedToCreator(),
   ],

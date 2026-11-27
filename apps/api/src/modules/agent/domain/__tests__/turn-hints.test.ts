@@ -16,6 +16,8 @@ import {
   ABANDON_HINTS,
   ASK_AVAILABILITY_HINT,
   ASKS_IF_BOT_HINT,
+  CUSTOM_INSTEAD_HINT,
+  CUSTOM_MID_SCRIPT_HINT,
   FAREWELL_HINTS,
   HE_CAME_EARLY_HINT,
   HE_CAME_HINT,
@@ -65,6 +67,7 @@ const CALM: SextingMoment = {
   justBought: false,
   compliment: false,
   suggestsCustom: false,
+  customMidScript: false,
   cameEarly: false,
   inPlay: false,
   haggling: false,
@@ -104,6 +107,14 @@ const PLAIN: TurnHintFacts = {
 describe('the hints of a turn', () => {
   it('says nothing on an ordinary answer', () => {
     expect(toneHintsOfTurn(PLAIN)).toEqual([]);
+  });
+
+  it('names the custom mid-script once, never beside the custom-instead hint (Charles 27/11)', () => {
+    const both = { ...CALM, suggestsCustom: true, customMidScript: true };
+    expect(toneHintsOfTurn({ ...PLAIN, sexting: both })).toEqual([CUSTOM_MID_SCRIPT_HINT]);
+    expect(toneHintsOfTurn({ ...PLAIN, sexting: { ...CALM, suggestsCustom: true } })).toEqual([
+      CUSTOM_INSTEAD_HINT,
+    ]);
   });
 
   it('lets his coming, a goodbye, or her question on his availability lead alone', () => {

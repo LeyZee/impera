@@ -18,7 +18,7 @@ import {
   unansweredSince,
   type VoiceHealth,
 } from '../dashboard';
-import type { DashboardFacts, TelegramReading, WaitingConversation } from '../dashboard-ports';
+import type { DashboardFacts, WaitingConversation } from '../dashboard-ports';
 
 const NOW = new Date('2026-10-17T21:30:00.000Z');
 const CONVERSATION = '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d';
@@ -60,7 +60,6 @@ const FACTS: DashboardFacts = {
 
 const assemble = (
   facts: Partial<DashboardFacts> = {},
-  telegram: TelegramReading | 'off' = { alertsTonight: 3, urgentReachable: false },
   automatic: AutomaticGate = { open: false, missing: [{ kind: 'blind_test' }] },
   reading: LiveRateReading = { rate: 0.8, decided: 10 },
   health: { voice?: VoiceHealth; jobs?: Dashboard['jobs'] } = {},
@@ -78,7 +77,6 @@ const assemble = (
     budget: { spentEur: 3.204, capEur: 20, alertAtEur: 16 },
     voice: health.voice ?? { ok: true, keyMissing: false },
     jobs: health.jobs ?? { dead: 0, stuck: [] },
-    telegram: telegram === 'off' ? undefined : telegram,
     automatic: { gate: automatic, reading },
     revealSales: null,
   });
@@ -91,8 +89,6 @@ describe('dashboard', () => {
     expect(dashboard.budget.spentToday).toBe(3.2);
     expect(dashboard.guards.today.meeting).toBe(2);
     expect(dashboard.guards.today.minor).toBe(0);
-    expect(dashboard.guards.telegramAlertsTonight).toBe(3);
-    expect(dashboard.telegramCoverage).toEqual({ urgentReachable: false });
   });
 
   it('says how the dollar sales were counted: at which ECB day, or not at all (choix de Charles, 28/10)', () => {
@@ -129,12 +125,12 @@ describe('dashboard', () => {
   it('passes a missing key and the stuck jobs through as read, unknown included', () => {
     const jobs = { dead: 2, stuck: [{ label: 'Réponse aux fans', count: 2, agency: false }] };
     const missing = DashboardSchema.parse(
-      assemble({}, 'off', undefined, undefined, { voice: { ok: false, keyMissing: true }, jobs }),
+      assemble({}, undefined, undefined, { voice: { ok: false, keyMissing: true }, jobs }),
     );
     expect(missing.voice).toMatchObject({ ok: false, keyMissing: true });
     expect(missing.jobs).toEqual(jobs);
     const unknown = DashboardSchema.parse(
-      assemble({}, 'off', undefined, undefined, { jobs: stuckJobsOf(null, true) }),
+      assemble({}, undefined, undefined, { jobs: stuckJobsOf(null, true) }),
     );
     expect(unknown.jobs).toEqual({ dead: null, stuck: [] });
   });
@@ -165,19 +161,13 @@ describe('dashboard', () => {
     });
   });
 
-  it('says Telegram is off rather than that no alert gets through', () => {
-    const dashboard = DashboardSchema.parse(assemble({}, 'off'));
-    expect(dashboard.guards.telegramAlertsTonight).toBeNull();
-    expect(dashboard.telegramCoverage).toBeNull();
-  });
-
   it('shows the lock as conversations reads it, never recomputed from the live rate', () => {
     const full = { rate: 1, decided: 150 };
-    expect(assemble({}, 'off', undefined, full).automatic).toEqual({
+    expect(assemble({}, undefined, full).automatic).toEqual({
       open: false,
       missing: [{ kind: 'blind_test' }],
     });
-    expect(assemble({}, 'off', { open: true, missing: [] }, full).automatic).toEqual({
+    expect(assemble({}, { open: true, missing: [] }, full).automatic).toEqual({
       open: true,
       missing: [],
     });
@@ -187,7 +177,6 @@ describe('dashboard', () => {
     const lock: AutomaticGate = { open: false, missing: [{ kind: 'live_rate', value: 79.5, target: 80 }] };
     const dashboard = assemble(
       { decidedThreeWeeksAgo: Array.from({ length: 4 }, (_, i) => ({ asIs: i < 3 })) },
-      'off',
       lock,
       { rate: 0.795, decided: 200 },
     );
@@ -333,10 +322,10 @@ describe('an AI outage over (IA-07)', () => {
   it('reads the voice’s health on the Dashboard and in « À traiter », a missing key never « back »', () => {
     const facts = { waiting: [held('A')] };
     expect(
-      assemble(facts, 'off', undefined, undefined, { voice: { ok: true, keyMissing: false } }).todos[0],
+      assemble(facts, undefined, undefined, { voice: { ok: true, keyMissing: false } }).todos[0],
     ).toMatchObject({ voiceBack: true });
     expect(
-      assemble(facts, 'off', undefined, undefined, { voice: { ok: false, keyMissing: false } }).todos[0],
+      assemble(facts, undefined, undefined, { voice: { ok: false, keyMissing: false } }).todos[0],
     ).not.toHaveProperty('voiceBack');
     const queue = (voice?: VoiceHealth) =>
       creatorQueue(

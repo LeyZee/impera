@@ -4,10 +4,8 @@ import {
   alertKeywordKey,
   CUSTOM_ALERT_NAME_MAX,
   CUSTOM_ALERT_PHRASE_MAX,
-  CUSTOM_ALERT_TOPIC,
   CustomAlertGroupIdSchema,
   SYSTEM_ALERT_CODES,
-  SYSTEM_ALERT_TOPICS,
   type AlertTestBody,
   type AlertTestResult,
   type CreatorId,
@@ -15,9 +13,8 @@ import {
   type CustomAlertGroup,
   type CustomAlertGroupId,
   type SystemAlertSetting,
-  type TelegramTopic,
 } from '@impera/contracts';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
@@ -45,21 +42,18 @@ import {
   issueList,
   newDraft,
   pauseLine,
+  quietLine,
   sameTest,
   switchedBody,
   SYSTEM_ALERTS,
   systemEnabled,
   systemLine,
-  telegramHeadLine,
-  telegramLine,
   testBodyOf,
   testCreatorOf,
   testCostLine,
   testHint,
   testVerdict,
   type AlertDraft,
-  type TelegramLine,
-  type TelegramRouting,
 } from './model';
 import './alerts.css';
 
@@ -69,21 +63,17 @@ import { hasActivePersonaOf } from '@/creators/overview/model';
 import { Entries, Field, FormContext, SwitchRow, TextArea, TextInput } from '@/creators/persona/fields';
 import { creatorsSearch } from '@/creators/search';
 import { distinctNames } from '@/settings/names';
-import { fetchOverview, TelegramOff } from '@/settings/telegram/api';
-import { TOPICS } from '@/settings/telegram/model';
-import { searchOfTab, TAB_OF_TOPIC } from '@/settings/telegram/search';
 import { useCreatorSetups } from '@/setup/api';
 import { Failure } from '@/shell/states';
 
 /**
  * Réglages › Alertes (P4-01), the owner's alone: the alerts she writes herself (a phrase the brain reads, words the
- * code finds, or both) and the system's, on each creator. Where each one goes on Telegram is read from Réglages ›
- * Telegram, never set here. Nothing on this page ever shows what a fan wrote.
+ * code finds, or both) and the system's, on each creator. When one rings, the team is told by an Impera notification,
+ * as each creator's « Qui est prévenu » says. Nothing on this page ever shows what a fan wrote.
  */
 export function AlertsSection(): JSX.Element {
   const alerts = useAlerts();
   const creators = useCreators();
-  const routing = useTelegramRouting();
   const [editing, setEditing] = useState<'new' | CustomAlertGroupId | null>(null);
 
   if (alerts.data === undefined || creators.data === undefined) {
@@ -117,8 +107,6 @@ export function AlertsSection(): JSX.Element {
     );
   }
 
-  const known = routing.data ?? null;
-  const telegramHead = telegramHeadLine(known);
   const all = distinctNames(creators.data, (creator) => creator.id);
   const custom = alerts.data.custom;
   return (
@@ -128,8 +116,8 @@ export function AlertsSection(): JSX.Element {
           <div className="al-head__text">
             {/* The page's title says « Alertes » already (recette visuelle 16/11, GES-03): no second one here. */}
             <p className="ps-lead">
-              Une alerte surveille ce que les fans écrivent. Quand elle sonne, l’équipe est prévenue ; si tu
-              le choisis, l’agent se met en pause sur ce fan et passe la main.
+              Une alerte surveille ce que les fans écrivent. Quand elle sonne, l’équipe est prévenue si tu le
+              choisis, et l’agent peut se mettre en pause sur ce fan pour passer la main.
             </p>
           </div>
           {/* One editor at a time: opening another would drop the changes of the open one (recette du 28/10). */}
@@ -149,24 +137,12 @@ export function AlertsSection(): JSX.Element {
         {all.length === 0 ? (
           <p className="ps-muted">Ajoute d’abord une créatrice : une alerte surveille ses fans.</p>
         ) : null}
-        {telegramHead === null ? null : (
-          <p className="al-telegram">
-            <span className="al-telegram__dot" aria-hidden="true" />
-            <span>
-              {telegramHead}{' '}
-              <Link to="/reglages/telegram" search={searchOfTab('bots')} className="al-link">
-                Brancher un groupe
-              </Link>
-            </span>
-          </p>
-        )}
       </header>
 
       {editing === 'new' ? (
         <AlertEditor
           saved={null}
           creators={all}
-          routing={known}
           onDone={() => {
             setEditing(null);
           }}
@@ -193,7 +169,6 @@ export function AlertsSection(): JSX.Element {
                   <AlertEditor
                     saved={alert}
                     creators={all}
-                    routing={known}
                     onDone={() => {
                       setEditing(null);
                     }}
@@ -205,7 +180,6 @@ export function AlertsSection(): JSX.Element {
                   alert={alert}
                   index={index}
                   creators={all}
-                  routing={known}
                   onEdit={
                     editing === null
                       ? () => {
@@ -234,7 +208,7 @@ export function AlertsSection(): JSX.Element {
               locked: isLocked(code),
               creators: [],
             };
-            return <SystemLine key={code} setting={setting} index={index} creators={all} routing={known} />;
+            return <SystemLine key={code} setting={setting} index={index} creators={all} />;
           })}
         </ul>
       </section>
@@ -254,65 +228,26 @@ export function AlertsSection(): JSX.Element {
   );
 }
 
-/** The routing of Réglages › Bots Telegram, as far as this page needs it: who has no group for which topic. */
-function useTelegramRouting(): { data: TelegramRouting | undefined } {
-  return useQuery({
-    queryKey: ['telegram', 'routing'],
-    queryFn: async (): Promise<TelegramRouting> => {
-      try {
-        const overview = await fetchOverview();
-        return overview.routes.length === 0 ? 'none' : overview.coverage;
-      } catch (error) {
-        if (error instanceof TelegramOff) return 'off';
-        throw error;
-      }
-    },
-    retry: false,
-  });
-}
-
-/** Said only when something is off (no group, Telegram silent for it): an alert that goes where it should says nothing. */
-function TelegramNote({ line }: { line: TelegramLine | null }): JSX.Element | null {
-  if (line === null || line.kind === 'sent') return null;
+/** Said only when an alert rings nobody: one that tells the team says nothing. */
+function QuietNote({ line }: { line: string | null }): JSX.Element | null {
+  if (line === null) return null;
   return (
-    <p className="al-telegram" data-kind={line.kind}>
-      <span className="al-telegram__dot" aria-hidden="true" />
-      <span>
-        {line.text}
-        {line.kind === 'missing' ? (
-          <>
-            {' '}
-            <ChooseGroup topic={line.topic} />
-          </>
-        ) : null}
-      </span>
+    <p className="al-quiet">
+      <span className="al-quiet__dot" aria-hidden="true" />
+      <span>{line}</span>
     </p>
   );
 }
-
-/** Opens Réglages › Bots Telegram on the tab that routes this topic. */
-function ChooseGroup({ topic }: { topic: TelegramTopic }): JSX.Element {
-  return (
-    <Link to="/reglages/telegram" search={searchOfTab(TAB_OF_TOPIC[topic])} className="al-link">
-      Choisir le groupe
-    </Link>
-  );
-}
-
-const enabledIds = (alert: CustomAlertGroup): CreatorId[] =>
-  alert.creators.filter((creator) => creator.enabled).map((creator) => creator.creatorId);
 
 function AlertLine({
   alert,
   index,
   creators,
-  routing,
   onEdit,
 }: {
   alert: CustomAlertGroup;
   index: number;
   creators: readonly CreatorSummary[];
-  routing: TelegramRouting | null;
   /** `null` while another alert is being written: no « Modifier » until it is saved or abandoned. */
   onEdit: (() => void) | null;
 }): JSX.Element {
@@ -337,15 +272,8 @@ function AlertLine({
     }
   };
 
-  const telegram = active
-    ? telegramLine({
-        notify: alert.notify,
-        topic: CUSTOM_ALERT_TOPIC,
-        topicLabel: TOPICS[CUSTOM_ALERT_TOPIC].label,
-        creatorIds: enabledIds(alert),
-        routing,
-      })
-    : null;
+  // Closed, the quiet line says it rings nobody; open, the line of what it does says it once (Design, 27/11).
+  const quiet = active && !open ? quietLine(alert.notify) : null;
 
   return (
     <li
@@ -395,7 +323,7 @@ function AlertLine({
           />
         </label>
       </div>
-      <TelegramNote line={telegram} />
+      <QuietNote line={quiet} />
       {error === null ? null : (
         <p className="ps-error" role="alert">
           {error}
@@ -414,7 +342,7 @@ function AlertLine({
         )}
         <p className="al-line__does" data-pauses={alert.pausesAgent ? 'true' : undefined}>
           {active
-            ? pauseLine(alert.pausesAgent)
+            ? pauseLine(alert.pausesAgent, alert.notify)
             : 'Coupée : elle ne surveille rien tant que tu ne la rallumes pas'}
         </p>
         {confirming ? (
@@ -476,12 +404,10 @@ function AlertLine({
 function AlertEditor({
   saved,
   creators,
-  routing,
   onDone,
 }: {
   saved: CustomAlertGroup | null;
   creators: readonly CreatorSummary[];
-  routing: TelegramRouting | null;
   onDone: () => void;
 }): JSX.Element {
   const queryClient = useQueryClient();
@@ -556,14 +482,6 @@ function AlertEditor({
         : [...draft.creatorIds, creatorId],
     });
   };
-
-  const telegram = telegramLine({
-    notify: true,
-    topic: CUSTOM_ALERT_TOPIC,
-    topicLabel: TOPICS[CUSTOM_ALERT_TOPIC].label,
-    creatorIds: draft.creatorIds,
-    routing,
-  });
 
   return (
     <form
@@ -648,18 +566,18 @@ function AlertEditor({
         <div className="ps-switches">
           <SwitchRow
             label="Mettre l’agent en pause"
-            detail={pauseLine(draft.pausesAgent)}
+            detail={pauseLine(draft.pausesAgent, draft.notify)}
             checked={draft.pausesAgent}
             onChange={(pausesAgent) => {
               edit({ pausesAgent });
             }}
           />
           <SwitchRow
-            label="Prévenir sur Telegram"
+            label="Prévenir l’équipe"
             detail={
               draft.notify
-                ? (telegram?.text ?? `Dans « ${TOPICS[CUSTOM_ALERT_TOPIC].label} »`)
-                : 'Gardée dans l’historique du Suivi, sans Telegram'
+                ? 'Une notification Impera, à ceux que sa fiche › Alertes désigne'
+                : 'Gardée dans l’historique du Suivi, sans notification'
             }
             checked={draft.notify}
             onChange={(notify) => {
@@ -667,14 +585,6 @@ function AlertEditor({
             }}
           />
         </div>
-        {draft.notify && telegram?.kind === 'missing' ? (
-          <p className="al-telegram" data-kind="missing">
-            <span className="al-telegram__dot" aria-hidden="true" />
-            <span>
-              <ChooseGroup topic={CUSTOM_ALERT_TOPIC} />
-            </span>
-          </p>
-        ) : null}
         <AlertTry draft={draft} creators={creators} />
         {error === null ? null : (
           <p className="ps-error" role="alert">
@@ -812,12 +722,10 @@ function SystemLine({
   setting,
   index,
   creators,
-  routing,
 }: {
   setting: SystemAlertSetting;
   index: number;
   creators: readonly CreatorSummary[];
-  routing: TelegramRouting | null;
 }): JSX.Element {
   const queryClient = useQueryClient();
   const titleId = useId();
@@ -825,8 +733,6 @@ function SystemLine({
   const [error, setError] = useState<string | null>(null);
   const meta = SYSTEM_ALERTS[setting.code];
   const locked = isLocked(setting.code);
-  const topic = SYSTEM_ALERT_TOPICS[setting.code];
-  const on = creators.filter((creator) => systemEnabled(setting, creator.id)).map((creator) => creator.id);
 
   const toggle = async (creatorId: CreatorId, enabled: boolean): Promise<void> => {
     setBusy(creatorId);
@@ -893,19 +799,6 @@ function SystemLine({
           ))}
         </p>
       ) : null}
-      <TelegramNote
-        line={
-          on.length === 0
-            ? null
-            : telegramLine({
-                notify: true,
-                topic,
-                topicLabel: TOPICS[topic].label,
-                creatorIds: on,
-                routing,
-              })
-        }
-      />
       {locked || single !== undefined ? null : (
         <div className="ps-switches al-creators">
           {creators.map((creator) => (

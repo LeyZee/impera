@@ -3,8 +3,11 @@ import { useEffect, useState, type JSX } from 'react';
 
 import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
+import type { securityPathOf } from '../shell/nav';
 
 import { browserOf, EXTENSION_ZIP, extensionKnowsThisCrm, type Browser } from './extension';
+
+type SecurityPath = ReturnType<typeof securityPathOf>;
 
 interface Steps {
   readonly title: string;
@@ -34,24 +37,52 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
   },
 };
 
-/** After the link step, its outcome; with no link step (a hosted build), what to do (avis Design du 19/11). */
-const LAST_STEP = 'Connecté au CRM, l’extension affiche alors ton nom.';
-const LAST_STEP_LINKED = 'Clique sur l’icône Impera : elle affiche ton nom.';
-
 /**
- * The zip carries no CRM address (ADR 0067 § 4): the popup links itself from this CRM's own page, nothing to type
- * (amendement du 19/11).
+ * « Relier l’extension », one step with one word (recette navigation du 27/11, CH-01): his account, by the code of
+ * Sécurité pasted in the extension, and before it, on a CRM whose extension does not know its address, this CRM itself
+ * (ADR 0067, amendement du 19/11), nothing to type. Named in the order he does them, so he knows when he is done.
  */
-function LinkStep(): JSX.Element {
+function LinkSteps({
+  knowsCrm,
+  security,
+}: {
+  readonly knowsCrm: boolean;
+  readonly security: SecurityPath;
+}): JSX.Element {
   return (
-    <li>
-      <span className="nv-help-ext__address">
-        <span>Relie-la à ce CRM, sans rien taper : un clic ici, puis sur l’icône Impera.</span>
-        <Link to="/extension/lier" className="nv-btn nv-btn--soft nv-btn--sm">
-          Relier l’extension à ce CRM
-        </Link>
-      </span>
-    </li>
+    <Panel title="Relier l’extension">
+      <PanelSection>
+        <ol className="nv-help-install__steps">
+          {knowsCrm ? null : (
+            <li>
+              <span className="nv-help-ext__address">
+                <span>À ce CRM, sans rien taper : un clic ici, puis sur l’icône Impera.</span>
+                <Link to="/extension/lier" className="nv-btn nv-btn--soft nv-btn--sm">
+                  Relier l’extension à ce CRM
+                </Link>
+              </span>
+            </li>
+          )}
+          <li>
+            <span className="nv-help-ext__address">
+              <span>
+                {/* « À ton compte » only beside « À ce CRM »: alone, the step says where to go. */}
+                {knowsCrm ? 'Dans' : 'À ton compte : dans'} Sécurité, «&nbsp;Relier l’extension&nbsp;», puis
+                «&nbsp;Copier le code&nbsp;».
+              </span>
+              <Link to={security} className="nv-btn nv-btn--soft nv-btn--sm">
+                Ouvrir Sécurité
+              </Link>
+            </span>
+          </li>
+          <li>
+            Ouvre Reveal, clique l’icône Impera et colle le code dans la carte «&nbsp;Copilote&nbsp;», puis
+            «&nbsp;Relier&nbsp;». Une seule fois par navigateur.
+          </li>
+          <li>C’est fait quand la carte «&nbsp;Copilote&nbsp;» ne dit plus «&nbsp;À relier&nbsp;».</li>
+        </ol>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -82,9 +113,8 @@ const WATCH: Offer = {
   text: 'Pendant que tu regardes Instagram, elle relève les posts qui marchent pour les idées du matin.',
 };
 
-/** The copilot, which exists (recette du 16/11, EXT-06): how to link, open it, and its three keys. */
+/** The copilot, which exists (recette du 16/11, EXT-06): how to open it, and its three keys; linking is its own panel. */
 const COPILOT_STEPS: readonly string[] = [
-  'Relie l’extension une fois : dans Moi › Sécurité, « Relier l’extension », puis Copier ; colle le code dans la carte « Copilote » de l’extension et « Relier ». Tes gestes comptent alors à ton nom.',
   'Ouvre une conversation dans Reveal, clique l’icône Impera, puis « Ouvrir le copilote » : il s’ouvre sur le côté et suit la conversation ouverte, sans clic.',
   'Trois touches : A copie le brouillon pour Reveal, où tu le colles et l’envoies ; E le retouche ; R le refuse, avec une raison.',
 ];
@@ -114,7 +144,14 @@ function useZipServed(): 'checking' | 'served' | 'missing' {
 }
 
 /** /aide/extension (ADR 0067): what the extension offers, then the steps for Chrome and Edge, this browser's first. */
-export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.Element {
+export function ExtensionPage({
+  watches,
+  security,
+}: {
+  readonly watches: boolean;
+  /** His own Sécurité, where the code is (`securityPathOf`). */
+  readonly security: SecurityPath;
+}): JSX.Element {
   const browser = browserOf(navigator.userAgent);
   const zip = useZipServed();
   const offers = watches ? [...OFFERS, WATCH] : OFFERS;
@@ -143,14 +180,14 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                 className="nv-help-ext__shot--night"
                 src="/help/extension-popup-nuit.webp"
                 width={348}
-                height={415}
+                height={427}
                 alt="L’extension ouverte : le bonjour, le compte connecté, quatre raccourcis et « Ouvrir le CRM »."
               />
               <img
                 className="nv-help-ext__shot--day"
                 src="/help/extension-popup-jour.webp"
                 width={348}
-                height={415}
+                height={427}
                 alt="L’extension ouverte : le bonjour, le compte connecté, quatre raccourcis et « Ouvrir le CRM »."
               />
             </figure>
@@ -190,14 +227,15 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                   {STEPS[key].steps.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
-                  {/* A hosted build is linked from the install: no step that would lead nowhere (ADR 0067). */}
-                  {linked ? null : <LinkStep />}
-                  <li>{linked ? LAST_STEP_LINKED : LAST_STEP}</li>
+                  {/* Built for this CRM, it is already connected; otherwise « Relier l’extension » comes first. */}
+                  {linked ? <li>Clique sur l’icône Impera : elle affiche ton nom.</li> : null}
                 </ol>
               </PanelSection>
             </Panel>
           ))}
         </div>
+        {/* A hosted build knows this CRM from the install: no step that would lead nowhere (ADR 0067). */}
+        <LinkSteps knowsCrm={linked} security={security} />
         <Panel title="Le copilote sur Reveal">
           <PanelSection>
             <ol className="nv-help-install__steps">

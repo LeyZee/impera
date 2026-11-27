@@ -292,26 +292,6 @@ describe('DashboardPage on the server’s data', () => {
       expect(location()).toBe('/reglages/modeles-ia');
     });
   });
-
-  it('says under the hero when nobody is warned at night', async () => {
-    serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
-    renderDashboard();
-    expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeDefined();
-  });
-
-  it('offers the group to choose to the owner only, and tells anyone else who does (recette 05/11, PRO-08)', async () => {
-    serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
-    renderDashboard(false);
-    expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeDefined();
-    expect(screen.queryByRole('link', { name: 'Choisir un groupe' })).toBeNull();
-    expect(
-      screen.getByText('Le propriétaire choisit ce groupe dans Réglages › Bots Telegram.'),
-    ).toBeDefined();
-    cleanup();
-    serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
-    renderDashboard(true);
-    expect(await screen.findByRole('link', { name: 'Choisir un groupe' })).toBeDefined();
-  });
 });
 
 /** A server that keeps her mode: `PUT /v1/agent/mode` changes what `GET /v1/dashboard` says next. */
