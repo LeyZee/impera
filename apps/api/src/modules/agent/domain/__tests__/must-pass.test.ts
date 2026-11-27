@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { forbiddenThemeOf } from '../forbidden-themes';
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
   checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
+  meetingCommitment,
   type GuardCode,
 } from '../guards';
 import { safetySigns } from '../safety-net';
@@ -141,10 +144,72 @@ describe('permitted phrases that must always pass, output guards', () => {
     expect(raised(bubble)).not.toContain('love_declaration');
   });
 
-  it.each(['j’ai rdv chez le coiffeur demain', 'j’ai rendez-vous chez le dentiste'])(
-    'meeting_promise lets « %s » through',
+  it.each([
+    'j’ai rdv chez le coiffeur demain',
+    'j’ai rendez-vous chez le dentiste',
+    'imagine un week-end tous les deux dans un chalet',
+    'un jour peut-être, tu me ferais visiter',
+    'si on était dans un chalet je te garderais contre moi',
+    'on se voit au prochain live',
+    'je te réserve une surprise',
+    'imagine we were alone in a cabin',
+    'je viens chez toi dans mes rêves',
+    'on se voit demain ici mon cœur',
+    'on se retrouve ce soir sur reveal',
+    'je passe à paris demain pour un shooting',
+    'je réserve une table pour mon anniv avec mes copines',
+    'je cale mon réveil à 7h',
+    'on organise un live samedi',
+    'on se voit ce soir en live ?',
+    'tu viens me voir demain sur mon live ?',
+  ])('meeting_promise lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('meeting_promise');
+    expect(meetingCommitment(bubble)).toBeUndefined();
+  });
+
+  it.each([
+    ['avec plaisir', 'tu m’envoies la suite ?'],
+    ['ok mais non, pas en vrai', 'samedi à Lyon ?'],
+    ['ok mais non', 'samedi à lyon ?'],
+    ['ok trop bien', 'samedi je suis à lyon pour le taf'],
+    ['avec plaisir', 'on se voit dans tes rêves ce soir ?'],
+    ['bonne nuit à demain', 'bonne nuit ma belle'],
+    ['bonne nuit, on se retrouve demain', 'bonne nuit ma belle'],
+  ] as const)('meeting_promise lets her « %s » to « %s » through', (bubble, fan) => {
+    expect(meetingCommitment(bubble, fan)).toBeUndefined();
+  });
+
+  it.each([
+    'merci pour ton cadeau 🥰',
+    'j’ai une petite surprise pour toi ce soir',
+    'merci pour la wishlist, t’es adorable',
+    'si tu la prends, dis-moi ce que t’en penses',
+    'thank you for the gift',
+    'grazie per il regalo',
+    'gracias por el regalo',
+    'achète des croissants et dis-moi',
+  ])('purchase_sweetener lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('purchase_sweetener');
+  });
+
+  it.each(['t’es un vilain garçon', 'petit coquin va'])(
+    'degrading_word lets « %s » through when her sheet names no word',
     (bubble) => {
-      expect(raised(bubble)).not.toContain('meeting_promise');
+      expect(raised(bubble)).not.toContain('degrading_word');
+    },
+  );
+
+  it.each(['haha', 'oh tu crois ?', 'hmm, raconte'])(
+    'moan_below_peak lets « %s » through before the frankest step',
+    (bubble) => {
+      expect(checkMoans([bubble], false)).toEqual([]);
+    },
+  );
+
+  it.each(['j’ai tellement envie de toi', 'continue, j’adore', 'tu me rends folle'])(
+    'mood_killer lets « %s » through',
+    (bubble) => {
+      expect(checkMoodKillers([bubble], false)).toEqual([]);
     },
   );
 

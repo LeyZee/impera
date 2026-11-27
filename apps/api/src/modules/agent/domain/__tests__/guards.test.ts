@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
   checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
+  meetingCommitment,
   touchesTerm,
   asksPrice,
   sumsMinorOf,
@@ -87,6 +90,38 @@ describe('voice guards', () => {
     expect(codes(['Dors bien toi', 'on se retrouve demain 😘'])).toEqual([]);
     expect(codes(['Bonne nuit, on se retrouve demain'])).toEqual([]);
     expect(codes(['on se retrouve demain ici 😌'])).toEqual([]);
+  });
+
+  it('reads « on se retrouve demain » with a goodnight as a chat goodbye in her meeting commitment too, both ways', () => {
+    expect(codes(['bonne nuit, on se retrouve demain'])).toEqual([]);
+    expect(
+      meetingCommitment('on se retrouve demain', undefined, 'dors bien toi on se retrouve demain'),
+    ).toBeUndefined();
+    expect(codes(['bonne nuit, on se retrouve demain à la gare'])).toContain('meeting_promise');
+    expect(codes(['bonne nuit, demain 20h chez moi'])).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, demain 20h chez moi')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve demain à la gare')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve demain à 20 h')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve samedi')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se voit demain')).toBeDefined();
+    expect(meetingCommitment('on se retrouve demain')).toBeDefined();
+  });
+
+  it('takes « bonne nuit, on se retrouve demain » as her yes after a concrete meeting he proposed (Sécurité, #1048)', () => {
+    const proposed = 'on se voit demain 18h à la gare ?';
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', proposed)).toBeDefined();
+    expect(
+      checkVoiceOutput(['bonne nuit, on se retrouve demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: proposed,
+      }).map((v) => v.code),
+    ).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(meetingCommitment('bonne nuit à demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(
+      checkVoiceOutput(['bonne nuit à demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: 'bonne nuit ma belle',
+      }),
+    ).toEqual([]);
   });
 
   it('still blocks a real meeting said with a goodnight', () => {
@@ -670,6 +705,97 @@ describe('checkExplicit', () => {
   });
 });
 
+describe('never an extra to unlock or close a purchase (Charles 26/11 at 23:44, `purchase_sweetener`)', () => {
+  it('blocks an extra tied to a purchase, in French, English, Italian and Spanish', () => {
+    for (const bubble of [
+      'si tu prends celle-là je t’en offre une autre 😘',
+      'Si tu l’achètes je te mets un petit bonus',
+      'je rajoute une petite surprise si tu achètes',
+      'un bonus si tu l’ouvres ce soir',
+      'prends-la et je t’en offre une 😏',
+      'deux pour le prix d’une, rien que pour toi',
+      'if you buy it I’ll throw in another one',
+      'buy this one and get a free one',
+      'se lo compri te ne regalo un altro',
+      'si lo compras te regalo otro',
+      'achète et t’auras une surprise',
+      'pour tout achat une photo en plus',
+    ]) {
+      expect(codes([bubble]), bubble).toContain('purchase_sweetener');
+    }
+  });
+
+  it('lets his gift, a surprise of hers with no purchase and her thanks for his wishlist pass', () => {
+    for (const bubble of [
+      'merci pour ton cadeau 🥰',
+      'je t’ai préparé une surprise pour ce soir 😏',
+      'merci pour le cadeau de ma wishlist, tu es adorable',
+      'si tu prends le temps de me répondre, ça me fait plaisir',
+      'thank you for the gift 💕',
+    ]) {
+      expect(codes([bubble]), bubble).not.toContain('purchase_sweetener');
+    }
+  });
+
+  it('blocks: rewritten once, then a human', () => {
+    expect(
+      isBlocked(checkVoiceOutput(['si tu le prends je t’en offre une autre'], DEFAULT_GUARD_SETTINGS)),
+    ).toBe(true);
+  });
+});
+
+describe('her degrading words (Charles 26/11, `degrading_word`)', () => {
+  const settings = { ...DEFAULT_GUARD_SETTINGS, degradingWords: ['motinterdit', 'autre mot'] };
+  const found = (bubbles: string[]) => checkVoiceOutput(bubbles, settings).map((v) => [v.code, v.severity]);
+
+  it('blocks a word of her persona’s list, whole words only, accents and case ignored', () => {
+    expect(found(['T’es mon MOTINTERDIT'])).toEqual([['degrading_word', 'blocking']]);
+    expect(found(['un Autre-Mot pour toi'])).toEqual([['degrading_word', 'blocking']]);
+    expect(found(['un motinterditable'])).toEqual([]);
+  });
+
+  it('checks nothing without a list: the words are never in the repository', () => {
+    expect(checkVoiceOutput(['T’es mon motinterdit'], DEFAULT_GUARD_SETTINGS)).toEqual([]);
+  });
+});
+
+describe('written sounds of pleasure only at the frankest rung (Charles 26/11, `moan_below_peak`)', () => {
+  it('flags them softly below it, lets them at its peak', () => {
+    expect(checkMoans(['mmmh continue', 'aaah'], false).map((v) => [v.code, v.severity])).toEqual([
+      ['moan_below_peak', 'soft'],
+      ['moan_below_peak', 'soft'],
+    ]);
+    expect(checkMoans(['mmmh continue'], true)).toEqual([]);
+  });
+
+  it('a laugh, a plain oh or a thinking hum are no moans', () => {
+    expect(checkMoans(['haha t’es bête', 'oh tu crois ?', 'hmm je sais pas', 'ah bon'], false)).toEqual([]);
+  });
+});
+
+describe('what kills the sexting while her script runs (Charles 26/11, `mood_killer`)', () => {
+  it('flags softly her pets, his partner, another man and money trouble', () => {
+    for (const bubble of [
+      'mon chat me regarde là 😹',
+      'et ta copine elle dort ?',
+      'mon ex faisait pareil',
+      'j’ai mon loyer à payer demain',
+      'my dog is barking',
+    ]) {
+      expect(
+        checkMoodKillers([bubble], false).map((v) => [v.code, v.severity]),
+        bubble,
+      ).toEqual([['mood_killer', 'soft']]);
+    }
+  });
+
+  it('lets another man pass when a fantasy of his asks for one, and leaves the rest', () => {
+    expect(checkMoodKillers(['imagine un autre homme qui nous regarde'], true)).toEqual([]);
+    expect(checkMoodKillers(['imagine un autre homme qui nous regarde'], false)).toHaveLength(1);
+    expect(checkMoodKillers(['ma chatte te réclame', 'continue comme ça'], false)).toEqual([]);
+  });
+});
+
 describe('guards read in context, not on a word alone (Charles 27/11, banc de la Sécurité)', () => {
   const raised = (bubble: string) => checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).map((v) => v.code);
   it.each([
@@ -830,6 +956,96 @@ describe('price_outside_offer, a price of hers only (Charles 27/11)', () => {
 
   it('reads the sums he wrote', () => {
     expect(sumsMinorOf('je te donne 20 € ou 12,50 euros, pas 30 balles')).toEqual([2_000, 1_250, 3_000]);
+  });
+});
+
+describe('a meeting she may only imagine (Charles 27/11)', () => {
+  it.each([
+    'imagine un week-end tous les deux dans un chalet',
+    'un jour peut-être, tu me ferais visiter',
+    'si on était dans un chalet je te garderais au chaud',
+    'imagine qu’on se voit, tu ferais quoi ?',
+    'on se voit au prochain live',
+    'samedi j’ai bossé toute la journée',
+    'je te réserve une surprise ce soir',
+    'je suis un peu réservée au début',
+    'je viens de rentrer, demain je bosse',
+    'j’adore Paris au printemps',
+  ])('lets the daydream « %s » through', (bubble) => {
+    expect(meetingCommitment(bubble)).toBeUndefined();
+    expect(codes([bubble])).not.toContain('meeting_promise');
+  });
+
+  it.each([
+    'on pourrait se voir samedi',
+    'un week-end tous les deux, le week-end prochain ?',
+    'on se retrouve la semaine pro',
+    'imagine qu’on se retrouve à Lyon',
+    'on pourrait organiser ça',
+    'je viens te voir',
+    'je pourrais venir te voir',
+    'je passe chez toi',
+    'réserve une chambre pour nous deux',
+    'je réserve l’hôtel',
+    'on se voit ?',
+    'on se voit quand ?',
+    'I’ll come see you',
+  ])('blocks the commitment « %s »', (bubble) => {
+    expect(codes([bubble])).toContain('meeting_promise');
+  });
+
+  it.each(['ok', 'avec plaisir', 'carrément 😍', 'Oui !'])(
+    'blocks her yes « %s » to a concrete proposal of his',
+    (bubble) => {
+      expect(meetingCommitment(bubble, 'samedi à Lyon ?')).toBeDefined();
+      expect(
+        checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, { fanLastMessage: 'on se voit samedi ?' }).map(
+          (v) => v.code,
+        ),
+      ).toContain('meeting_promise');
+    },
+  );
+
+  it('lets her yes through when he proposed no meeting, and her no when he did', () => {
+    expect(meetingCommitment('avec plaisir', 'tu m’envoies la suite ?')).toBeUndefined();
+    expect(meetingCommitment('ok', 'imagine un chalet tous les deux')).toBeUndefined();
+    expect(meetingCommitment('ok mais non, pas en vrai', 'samedi à Lyon ?')).toBeUndefined();
+    expect(meetingCommitment('haha t’es fou', 'samedi à Lyon ?')).toBeUndefined();
+  });
+
+  it('lets online, a dream or « ici » through over the whole sentence, and her everyday plans (Sécurité, #1043)', () => {
+    for (const bubble of [
+      'je viens chez toi dans mes rêves',
+      'on se voit demain ici mon cœur',
+      'on se retrouve ce soir sur reveal',
+      'on se voit ce soir en live ?',
+      'tu viens me voir demain sur mon live ?',
+      'je passe à paris demain pour un shooting',
+      'je réserve une table pour mon anniv avec mes copines',
+      'je cale mon réveil à 7h',
+      'on organise un live samedi',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('meeting_promise');
+    for (const bubble of [
+      'on se voit samedi',
+      'je viens te voir samedi',
+      'je réserve l’hôtel',
+      'on pourrait organiser ça',
+      'un verre toi et moi demain',
+      'je réserve une table pour nous deux samedi',
+      'on s’organise ?',
+      'on se voit samedi à lyon, ici il pleut',
+    ])
+      expect(codes([bubble]), bubble).toContain('meeting_promise');
+  });
+
+  it('reads his message as a proposal only when he asks or says « on », never in a dream or online', () => {
+    expect(meetingCommitment('ok trop bien', 'samedi je suis à lyon pour le taf')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'on se voit dans tes rêves ce soir ?')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'on se voit ce soir en live ?')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'samedi à lyon ?')).toBeDefined();
+    expect(meetingCommitment('ok', 'on se voit samedi')).toBeDefined();
+    expect(meetingCommitment('ok mais non', 'samedi à lyon ?')).toBeUndefined();
   });
 });
 

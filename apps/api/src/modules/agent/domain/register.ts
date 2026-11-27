@@ -33,6 +33,11 @@ export interface RegisterInput {
   readonly ageConfirmed: boolean;
   /** A human's « rien d'explicite » for him. */
   readonly noExplicit: boolean;
+  /**
+   * He already bought from her, ever (Charles 26/11): she may meet his level at once, hot is enough to be frank, without
+   * waiting for his crude words or a paid step of this evening. Absent: false.
+   */
+  readonly boughtBefore?: boolean;
 }
 
 const rank = (rung: Rung): number => REGISTER_LADDER.indexOf(rung);
@@ -46,7 +51,13 @@ export function registerOf(input: RegisterInput): Register {
   const bought = open && run.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought');
   // His own level, capped at explicit: what she may follow without any media. Before his first paid step, sensual at
   // most unless he is crude first, even hot with the teaser seen (Charles 23:09).
-  const his: Rung = input.heIsCrude || bought ? 'explicit' : input.hot ? 'sensual' : 'suggestive';
+  // A fan who already bought from her may be met at his level at once (Charles 26/11): hot is enough.
+  const his: Rung =
+    input.heIsCrude || bought || (input.boughtBefore === true && input.hot)
+      ? 'explicit'
+      : input.hot
+        ? 'sensual'
+        : 'suggestive';
   if (!open) return his;
   // What he has seen sets the floor and lets her go further: never prim on an explicit step.
   const seen = input.seenIntensities
