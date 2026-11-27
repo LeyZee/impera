@@ -93,6 +93,17 @@ export function wireScheduling(
           );
         },
       ),
+      'scheduling.check_uncovered': defineTask(
+        'scheduling.check_uncovered',
+        JOB_PAYLOADS['scheduling.check_uncovered'],
+        logger,
+        async (_payload, context) => {
+          context.logger.info(
+            { published: await module.jobs.checkUncovered(`job:${context.jobId}`) },
+            'scheduling: créneaux begun with nobody answering checked',
+          );
+        },
+      ),
       'scheduling.check_reports': defineTask(
         'scheduling.check_reports',
         JOB_PAYLOADS['scheduling.check_reports'],
