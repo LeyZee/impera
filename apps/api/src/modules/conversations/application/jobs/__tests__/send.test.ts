@@ -116,7 +116,7 @@ function world(send: OutboundSender['sendText']) {
     switches: { lockCreator: unused, archived: unused, isOn: unused, setCreator: unused },
     automatic: { personaActive: unused, decided: unused, latestBlindTest: unused, recordBlindTest: unused },
     audit: { record: unused },
-    scriptRuns: { latest: unused, open: unused, save: unused, stalled: unused },
+    scriptRuns: { latest: unused, open: unused, save: unused, stalled: unused, unbought: unused },
   };
   const uow: UnitOfWork = { inTenant: (_creatorId, work) => work(tx) };
   const sender: OutboundSender = {
