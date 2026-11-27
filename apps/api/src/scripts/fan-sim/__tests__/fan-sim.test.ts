@@ -374,7 +374,7 @@ describe('Julien against the real playground session', () => {
   it('plays his first week with the simulated catalogue, nothing sent anywhere', async () => {
     const root = fileURLToPath(new URL('../../../../../../', import.meta.url));
     const persona = readPersonaFile(
-      readFileSync(`${root}personas/demo/v0.5.0.yaml`, 'utf8'),
+      readFileSync(`${root}personas/demo/v0.7.0.yaml`, 'utf8'),
       'Elena',
       '2026-11-26',
     );
