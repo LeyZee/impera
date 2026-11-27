@@ -17,7 +17,7 @@
   gap: 10px 16px;
   padding: 12px;
   border-radius: var(--nv-radius-md);
-  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+  background: var(--nv-tile-fill);
 }
 .cl-row__main {
   flex: 1 1 240px;
@@ -87,8 +87,9 @@
   border-top: 1px solid var(--nv-hairline);
 }
 @media (max-width: 640px) {
+  /* « Relier » and « Modifier » side by side, one alone takes the row. */
   .cl-row > .nv-btn {
-    flex: 1 1 100%;
+    flex: 1 1 calc(50% - 8px);
     min-height: 44px;
   }
 }
@@ -160,5 +161,111 @@
   color: var(--nv-warning);
 }
 .cl-detected__refusal > .cl-row__dot {
+  flex: none;
+}
+/* Trafic › « Ses clics, heure par heure » (INS-02 lot e3): the answer on top, the hours, the links ranked. */
+.clh-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 32px;
+}
+.clh-side {
+  display: flex;
+  gap: 24px;
+  margin: 0;
+}
+.clh-side > div {
+  display: grid;
+  gap: 2px;
+}
+.clh-side dt {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.clh-side dd {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 650;
+}
+.clh-side > div[data-tone='warning'] dd {
+  color: var(--nv-warning);
+}
+.clh-side__share {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.clh-hours {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.clh-links {
+  display: grid;
+  gap: 6px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.clh-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 96px auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-tile-fill);
+}
+.clh-link__name {
+  display: grid;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.clh-link__place {
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+}
+.clh-link__spark {
+  height: 28px;
+}
+.clh-link__spark .nv-spark {
+  width: 100%;
+  height: 100%;
+}
+.clh-link__clicks {
+  font-weight: 650;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  /* On a phone the ranked links sit right under the columns, in the same order: the legend would say them twice. */
+  .clh-hours > .nv-keys {
+    display: none;
+  }
+  .clh-link {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .clh-link__spark {
+    display: none;
+  }
+}
+/* A link the hourly reading follows: a chain and the word; the owner's « Relier » on the others. */
+.cl-row__linked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-success);
+}
+.cl-row__linked svg,
+.cl-chain {
+  width: 16px;
+  height: 16px;
   flex: none;
 }

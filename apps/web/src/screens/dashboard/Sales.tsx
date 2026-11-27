@@ -5,13 +5,14 @@ import {
   nearestIndex,
   niceTicks,
   placeSegmentThumb,
-  ringDash,
 } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { changePercent, chartTip, eur, leverView, sharePercent, signed, trendSeries } from './logic';
 import { PERIODS, type Lever, type Period, type Sales, type SalesSeries } from './model';
 import { CountUp, type FloatingTip } from './parts';
+
+import { Ring } from '@/shell/figures/figures';
 
 const SUB: Record<Period, string> = {
   day: 'cumulé depuis minuit, l’agent hier en pointillés',
@@ -23,7 +24,6 @@ const AGAINST: Record<Period, string> = {
   week: 'par rapport à la semaine d’avant',
   month: 'par rapport aux 30 jours d’avant',
 };
-const RING_RADIUS = 28;
 
 /** Arrow keys of the radio group and the way they move (as Réglages › Apparence). */
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
@@ -136,22 +136,10 @@ export function SalesPanel({
               ],
             })}
           >
-            <div className="nv-ring" role="img" aria-label={`${String(share)} % vendu par l’agent`}>
-              <svg viewBox="0 0 66 66" aria-hidden="true">
-                <circle className="nv-ring__track" cx="33" cy="33" r={RING_RADIUS} />
-                <circle
-                  className="nv-ring__value"
-                  cx="33"
-                  cy="33"
-                  r={RING_RADIUS}
-                  strokeDasharray={ringDash(share / 100, RING_RADIUS)}
-                />
-              </svg>
-              <span className="nv-ring__label" aria-hidden="true">
-                <CountUp value={share} format={formatPercent} />
-                <span className="nv-ring__sub">agent</span>
-              </span>
-            </div>
+            <Ring share={share / 100} label={`${String(share)} % vendu par l’agent`}>
+              <CountUp value={share} format={formatPercent} />
+              <span className="nv-ring__sub">agent</span>
+            </Ring>
             <div className="nv-legend">
               <span className="nv-legend__item">
                 <i className="nv-legend__key" />

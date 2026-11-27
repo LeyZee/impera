@@ -124,12 +124,12 @@ export function ServiceHealth({
   );
 }
 
-/** A bolt in a ring: the spark of a real call. The ring turns while it runs. */
+/** A pulse in a ring: the service is asked whether it answers. The ring turns while it runs. */
 function ProbeIcon(): JSX.Element {
   return (
     <svg className="sv-probe__icon" viewBox="0 0 20 20" aria-hidden="true">
       <circle className="sv-probe__ring" cx="10" cy="10" r="8.25" pathLength="1" />
-      <path className="sv-probe__bolt" d="M11 3.8 6.3 11h3.4L9 16.2 13.7 9h-3.4z" />
+      <path className="sv-probe__pulse" d="M4.4 10h2.5l1.5-3.6 2.7 7.2 1.6-3.6h2.9" />
     </svg>
   );
 }

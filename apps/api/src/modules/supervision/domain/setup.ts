@@ -33,6 +33,13 @@ export interface CreatorSetupFacts {
   /** Of those, how many have pay rules (Réglages › Règles de paie). */
   readonly accountsWithPayRules: number;
   readonly hasActivePersona: boolean;
+  /**
+   * Her scripts the agent may offer (ADR 0161): ours, recognised in Reveal and active there, that play by day and by
+   * night (« jour et nuit » on both sides).
+   */
+  readonly scripts: { readonly day: number; readonly night: number };
+  /** Her grid of custom prices saved (ADR 0159 § C): the agent quotes nothing without it. */
+  readonly hasCustomPrices: boolean;
   /** An agency percentage in force today or earlier. */
   readonly hasAgencyRate: boolean;
   /**
@@ -69,6 +76,12 @@ export function creatorSetup(facts: CreatorSetupFacts): CreatorSetupStep[] {
   return [
     step('platform_account', doneIf(accounts > 0)),
     step('persona', doneIf(facts.hasActivePersona)),
+    // At least one by day and one by night, or the agent has nothing to offer half the time (trous du 21/11).
+    step('scripts', doneIf(facts.scripts.day > 0 && facts.scripts.night > 0), {
+      kind: 'scripts',
+      ...facts.scripts,
+    }),
+    step('custom_prices', doneIf(facts.hasCustomPrices)),
     // Done by a percentage, or by her share read at Reveal: the percentage is then optional (ADR 0054 § 7).
     step(
       'agency_rate',

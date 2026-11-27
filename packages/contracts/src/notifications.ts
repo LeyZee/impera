@@ -140,6 +140,11 @@ export const NOTIFICATION_REASONS = [
    */
   'owner_change',
   /**
+   * A question put to a creator on her « À décider » card (ADR 0164 § 9): once per question, held in the quiet hours,
+   * within the daily cap like a reminder.
+   */
+  'decision',
+  /**
    * A member's « Où te verser » changed (ADR 0165 § 5), to his own devices: it rings even in the quiet hours and outside
    * the daily cap, so that a change he did not make is heard before a transfer.
    */
@@ -163,6 +168,33 @@ export type NotificationRequest = z.infer<typeof NotificationRequestSchema>;
 
 /** What became of it: rung now, held for the recap, grouped with a burst of sales, silent past the cap, or already done. */
 export type NotificationOutcome = 'rang' | 'held' | 'grouped' | 'silent' | 'duplicate';
+
+/** How many days « Tes notifications » goes back: the recap of a night, a weekend away, never an archive. */
+export const NOTIFICATION_INBOX_DAYS = 7;
+/** At most this many lines, newest first. */
+export const NOTIFICATION_INBOX_MAX = 60;
+
+/**
+ * One line of « Tes notifications » (trou 9 du 21/11): every notification asked for the account, rung or not. `quiet`
+ * is true for the ones that never rang on their own (held for the quiet hours then recapped, or kept past the daily
+ * cap): the recap says « t’attendent dans Impera », this is where they wait. Title and path only, as on the lock screen:
+ * never a fan's name nor what he wrote (ADR 0020).
+ */
+export const NotificationInboxItemSchema = z.object({
+  id: z.uuid(),
+  reason: NotificationReasonSchema,
+  title: z.string().min(1).max(PUSH_TITLE_MAX),
+  url: AppPathSchema,
+  quiet: z.boolean(),
+  at: z.iso.datetime({ offset: true }),
+});
+export type NotificationInboxItem = z.infer<typeof NotificationInboxItemSchema>;
+
+/** `GET /v1/notifications/inbox`: the account's own, the last {@link NOTIFICATION_INBOX_DAYS} days. */
+export const NotificationInboxSchema = z.object({
+  items: z.array(NotificationInboxItemSchema).max(NOTIFICATION_INBOX_MAX),
+});
+export type NotificationInbox = z.infer<typeof NotificationInboxSchema>;
 
 export const NOTIFICATION_ERROR_CODES = [
   /** « Tester » with no device subscribed on this account. */

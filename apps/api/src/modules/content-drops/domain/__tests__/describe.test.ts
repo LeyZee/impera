@@ -2,6 +2,7 @@ import { DropMediaDescriptionSchema, type ScriptDropSummary, type ScriptSegment 
 import { describe, expect, it } from 'vitest';
 
 import {
+  awaitsAgency,
   dropContextOf,
   handDescription,
   mediaHashOf,
@@ -289,5 +290,14 @@ describe('handDescription (recette créatrice 2)', () => {
     expect(written.detailed).toBe(long.trim());
     expect(written.durationS).toBeNull();
     expect(DropMediaDescriptionSchema.safeParse(written).success).toBe(true);
+  });
+});
+
+describe('awaitsAgency (Sécurité on #995)', () => {
+  it('holds a row with a review reason, a flag, or a content it cannot read; frees a clean one', () => {
+    expect(awaitsAgency({ reviewReasons: [], content: { flags: [] } })).toBe(false);
+    expect(awaitsAgency({ reviewReasons: ['unsure'], content: { flags: [] } })).toBe(true);
+    expect(awaitsAgency({ reviewReasons: [], content: { flags: ['weapon'] } })).toBe(true);
+    expect(awaitsAgency({ reviewReasons: [], content: null })).toBe(true);
   });
 });

@@ -1,0 +1,7 @@
+# 2026-11-21 — SCB-04 lot 4 a : garder les totaux de Reveal par étape (ADR 0129 § 12) — done
+Fait : les compteurs que Reveal donne sur chaque étape (`sentCount`, `paidBundlesCount`, `paidBundlesTotalAmount` de `scripts.list`), lus à chaque import puis perdus, sont portés par le contrat (`PlatformScriptStep.totals`, facultatif) et gardés par l'import, dans sa transaction, dans une table nouvelle `platform_script_step_daily` : une ligne par étape et par jour de la plateforme, la dernière lecture du jour par-dessus, les jours d'avant gardés. Ils n'entrent pas dans l'empreinte d'un script. Migration additive (RLS forcée, lecture de l'agence comme ses scripts, fermée au compte de la créatrice, `impera_service` lit et écrit, `nirvana_app` lit). Tests : mapping contre FakeReveal (étape de séquence et étape seule), domaine (empreinte, une étape une fois, ref trop longue), application (jour de Paris, plateforme sans jour), intégration (une ligne par jour, la dernière lecture, fermée au compte de la créatrice, rôle applicatif en lecture seule).
+Pas fait : le relevé quotidien automatique. Aujourd'hui l'import ne tourne qu'avec la synchronisation du coffre ; un job quotidien qui le met en file pour chaque compte demande un accès de plus du rôle de service (plafond, avis de Sécurité). Puis le bilan d'un script (4 c) et sa vue (4 d).
+Décisions : aucune (ADR 0129 § 12).
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : `pnpm check` ; tests des modules scripts et connecteurs, plafond du rôle de service ; intégration en CI.

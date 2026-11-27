@@ -30,6 +30,9 @@ Chaque réponse passe sous les gardes `no_commitment` (ni oui, ni prix, ni déla
 
 - `GET /v1/creators/:creatorId/custom-prices` : la grille en vigueur, la grille vide (version 0) avant le premier enregistrement.
 - `PUT /v1/creators/:creatorId/custom-prices` : la grille entière, sur la version lue (`baseVersion`). Une autre version enregistrée depuis : `custom_prices_version_conflict` (409), rien n'est écrit. Le même enregistrement rejoué rend la même version.
+- `GET /v1/creators/:creatorId/custom-orders?scope=active|all` : ses commandes, la plus récente d'abord, avec le nom du fan et sa dernière conversation. Propriétaire, ou manager actif qui la suit (lecture seule).
+- `POST /v1/creators/:creatorId/custom-orders/:orderId/decision` : son oui à un prix (`priceMinor`, l'acompte est calculé) ou son non. Propriétaire seul ; une commande déjà répondue : `custom_order_move_conflict` (409).
+- `POST /v1/creators/:creatorId/custom-orders/:orderId/advance` : acompte reçu (seulement si son prix en demande un), livrée, annulée. Propriétaire seul.
 - Refus : `custom_prices_creator_not_found` (404), aussi pour un compte qui n'est pas le propriétaire de l'agence.
 
 ## Règles tenues par le code

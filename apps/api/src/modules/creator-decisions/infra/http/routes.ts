@@ -6,6 +6,11 @@ import {
   CreatorDecisionParamsSchema,
   CreatorDecisionsSchema,
   DomainError,
+  OtherIdeasBodySchema,
+  OtherIdeasSchema,
+  type CreatorDecision,
+  type CreatorDecisionId,
+  type OtherIdeasBody,
   type UserRole,
 } from '@impera/contracts';
 import { NotACreatorAccount } from '@impera/db';
@@ -19,6 +24,13 @@ export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandle
 
 export interface DecisionRoutesDeps {
   readonly store: DecisionStore;
+  /** « D'autres idées », with her right read again in her account. */
+  readonly otherIdeas: (
+    userId: string,
+    id: CreatorDecisionId,
+    wish: OtherIdeasBody,
+    now: Date,
+  ) => Promise<CreatorDecision>;
   readonly requireRole: RequireRole;
   readonly clock?: () => Date;
 }
@@ -87,6 +99,23 @@ export function createDecisionRoutes(deps: DecisionRoutesDeps): FastifyPluginAsy
         await asCreator(() => deps.store.later(actorOf(request).userId, request.params.id, clock()));
         return reply.code(204).send();
       },
+    );
+
+    app.post(
+      '/creator-space/decisions/:id/other-ideas',
+      {
+        ...creatorOnly,
+        schema: {
+          params: CreatorDecisionParamsSchema,
+          body: OtherIdeasBodySchema,
+          response: { 200: OtherIdeasSchema },
+        },
+      },
+      async (request) => ({
+        decision: await asCreator(() =>
+          deps.otherIdeas(actorOf(request).userId, request.params.id, request.body, clock()),
+        ),
+      }),
     );
 
     app.get(

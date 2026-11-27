@@ -5,13 +5,15 @@ import { useCallback, type JSX, type ReactNode } from 'react';
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
 import { CreatorPicker } from './CreatorPicker';
-import { FunnelPanel } from './Funnel';
+import { AGENT_PATH, FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
+import { OwnerDecisions } from './OwnerDecisions';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TodoCard } from './TodoCard';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
+import { SteeringPanel } from './agency/Steering';
 import type { AgencySelection } from './agency/period';
 import { agentRuns, litParts } from './logic';
 import type { Fan, Period, Todo, Tone } from './model';
@@ -278,6 +280,14 @@ function Loaded({
   const several = agency === undefined && (creators?.length ?? 0) >= 2;
   // Her photo copied at her import (CRM-07 b2), read in the list: the Dashboard's answer does not carry it.
   const hasPhoto = creators?.find((one) => one.id === creatorId)?.hasAvatar === true;
+  const ownerDecisions = (at: 'top' | 'under-day'): JSX.Element | null =>
+    forOwner ? (
+      <OwnerDecisions
+        creators={creators?.filter((one) => one.id === creatorId) ?? []}
+        showWho={false}
+        at={at}
+      />
+    ) : null;
 
   const navigate = useNavigate();
   // Every line opens in Suivi, where a draft is decided and a handoff given back; a best fan too, on his conversation.
@@ -374,9 +384,23 @@ function Loaded({
           where they go are the owner's to set (Réglages › Bots Telegram): anyone else reads it. */}
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
+      {/* What she has not answered yet, the owner answering in her place (INS-05): here while one ends soon, else under
+          the day's goal; nothing if nothing waits. */}
+      {ownerDecisions('top')}
+
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
       {agency === undefined ? null : (
+        <SteeringPanel
+          creatorId={creatorId}
+          opensTracking={opensTracking}
+          tip={tip}
+          index={2}
+          afterDay={ownerDecisions('under-day')}
+        />
+      )}
+      {agency === undefined ? null : (
         <AgencyInsightsPanel
+          index={5}
           selection={agency.selection}
           onSelection={agency.onSelection}
           creatorId={creatorId}
@@ -393,7 +417,13 @@ function Loaded({
           </Section>
 
           <Section title="Parcours des fans" sub={FUNNEL_SUB[period]} index={3}>
-            <FunnelPanel key={period} counts={sales.funnel.counts} before={sales.funnel.before} tip={tip} />
+            <FunnelPanel
+              key={period}
+              labels={AGENT_PATH}
+              counts={sales.funnel.counts}
+              before={sales.funnel.before}
+              tip={tip}
+            />
           </Section>
         </>
       )}
@@ -445,6 +475,8 @@ function Loaded({
       {/* The export, the invoices and the documents are the owner's to settle (OPS-02, EQ-06 lot 8d), the reports that
           wait are their reviewer's (ADR 0073): one card, « À faire » (W3). */}
       {agency === undefined ? <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} /> : null}
+      {/* Without the steering's cards, what she has not answered stands here when nothing ends soon. */}
+      {agency === undefined ? ownerDecisions('under-day') : null}
 
       {tip.element}
     </div>

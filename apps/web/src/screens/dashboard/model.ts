@@ -1,3 +1,5 @@
+import type { CreatorId, FanId } from '@impera/contracts';
+
 import type { TelegramNight } from '@/settings/telegram/NightBanner';
 
 /**
@@ -31,6 +33,8 @@ export interface Todo {
   /** « Reçu à 23 h 41 », her time: the exact hour, in the line's tip. */
   readonly at: string;
   readonly conversationId: string;
+  /** A « Demande sur mesure »: whose fan, to unfold his order's card under the line (ADR 0159, trous béants 6). */
+  readonly customOrder?: { readonly creatorId: CreatorId; readonly fanId: FanId };
 }
 
 /**

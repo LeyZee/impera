@@ -1,0 +1,18 @@
+# Langue du fan, L6 (ADR 0168) : un « ciao bella » au milieu d'un message français ne change pas la langue ; elle reste
+# en français. Fan et messages fictifs (ADR 0010).
+description: Deux mots d'italien dans une phrase française ; elle reste en français.
+persona_version: demo
+tier: full
+history:
+  - from: fan
+    text: coucou, ça va ce soir ?
+  - from: creator
+    text: Ça va super et toi, ta journée ?
+inbound: ciao bella, ma journée était longue mais là je suis content de te parler
+expect:
+  voice:
+    bubbles_min: 1
+    must_match_any:
+      - \b(je|tu|toi|ta|ton|et|c’est|c'est)\b
+    must_not_match:
+      - \b(ciao|grazie|sono|anche|you|the)\b

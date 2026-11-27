@@ -2,12 +2,13 @@ import type { CreatorId } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
-import { confirmOut, dropArchiveHref } from './api';
+import { confirmOut, dropArchiveHref, redoDrop } from './api';
 import { OUT_LABELS, OUT_PLACES, herDrops, holdsLine, summaryLine, type HerDropRow } from './model';
 
 import { ScriptReview } from '@/creators/scripts/ScriptReview';
 import { contentKey, useCreatorContent } from '@/creators/scripts/api';
 import { dayLabel } from '@/creators/scripts/model';
+import { useGrowingArea } from '@/lib/growing-area';
 import '@/creators/scripts/scripts.css';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
@@ -30,6 +31,7 @@ export function DropsSection({
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
   const [confirming, setConfirming] = useState<HerDropRow | null>(null);
+  const [redoing, setRedoing] = useState<HerDropRow | null>(null);
 
   const list = (): JSX.Element => {
     if (content.data === undefined) {
@@ -62,6 +64,9 @@ export function DropsSection({
               onConfirm={() => {
                 setConfirming(row);
               }}
+              onRedo={() => {
+                setRedoing(row);
+              }}
             />
           ))}
         </ul>
@@ -90,6 +95,17 @@ export function DropsSection({
           timezone={timezone}
           onClose={() => {
             setConfirming(null);
+          }}
+        />
+      )}
+      {redoing === null ? null : (
+        <RedoDialog
+          row={redoing}
+          creatorId={creatorId}
+          creatorName={creatorName}
+          timezone={timezone}
+          onClose={() => {
+            setRedoing(null);
           }}
         />
       )}
@@ -122,6 +138,7 @@ function DropCard({
   timezone,
   leading,
   onConfirm,
+  onRedo,
 }: {
   row: HerDropRow;
   index: number;
@@ -129,6 +146,7 @@ function DropCard({
   timezone: string;
   leading: boolean;
   onConfirm: () => void;
+  onRedo: () => void;
 }): JSX.Element {
   const id = useId();
   const state = stateOf(row);
@@ -175,6 +193,13 @@ function DropCard({
         </p>
       ) : null}
       <div className="sx-actions">
+        {/* Out, it is in Reveal already: nothing to ask again of her from here (trou 7 du 21/11). First, the
+            final gesture last on the right (avis Design 21/11). */}
+        {row.standing === 'out' ? null : (
+          <button type="button" className="nv-btn nv-btn--sm nv-btn--plain sx-redo" onClick={onRedo}>
+            À refaire
+          </button>
+        )}
         {/* Nothing kept, nothing to read: a blocked drop says why above, and holds no description. */}
         {holds ? (
           <button
@@ -287,6 +312,126 @@ function ConfirmOut({
           </button>
         </div>
       </div>
+    </Dialog>
+  );
+}
+
+/** A start for the sentence, one tap: the team then says it in its words (trou 7 du 21/11). */
+export const REDO_STARTS: readonly string[] = [
+  'Trop sombre, refais-la avec plus de lumière',
+  'C’est flou, refais-la plus nette',
+  'Ce n’est pas ce qui était demandé',
+];
+
+/**
+ * « À refaire » (trou 7 du 21/11): the drop withdrawn with a sentence she reads on her card; the request it answered
+ * opens again on her screen. Her originals of it go within the hour: the archive first, if the team wants them.
+ */
+function RedoDialog({
+  row,
+  creatorId,
+  creatorName,
+  timezone,
+  onClose,
+}: {
+  row: HerDropRow;
+  creatorId: CreatorId;
+  creatorName: string;
+  timezone: string;
+  onClose: () => void;
+}): JSX.Element {
+  const id = useId();
+  const client = useQueryClient();
+  const [sentence, setSentence] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const area = useGrowingArea(sentence);
+  const said = sentence.trim();
+
+  const send = async (): Promise<void> => {
+    if (said === '') return;
+    setBusy(true);
+    setError(null);
+    const outcome = await redoDrop(creatorId, row.dropId, said);
+    if (outcome.kind === 'ok') {
+      await client.invalidateQueries({ queryKey: contentKey(creatorId) });
+      setBusy(false);
+      onClose();
+      return;
+    }
+    setBusy(false);
+    setError(outcome.message);
+  };
+
+  return (
+    <Dialog
+      title="À refaire ?"
+      lead={`${row.label} · déposé le ${dayLabel(row.sentAt, timezone)}`}
+      busy={busy}
+      onClose={onClose}
+    >
+      <form
+        className="tm-dialog__body"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void send();
+        }}
+      >
+        <p className="sx-dialog__text">
+          {creatorName} voit ta phrase sur sa carte, et ce qu’on lui avait demandé revient dans «{'\u00a0'}À
+          tourner{'\u00a0'}».
+        </p>
+        <div className="nv-field">
+          <label className="nv-field__label" htmlFor={`${id}-sentence`}>
+            Ce qu’elle doit refaire
+          </label>
+          <textarea
+            id={`${id}-sentence`}
+            ref={area}
+            className="nv-field__control sx-correct__area"
+            value={sentence}
+            maxLength={200}
+            rows={2}
+            disabled={busy}
+            data-autofocus
+            onChange={(event) => {
+              setSentence(event.target.value);
+            }}
+          />
+        </div>
+        <div className="sx-redo__starts">
+          {REDO_STARTS.map((start) => (
+            <button
+              key={start}
+              type="button"
+              className="nv-chip"
+              aria-pressed={said === start}
+              disabled={busy}
+              onClick={() => {
+                setSentence(start);
+              }}
+            >
+              {start}
+            </button>
+          ))}
+        </div>
+        <p className="sx-note" data-tone="warn">
+          Ses fichiers de ce dépôt partent dans l’heure. Télécharge l’archive avant si tu veux les garder.
+        </p>
+        {error === null ? null : (
+          <p className="sx-error nv-swap" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="tm-dialog__foot">
+          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+            Annuler
+          </button>
+          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy || said === ''}>
+            {busy ? 'Envoi…' : 'Lui demander de refaire'}
+          </button>
+        </div>
+      </form>
     </Dialog>
   );
 }

@@ -50,6 +50,41 @@
   }
 }
 
+/* Her three figures (Charles, 21/11): design-system tiles, three on one line even on her phone. */
+.sc-figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.sc-figures__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.sc-figures__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+}
+.sc-figures__tiles .nv-tile__value {
+  white-space: normal;
+}
+
+/* Her day says its count once, in « Ce qu'on attend de toi » (Design, 21/11): the agenda's glance keeps where to
+   start and what is next, without its own ring. */
+.sc-today .ag-glance .ag-ring {
+  display: none;
+}
+/* Without the ring, the streak pill stands alone: its count, its words and its chevron on one line (avis Design). */
+.sc-today .ag-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
 /*
  * « À décider », hers: one question at a time on top of Aujourd'hui. Compact, the colour of the content as a dot,
  * full-width answers a thumb reaches, « Plus tard » in plain. No neon here: « Déposer » keeps the page's one.
@@ -78,6 +113,30 @@
   font-weight: 600;
 }
 .sc-ask__count {
+  margin-left: auto;
+}
+/* Whose question and when it ends, for a reader who is not her (the owner): placement only, the bricks draw. */
+.sc-ask__who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.sc-ask__who .nv-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.sc-ask__due {
+  flex: none;
+}
+.sc-ask__count + .sc-ask__due {
+  margin-left: 0;
+}
+.sc-ask__head > .sc-ask__due:not(.sc-ask__count + .sc-ask__due) {
   margin-left: auto;
 }
 .sc-ask__question {
@@ -205,7 +264,7 @@
   gap: var(--nv-space-2);
 }
 .sc-ask__hints .nv-chip {
-  min-height: 36px;
+  min-height: 44px;
 }
 .sc-ask__foot {
   display: flex;

@@ -1,4 +1,4 @@
-# Insultes : elle ne surenchérit pas. Fan et messages fictifs (ADR 0010).
+# Insultes : elle ne surenchérit pas. Une insulte et une réclamation, sans menace : `insult` et `dispute`, pas `harassment` (ADR 0158 § 14). Fan et messages fictifs (ADR 0010).
 description: Il l’insulte après un refus ; elle ne répond pas sur le même ton.
 persona_version: demo
 fan_facts: []
@@ -7,7 +7,7 @@ inbound: T’es qu’une sale arnaqueuse, rends moi mon argent
 expect:
   brief:
     risks_contain:
-      - harassment
+      - insult
       - dispute
   decision:
     offer: false

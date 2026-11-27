@@ -9,7 +9,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from '@impera/contracts';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { withAdmin, withCreatorAccount, withTenantMember } from './client';
@@ -202,6 +202,347 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
     expect(await failure(asNora((tx) => tx.insert(s.contentDropFiles).values(file(nora, mine.id))))).toMatch(
       /row-level security/u,
     );
+  });
+
+  it('she withdraws a blocked drop, its reason kept: her guard never lets her clear it (grande recette du 21/11)', async () => {
+    const blocked = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(blocked));
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'blocked', blockedReason: 'Aucun fichier gardé' })
+        .where(eq(s.contentDrops.id, blocked.id)),
+    );
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.update(s.contentDrops).set({ blockedReason: null }).where(eq(s.contentDrops.id, blocked.id)),
+        ),
+      ),
+    ).toMatch(/only withdraws|permission denied/u);
+    await asNora((tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: noraUser })
+        .where(eq(s.contentDrops.id, blocked.id)),
+    );
+    expect(await stateOf(blocked.id)).toMatchObject({
+      state: 'withdrawn',
+      blockedReason: 'Aucun fichier gardé',
+    });
+    // A reason still never stands on a drop that is neither blocked nor withdrawn.
+    const ready = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(ready));
+    expect(
+      await failure(
+        withAdmin(test.admin.db, (tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ state: 'ready', blockedReason: 'Aucun fichier gardé' })
+            .where(eq(s.contentDrops.id, ready.id)),
+        ),
+      ),
+    ).toMatch(/content_drops_blocked_check/u);
+  });
+
+  it('only her team withdraws a drop with « À refaire », a sentence of 1 to 200 characters (trou 7 du 21/11)', async () => {
+    const mine = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(mine));
+    const withdrawn = { state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: noraUser } as const;
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ ...withdrawn, redoSentence: 'Je me le demande moi-même' })
+            .where(eq(s.contentDrops.id, mine.id)),
+        ),
+      ),
+    ).toMatch(/only her team asks a drop again/u);
+    // Never on a live drop, never empty.
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ redoSentence: 'Trop sombre' })
+            .where(eq(s.contentDrops.id, mine.id)),
+        ),
+      ),
+    ).toMatch(/content_drops_redo_check/u);
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ ...withdrawn, withdrawnBy: manager, redoSentence: '' })
+            .where(eq(s.contentDrops.id, mine.id)),
+        ),
+      ),
+    ).toMatch(/content_drops_redo_check/u);
+    await asTeam(manager, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({
+          ...withdrawn,
+          withdrawnBy: manager,
+          redoSentence: 'Trop sombre, refais-la avec plus de lumière',
+        })
+        .where(eq(s.contentDrops.id, mine.id)),
+    );
+    expect(await stateOf(mine.id)).toMatchObject({
+      state: 'withdrawn',
+      redoSentence: 'Trop sombre, refais-la avec plus de lumière',
+    });
+    // She never wipes it: refused, or her policy does not even reach a withdrawn drop.
+    await failure(
+      asNora((tx) =>
+        tx.update(s.contentDrops).set({ redoSentence: null }).where(eq(s.contentDrops.id, mine.id)),
+      ),
+    );
+    expect((await stateOf(mine.id))?.redoSentence).toBe('Trop sombre, refais-la avec plus de lumière');
+  });
+
+  it('only her team asks one medium again, on a drop received and not out, and only the server resets its export', async () => {
+    const mine = drop(nora, noraUser);
+    const medium = file(nora, mine.id);
+    await asNora(async (tx) => {
+      await tx.insert(s.contentDrops).values(mine);
+      await tx.insert(s.contentDropFiles).values(medium);
+    });
+    const ask = (sentence: string | null) => ({
+      redoSentence: sentence,
+      redoAt: new Date(),
+      redoBy: manager,
+    });
+    const fileOf = async () => {
+      const [row] = await withAdmin(test.admin.db, (tx) =>
+        tx.select().from(s.contentDropFiles).where(eq(s.contentDropFiles.id, medium.id)),
+      );
+      return row;
+    };
+    // Still on its way: nothing to ask again.
+    expect(
+      await asTeam(manager, (tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set(ask('Trop sombre'))
+          .where(eq(s.contentDropFiles.id, medium.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    await withAdmin(test.admin.db, (tx) =>
+      tx.update(s.contentDrops).set({ state: 'received' }).where(eq(s.contentDrops.id, mine.id)),
+    );
+    // Never by her, never by a chatter, never empty.
+    await failure(
+      asNora((tx) =>
+        tx.update(s.contentDropFiles).set(ask('Moi')).where(eq(s.contentDropFiles.id, medium.id)),
+      ),
+    );
+    expect(
+      await asTeam(chatter, (tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set(ask('Trop sombre'))
+          .where(eq(s.contentDropFiles.id, medium.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    expect((await fileOf())?.redoSentence).toBeNull();
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx.update(s.contentDropFiles).set(ask('')).where(eq(s.contentDropFiles.id, medium.id)),
+        ),
+      ),
+    ).toMatch(/content_drop_files_redo_check/u);
+    // Signed by whoever asks, never in the owner's name.
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx
+            .update(s.contentDropFiles)
+            .set({ ...ask('Trop sombre'), redoBy: owner })
+            .where(eq(s.contentDropFiles.id, medium.id)),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
+    await asTeam(manager, (tx) =>
+      tx.update(s.contentDropFiles).set(ask('Trop sombre')).where(eq(s.contentDropFiles.id, medium.id)),
+    );
+    expect((await fileOf())?.redoSentence).toBe('Trop sombre');
+    // Out on her feed: no longer asked.
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'ready', exportedAt: new Date(), exportedBy: owner })
+        .where(eq(s.contentDrops.id, mine.id)),
+    );
+    expect(
+      await asTeam(owner, (tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set(ask('Autre'))
+          .where(eq(s.contentDropFiles.id, medium.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    // An export is taken back by the server alone, for a script, in the transaction that says so.
+    const reset = { exportedAt: null, exportedBy: null } as const;
+    expect(
+      await failure(
+        withAdmin(test.admin.db, async (tx) => {
+          await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
+          await tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, mine.id));
+        }),
+      ),
+    ).toMatch(/an export is confirmed once/u);
+    const script = drop(nora, owner, {
+      category: 'script',
+      requestId: await withAdmin(test.admin.db, async (tx) => {
+        const asked = request(owner, { category: 'script', structureId });
+        await tx.insert(s.contentRequests).values(asked);
+        return asked.id;
+      }),
+      state: 'ready',
+      scriptNumber: 1,
+      exportedAt: new Date(),
+      exportedBy: owner,
+    });
+    await withAdmin(test.admin.db, (tx) => tx.insert(s.contentDrops).values(script));
+    expect(
+      await failure(
+        withAdmin(test.admin.db, (tx) =>
+          tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, script.id)),
+        ),
+      ),
+    ).toMatch(/an export is confirmed once/u);
+    expect(
+      await failure(
+        asTeam(owner, async (tx) => {
+          await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
+          await tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, script.id));
+        }),
+      ),
+    ).toMatch(/an export is confirmed once|permission denied/u);
+    await withAdmin(test.admin.db, async (tx) => {
+      await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
+      await tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, script.id));
+    });
+    expect(await stateOf(script.id)).toMatchObject({ exportedAt: null, exportedBy: null });
+  });
+
+  it('she replaces a medium asked again or refused, in place, and nothing else; another creator never does', async () => {
+    const mine = drop(nora, noraUser);
+    const asked = file(nora, mine.id, 0);
+    const pending = file(nora, mine.id, 1);
+    await asNora(async (tx) => {
+      await tx.insert(s.contentDrops).values(mine);
+      await tx.insert(s.contentDropFiles).values([asked, pending]);
+    });
+    await withAdmin(test.admin.db, async (tx) => {
+      await tx.update(s.contentDrops).set({ state: 'ready' }).where(eq(s.contentDrops.id, mine.id));
+      await tx
+        .update(s.contentDropFiles)
+        .set({ state: 'refused', refusal: 'Photo illisible' })
+        .where(eq(s.contentDropFiles.id, asked.id));
+      await tx
+        .update(s.contentDropFiles)
+        .set({ state: 'received' })
+        .where(eq(s.contentDropFiles.id, pending.id));
+    });
+    const asInes = <T>(fn: Parameters<typeof withCreatorAccount<T>>[2]) =>
+      withCreatorAccount(test.app.db, inesUser, fn);
+    const markReplaced = (id: string) => (tx: Parameters<Parameters<typeof asNora>[0]>[0]) =>
+      tx
+        .update(s.contentDropFiles)
+        .set({ replacedAt: new Date() })
+        .where(eq(s.contentDropFiles.id, id))
+        .returning({ id: s.contentDropFiles.id });
+    const after = (position: number, values: Partial<typeof s.contentDropFiles.$inferInsert> = {}) => ({
+      ...file(nora, mine.id, position),
+      ...values,
+    });
+    const rowOf = async (id: string) => {
+      const [row] = await withAdmin(test.admin.db, (tx) =>
+        tx.select().from(s.contentDropFiles).where(eq(s.contentDropFiles.id, id)),
+      );
+      return row;
+    };
+
+    // Another creator: neither her file nor a file in her drop, under either name.
+    expect(await asInes(markReplaced(asked.id))).toEqual([]);
+    // Nothing is replaced in place of a file still there.
+    expect(await failure(asNora((tx) => tx.insert(s.contentDropFiles).values(after(0))))).toMatch(
+      /row-level security/u,
+    );
+    // A medium neither asked again nor refused is not hers to swap.
+    expect(await asNora(markReplaced(pending.id))).toEqual([]);
+    // Only `replaced_at`, and never back to empty.
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.update(s.contentDropFiles).set({ bytes: 1 }).where(eq(s.contentDropFiles.id, asked.id)),
+        ),
+      ),
+    ).toMatch(/permission denied/u);
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.update(s.contentDropFiles).set({ replacedAt: null }).where(eq(s.contentDropFiles.id, asked.id)),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
+    expect(await asNora(markReplaced(asked.id))).toEqual([{ id: asked.id }]);
+    expect(
+      await asNora((tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set({ replacedAt: null })
+          .where(eq(s.contentDropFiles.id, asked.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    expect((await rowOf(asked.id))?.replacedAt).not.toBeNull();
+
+    // The new one: at the old one's place and slot, waiting for its bytes, nothing settled on it.
+    for (const wrong of [
+      after(1),
+      after(0, { slotKey: 'salon::0' }),
+      after(0, { state: 'kept' }),
+      after(0, { redoSentence: 'Moi' }),
+      after(0, { replacedAt: new Date() }),
+    ])
+      expect(await failure(asNora((tx) => tx.insert(s.contentDropFiles).values(wrong)))).toMatch(
+        /row-level security|content_drop_files_redo_check/u,
+      );
+    expect(
+      await failure(asInes((tx) => tx.insert(s.contentDropFiles).values({ ...after(0), creatorId: ines }))),
+    ).toMatch(/row-level security/u);
+    expect(await failure(asInes((tx) => tx.insert(s.contentDropFiles).values(after(0))))).toMatch(
+      /row-level security/u,
+    );
+    const fresh = after(0);
+    await asNora((tx) => tx.insert(s.contentDropFiles).values(fresh));
+    expect(await rowOf(fresh.id)).toMatchObject({ state: 'awaiting', position: 0, replacedAt: null });
+    // The drop stays as it was: its receipt settles it.
+    expect(await stateOf(mine.id)).toMatchObject({ state: 'ready' });
+
+    // Out on her feed: nothing replaced any more.
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ exportedAt: new Date(), exportedBy: owner })
+        .where(eq(s.contentDrops.id, mine.id)),
+    );
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDropFiles)
+        .set({ state: 'refused', refusal: 'Photo illisible' })
+        .where(eq(s.contentDropFiles.id, fresh.id)),
+    );
+    expect(await asNora(markReplaced(fresh.id))).toEqual([]);
   });
 
   it('she never withdraws a scheduled drop, never touches a file, never deletes', async () => {

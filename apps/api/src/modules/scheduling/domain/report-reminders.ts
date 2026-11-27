@@ -66,7 +66,7 @@ function clockFormat(timeZone: string): Intl.DateTimeFormat {
 }
 
 /** « 23 h », « 23 h 30 », in `timeZone`. */
-function clockIn(at: Date, timeZone: string): string {
+export function clockIn(at: Date, timeZone: string): string {
   const parts = clockFormat(timeZone).formatToParts(at);
   const get = (type: string): string => parts.find((part) => part.type === type)?.value ?? '';
   const minutes = get('minute');

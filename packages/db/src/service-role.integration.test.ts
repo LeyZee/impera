@@ -61,6 +61,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   pay_period_blocks: ['insert', 'update', 'delete'],
   pay_periods: ['insert'],
   platform_script_step_media: ['insert', 'delete'],
+  // The import keeps the platform's totals of a step each day, the same day written over (ADR 0129 § 12).
+  platform_script_step_daily: ['insert', 'update'],
   script_identities: ['insert'],
   platform_script_steps: ['insert', 'delete'],
   // The recognition passes the agency's order and conditions to the native script a copy became (ADR 0112 § 23).

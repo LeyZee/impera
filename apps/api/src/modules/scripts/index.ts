@@ -2,6 +2,7 @@
 import type {
   CreatorId,
   JobPayload,
+  Platform,
   PlatformAccountId,
   ScriptStructureVersion,
   ScriptVariantLetter,
@@ -21,12 +22,14 @@ import {
   type PlatformScriptView,
 } from './application/platform-script-reads';
 import { creatorQueue, queuedDigest, type QueuedDigest, type ScriptsReader } from './application/reads';
+import { creatorScriptPerformance } from './application/script-performance';
 import { cardContent, cardSvg } from './domain/cards';
 import type {
   DiscountedPlatformScript,
   LimitsOf,
   PlatformScriptSource,
   RasterizeCard,
+  RunsSince,
   ScriptRequests,
   ScriptStructureStore,
 } from './domain/ports';
@@ -162,10 +165,18 @@ export interface ScriptsModule {
 interface PlatformScriptPorts {
   /** `connectors`: the scripts the platform lists for an account; `null` when its connector reads none now. */
   readonly source: PlatformScriptSource;
+  /** `connectors`: the zone of a platform's days, for the totals of its steps (ADR 0129 § 12); `null` for none. */
+  readonly dayZone: (platform: Platform) => string | null;
+  /** `conversations`: her runs started from a date, read by the team (ADR 0129, sous-lot 4c). */
+  readonly runsSince: RunsSince;
 }
 
-/** Until the connectors' read is wired: no account reads any script. */
-const NO_PLATFORM_SCRIPTS: PlatformScriptPorts = { source: () => Promise.resolve(null) };
+/** Until the connectors' read is wired: no account reads any script, and no run is counted. */
+const NO_PLATFORM_SCRIPTS: PlatformScriptPorts = {
+  source: () => Promise.resolve(null),
+  dayZone: () => null,
+  runsSince: () => Promise.resolve([]),
+};
 
 export interface ScriptsDeps {
   /** Application role: the library under the team's policies, the queue under her RLS too. */
@@ -231,6 +242,14 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       createDrizzleScriptIdentityReviewStore(deps.db),
       createDrizzleScriptBranchStore(deps.db),
       deps.requireRole,
+      (creatorId, reader, days) =>
+        creatorScriptPerformance(
+          { store: platformReads.store, dayZone: platform.dayZone, runsSince: platform.runsSince },
+          reader,
+          creatorId,
+          days,
+          new Date(),
+        ),
     ),
     preparedScriptRoutes: createPreparedScriptRoutes(
       createDrizzlePreparedScriptStore(deps.db),
@@ -253,6 +272,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
           {
             store: platformImports,
             source: platform.source,
+            dayZone: platform.dayZone,
             recognition: createDrizzlePreparedRecognitionStore(deps.adminDb),
             ...(onRecognitionFailed === undefined ? {} : { onRecognitionFailed }),
           },

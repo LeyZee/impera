@@ -1,8 +1,9 @@
 import { JOB_PAYLOADS, ScriptStructureIdSchema, asPersonaV2 } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
-import { PlatformReadUnavailable, type ConnectorsModule } from '../modules/connectors';
+import { PlatformReadUnavailable, salesFeedTimeZone, type ConnectorsModule } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
+import { scriptRunsForTeam } from '../modules/conversations';
 import type { PersonaModule } from '../modules/persona';
 import { createScriptsModule, type ScriptsModule } from '../modules/scripts';
 
@@ -61,6 +62,9 @@ export function wireScripts(
           throw error;
         }
       },
+      dayZone: salesFeedTimeZone,
+      // Her runs, for the performance of her scripts (ADR 0129, sous-lot 4c): read by the team, under her RLS.
+      runsSince: (creatorId, userId, since) => scriptRunsForTeam(shared.db, creatorId, userId, since),
     },
   });
   const now = deps.now ?? (() => new Date());

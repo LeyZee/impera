@@ -98,6 +98,67 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns('je suis né en 2007', now)).toEqual([]);
   });
 
+  // ADR 0168 § 4: the same net in Italian, Spanish and English, invented messages.
+  it.each([
+    'ho 16 anni',
+    'io ho quindici anni e tu?',
+    'quanti anni ho? ne ho 16',
+    '16 anni, sono troppo giovane?',
+    'sono minorenne',
+    'non ho ancora 18 anni',
+    'vado ancora alle medie',
+    'faccio la terza media',
+    'sto per compiere 18 anni',
+    'sono del 2011',
+    'tengo 15 años',
+    'tengo quince años de edad',
+    'soy menor de edad',
+    'no tengo 18 años todavía',
+    'estoy en tercero de la eso',
+    'voy a cumplir 18 el mes que viene',
+    'nací en 2012',
+    'i am 16',
+    'age: 15',
+    'i’m still in high school',
+    'i’m underage',
+    'i’ll be 18 next month',
+    'born in 2011',
+  ])('reads a minor in « %s » (Italian, Spanish, English)', (text) => {
+    expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).toEqual(['minor_suspected']);
+  });
+
+  it.each([
+    'ho 25 anni',
+    'ho 16 anni di esperienza',
+    'ho 2 figli',
+    'mia figlia ha 16 anni',
+    'quasi 18 euro, troppo',
+    'quando andavo alle medie ero timido',
+    'sono del 1990',
+    'tengo 30 años',
+    'tengo 2 hijos',
+    'tengo 15 años de casado',
+    'mi hija está en tercero de la eso',
+    'i am 30',
+    'almost 18 dollars for a coffee',
+    'my daughter is in high school',
+  ])('stays quiet on « %s » (Italian, Spanish, English)', (text) => {
+    expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).toEqual([]);
+  });
+
+  it.each([
+    'voglio farla finita',
+    'non ho più voglia di vivere',
+    'penso al suicidio',
+    'quiero morir',
+    'quiero quitarme la vida',
+    'no quiero seguir viviendo',
+    'i want to end my life',
+    'i keep wanting to hurt myself',
+  ])('reads self-harm in « %s » (Italian, Spanish, English)', (text) => {
+    expect(safetySigns(text)).toEqual(['self_harm']);
+  });
+
   it('says both, the minor first, when he says both', () => {
     expect(safetySigns('j’ai 15 ans et je veux mourir')).toEqual(['minor_suspected', 'self_harm']);
   });

@@ -21,7 +21,15 @@ import {
   PaySaleDecisionSchema,
   PaySaleSignalSchema,
   PenaltySchema,
+  MySaleClaimsSchema,
+  PendingSaleClaimsSchema,
   REAUTHENTICATION_ERROR_CODE,
+  SaleClaimSchema,
+  type AnswerSaleClaimBody,
+  type CreateSaleClaimBody,
+  type MySaleClaims,
+  type PendingSaleClaims,
+  type SaleClaim,
   type Bonus,
   type BonusTierSet,
   type CollectiveGoal,
@@ -404,6 +412,43 @@ export const decideSale = (body: CreatePaySaleDecisionBody): Promise<PayOutcome<
 /** A member's signal on a line of their own statement (CRM-03 lot b4c), or its withdrawal; the same `id` sent twice is one. */
 export const signalSale = (body: CreatePaySaleSignalBody): Promise<PayOutcome<PaySaleSignal>> =>
   send('POST', '/v1/payroll/sale-signals', body, (json) => PaySaleSignalSchema.parse(json));
+
+/**
+ * « J'ai été décisif sur une vente » (ADR 0101 §§ 18 to 22), the member's side: his claims, the newest first, and his
+ * ended shifts of the last 15 days that may still take one.
+ */
+export function useMySaleClaims(enabled: boolean): UseQueryResult<MySaleClaims> {
+  return useQuery({
+    queryKey: [...PAYROLL_KEY, 'sale-claims', 'mine'],
+    queryFn: () => read('/v1/payroll/sale-claims/mine', (body) => MySaleClaimsSchema.parse(body)),
+    enabled,
+    retry: READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
+}
+
+/** The claims no one answered yet, the oldest first, for the owner and an active manager (ADR 0101 § 19). */
+export function usePendingSaleClaims(enabled: boolean): UseQueryResult<PendingSaleClaims> {
+  return useQuery({
+    queryKey: [...PAYROLL_KEY, 'sale-claims', 'pending'],
+    queryFn: () => read('/v1/payroll/sale-claims', (body) => PendingSaleClaimsSchema.parse(body)),
+    enabled,
+    // A claim arrives without a write here: read again every minute, like the held sales.
+    refetchInterval: 60_000,
+    retry: READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
+}
+
+const saleClaim = (json: unknown): SaleClaim => SaleClaimSchema.parse(json);
+
+/** A member's claim on one of his ended shifts; the same `id` sent twice is one. */
+export const createSaleClaim = (body: CreateSaleClaimBody): Promise<PayOutcome<SaleClaim>> =>
+  send('POST', '/v1/payroll/sale-claims', body, saleClaim);
+
+/** A claim settled or not retained by a validator, or withdrawn by its member; the same answer twice is one. */
+export const answerSaleClaim = (id: string, body: AnswerSaleClaimBody): Promise<PayOutcome<SaleClaim>> =>
+  send('POST', `/v1/payroll/sale-claims/${id}/answer`, body, saleClaim);
 
 /** After a write, and after a refusal that says the period changed: everything pay shows reads again. */
 export function useRefreshPayroll(): () => Promise<void> {

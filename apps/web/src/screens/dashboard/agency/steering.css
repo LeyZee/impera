@@ -1,0 +1,504 @@
+/* ── « Le pilotage » (ADR 0092, avenant du 21/11/2026): the day's objective, traffic to money, the fans it hangs on. */
+.stg-body {
+  display: contents;
+}
+.stg-loading {
+  min-height: 260px;
+}
+
+/* The figures beside a gauge or a ring: a label, its value on the same line. */
+.stg-figures {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.stg-figures div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stg-figures dt {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.stg-figures dd {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+
+/* ── The day. */
+.stg-day {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: var(--nv-plate-pad);
+}
+.stg-day__head {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.stg-day__words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+/* The sentence in ink, a step under the day's figure; only its tag carries the tone. */
+.stg-day__verdict {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 600;
+  letter-spacing: var(--nv-text-headline-tracking);
+  color: var(--nv-ink);
+  text-wrap: balance;
+  --_c: var(--nv-ink-muted);
+}
+.stg-day__verdict[data-tone='up'] {
+  --_c: var(--nv-trend-up-text);
+}
+.stg-day__verdict[data-tone='down'] {
+  --_c: var(--nv-trend-down-text);
+}
+.stg-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-inline-end: 8px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--_k, var(--nv-series-2)) 35%, transparent);
+  vertical-align: 1px;
+}
+/* The ghost arc's own colour: the dot in front of the line it draws. */
+.stg-key[data-tone='up'] {
+  --_k: var(--nv-series-1);
+}
+.stg-key[data-tone='down'] {
+  --_k: var(--nv-trend-down);
+}
+.stg-day__tag {
+  display: inline-block;
+  margin-inline-end: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--_c) 14%, transparent);
+  color: var(--_c);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  vertical-align: 2px;
+}
+
+.stg-gauge {
+  flex: none;
+  --nv-donut-size: 184px;
+}
+/* Today's figure is the card's hero: bigger than a donut's usual middle. */
+.stg-gauge .stg-gauge__value {
+  font-size: var(--nv-text-title-1);
+  letter-spacing: var(--nv-text-title-1-tracking);
+}
+
+/* ── Traffic to money: the shared path, its note under it. */
+.stg-traffic {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: var(--nv-plate-pad);
+}
+
+/* One colour per step (Design, 21/11); the step that breaks keeps its colour, its amber flag says it. */
+.stg-traffic .db-funnel .nv-funnel__step .nv-funnel__bar,
+.stg-traffic .db-funnel .nv-funnel__step:not(.nv-funnel__step--break) .nv-funnel__bar {
+  --_c: var(--_step, var(--nv-data-1));
+  background: var(--_c);
+  opacity: 1;
+  box-shadow: none;
+}
+.stg-traffic .db-funnel .nv-funnel__step:hover .nv-funnel__bar,
+.stg-traffic .db-funnel .nv-funnel__step:focus-visible .nv-funnel__bar {
+  box-shadow: 0 0 18px color-mix(in oklab, var(--_c) 40%, transparent);
+  filter: brightness(1.1);
+}
+.stg-traffic .db-funnel {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  border: 0;
+}
+
+/* The answer first, big, the rest under it (Charles, 21/11). */
+.stg-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin: 0;
+}
+.stg-hero__figure {
+  font-size: var(--nv-text-large-title);
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.stg-hero__words {
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  color: var(--nv-ink-muted);
+}
+
+/* ── The fans it hangs on. */
+.stg-dep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-card-gap);
+}
+.stg-dep__card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: var(--nv-plate-pad);
+}
+/* The sentence is the card's title, strong: it is what the card says. */
+.stg-dep__lead {
+  margin: 0;
+  text-wrap: balance;
+}
+.stg-dep__card[data-pending] .stg-dep__lead {
+  color: var(--nv-ink-muted);
+}
+.stg-dep__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+}
+.stg-dep__card .ins-ring-card--bare {
+  padding: 0;
+}
+/* No comparison on this ring, so no delta column: its amounts end on the card's right edge, with the figures. */
+.stg-dep__card {
+  --nv-breakdown-cols: auto minmax(0, 1fr) auto auto;
+}
+.stg-dep__figures {
+  gap: 16px;
+}
+
+.stg-lapsed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--nv-plate-pad);
+}
+.stg-lapsed__sub {
+  font-family: var(--nv-font-sans);
+  font-size: var(--nv-text-caption);
+  font-weight: 450;
+  color: var(--nv-ink-faint);
+}
+.stg-lapsed__none {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.stg-lapsed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stg-lapsed__list li {
+  animation: stg-in var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * var(--nv-stagger) + var(--nv-dur-fast));
+}
+@keyframes stg-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.stg-lapsed__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(80px, 180px) auto auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: var(--nv-target-min);
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.stg-lapsed__row.is-link {
+  cursor: pointer;
+  transition: background var(--nv-dur-fast);
+}
+.stg-lapsed__row.is-link:hover {
+  background: var(--nv-plate-hover);
+}
+.stg-lapsed__row.is-link:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+.stg-lapsed__name {
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stg-lapsed__who {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.stg-lapsed__spent {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.stg-lapsed__since {
+  justify-self: end;
+  min-width: 42px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nv-fill-track);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--nv-ink-muted);
+}
+.stg-lapsed__meter {
+  min-width: 0;
+}
+
+/* The bars' legend: the dashed target and today's hatch drawn like the bars. */
+.stg-bars__keys {
+  margin-bottom: 10px;
+}
+.nv-keys .nv-key.stg-bars__key-today {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--nv-series-3) 0 2px,
+    color-mix(in oklab, var(--nv-series-3) 45%, transparent) 2px 4px
+  );
+}
+.stg-bars__key-target {
+  display: inline-block;
+  width: 16px;
+  border-top: 1.5px dashed var(--nv-ink-faint);
+}
+.stg-traffic__scale {
+  margin: -6px 0 0;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+
+@media (max-width: 720px) {
+  .stg-day__head {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .stg-day__words {
+    width: 100%;
+    text-align: center;
+  }
+  .stg-gauge {
+    --nv-donut-size: 168px;
+  }
+  .stg-dep__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* On a phone the tag stands alone on its line, the sentence under it. */
+  .stg-day__tag {
+    display: table;
+    margin: 0 auto 6px;
+  }
+  .stg-lapsed__row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px 10px;
+  }
+  .stg-lapsed__who {
+    display: none;
+  }
+  /* The meter on its own line under the fan, the full width. */
+  .stg-lapsed__meter {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stg-lapsed__list li {
+    animation: none;
+  }
+}
+
+/* ── « Ils t'attendent »: the fans waiting, before any figure. Red the grave, amber the rest; no bar on the left. */
+.urg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--nv-plate-pad);
+  --_c: var(--nv-warning);
+}
+.urg[data-tone='bad'] {
+  --_c: var(--nv-danger);
+}
+.urg__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.urg__pulse {
+  position: relative;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--_c);
+}
+.urg__pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--_c);
+  animation: urg-pulse var(--nv-dur-breathe) var(--nv-ease-out) infinite;
+}
+@keyframes urg-pulse {
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+.urg__title {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+}
+.urg__grave {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-danger);
+}
+.urg__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  text-decoration: none;
+}
+.urg__all:hover {
+  color: var(--nv-ink);
+}
+.urg__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.urg__list li {
+  animation: stg-in var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * var(--nv-stagger) + var(--nv-dur-fast));
+}
+.urg__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 0.9fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--nv-target-min);
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--nv-dur-fast);
+  --_c: var(--nv-warning);
+}
+.urg__row[data-tone='bad'] {
+  --_c: var(--nv-danger);
+}
+.urg__row:hover {
+  background: color-mix(in oklab, var(--_c) 9%, transparent);
+}
+.urg__row:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+.urg__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--_c);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--_c) 60%, transparent);
+}
+.urg__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.urg__who b {
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.urg__creator {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.urg__why {
+  overflow: hidden;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.urg__time {
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+  color: var(--_c);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .urg__row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+  /* The reason stays on a phone, on its own line under the fan: it says what to do. */
+  .urg__why {
+    grid-row: 2;
+    grid-column: 2 / -1;
+    white-space: normal;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .urg__pulse::after,
+  .urg__list li {
+    animation: none;
+  }
+}
