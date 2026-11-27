@@ -8,7 +8,7 @@ import {
   type CreatorId,
   type FanId,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -24,9 +24,9 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const PASSWORD = 'correct horse battery';
 
 /**
- * The staircase of her scripts' paid steps (ADR 0098, avenant du 27/11/2026): the agency's settings, entered by the
- * owner alone and empty until then, and what the agent reads of a fan for it (his biggest paid message). Everything is
- * invented (ADR 0010), the settings too.
+ * The cap at a script's start (ADR 0098, avenant du 27/11/2026): the agency's setting, entered by the owner alone with
+ * a recent sign-in and empty until then, and what the agent reads of a fan for it (his biggest paid message).
+ * Everything is invented (ADR 0010), the setting too.
  */
 describe('PUT /v1/creators/:id/staircase and the fan’s biggest purchase', () => {
   let test: TestDb;
@@ -132,13 +132,26 @@ describe('PUT /v1/creators/:id/staircase and the fan’s biggest purchase', () =
   });
 
   it('lets the owner alone set it, refuses a multiple not above one, and the agent reads it', async () => {
-    const setting = { targetMultiple: 1.7, startCapMultiple: 1.25, spendBranchJumpMultiple: 2.4 };
+    const setting = { startCapMultiple: 1.25 };
     expect((await call('PUT', 'manager', setting)).statusCode).toBe(403);
     expect((await call('PUT', 'owner', { startCapMultiple: 1 })).statusCode).toBe(400);
+    expect((await call('PUT', 'owner', { other: 1.1 })).statusCode).toBe(400);
     const saved = await call('PUT', 'owner', setting);
     expect(saved.statusCode).toBe(200);
     expect(saved.json()).toEqual(setting);
     expect((await call('GET', 'owner')).json()).toEqual(setting);
     expect((await fanStats()).staircase).toEqual(setting);
+  });
+
+  it('asks for a recent sign-in to change it, never to read it', async () => {
+    await test.admin.db.execute(
+      sql`update "session" set reauthenticated_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = 'owner@example.test')`,
+    );
+    const stale = await call('PUT', 'owner', {});
+    expect([stale.statusCode, stale.json<{ error: { code: string } }>().error.code]).toEqual([
+      403,
+      'reauthentication_forbidden',
+    ]);
+    expect((await call('GET', 'owner')).json()).toEqual({ startCapMultiple: 1.25 });
   });
 });

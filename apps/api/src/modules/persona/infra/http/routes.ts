@@ -215,8 +215,8 @@ export function createCreatorRoutes(
       },
     );
 
-    // Créatrices › (elle) › Compte: the staircase of her scripts' paid steps (ADR 0098, avenant du 27/11/2026), the
-    // agency's numbers, entered by the owner alone; none in the repository.
+    // Créatrices › (elle) › Compte › Paliers de ses fans: the cap at a script's start (ADR 0098, avenant du 27/11/2026),
+    // the agency's number, entered by the owner alone; none in the repository.
     app.get(
       '/creators/:id/staircase',
       {
@@ -233,7 +233,8 @@ export function createCreatorRoutes(
     app.put(
       '/creators/:id/staircase',
       {
-        preValidation: requireRole('owner'),
+        // Money: the owner's call, with a recent sign-in, like her other money settings.
+        preValidation: [requireRole('owner'), recentLogin],
         schema: {
           params: CreatorParamsSchema,
           body: StaircaseSettingSchema,

@@ -21,14 +21,7 @@ import { byRankThenRef } from './branches';
  * run or a reward may still name it); one back again is active again.
  */
 
-/**
- * The warning ceiling of a step's price: 40 € VAT included, in minor units (P6-01; unit confirmed by Charles on
- * 14/11/2026). A warning to the agency at import, never a refusal: the price stays the platform's.
- */
-const PLATFORM_SCRIPT_PRICE_CEILING_MINOR = 4000;
-
-type PlatformScriptWarningCode =
-  'price_more_than_double' | 'price_jump_over_setting' | 'price_above_ceiling' | 'step_without_default';
+type PlatformScriptWarningCode = 'price_more_than_double' | 'step_without_default';
 
 /** A step whose price the agency should look at; `position` counts from 0, as the platform's `stepIndex`. */
 export interface PlatformScriptWarning {
@@ -41,11 +34,6 @@ interface PricedStep {
   readonly platformIndex: number;
   readonly priceMinor: number;
   readonly currency: Currency;
-  /**
-   * A branch on his past spend (`spent_at_least`, the tier's branch of ADR 0132 § 12 bis): its jump is read against the
-   * agency's setting when there is one (ADR 0112 § 14, avenant du 27/11/2026). Absent: an ordinary step.
-   */
-  readonly spendBranch?: boolean;
 }
 
 /**
@@ -81,23 +69,15 @@ function paidStepsWithPrevious<T extends PricedStep>(
 
 /**
  * P6-01, path by path (ADR 0112 § 14): a paid step that costs more than twice the paid step before it on some path
- * (tripling cut the old bot's sales short), or more than the ceiling. A branch on his spend is read instead against
- * the agency's jump setting when she has one (`price_jump_over_setting`, avenant du 27/11/2026).
+ * (tripling cut the old bot's sales short). Free steps neither warn nor reset the comparison:
+ * the step before is the last paid one of the path. A change of currency between two paid steps compares nothing.
+ * Without branches, a path is the script.
  */
-export function priceWarnings(
-  steps: readonly PricedStep[],
-  options: { readonly spendBranchJumpMultiple?: number } = {},
-): PlatformScriptWarning[] {
+export function priceWarnings(steps: readonly PricedStep[]): PlatformScriptWarning[] {
   const warnings: PlatformScriptWarning[] = [];
   for (const { step, position, previous } of paidStepsWithPrevious(steps)) {
-    const setting = step.spendBranch === true ? options.spendBranchJumpMultiple : undefined;
-    if (previous.some((one) => step.priceMinor > (setting ?? 2) * one.priceMinor))
-      warnings.push({
-        code: setting === undefined ? 'price_more_than_double' : 'price_jump_over_setting',
-        position,
-      });
-    if (step.currency === 'EUR' && step.priceMinor > PLATFORM_SCRIPT_PRICE_CEILING_MINOR)
-      warnings.push({ code: 'price_above_ceiling', position });
+    if (previous.some((one) => step.priceMinor > 2 * one.priceMinor))
+      warnings.push({ code: 'price_more_than_double', position });
   }
   return warnings.sort((a, b) => a.position - b.position);
 }

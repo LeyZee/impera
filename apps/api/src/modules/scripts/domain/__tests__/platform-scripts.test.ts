@@ -166,14 +166,11 @@ describe('the price warnings of P6-01, never a refusal', () => {
   it('warns a paid step over twice the paid step before it, offered steps skipped', () => {
     expect(priceWarnings(line(eur(1_000), eur(0), eur(2_000), eur(2_100), eur(0), eur(4_300)))).toEqual([
       { code: 'price_more_than_double', position: 5 },
-      { code: 'price_above_ceiling', position: 5 },
     ]);
   });
 
-  it('warns a step above 40 € VAT included, and none at exactly 40 €', () => {
-    expect(priceWarnings(line(eur(4_000), eur(4_001)))).toEqual([
-      { code: 'price_above_ceiling', position: 1 },
-    ]);
+  it('warns no price for being high: the advised ceiling is gone (Charles, 27/11/2026)', () => {
+    expect(priceWarnings(line(eur(4_000), eur(7_900)))).toEqual([]);
   });
 
   it('compares nothing across two currencies, nor the first paid step', () => {
@@ -199,11 +196,10 @@ describe('the price warnings of P6-01, never a refusal', () => {
 });
 
 describe('the staircase of paid steps (ADR 0098 and ADR 0112 § 14, avenant du 27/11/2026)', () => {
-  const at = (platformIndex: number, priceMinor: number, spendBranch?: boolean) => ({
+  const at = (platformIndex: number, priceMinor: number) => ({
     platformIndex,
     priceMinor,
     currency: 'EUR' as const,
-    ...(spendBranch !== undefined && { spendBranch }),
   });
 
   it('asks each paid step to cost strictly more than the last paid one, free bridges skipped, nothing more', () => {
@@ -218,21 +214,6 @@ describe('the staircase of paid steps (ADR 0098 and ADR 0112 § 14, avenant du 2
     // Rank 1: a free branch and a paid one. On the free branch's path, 1 100 follows 1 000; on the other, 1 200.
     expect(priceNotAbovePrevious([at(0, 1_000), at(1, 0), at(1, 1_200), at(2, 1_100)])).toEqual([3]);
     expect(priceNotAbovePrevious([at(0, 1_000), at(1, 0), at(1, 1_200), at(2, 1_300)])).toEqual([]);
-  });
-
-  it('reads a branch on his spend against the agency’s jump setting, and as any step without it', () => {
-    // Invented setting.
-    const options = { spendBranchJumpMultiple: 2.4 };
-    expect(priceWarnings([at(0, 1_000), at(1, 2_400, true)], options)).toEqual([]);
-    expect(priceWarnings([at(0, 1_000), at(1, 2_500, true)], options)).toEqual([
-      { code: 'price_jump_over_setting', position: 1 },
-    ]);
-    expect(priceWarnings([at(0, 1_000), at(1, 2_400, true)])).toEqual([
-      { code: 'price_more_than_double', position: 1 },
-    ]);
-    expect(priceWarnings([at(0, 1_000), at(1, 2_400)], options)).toEqual([
-      { code: 'price_more_than_double', position: 1 },
-    ]);
   });
 });
 

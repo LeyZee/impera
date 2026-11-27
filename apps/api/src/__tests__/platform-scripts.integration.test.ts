@@ -280,11 +280,10 @@ describe('the native scripts imported from the platform', () => {
     expect([gone?.active, gone?.deactivatedAt?.toISOString()]).toEqual([false, at.toISOString()]);
     const changed = await ownerView('sequence_1');
     expect(changed?.steps.map((step) => step.priceMinor)).toEqual([500, 1_500, 4_500]);
-    // 5 € then 15 €: already more than double; then 45 €, three times 15 € and above 40 €.
+    // 5 € then 15 €: already more than double; then 45 €, more than double 15 €. No warning for a high price.
     expect(changed?.warnings).toEqual([
       { code: 'price_more_than_double', position: 1 },
       { code: 'price_more_than_double', position: 2 },
-      { code: 'price_above_ceiling', position: 2 },
     ]);
     // A gone script keeps its steps: a run or a reward may still name it.
     expect((await ownerView('sequence_2'))?.steps).toHaveLength(3);

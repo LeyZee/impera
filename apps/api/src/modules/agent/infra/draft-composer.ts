@@ -451,7 +451,6 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
     countsHisMessage: (input.waited ?? 0) === 0,
     pricing: {
       biggestPurchaseMinor: input.fan.biggestPurchaseMinor ?? null,
-      ...(input.fan.tier !== undefined && { fanTier: input.fan.tier }),
       ...(input.fan.staircase !== undefined && { setting: input.fan.staircase }),
     },
     ...(input.scriptAbandon !== undefined && {

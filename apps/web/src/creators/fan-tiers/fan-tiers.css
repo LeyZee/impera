@@ -40,3 +40,11 @@
   align-items: center;
   gap: var(--nv-space-3);
 }
+/* Plafond au lancement (ADR 0098, avenant du 27/11/2026): set apart from the tiers by a hairline. */
+.ft-cap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}

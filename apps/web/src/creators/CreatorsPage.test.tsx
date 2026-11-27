@@ -395,7 +395,6 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
       'acces',
       'part',
       'paliers',
-      'escalier',
       'profil',
       'telegram',
     ]);

@@ -4,6 +4,7 @@ import { useId, useState, type JSX } from 'react';
 
 import { Field } from '../persona/fields';
 
+import { StartCapForm } from './StartCapForm';
 import { fanTiersKey, saveFanTiers, useFanTiers } from './api';
 import { textsOf, TIER_FIELDS, tiersOf, type TierTexts } from './model';
 import './fan-tiers.css';
@@ -11,7 +12,8 @@ import './fan-tiers.css';
 /**
  * Créatrices › Compte › Paliers des fans (Charles, 21/11), the owner's alone: from how much one of her fans is a good
  * payer, a very good one, a whale. The chatter reads the tier beside what the fan spent, on Aujourd'hui and in Suivi.
- * Under the first threshold a fan who bought is « Payeur »; one who never bought is « Nouveau » for seven days.
+ * Under the first threshold a fan who bought is « Payeur »; one who never bought is « Nouveau » for seven days. Under
+ * them, the cap at a script's start (`StartCapForm`).
  */
 export function FanTiersSection({ creatorId }: { creatorId: CreatorId }): JSX.Element | null {
   const read = useFanTiers(creatorId);
@@ -94,6 +96,7 @@ function TiersForm({ creatorId, initial }: { creatorId: CreatorId; initial: Tier
           )}
         </div>
       </form>
+      <StartCapForm creatorId={creatorId} />
     </section>
   );
 }

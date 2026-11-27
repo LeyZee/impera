@@ -1,4 +1,4 @@
-import type { FanTiersSetting } from '@impera/contracts';
+import { StaircaseSettingSchema, type FanTiersSetting, type StaircaseSetting } from '@impera/contracts';
 
 import { eurosOfMinor, minorOfEuros } from '../custom-prices/model';
 
@@ -31,4 +31,22 @@ export function tiersOf(
   if (!(good < veryGood && veryGood < whale))
     return { problem: 'Chaque palier commence plus haut que le précédent.' };
   return { tiers: { goodFromMinor: good, veryGoodFromMinor: veryGood, whaleFromMinor: whale } };
+}
+
+/** The cap at a script's start as typed: a multiple, with a comma or a point; empty, the cap is off. */
+export const startCapTextOf = (setting: StaircaseSetting): string =>
+  setting.startCapMultiple === undefined ? '' : String(setting.startCapMultiple).replace('.', ',');
+
+/** The setting typed, or why it cannot be saved, in his words. */
+export function startCapOf(
+  text: string,
+): { readonly setting: StaircaseSetting } | { readonly problem: string } {
+  const trimmed = text.trim().replace(',', '.');
+  if (trimmed === '') return { setting: {} };
+  const parsed = StaircaseSettingSchema.safeParse({
+    startCapMultiple: /^\d+(\.\d+)?$/u.test(trimmed) ? Number(trimmed) : Number.NaN,
+  });
+  if (!parsed.success)
+    return { problem: 'Un multiple au-dessus de 1, jusqu’à 10, ou rien pour couper le plafond.' };
+  return { setting: parsed.data };
 }

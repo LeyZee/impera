@@ -169,9 +169,6 @@ export function gapText(content: PreparedScriptContent, gap: PreparedScriptGap):
 
 const WARNING_TEXTS: Readonly<Record<PreparedScriptWarning['code'], string>> = {
   price_more_than_double: 'plus du double de l’étape payante d’avant',
-  price_jump_over_setting:
-    'saut de prix au-delà du réglage de l’agence pour une branche selon la dépense : baisse son prix ou revois le réglage',
-  price_above_ceiling: 'au-dessus du prix le plus haut conseillé',
   step_without_default: 'aucune branche par défaut : un fan sans condition remplie ne reçoit rien',
 };
 

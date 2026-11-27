@@ -1,7 +1,6 @@
 import type {
   FanAvailabilityState,
   FanFlags,
-  FanTier,
   StaircaseSetting,
   Language,
   ScriptRunStatus,
@@ -416,8 +415,6 @@ function firstPaidStepFits(script: PlatformScriptView, pricing: StaircasePricing
       branchesMinor: [price],
       lastBoughtMinor: null,
       biggestPurchaseMinor: pricing?.biggestPurchaseMinor ?? null,
-      fanTier: null,
-      desire: 0,
       setting: pricing?.setting,
     }).kind === 'offer'
   );
@@ -469,11 +466,10 @@ export function stepPriceCheck(
 
 /**
  * What the staircase of paid steps reads of him (ADR 0098, avenant du 27/11/2026): his biggest single purchase before
- * (`null` never), his tier in « Fans », and the agency's settings for her. Absent: only the strict rise holds.
+ * (`null` never), and the agency's setting for her. Absent: only the strict rise holds.
  */
 export interface StaircasePricing {
   readonly biggestPurchaseMinor: number | null;
-  readonly fanTier?: FanTier | null;
   readonly setting?: StaircaseSetting;
 }
 
@@ -653,9 +649,7 @@ function nextInOpenRun(
       branchesMinor: step.priceMinor === null ? [] : [step.priceMinor],
       lastBoughtMinor,
       biggestPurchaseMinor: input.pricing?.biggestPurchaseMinor ?? null,
-      fanTier: input.pricing?.fanTier,
       setting: input.pricing?.setting,
-      desire: input.offer.desire,
     });
     const stepPrice = traceOf(step.stepIndex, choice, lastBoughtMinor);
     if (choice.kind === 'stop') return { kind: 'none', reason: choice.reason, stepPrice };
@@ -718,9 +712,7 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
     branchesMinor: [step.priceMinor],
     lastBoughtMinor: null,
     biggestPurchaseMinor: pricing?.biggestPurchaseMinor ?? null,
-    fanTier: pricing?.fanTier,
     setting: pricing?.setting,
-    desire: input.offer.desire,
   });
   return { kind: 'start', script, step, stepPrice: traceOf(0, choice, null) };
 }

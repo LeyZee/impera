@@ -7,7 +7,6 @@ import {
   type PreparedScriptGapCode,
   type PreparedScriptState,
   type PreparedScriptWarning,
-  type StaircaseSetting,
 } from '@impera/contracts';
 
 import { branchGaps, type BranchSetting } from './branches';
@@ -36,7 +35,6 @@ function asPlatformSteps(content: PreparedScriptContent) {
       priceMinor: branch.priceMinor,
       currency: branch.currency,
       soldMediaRefs: branch.media.map((media) => media.ref),
-      spendBranch: branch.condition?.kind === 'structured' && branch.condition.rule.kind === 'spent_at_least',
     })),
   );
 }
@@ -139,14 +137,9 @@ export function preparedScriptGaps(
 }
 
 /** The price warnings of § 14, path by path, on the branch they concern; `step_without_default` on its step. */
-export function preparedScriptWarnings(
-  content: PreparedScriptContent,
-  staircase?: StaircaseSetting,
-): PreparedScriptWarning[] {
+export function preparedScriptWarnings(content: PreparedScriptContent): PreparedScriptWarning[] {
   const flat = asPlatformSteps(content);
-  const jump = staircase?.spendBranchJumpMultiple;
-  const options = jump === undefined ? {} : { spendBranchJumpMultiple: jump };
-  const warnings: PreparedScriptWarning[] = priceWarnings(flat, options).map((warning) => {
+  const warnings: PreparedScriptWarning[] = priceWarnings(flat).map((warning) => {
     const branch = flat[warning.position];
     return { code: warning.code, step: branch?.platformIndex ?? 0, branch: branch?.ref ?? null };
   });
