@@ -44,11 +44,18 @@ export function linkedDay(iso: string): string {
 export function PrivateChat({
   owner,
   onAddBot,
+  botReady,
   frame,
 }: {
   /** The owner adds the bots: with none, he is sent to them; anyone else asks him. */
   owner: boolean;
   onAddBot?: () => void;
+  /**
+   * Whether a bot can take codes, when the page has read it (the owner's bots, recette CHAT-07): `false` says so in
+   * place of « Lier mon Telegram », before any password or code is asked. Unknown elsewhere: a member's page has no
+   * read of the agency's bots, and learns it from the code's answer.
+   */
+  botReady?: boolean;
   /** The page's own frame around the block; nothing at all is shown where the server does not serve it. */
   frame: (body: JSX.Element) => JSX.Element;
 }): JSX.Element | null {
@@ -57,7 +64,7 @@ export function PrivateChat({
   const [pending, setPending] = useState<Pending>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [noBot, setNoBot] = useState(false);
+  const [noBot, setNoBot] = useState(botReady === false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -320,7 +327,8 @@ export function PrivateChat({
                   2
                 </span>
                 <span className="pc-steps__text">
-                  Le bot répond « C’est fait » et cette page se met à jour.
+                  {/* The link is read each minute on the server's side (recette MED-11). */}
+                  Le bot répond « C’est fait » et cette page se met à jour, jusqu’à une minute après.
                 </span>
               </li>
             </ol>

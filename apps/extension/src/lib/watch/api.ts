@@ -1,5 +1,6 @@
 import {
   ExtensionLinkCreatorsSchema,
+  ExtensionLinkHolderSchema,
   ExtensionLinkTokenSchema,
   TrendCapturesDescribedSchema,
   TrendReadingsAcceptedSchema,
@@ -9,6 +10,7 @@ import {
   TREND_WATCH_BUDGET_LIMITED,
   TREND_CAPTURE_VISION_UNAVAILABLE,
   type ExtensionLinkCreators,
+  type ExtensionLinkHolder,
   type TrendCapturesBody,
   type TrendReadingsBatch,
 } from '@impera/contracts';
@@ -89,6 +91,38 @@ export function fetchMarkableCreators(
     const parsed = ExtensionLinkCreatorsSchema.safeParse(body);
     return parsed.success ? parsed.data : null;
   });
+}
+
+/** Whether the code names someone, a chatter included (EXT-01): the door every holder may knock at. */
+export function fetchLinkHolder(
+  origin: string,
+  token: string,
+  fetchFn: Fetch = fetch,
+): Promise<Sent<ExtensionLinkHolder>> {
+  return call(fetchFn, `${origin}/v1/trends/extension-links/holder`, token, { method: 'GET' }, (body) => {
+    const parsed = ExtensionLinkHolderSchema.safeParse(body);
+    return parsed.success ? parsed.data : null;
+  });
+}
+
+/**
+ * A code pasted in the popup: checked with the CRM, kept when it names someone. The watch's menu is drawn only for a
+ * holder of the watch: a chatter's code serves the copilot's gestures and opens none of the watch's doors.
+ */
+export async function linkCode(
+  token: string,
+  deps: {
+    readonly check: (token: string) => Promise<Sent<ExtensionLinkHolder>>;
+    readonly save: (token: string) => Promise<void>;
+    readonly watch: (token: string) => Promise<void>;
+  },
+): Promise<'linked' | 'refused' | 'busy' | 'unreachable'> {
+  const answer = await deps.check(token);
+  if (answer.kind === 'revoked' || answer.kind === 'refused') return 'refused';
+  if (answer.kind === 'busy' || answer.kind === 'unreachable') return answer.kind;
+  await deps.save(token);
+  if (answer.value.watch) await deps.watch(token);
+  return 'linked';
 }
 
 export function sendReadings(

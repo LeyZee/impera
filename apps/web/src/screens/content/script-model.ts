@@ -1,4 +1,5 @@
 import {
+  bridgeName,
   scriptSegmentCodes,
   scriptSlots,
   type ContentDropFile,
@@ -25,7 +26,7 @@ export interface ScriptCard {
   readonly variant: ScriptVariantLetter | null;
   /** « E1 », « E2A », « P12 ». */
   readonly code: string;
-  /** The stage's name (« Chambre »), or « Pont vers Chambre ». */
+  /** The stage's name (« Chambre »), or « Pont vers l’étape 3 ». */
   readonly title: string;
   /** « Série A · Lumière tamisée », the bridge's teaser, or nothing. */
   readonly detail: string | null;
@@ -56,10 +57,7 @@ export function scriptCards(segments: readonly ScriptSegment[]): ScriptCard[] {
         segmentKey: segment.key,
         variant,
         code: `${code}${variant ?? ''}`,
-        title:
-          segment.kind === 'stage'
-            ? segment.name
-            : `Pont vers ${names.get(segment.to) ?? 'l’étape suivante'}`,
+        title: segment.kind === 'stage' ? segment.name : bridgeName(segments, segment.to),
         detail:
           segment.kind === 'bridge'
             ? segment.teaser

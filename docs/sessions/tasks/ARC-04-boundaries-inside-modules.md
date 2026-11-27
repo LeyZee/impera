@@ -1,5 +1,5 @@
 # ARC-04 Les frontières vérifiées aussi à l'intérieur d'un module
-Statut : todo
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo
 Phase : exploitation
 Dépend de : ARC-03 fusionnée (ADR 0051, couche `pure.ts`)
 Branche : task/arc-04-boundaries-inside-modules

@@ -28,7 +28,7 @@ const facts = (
 ) => ({ stock, scripts, lastScriptOn });
 
 describe('what there is to shoot (ADR 0140 § 4, Charles’s rhythm of 20/11)', () => {
-  it('asks each script, the boudoir sessions the stock lacks, the daily videos and the stories as one line each', () => {
+  it('asks each script, the boudoir sessions the stock lacks, the daily videos as one line, never a story (Charles, 27/11)', () => {
     const needs = weekNeeds(
       facts({ sessions: 1, videos: 2, stories: 4 }, [{ requestId: request(1), name: 'La douche' }]),
       WEEK,
@@ -38,7 +38,6 @@ describe('what there is to shoot (ADR 0140 § 4, Charles’s rhythm of 20/11)', 
       ['feed_shoot', 'Une séance boudoir', 1, 60],
       ['feed_shoot', 'Une séance boudoir', 1, 60],
       ['feed_video', '5 vidéos du jour', 5, 25],
-      ['reveal_story', '3 stories', 3, 15],
     ]);
     expect(needs[0]?.requestId).toBe(request(1));
   });
@@ -102,12 +101,10 @@ describe('her lines laid on her days (ADR 0140 § 5)', () => {
     expect(minutes.every((total) => total <= 240)).toBe(true);
     expect(packed.shootDays[0]?.items[0]?.need).toBe('script');
     expect(packed.shootDays[1]?.items[0]?.need).toBe('script');
-    // 2 × 90 + 3 × 60 + 35 + 35 = 430 minutes: all of it fits in 480.
+    // 2 × 90 + 3 × 60 + 35 = 395 minutes: all of it fits in 480.
     expect(packed.deferred).toEqual([]);
-    for (const need of ['feed_video', 'reveal_story'] as const) {
-      const cut = packed.shootDays.flatMap((day) => day.items).filter((item) => item.need === need);
-      expect(cut.reduce((sum, item) => sum + item.count, 0)).toBe(7);
-    }
+    const cut = packed.shootDays.flatMap((day) => day.items).filter((item) => item.need === 'feed_video');
+    expect(cut.reduce((sum, item) => sum + item.count, 0)).toBe(7);
   });
 
   it('never makes a week heavier than her days: a daily video line is cut, the rest moves to the week after', () => {
@@ -120,7 +117,6 @@ describe('her lines laid on her days (ADR 0140 § 5)', () => {
       ['feed_shoot', 1],
       ['feed_shoot', 1],
       ['feed_video', 5],
-      ['reveal_story', 7],
     ]);
   });
 

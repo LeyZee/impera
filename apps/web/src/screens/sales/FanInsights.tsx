@@ -10,20 +10,21 @@ import {
   DAYS,
   DAYS_SHORT,
   heatOf,
+  insightsWaitLine,
   JOB_LABELS,
   PLACE_LABELS,
   SITUATION_LABELS,
   slotLabel,
   shareText,
   TIER_LABELS,
+  waitingBlocks,
   waitingLines,
-  type InsightBlock,
 } from './insights-view';
 import './insights.css';
 
 import { Donut } from '@/shell/figures/figures';
 import { Panel, PanelSection } from '@/shell/layout';
-import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /*
  * « Qui sont tes fans » (CR-15, ADR 0065 § 2, ADR 0074 § 8): in front of Ventes, figures on all her fans, never one.
@@ -426,8 +427,9 @@ const sameCounts = (fans: CreatorFanInsights['fans']): boolean =>
 
 /**
  * The panel: three numbers, then a card per question that has enough fans, and for those that wait, what they wait
- * for (recette CRE-04). Under ten fans in all, one short sentence and nothing else. `silent`: the page says once that
- * the server does not answer, when its fans do not load either (recette CRE-31).
+ * for (recette CRE-04). It comes under her fans, and only once a block has enough fans: until then, one discreet line
+ * under the list says it (`FanInsightsWaitLine`, choice of 21/11). `silent`: the page says once that the server does
+ * not answer, when its fans do not load either (recette CRE-31).
  */
 export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Element | null {
   const insights = useCreatorFanInsights();
@@ -447,20 +449,9 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
       </Skeleton>
     );
   const data = insights.data;
+  if (insightsWaitLine(data) !== null) return null;
   const age = data.age;
-  const waiting = (['age', 'place', 'situation', 'job', 'spending', 'activity'] as const).filter(
-    (block: InsightBlock) => data[block].status !== 'enough',
-  );
-  // Under ten fans in all, every block waits for the same reason: one short card. With more fans, the panel keeps
-  // its numbers and says block by block what is missing, since each block counts something else (recette CRE-04).
-  if (waiting.length === 6 && data.fans.total === null)
-    return (
-      <Panel className="fi-panel nv-enter" title={<>Qui sont tes fans</>}>
-        <Empty title="Encore trop peu de fans pour le dire.">
-          Ça s’affichera à partir de dix, pour qu’aucun ne s’y reconnaisse.
-        </Empty>
-      </Panel>
-    );
+  const waiting = waitingBlocks(data);
   const lines = waitingLines(waiting);
   return (
     <Panel
@@ -539,4 +530,11 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
       </PanelSection>
     </Panel>
   );
+}
+
+/** The discreet line under her fans while the panel has nothing to show yet (choice of 21/11). */
+export function FanInsightsWaitLine(): JSX.Element | null {
+  const insights = useCreatorFanInsights();
+  const line = insights.data === undefined ? null : insightsWaitLine(insights.data);
+  return line === null ? null : <p className="vt-note fi-wait-line">{line}</p>;
 }

@@ -523,11 +523,13 @@ export function flowOf(
       amount: amountText(line.grossEurMinor, 'EUR'),
     });
   if (counted === null) {
-    steps.push({
-      label: 'Hors TVA',
-      op: line.vatBps === 0 ? 'sans TVA' : `TVA ${percentText(line.vatBps)}`,
-      amount: amountText(line.exclVatMinor, 'EUR'),
-    });
+    // Without VAT the step changes nothing: it would only say the sales again (recette CHAT-10).
+    if (line.vatBps !== 0)
+      steps.push({
+        label: 'Hors TVA',
+        op: `TVA ${percentText(line.vatBps)}`,
+        amount: amountText(line.exclVatMinor, 'EUR'),
+      });
     steps.push({
       label: platformNetName(platform),
       op: `${platform === null ? 'la plateforme' : platformName(platform)} ${percentText(line.platformFeeBps)}`,
@@ -917,6 +919,8 @@ export function statementsCsv(
       'Hors TVA',
       'Net',
       'Commission',
+      // A manager's share of the others' net (recette PRO2-02): without it his total is not the sum of its row.
+      'Part d’équipe',
       'Primes',
       'Malus',
       'Reports reçus',
@@ -951,6 +955,7 @@ export function statementsCsv(
         '',
         '',
         '',
+        '',
         // Where the line's figures come from (CRM-03): on the platform's net, « Ventes » is that net already.
         line.base === 'platform_net' ? 'Net de la plateforme' : 'Rapports',
       ]);
@@ -963,6 +968,7 @@ export function statementsCsv(
       '',
       euros(statement.netMinor),
       euros(statement.commissionMinor),
+      euros(statement.teamShare?.amountMinor ?? 0),
       euros(statement.bonusesMinor),
       euros(-statement.penaltiesMinor),
       euros(statement.carryOversInMinor),
@@ -980,7 +986,7 @@ export function statementsCsv(
 }
 
 /**
- * Paie's address: the period Quinzaine shows when one was chosen, from Historique or its arrows, and the member whose
+ * Paie's address: the period Quinzaine shows when one was chosen, from Relevés or its arrows, and the member whose
  * statement opens on it, from his record in Équipe (EQ-11).
  */
 export interface PaySearch {
@@ -1396,9 +1402,12 @@ export function periodsBetween(from: PayPeriod, to: PayPeriod): PayPeriod[] {
 export const spanText = (span: { readonly from: PayPeriod; readonly to: PayPeriod }): string =>
   `sur ${String(periodsBetween(span.from, span.to).length)} quinzaines, du ${dayShortMonth(span.from)} au ${dayShortMonth(payPeriodLastDay(span.to))}`;
 
-/** Who made an entry and when, or who cancelled it: « par Charles le lun. 9 nov. », « annulé par Charles le … ». */
+/**
+ * Who made an entry and when, or who cancelled it: « par Charles le lun. 9 nov. », « annulé par Charles le … ». A prime
+ * is feminine (« annulée par », « elle compte encore ici »), a malus or an adjustment masculine (recette MAN-06).
+ */
 export function entryByText(
-  row: Pick<EntryRow, 'createdBy' | 'createdAt' | 'cancellation'>,
+  row: Pick<EntryRow, 'kind' | 'createdBy' | 'createdAt' | 'cancellation'>,
   period: PayPeriod,
   who: (userId: string) => string,
   timeZone: string,
@@ -1407,9 +1416,10 @@ export function entryByText(
   const made = `${by(row.createdBy).trim()} le ${dayAt(row.createdAt, timeZone)}`;
   const { cancellation } = row;
   if (cancellation === null) return made;
-  const cancelled = `annulé${by(cancellation.by)} le ${dayAt(cancellation.at, timeZone)}`;
+  const feminine = row.kind === 'bonus';
+  const cancelled = `${feminine ? 'annulée' : 'annulé'}${by(cancellation.by)} le ${dayAt(cancellation.at, timeZone)}`;
   if (cancellation.from !== null && cancellation.from > period)
-    return `${made} · ${cancelled}, à partir de la quinzaine ${periodLine(cancellation.from)} : il compte encore ici`;
+    return `${made} · ${cancelled}, à partir de la quinzaine ${periodLine(cancellation.from)} : ${feminine ? 'elle' : 'il'} compte encore ici`;
   return cancelled;
 }
 

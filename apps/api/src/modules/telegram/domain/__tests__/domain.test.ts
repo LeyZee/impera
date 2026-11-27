@@ -53,7 +53,7 @@ describe('classification (ADR 0020 §2)', () => {
       );
     }
     expect(classify({ kind: 'handoff', conversationId, cause: 'identity_doubt' })).toMatchObject({
-      body: 'Le fan doute de parler vraiment à la créatrice. Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Le fan doute de parler vraiment à la créatrice. L’agent n’écrit plus à ce fan et attend un humain.',
     });
   });
 
@@ -62,11 +62,11 @@ describe('classification (ADR 0020 §2)', () => {
     const handoff = { kind: 'handoff', conversationId, cause: 'custom_alert', alert } as const;
     expect(classify(handoff, (one) => (one.id === alert.id ? 'Appel vidéo' : null))).toMatchObject({
       title: 'Important',
-      body: 'Le message du fan correspond à l’alerte « Appel vidéo ». Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Le message du fan correspond à l’alerte « Appel vidéo ». L’agent n’écrit plus à ce fan et attend un humain.',
     });
     // Its name not read (archived and purged, or the read failed): the generic line, the message still goes.
     expect(classify(handoff)).toMatchObject({
-      body: 'Une alerte personnalisée a sonné. Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Une alerte personnalisée a sonné. L’agent n’écrit plus à ce fan et attend un humain.',
     });
   });
 
@@ -103,7 +103,7 @@ describe('classification (ADR 0020 §2)', () => {
 
   it('says a silent model in the alert, without the fan’s text', () => {
     expect(classify({ kind: 'handoff', conversationId, cause: 'llm_unavailable' })).toMatchObject({
-      body: 'Le modèle ne répond plus. Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Le modèle ne répond plus. L’agent n’écrit plus à ce fan et attend un humain.',
     });
   });
 
@@ -571,7 +571,7 @@ describe('classification (ADR 0020 §2)', () => {
       topic: 'important',
       threadKey: `conversation:${conversationId}`,
       title: 'Important',
-      body: 'Un message de l’agent n’a pas pu partir. Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Un message de l’agent n’a pas pu partir. L’agent n’écrit plus à ce fan et attend un humain.',
       link: { label: 'Ouvrir la conversation', path: `/suivi?conversation=${conversationId}` },
     });
   });

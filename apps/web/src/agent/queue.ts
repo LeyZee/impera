@@ -21,9 +21,14 @@ const SYSTEM_CAUSES: ReadonlySet<DashboardTodo['kind']> = new Set([
  */
 const URGENT_CAUSES: ReadonlySet<DashboardTodo['kind']> = new Set(['llm_unavailable']);
 
-/** The tone a line shows: the route's, red for an outage. */
-export const toneOf = (todo: DashboardTodo): DashboardTodo['tone'] =>
-  URGENT_CAUSES.has(todo.kind) ? 'bad' : todo.tone;
+/**
+ * An outage over (IA-07): a voice model answers again, the fans held for it wait to be given back. No longer an
+ * urgency: the route's tone, ranked with the other failures of the agent.
+ */
+const isUrgent = (todo: DashboardTodo): boolean => URGENT_CAUSES.has(todo.kind) && todo.voiceBack !== true;
+
+/** The tone a line shows: the route's, red for an outage still on. */
+export const toneOf = (todo: DashboardTodo): DashboardTodo['tone'] => (isUrgent(todo) ? 'bad' : todo.tone);
 
 export type QueueEntry<T extends DashboardTodo> =
   | { readonly kind: 'one'; readonly todo: T }
@@ -45,7 +50,7 @@ function keyOf(todo: DashboardTodo): string {
 }
 
 const rankOf = (todo: DashboardTodo): number =>
-  todo.tone === 'bad' ? 0 : URGENT_CAUSES.has(todo.kind) ? 1 : SYSTEM_CAUSES.has(todo.kind) ? 3 : 2;
+  todo.tone === 'bad' ? 0 : isUrgent(todo) ? 1 : SYSTEM_CAUSES.has(todo.kind) ? 3 : 2;
 
 /** Said once for everyone: a failure of the agent the route did not already mark grave. */
 const isGroupable = (todo: DashboardTodo): boolean => SYSTEM_CAUSES.has(todo.kind) && todo.tone !== 'bad';

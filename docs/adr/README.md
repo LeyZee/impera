@@ -4,7 +4,10 @@ Une ADR (Architecture Decision Record) fige une décision structurante avec son 
 
 ## Règles
 
-- Une ADR est **immuable** une fois `accepted`. Pour changer d'avis : nouvelle ADR qui `supersedes` l'ancienne (l'ancienne passe en `superseded`).
+- Une ADR `accepted` ne se réécrit pas : son texte d'origine reste lisible. Pour changer d'avis, deux voies (décision de Charles du 27/11/2026, qui entérine la pratique) :
+  - **amender en place** : un ajout daté en fin de fichier (« Avenant du JJ/MM : … », avec les mots de Charles), et le statut qui le dit ; ou
+  - **une nouvelle ADR** dont la ligne « Remplace : » ou « Amende : » cite le passage exact qu'elle change. L'ancienne reçoit alors en tête le bandeau « Changée en partie depuis » (voir `docs/regles/`), ou passe en `superseded` si elle est remplacée en entier.
+- Dans les deux cas, la page du sujet dans `docs/regles/` est mise à jour dans la même PR.
 - Statuts : `proposed` (une session Opus peut en créer une) → `accepted` (Charles ou la session d'architecture) → `superseded` / `rejected`.
 - Numérotation séquentielle à 4 chiffres, nom `NNNN-slug.md`.
 - Une session de code qui prend une décision structurante non couverte **doit** créer une ADR `proposed` et le dire dans sa fiche de tâche. Elle ne doit pas passer outre une ADR `accepted`.
@@ -148,7 +151,7 @@ Date : AAAA-MM-JJ
 | 0133 | L'agent pose une réaction sur un message du fan, en plus de sa réponse, quand le message la justifie | accepted (précise 0018, 0019, 0021, 0086, 0088, 0079) |
 | 0134 | Navigation du CRM : une section Scripts, un sélecteur de créatrice, une fiche créatrice en quatre onglets, des icônes qui disent l'onglet | accepted (précise 0024, 0042 § 8, 0066 § 6 ; §§ 1, 3, 4 et 7 amendés par 0149) |
 | 0135 | Time waster : le fan qui parle sans jamais acheter reçoit une attention rare, jamais du mépris ; le premier achat la lui rend | accepted (précise 0132, 0128, 0131, 0088, 0085, 0086, 0091) |
-| 0136 | Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait | accepted (amende 0044 § 3 et § 4, 0055 § 5 ; précise 0044 § 6, 0083, 0126) |
+| 0136 | Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait | accepted, amendée le 27/11 (la story reprend la vidéo du feed vidéo) (amende 0044 § 3 et § 4, 0055 § 5 ; précise 0044 § 6, 0083, 0126) |
 | 0137 | Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle | accepted, amendée deux fois le 16/11 (amende 0044 § 5 ; précise 0110 § 5 et § 6, 0136, 0126) |
 | 0138 | Aperçu net du coffre : la petite image de Reveal lue à la demande, servie sans être gardée | accepted (précise 0099 § 7, 0030 § 4, 0018 ; amende 0099 : l'écran du coffre montre l'image à la demande) |
 | 0140 | La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit | accepted (précise 0042 §§ 3-5, 0055 §§ 4-5, 0056 § 2, 0126, 0136, 0137, 0120, 0082) |

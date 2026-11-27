@@ -182,6 +182,22 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
     expect(screen.getByText('Modifications en cours')).toBeDefined();
   });
 
+  it('says a price typed that is not one, keeps the old one and never says « Enregistré » (PRO1-08)', async () => {
+    serve({ ...vaultRoutes, [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf()] }) });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Soirée inventée/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Étape 2/u }));
+    const [field] = screen.getAllByLabelText(/Prix TTC/u);
+    if (field === undefined) throw new Error('price');
+    fireEvent.change(field, { target: { value: '-3' } });
+    expect(screen.getByText('Un prix comme 12 ou 12,50')).toBeDefined();
+    expect(screen.getByText('Un prix n’est pas enregistré')).toBeDefined();
+    expect(screen.getByText(/^Étape \d.* : prix à corriger, l’ancien est gardé$/u)).toBeDefined();
+    fireEvent.change(field, { target: { value: '12' } });
+    expect(screen.queryByText('Un prix comme 12 ou 12,50')).toBeNull();
+    expect(screen.queryByText(/prix à corriger/u)).toBeNull();
+  });
+
   it('sets a branch’s condition from the closed list', async () => {
     serve({ ...vaultRoutes, [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf()] }) });
     show();
@@ -263,6 +279,37 @@ describe('Créatrices › Scripts, each view standing alone (for the creator she
     cleanup();
     show(<PreparedScriptsView creatorId={CREATOR} creatorName="Lina" opening={viewOf()} onCopy={onCopy} />);
     expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
+  });
+
+  it('opens the script the address names, and writes the address on opening one or going back (PRO1-06)', async () => {
+    serve({ ...vaultRoutes, [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf()] }) });
+    const onScript = vi.fn();
+    show(
+      <PreparedScriptsView
+        creatorId={CREATOR}
+        creatorName="Lina"
+        scriptId={SCRIPT}
+        onScript={onScript}
+        onCopy={() => undefined}
+      />,
+    );
+    // A reload on the script's address opens it once the list is read.
+    fireEvent.click(await screen.findByRole('button', { name: /Ses scripts/u }));
+    expect(onScript).toHaveBeenLastCalledWith(null);
+    cleanup();
+    show(
+      <PreparedScriptsView
+        creatorId={CREATOR}
+        creatorName="Lina"
+        scriptId={null}
+        onScript={onScript}
+        onCopy={() => undefined}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Soirée inventée/u }));
+    expect(onScript).toHaveBeenLastCalledWith(SCRIPT);
+    // The address still names none (the page has not followed yet): the list stays, never an editor of its own.
+    expect(screen.getByRole('button', { name: /Nouveau script/u })).toBeDefined();
   });
 
   it('« À copier dans Reveal » shows what is ready, then what she sent, and hands back a script to open', async () => {

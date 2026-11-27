@@ -8,7 +8,7 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     const cards = scriptCards(scriptSegments);
     expect(cards.map((card) => [card.code, card.title, card.detail, card.slots.length])).toEqual([
       ['E1', 'Salon', 'Elle se dévoile un peu', 2],
-      ['P12', 'Pont vers Chambre', 'La suite est dans la chambre', 1],
+      ['P12', 'Pont vers l’étape 2', 'La suite est dans la chambre', 1],
       ['E2A', 'Chambre', 'Série A · Lumière tamisée', 1],
       ['E2B', 'Chambre', 'Série B · Plein jour', 1],
     ]);

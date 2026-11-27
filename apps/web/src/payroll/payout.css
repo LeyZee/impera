@@ -46,15 +46,6 @@
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
 }
-.po-answer[data-tone='warn'] {
-  display: block;
-  padding: var(--nv-space-3) var(--nv-space-4);
-  border-radius: var(--nv-radius-md);
-  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
-}
-.po-answer[data-tone='warn'] .po-answer__value {
-  color: var(--nv-warning);
-}
 
 /* The details: label faded, value in full ink, aligned on one column. */
 .po-lines {
@@ -64,7 +55,8 @@
 }
 .po-lines > div {
   display: grid;
-  grid-template-columns: minmax(7.5rem, auto) 1fr;
+  /* One label column for every line, wide enough for « Téléphone de contact »: the values share one vertical. */
+  grid-template-columns: 11.5rem minmax(0, 1fr);
   gap: var(--nv-space-3);
   align-items: baseline;
 }
@@ -73,13 +65,24 @@
   font-size: var(--nv-text-footnote);
 }
 .po-lines dd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
   min-width: 0;
   margin: 0;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.po-lines dd > span {
+  min-width: 0;
+}
+/* One copy per line, quiet until hovered: the owner pastes WorldRemit's fields one by one. */
+.po-copy {
+  flex: none;
+}
 
-/* The form: three tiles for the way of receiving, then its fields. */
+/* The form: the way of receiving among three options, then its fields. */
 .po-form {
   display: flex;
   flex-direction: column;
@@ -91,54 +94,15 @@
   border: 0;
 }
 .po-methods__row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--nv-space-2);
   margin-top: var(--nv-space-2);
 }
-.po-method {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-height: 76px;
-  padding: var(--nv-space-3) var(--nv-space-2);
-  border: 0;
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 30%, transparent);
-  color: var(--nv-ink-muted);
-  font: inherit;
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-  text-align: center;
-  cursor: pointer;
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
-    color var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-fast) var(--nv-ease-out);
-}
+/* sc-option carries the tile; only the way's colour on its pictogram and on the chosen edge stays here. */
 .po-method .po-icon {
+  flex: none;
   color: var(--_c);
 }
-@media (hover: hover) {
-  .po-method:hover:not([aria-pressed='true']) {
-    background: color-mix(in srgb, var(--_c) 10%, var(--nv-glass-fill));
-    color: var(--nv-ink);
-  }
-}
-.po-method:active {
-  transform: scale(0.98);
-}
-.po-method[aria-pressed='true'] {
-  background: color-mix(in srgb, var(--_c) 18%, transparent);
-  box-shadow: inset 0 0 0 2px var(--_c);
-  color: var(--nv-ink);
-}
-.po-method:focus-visible {
-  outline: 2px solid var(--nv-focus, var(--_c));
-  outline-offset: 2px;
+.sc-option.po-method[aria-checked='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--_c);
 }
 .po-pair {
   display: grid;
@@ -165,12 +129,6 @@
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
 }
-.po-to[data-tone='warn'] {
-  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
-}
-.po-to[data-tone='warn'] .po-to__title {
-  color: var(--nv-warning);
-}
 .po-to__head {
   display: flex;
   align-items: center;
@@ -196,16 +154,8 @@
 .po-to__shown {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--nv-space-3);
-  animation: po-in var(--nv-dur-base, 220ms) var(--nv-ease-out) both;
-}
-
-@keyframes po-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
 }
 
 @media (max-width: 520px) {
@@ -215,13 +165,5 @@
   .po-lines > div {
     grid-template-columns: 1fr;
     gap: 2px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .po-method,
-  .po-to__shown {
-    transition: none;
-    animation: none;
   }
 }

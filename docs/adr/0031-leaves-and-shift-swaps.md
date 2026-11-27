@@ -1,5 +1,13 @@
 # 0031. Congés et échanges de shift : le congé appartient au membre, l'échange se fait entre chatteurs
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0045 · Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt](0045-shift-calendar-for-everyone.md) : Remplace : dans l'ADR 0031 § Échanges, la phrase « C'est la seule porte par laquelle un chatteur lit le planning d'un autre. » Précise l'ADR 0024 (le Planning du chatteur montre « le sien, celui de l'équipe »), l'ADR 0042 § 2 et § 4 (ce que la créatrice voit de qui est en poste), et les fiches EQ-02, EQ-12 et EQ-14.
+>
+> Toutes les décisions du même sujet : [`docs/regles/equipe.md`](../regles/equipe.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 27/10/2026 20h56)
 Date : 2026-10-27
 Remplace : dans l'ADR 0023 (§ Données et RLS), « congés » dans la phrase « Shifts, rapports, congés et échanges portent `creator_id` **et** `member_id` »

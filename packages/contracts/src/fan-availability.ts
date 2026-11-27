@@ -38,6 +38,9 @@ export const FanAvailabilitySchema = z.object({
 });
 export type FanAvailability = z.infer<typeof FanAvailabilitySchema>;
 
+/** How many sessions without a sale the record keeps, newest last (`freeSexting.noSaleSessions`). */
+export const FREE_SEXTING_SESSIONS_KEPT = 8;
+
 /**
  * What the conversation keeps (`conversations.fan_availability`, event `fan_availability_changed`): his availability,
  * plus what the session remembers for the script gate. `seen`: his positive signals in the session (he says « seul »,
@@ -50,6 +53,29 @@ export const FanAvailabilityRecordSchema = FanAvailabilitySchema.extend({
   sexualizedAt: z.coerce.date().nullable(),
   askedAt: z.coerce.date().nullable(),
   hotAt: z.coerce.date().nullable(),
+  /**
+   * The exception « au travail » (Charles 26/11, ADR 0098 amendement du 26/11): when she last warmed him up at his
+   * work, whether he bit and whether he stopped her. Kept across sessions: at most one per span, counted per fan. Absent
+   * or `null`: never.
+   */
+  workTease: z
+    .object({
+      startedAt: z.coerce.date(),
+      bitAt: z.coerce.date().nullable(),
+      stoppedAt: z.coerce.date().nullable(),
+    })
+    .nullish(),
+  /**
+   * The sexting without a sale (Charles 26/11): the draw of the last hot session (its `hotAt`, and whether it went
+   * without a sale), and the hot sessions that did, oldest first, the last few kept. Absent or `null`: never drawn.
+   */
+  freeSexting: z
+    .object({
+      sessionAt: z.coerce.date(),
+      noSale: z.boolean(),
+      noSaleSessions: z.array(z.coerce.date()).max(FREE_SEXTING_SESSIONS_KEPT),
+    })
+    .nullish(),
 });
 export type FanAvailabilityRecord = z.infer<typeof FanAvailabilityRecordSchema>;
 

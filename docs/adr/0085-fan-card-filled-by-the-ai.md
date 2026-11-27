@@ -53,7 +53,9 @@ Ce qui manque :
    | Ce qu'il aime chez elle | `dislikes_about_her` | Ce qu'il ne veut pas voir d'elle | liste | à noter |
    | Ce qu'il aime chez elle | `outfits` | Les tenues qu'il aime la voir porter (lingerie, cosplay, nue…) | liste | à noter |
    | Intime | `desires` | Ses fantasmes | liste | à noter |
+   | Intime | `words_that_work` | Les mots qui marchent sur lui (ajout du 26/11, ADR 0098, amendement) | liste | à noter |
    | Intime | `limits` | Ce qu'il ne veut pas (« je n'aime pas… ») | liste | à noter |
+   | Intime | `cools_him` | Ce qui le refroidit (ajout du 26/11, ADR 0098, amendement) | liste | à noter |
    | Intime | `intensity` | L'intensité qu'il cherche : doux, coquin, très explicite | une | à observer |
    | Intime | `lead` | Il aime qu'elle mène, qu'elle se laisse mener, ou les deux | une | à observer |
 

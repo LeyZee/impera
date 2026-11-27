@@ -1,6 +1,6 @@
 {
-  "id": "0fdf4e76-3f7d-400e-a08c-5ff943530ee1",
-  "prevId": "f51ff458-14be-4827-a094-50b8f14d8a0a",
+  "id": "72b1d658-fbe6-4ed2-ac4d-3f4ca3ed5ffd",
+  "prevId": "d20758e6-a7f0-4b58-95b3-f296e1ea2849",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2090,6 +2090,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "ready_video_id": {
+          "name": "ready_video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2291,6 +2297,10 @@
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
           "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
+        },
+        "content_drops_ready_video_check": {
+          "name": "content_drops_ready_video_check",
+          "value": "\"content_drops\".\"ready_video_id\" is null or (\"content_drops\".\"category\" = 'sale_video' and \"content_drops\".\"ready_video_id\" ~ '^rv_[0-9a-f]{8}$')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
@@ -18742,6 +18752,121 @@
       },
       "isRLSEnabled": false
     },
+    "public.member_availability_weeks": {
+      "name": "member_availability_weeks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ranges": {
+          "name": "ranges",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "member_availability_weeks_member_idx": {
+          "name": "member_availability_weeks_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "member_availability_weeks_member_id_team_members_id_fk": {
+          "name": "member_availability_weeks_member_id_team_members_id_fk",
+          "tableFrom": "member_availability_weeks",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "member_availability_weeks_created_by_user_id_fk": {
+          "name": "member_availability_weeks_created_by_user_id_fk",
+          "tableFrom": "member_availability_weeks",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "member_read": {
+          "name": "member_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"member_availability_weeks\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "member_insert": {
+          "name": "member_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"member_availability_weeks\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and (nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"member_availability_weeks\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        }
+      },
+      "checkConstraints": {
+        "member_availability_weeks_ranges_check": {
+          "name": "member_availability_weeks_ranges_check",
+          "value": "jsonb_typeof(\"member_availability_weeks\".\"ranges\") = 'array' and jsonb_array_length(\"member_availability_weeks\".\"ranges\") <= 21"
+        },
+        "member_availability_weeks_zone_check": {
+          "name": "member_availability_weeks_zone_check",
+          "value": "char_length(\"member_availability_weeks\".\"time_zone\") between 1 and 64"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.scheduling_settings": {
       "name": "scheduling_settings",
       "schema": "",
@@ -24784,6 +24909,199 @@
         "password_reset_links_one_end_check": {
           "name": "password_reset_links_one_end_check",
           "value": "\"password_reset_links\".\"used_at\" is null or \"password_reset_links\".\"revoked_at\" is null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.team_member_departures": {
+      "name": "team_member_departures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_by": {
+          "name": "cancelled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reveal_removed_at": {
+          "name": "reveal_removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reveal_removed_by": {
+          "name": "reveal_removed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "team_member_departures_waiting_unique": {
+          "name": "team_member_departures_waiting_unique",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"team_member_departures\".\"cancelled_at\" is null and \"team_member_departures\".\"applied_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "team_member_departures_member_idx": {
+          "name": "team_member_departures_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "team_member_departures_member_id_team_members_id_fk": {
+          "name": "team_member_departures_member_id_team_members_id_fk",
+          "tableFrom": "team_member_departures",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "team_member_departures_created_by_user_id_fk": {
+          "name": "team_member_departures_created_by_user_id_fk",
+          "tableFrom": "team_member_departures",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "team_member_departures_cancelled_by_user_id_fk": {
+          "name": "team_member_departures_cancelled_by_user_id_fk",
+          "tableFrom": "team_member_departures",
+          "tableTo": "user",
+          "columnsFrom": ["cancelled_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "team_member_departures_reveal_removed_by_user_id_fk": {
+          "name": "team_member_departures_reveal_removed_by_user_id_fk",
+          "tableFrom": "team_member_departures",
+          "tableTo": "user",
+          "columnsFrom": ["reveal_removed_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "owner_or_self_select": {
+          "name": "owner_or_self_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or exists (select 1 from team_members m where m.id = \"team_member_departures\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"team_member_departures\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"team_member_departures\".\"cancelled_at\" is null and \"team_member_departures\".\"reveal_removed_at\" is null and \"team_member_departures\".\"created_at\" = now() and (\"team_member_departures\".\"applied_at\" is null or (\"team_member_departures\".\"applied_at\" = now() and \"team_member_departures\".\"ends_at\" = now()))"
+        },
+        "owner_update": {
+          "name": "owner_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        }
+      },
+      "checkConstraints": {
+        "team_member_departures_window_check": {
+          "name": "team_member_departures_window_check",
+          "value": "\"team_member_departures\".\"ends_at\" >= \"team_member_departures\".\"created_at\" - interval '1 minute' and \"team_member_departures\".\"ends_at\" <= \"team_member_departures\".\"created_at\" + interval '31 days'"
+        },
+        "team_member_departures_one_end_check": {
+          "name": "team_member_departures_one_end_check",
+          "value": "\"team_member_departures\".\"cancelled_at\" is null or \"team_member_departures\".\"applied_at\" is null"
+        },
+        "team_member_departures_cancel_check": {
+          "name": "team_member_departures_cancel_check",
+          "value": "(\"team_member_departures\".\"cancelled_at\" is null) = (\"team_member_departures\".\"cancelled_by\" is null)"
+        },
+        "team_member_departures_applied_check": {
+          "name": "team_member_departures_applied_check",
+          "value": "\"team_member_departures\".\"applied_at\" is null or \"team_member_departures\".\"applied_at\" >= \"team_member_departures\".\"ends_at\""
+        },
+        "team_member_departures_reveal_check": {
+          "name": "team_member_departures_reveal_check",
+          "value": "(\"team_member_departures\".\"reveal_removed_at\" is null) = (\"team_member_departures\".\"reveal_removed_by\" is null) and (\"team_member_departures\".\"reveal_removed_at\" is null or \"team_member_departures\".\"cancelled_at\" is null)"
         }
       },
       "isRLSEnabled": false

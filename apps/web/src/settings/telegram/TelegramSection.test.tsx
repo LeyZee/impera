@@ -14,6 +14,7 @@ import { TelegramSection } from './TelegramSection';
 import {
   TelegramForbidden,
   TelegramOff,
+  addBot,
   fetchDeliveries,
   fetchOverview,
   fetchSaleSettings,
@@ -27,6 +28,7 @@ vi.mock('./api', async (actual) => ({
   ...(await actual<typeof import('./api')>()),
   fetchOverview: vi.fn(),
   fetchDeliveries: vi.fn(),
+  addBot: vi.fn(),
   saveRoutes: vi.fn(),
   removeChat: vi.fn(),
   fetchSaleSettings: vi.fn(),
@@ -182,6 +184,36 @@ describe('Réglages › Bots Telegram without a bot', () => {
   });
 });
 
+describe('Réglages › Bots Telegram, the first bot (recette MED-02)', () => {
+  const firstBot = {
+    id: TelegramBotIdSchema.parse('01900000-0000-7000-8000-0000000000b3'),
+    username: 'premier_bot',
+    displayName: 'Premier',
+    state: 'active' as const,
+    lastPolledAt: null,
+    chats: [],
+  };
+
+  it('keeps the sheet on its step when the page turns from empty to its first bot', async () => {
+    vi.mocked(fetchOverview).mockResolvedValue({ bots: [], routes: [], coverage: [], version: 0 });
+    vi.mocked(addBot).mockImplementation(() => {
+      vi.mocked(fetchOverview).mockResolvedValue({ bots: [firstBot], routes: [], coverage: [], version: 1 });
+      return Promise.resolve({ ok: true, value: firstBot });
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un bot' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'J’ai le jeton' }));
+    fireEvent.paste(screen.getByLabelText('Jeton du bot'), {
+      clipboardData: { getData: () => '123456789:AAFabcdefghijklmnopqrstuvwxyz0123456' },
+    });
+    expect(await screen.findByText('Jeton valide, chiffré et enregistré.')).toBeTruthy();
+    // The page has read its first bot (its strip shows), and the sheet is still where it was.
+    expect((await screen.findAllByText('Tout fonctionne')).length).toBeGreaterThan(0);
+    expect(screen.getByText('Jeton valide, chiffré et enregistré.')).toBeTruthy();
+    expect(screen.queryByText('Crée ton bot')).toBeNull();
+  });
+});
+
 describe('Réglages › Bots Telegram with its tab in the address', () => {
   /** Renders the page at `address`; gives what the address now holds and how many steps back it has. */
   function renderAt(address: string): () => { search: unknown; steps: number } {
@@ -294,9 +326,24 @@ describe('Réglages › Bots Telegram, her own alerts (P4-01)', () => {
   it('routes « Alertes personnalisées » from the Alertes tab, as Réglages › Alertes links to', async () => {
     renderSection();
     const row = await screen.findByRole('group', { name: 'Groupes pour Alertes personnalisées' });
+    const reads = vi.mocked(fetchOverview).mock.calls.length;
     fireEvent.click(within(row).getByRole('checkbox', { name: /Équipe/ }));
     await waitFor(() => {
       expect(saveRoutes).toHaveBeenCalledWith(3, [{ creatorId: null, topic: 'custom', chatId }]);
+    });
+    // Saved, the page reads the server again: its health and the night's coverage follow (COUV-05).
+    await waitFor(() => {
+      expect(vi.mocked(fetchOverview).mock.calls.length).toBeGreaterThan(reads);
+    });
+  });
+
+  it('reads the coverage again once a choice is saved, so the strip says what the server holds (recette MED-03)', async () => {
+    renderSection();
+    const row = await screen.findByRole('group', { name: 'Groupes pour Alertes personnalisées' });
+    const reads = vi.mocked(fetchOverview).mock.calls.length;
+    fireEvent.click(within(row).getByRole('checkbox', { name: /Équipe/ }));
+    await waitFor(() => {
+      expect(vi.mocked(fetchOverview).mock.calls.length).toBeGreaterThan(reads);
     });
   });
 
