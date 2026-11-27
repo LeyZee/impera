@@ -46,6 +46,8 @@ export interface PersonaForModels {
   readonly followUps: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
   /** False: her answer goes out as one message, whatever the voice wrote (`behavior.split_messages`). */
   readonly splitMessages: boolean;
+  /** She may play the jealous one when he speaks of another woman (`behavior.plays_jealous`); absent, she is not. */
+  readonly playsJealous: boolean;
   /** The only pet names she gives fans (`behavior.pet_names`); a guard flags any other. */
   readonly petNames: readonly string[];
   /** Her alert keywords (`notifications.alert_keywords`): one written by a fan pauses the agent for him (P4-01). */
@@ -187,6 +189,7 @@ export function personaForModels(
       spirit: agent.follow_ups.text,
     },
     splitMessages: agent.behavior.split_messages,
+    playsJealous: agent.behavior.plays_jealous ?? false,
     petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,

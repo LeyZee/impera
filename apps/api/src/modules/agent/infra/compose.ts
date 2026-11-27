@@ -122,6 +122,7 @@ import {
   cameBeforeFinale,
   haggles,
   insistsForMore,
+  mentionsOtherWoman,
   isBareMurmur,
   peakSeen,
   wantsOtherMan,
@@ -156,6 +157,11 @@ export interface ComposerPersona {
   readonly guardSettings: GuardSettings;
   /** False: her answer goes out as one message (`behavior.split_messages`). Absent: as the voice wrote it. */
   readonly splitMessages?: boolean;
+  /**
+   * She may play the jealous one when he speaks of another woman (`behavior.plays_jealous`, Charles 27/11). Absent or
+   * false: the voice is told she is not jealous.
+   */
+  readonly playsJealous?: boolean;
   /**
    * Her bio on her platform profile, as last read (ADR 0154): beside her sheet, read as data, it wins where they
    * differ. Absent or empty: no section.
@@ -742,6 +748,10 @@ const MOOD_KILLER_OTHER_MAN_HINT = 'ni d’un autre homme';
 const DISAPPOINTED_MEDIA_HINT =
   'elle lui pose des questions sur ce qui l’a déçu et compare avec ce que la description du média annonçait';
 /** He insists for something more after a disappointing media (Charles 26/11): sulk, then whine, never angry. */
+// He speaks of another woman (Charles 27/11): her sheet alone says whether she may play the jealous one.
+const JEALOUS_ALLOWED_HINT =
+  'il parle d’une autre femme : elle peut jouer la jalouse, pour jouer, sans reproche ni possessivité';
+const NOT_JEALOUS_HINT = 'il parle d’une autre femme : elle n’est pas jalouse';
 const INSISTS_FOR_MORE_HINT = `il insiste pour avoir quelque chose en plus : elle boude, puis chouine un peu, sans colère ; jamais de remise, jamais de média offert${SULK_NOT_INSULT}`;
 /** Written sounds of pleasure (Charles 26/11): only at the frankest rung. */
 const NO_MOANS_HINT = 'pas de bruits de plaisir écrits à ce stade';
@@ -956,6 +966,7 @@ export function guardContextOf(
   hasMedia = false,
   allowedPriceMinor?: number,
 ): GuardContext {
+  const lastTurn = history.at(-1);
   return {
     hasMedia,
     ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
@@ -968,6 +979,8 @@ export function guardContextOf(
       .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
       .filter((turn) => turn.from === 'fan')
       .flatMap((turn) => sumsMinorOf(turn.text)),
+    // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
+    ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
   };
 }
 
@@ -1772,6 +1785,9 @@ export async function composeTurn(
                 ...(meeting === undefined ? [] : [meetingHint(meeting)]),
                 ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
                 ...(degradedByHim ? [DEGRADING_FROM_HIM_HINT] : []),
+                ...(mentionsOtherWoman(input.fanText)
+                  ? [persona.playsJealous === true ? JEALOUS_ALLOWED_HINT : NOT_JEALOUS_HINT]
+                  : []),
                 ...(workHint === null ? [] : [workHint]),
                 ...(noSale ? [FREE_SEXTING_HINT] : []),
                 ...(free?.backToSale === true ? [MEDIA_IS_HER_TRADE_HINT] : []),

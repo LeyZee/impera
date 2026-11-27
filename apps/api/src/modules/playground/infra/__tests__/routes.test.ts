@@ -178,6 +178,7 @@ async function server(
       sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
       followUps: { delaysHours: [12, 24], spirit: null },
       splitMessages: true,
+      playsJealous: false,
       petNames: [],
       alertKeywords: [],
       forbiddenEmojis: [],

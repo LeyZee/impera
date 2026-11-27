@@ -182,6 +182,7 @@ function composerFields(
       personaSheet: persona.personaSheet,
       guardSettings,
       splitMessages: persona.splitMessages,
+      playsJealous: persona.playsJealous,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(examples.length > 0 && { voiceExamples: examples }),
     },

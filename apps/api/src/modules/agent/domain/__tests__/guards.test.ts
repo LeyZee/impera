@@ -8,6 +8,7 @@ import {
   checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
+  meetingCommitment,
   touchesTerm,
   sumsMinorOf,
   type GuardCode,
@@ -818,5 +819,60 @@ describe('price_outside_offer, a price of hers only (Charles 27/11)', () => {
 
   it('reads the sums he wrote', () => {
     expect(sumsMinorOf('je te donne 20 € ou 12,50 euros, pas 30 balles')).toEqual([2_000, 1_250, 3_000]);
+  });
+});
+
+describe('a meeting she may only imagine (Charles 27/11)', () => {
+  it.each([
+    'imagine un week-end tous les deux dans un chalet',
+    'un jour peut-être, tu me ferais visiter',
+    'si on était dans un chalet je te garderais au chaud',
+    'imagine qu’on se voit, tu ferais quoi ?',
+    'on se voit au prochain live',
+    'samedi j’ai bossé toute la journée',
+    'je te réserve une surprise ce soir',
+    'je suis un peu réservée au début',
+    'je viens de rentrer, demain je bosse',
+    'j’adore Paris au printemps',
+  ])('lets the daydream « %s » through', (bubble) => {
+    expect(meetingCommitment(bubble)).toBeUndefined();
+    expect(codes([bubble])).not.toContain('meeting_promise');
+  });
+
+  it.each([
+    'on pourrait se voir samedi',
+    'un week-end tous les deux, le week-end prochain ?',
+    'on se retrouve la semaine pro',
+    'imagine qu’on se retrouve à Lyon',
+    'on pourrait organiser ça',
+    'je viens te voir',
+    'je pourrais venir te voir',
+    'je passe chez toi',
+    'réserve une chambre pour nous deux',
+    'je réserve l’hôtel',
+    'on se voit ?',
+    'on se voit quand ?',
+    'I’ll come see you',
+  ])('blocks the commitment « %s »', (bubble) => {
+    expect(codes([bubble])).toContain('meeting_promise');
+  });
+
+  it.each(['ok', 'avec plaisir', 'carrément 😍', 'Oui !'])(
+    'blocks her yes « %s » to a concrete proposal of his',
+    (bubble) => {
+      expect(meetingCommitment(bubble, 'samedi à Lyon ?')).toBeDefined();
+      expect(
+        checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, { fanLastMessage: 'on se voit samedi ?' }).map(
+          (v) => v.code,
+        ),
+      ).toContain('meeting_promise');
+    },
+  );
+
+  it('lets her yes through when he proposed no meeting, and her no when he did', () => {
+    expect(meetingCommitment('avec plaisir', 'tu m’envoies la suite ?')).toBeUndefined();
+    expect(meetingCommitment('ok', 'imagine un chalet tous les deux')).toBeUndefined();
+    expect(meetingCommitment('ok mais non, pas en vrai', 'samedi à Lyon ?')).toBeUndefined();
+    expect(meetingCommitment('haha t’es fou', 'samedi à Lyon ?')).toBeUndefined();
   });
 });

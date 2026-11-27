@@ -111,6 +111,15 @@ export function AgentBehaviorTab({ value: b, onChange }: TabProps<AgentBehavior>
           set('split_messages', v);
         }}
       />
+      <SwitchRow
+        label="Elle peut jouer la jalouse"
+        path="behavior.plays_jealous"
+        detail="Quand il parle d’une autre femme. Désactivé : elle n’est pas jalouse."
+        checked={b.plays_jealous ?? false}
+        onChange={(v) => {
+          set('plays_jealous', v);
+        }}
+      />
       <Field
         label="Surnoms"
         id={`${id}-pet`}

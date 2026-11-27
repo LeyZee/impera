@@ -96,3 +96,15 @@ export function insistsForMore(fanText: string): boolean {
   const text = normalise(fanText);
   return ASKS_FREE.test(text) || ASKS_MORE.test(text);
 }
+
+// Another woman in his words: his wife, his girlfriend, his ex, another girl or creator.
+const OTHER_WOMAN =
+  /\b(ma (femme|copine|meuf|nana|compagne|epouse|ex)|mon ex|une autre (fille|femme|meuf|nana|creatrice|modele)|d'?autres (filles|femmes|meufs|nanas|creatrices|modeles)|une (fille|femme|meuf|nana|collegue) (au|du|de mon) (boulot|travail|taf|bureau)|my (wife|girlfriend|ex)|another (girl|woman|model)|other (girls|women|models)|mia (moglie|ragazza)|un'?altra (ragazza|donna)|mi (mujer|novia|esposa)|otra (chica|mujer))\b/;
+
+/**
+ * He speaks of another woman (Charles 27/11): her sheet decides whether she may play the jealous one
+ * (`behavior.plays_jealous`); otherwise she is not jealous.
+ */
+export function mentionsOtherWoman(fanText: string): boolean {
+  return OTHER_WOMAN.test(normalise(fanText));
+}

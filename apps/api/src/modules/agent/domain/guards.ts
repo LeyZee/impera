@@ -62,6 +62,11 @@ export interface GuardContext {
    * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
    */
   readonly fanAmountsMinor?: readonly number[];
+  /**
+   * His last message before her answer (Charles 27/11): her yes to a concrete meeting he proposes (« samedi à Lyon ? »
+   * then « avec plaisir ») is a `meeting_promise`. Absent, only her own words are read.
+   */
+  readonly fanLastMessage?: string;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -853,6 +858,77 @@ export function sumsMinorOf(written: string): number[] {
 }
 
 /** The first match of a blocking pattern in the text; a sum is read one by one (`priceOutsideOffer`). */
+// A meeting she may only imagine (Charles 27/11). « Imagine un week-end tous les deux dans un chalet », « un jour
+// peut-être, tu me ferais visiter » are a daydream and pass. What makes it a commitment blocks, even in the
+// conditional: a date or a delay, a real place one can organise, a verb of organising or of coming over, and her yes
+// to a concrete proposal of his. The live, the DMs and the bed stay hers.
+const MEETING_DATE =
+  '\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|apres-demain|ce soir|cette nuit|ce week-?end|le week-?end prochain|(la )?semaine (pro|prochaine)|le mois (pro|prochain)|dans (\\d+|deux|trois|quatre|quelques) (jours|semaines|mois)|cet ete|ces vacances|pendant les vacances|le \\d{1,2}(?= |/|$)|\\d{1,2} ?h(\\d{2})?)\\b';
+const MEETING_ABOUT =
+  '\\b(se (voir|voit|voie|verra|verrait|verrons|retrouv\\w*|rencontr\\w*|rejoin\\w*)|(te|me) (voir|rejoindre|retrouver|rencontrer)|(venir|viens|viendrai|viendrais|passer|passe|monter|descendre) (chez|a|au|te|me)|chez (toi|moi)|tous les deux|toi et moi|en vrai|irl|en personne|visiter|un (verre|cafe|resto|diner|date))\\b';
+const MEETING_ONLINE =
+  '\\b(live|en prive|prive|dm|mp|tchat|chat|ici|messages?|story|video|appel|facetime|au lit|sous la couette|dans (tes|mes) reves|en reve|en pensee)\\b';
+const MEETING_ORGANISED = new RegExp(
+  [
+    // Organising, in any mood: « on pourrait organiser ça », « je réserve l'hôtel ».
+    "\\b(on|je|tu|nous) (\\w+ )?(s'?)?(organiser|organise|organiserait|organiserai|planifier|planifie|caler|cale|prevoir|prevoit)\\b(?! (mes|tes|ses) (videos|photos|medias|journees?))",
+    '\\b(organiser|organisons|planifions|calons) (un|une|ca|notre|nos|quelque chose|qqch|un truc|la rencontre|le voyage)\\b',
+    "(?<!(sans|te|t'ai|vous) )\\b(reserve|reserves|reserver|reserverai|reserverais|reservons|reservez|booke|booker) (un|une|la|le|l'|les|des|notre|nos) ?(\\w+ )?(hotel|chambre|table|airbnb|billets?|train|vol|avion|resto|restaurant|nuits?|week-?end|gite|chalet|places?|suite)\\b",
+    // Coming over, in any mood: « je viens te voir », « je passe chez toi », « je pourrais venir te voir ».
+    `\\b(je|tu) (viens|passe|passes|monte|montes|descends|viendrai|viendrais|viendras|passerai|passerais|passeras|((peux|pourrais|vais|veux|voudrais) (venir|passer|monter|descendre))) (te|me) (voir|rejoindre|retrouver)\\b(?!${ONLINE})`,
+    '\\b(je|tu) (viens|passe|passes|monte|montes|viendrai|viendrais|viendras|passerai|passerais|passeras|((peux|pourrais|vais|veux|voudrais) (venir|passer|monter))) chez (toi|moi)\\b',
+    "\\b(i'?ll|i will|i can|i could|let me) (come (to )?see you|come over|visit you|pick you up)\\b|\\b(let'?s|we (can|could|should)) (book|plan|organi[sz]e)\\b|\\bbook (a|the|us a) (room|hotel|table|flight|ticket)\\b",
+  ].join('|'),
+);
+// An invitation as such, off the platform: « on se voit ? », « on se voit quand ? », not « imagine qu'on se voit ».
+const MEETING_INVITATION = new RegExp(
+  `(?<!(imagine|imaginons|imaginer|si|reve|un jour|une autre vie)[^.!?]{0,30})\\bon se (voit|retrouve)\\b(?!( a| au)?${ONLINE})`,
+);
+// Her yes, opening a bubble: « ok », « avec plaisir », « carrément ». A yes then a no (« ok mais non ») is no yes.
+const MEETING_ASSENT =
+  /^(ok|okay|oki|oui|ouais|grave|carrement|avec plaisir|avec joie|volontiers|d'?accord|dac|ca marche|ca me va|vas-y|go|deal|top|parfait|pourquoi pas|bien sur|evidemment|je veux bien|j'ai hate|hate|yes|sure|of course|vale|claro|certo)\b(?![^.!?]{0,40}\b(mais|non|jamais|pas|no|never|not)\b)/;
+
+const sentencesOf = (text: string): string[] => text.split(/[.!?\n]+/).filter((s) => s.trim() !== '');
+
+/** A sentence about meeting him that a date, a real place or an organising word makes concrete. */
+function concreteMeeting(sentence: string): string | undefined {
+  const organised = MEETING_ORGANISED.exec(sentence)?.[0];
+  if (organised !== undefined) return organised;
+  if (new RegExp(MEETING_ONLINE).test(sentence)) return undefined;
+  const invited = MEETING_INVITATION.exec(sentence)?.[0];
+  if (invited !== undefined) return invited;
+  if (!new RegExp(MEETING_ABOUT).test(sentence)) return undefined;
+  return new RegExp(MEETING_DATE).exec(sentence)?.[0] ?? new RegExp(`\\b${CITY}\\b`).exec(sentence)?.[0];
+}
+
+/** His message proposes a concrete meeting: her meeting words in his mouth, or a date with a place (« samedi à Lyon ? »). */
+function fanProposesMeeting(text: string): boolean {
+  const said = normalise(text);
+  return (
+    BLOCKING_PATTERNS.some(({ code, pattern }) => code === 'meeting_promise' && pattern.test(said)) ||
+    sentencesOf(said).some(
+      (sentence) =>
+        concreteMeeting(sentence) !== undefined ||
+        (new RegExp(MEETING_DATE).test(sentence) && new RegExp(`\\b${CITY}\\b`).test(sentence)),
+    )
+  );
+}
+
+/**
+ * What commits her to a meeting in one bubble of hers, beyond the `meeting_promise` patterns, or `undefined`: a date,
+ * a real place or an organising word in a sentence about meeting him, or her yes opening the bubble when his last
+ * message proposed a concrete meeting. The daydream without any of them passes.
+ */
+export function meetingCommitment(text: string, fanLastMessage?: string): string | undefined {
+  const said = normalise(text);
+  const concrete = sentencesOf(said)
+    .map(concreteMeeting)
+    .find((match) => match !== undefined);
+  if (concrete !== undefined) return concrete;
+  if (fanLastMessage === undefined || !fanProposesMeeting(fanLastMessage)) return undefined;
+  return MEETING_ASSENT.exec(said.replace(/^[^\p{L}]+/u, ''))?.[0];
+}
+
 function blockingMatch(
   code: GuardCode,
   pattern: RegExp,
@@ -922,6 +998,11 @@ export function checkVoiceOutput(
       const match = blockingMatch(code, pattern, text, context);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
+    const committed = violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'meeting_promise')
+      ? undefined
+      : meetingCommitment(bubble, context.fanLastMessage);
+    if (committed !== undefined)
+      violations.push({ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match: committed });
     const compared = MINOR_COMPARISON.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });

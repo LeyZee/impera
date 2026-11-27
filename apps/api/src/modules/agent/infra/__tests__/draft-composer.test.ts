@@ -104,7 +104,7 @@ function composer(
   limits?: FanLimits,
   offer: Pick<
     DraftComposerDeps,
-    'offerLimits' | 'lastOfferAt' | 'sexualizationLimits' | 'scripts' | 'alertsOf' | 'random'
+    'offerLimits' | 'lastOfferAt' | 'sexualizationLimits' | 'scripts' | 'alertsOf' | 'random' | 'persona'
   > = {},
 ) {
   const traces: unknown[] = [];
@@ -4065,5 +4065,38 @@ describe('createDraftComposer, the sexting calibrated by the creator (Charles 26
         hints(more.seen).some((hint) => hint.startsWith('il insiste pour avoir quelque chose en plus')),
       ).toBe(true);
     });
+  });
+});
+
+describe('createDraftComposer, the jealous one only when her sheet says so (Charles 27/11)', () => {
+  const PERSONA = { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS };
+  const hints = (seen: Seen) => seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+  const speaksOfHer: AgentComposeInput = {
+    ...free(INPUT),
+    history: [
+      { direction: 'inbound', text: 'ma copine rentre tard ce soir', at: new Date('2026-10-17T09:59:00Z') },
+    ],
+  };
+
+  it('tells the voice she is not jealous when her sheet leaves it off', async () => {
+    const { draftComposer, seen } = composer({}, undefined, undefined, { persona: PERSONA });
+    await draftComposer.compose(speaksOfHer);
+    expect(hints(seen)).toContain('il parle d’une autre femme : elle n’est pas jalouse');
+    expect(hints(seen).some((hint) => hint.includes('jouer la jalouse'))).toBe(false);
+  });
+
+  it('lets her play the jealous one when her sheet allows it', async () => {
+    const { draftComposer, seen } = composer({}, undefined, undefined, {
+      persona: { ...PERSONA, playsJealous: true },
+    });
+    await draftComposer.compose(speaksOfHer);
+    expect(hints(seen).some((hint) => hint.includes('elle peut jouer la jalouse'))).toBe(true);
+    expect(hints(seen)).not.toContain('il parle d’une autre femme : elle n’est pas jalouse');
+  });
+
+  it('says nothing of jealousy when he speaks of no other woman', async () => {
+    const { draftComposer, seen } = composer({}, undefined, undefined, { persona: PERSONA });
+    await draftComposer.compose(free(INPUT));
+    expect(hints(seen).some((hint) => hint.includes('jalouse'))).toBe(false);
   });
 });

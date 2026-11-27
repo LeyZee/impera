@@ -4,6 +4,7 @@ import {
   cameBeforeFinale,
   haggles,
   insistsForMore,
+  mentionsOtherWoman,
   isBareMurmur,
   peakSeen,
   peakStepIndex,
@@ -80,5 +81,13 @@ describe('the moments of the sexting (Charles 26/11)', () => {
     expect(insistsForMore('bof, tu m’en envoies une autre ?')).toBe(true);
     expect(insistsForMore('il faut compenser là')).toBe(true);
     expect(insistsForMore('je m’attendais à mieux')).toBe(false);
+  });
+
+  it('he speaks of another woman', () => {
+    expect(mentionsOtherWoman('ma copine dort à côté')).toBe(true);
+    expect(mentionsOtherWoman('je parle à d’autres créatrices aussi')).toBe(true);
+    expect(mentionsOtherWoman('my wife is away')).toBe(true);
+    expect(mentionsOtherWoman('ma mère m’a appelé')).toBe(false);
+    expect(mentionsOtherWoman('t’es la plus belle')).toBe(false);
   });
 });
