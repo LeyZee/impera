@@ -27,9 +27,24 @@
   line-height: var(--nv-text-title-2-leading);
   font-weight: 700;
 }
+/* On a phone the ring sits beside its sentence, at 120 px, so that « Ma journée » and its first task show without a
+   scroll (Design, recette navigation 27/11). The computer keeps the big ring. */
 @media (max-width: 720px) {
   .dh-card {
-    --nv-donut-size: 216px;
+    --nv-donut-size: 120px;
+  }
+  .dh-card .nv-donut-row {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--nv-space-4);
+  }
+  .dh-card .nv-donut-row > .nv-donut {
+    flex: none;
+    align-self: center;
+  }
+  .dh-line {
+    font-size: var(--nv-text-headline);
+    line-height: var(--nv-text-headline-leading);
   }
 }
 .dh-legend {

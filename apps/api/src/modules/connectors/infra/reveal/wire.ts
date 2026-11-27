@@ -198,6 +198,17 @@ const WireMessageItemSchema = z.strictObject({
 });
 export type RevealWireMessageItem = z.infer<typeof WireMessageItemSchema>;
 
+/**
+ * Reveal's own translation settings for a conversation, sent with its messages since 2026-11-27 (capture of the owner's
+ * dashboard): the team's language, and the fan's and the reply's when set. Read only so the page still parses; the
+ * agent never takes its language from here (the reply language is decided in our code, ADR 0168).
+ */
+const WireTranslationSchema = z.strictObject({
+  teamLanguage: z.string().min(1),
+  memberLanguage: z.string().min(1).nullable(),
+  replyLanguage: z.string().min(1).nullable(),
+});
+
 const WireBuyRateSchema = z.strictObject({
   purchased: z.number().int().min(0),
   total: z.number().int().min(0),
@@ -271,7 +282,10 @@ export const REVEAL_ENDPOINTS = {
   'messages.list': {
     method: 'GET',
     path: '/conversations/:id/messages',
-    shape: page(WireMessageItemSchema).extend({ memberLastReadAt: iso.nullable().optional() }),
+    shape: page(WireMessageItemSchema).extend({
+      memberLastReadAt: iso.nullable().optional(),
+      translation: WireTranslationSchema.optional(),
+    }),
   },
   'messages.send': { method: 'POST', path: '/conversations/:id/messages', shape: WireMessageCoreSchema },
   'conversations.read': { method: 'PATCH', path: '/conversations/:id/read', shape: WireConversationSchema },
