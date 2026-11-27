@@ -362,12 +362,6 @@ body {
   font-weight: 600;
   color: var(--nv-sale);
 }
-.cp-sold__why {
-  margin: 2px 0 0;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-}
 /* The moment to sell (maquette v4, 27/11): the step and its price as the title, on a soft plate of success, rising in. */
 .cp-move[data-tone='good'] {
   margin: var(--nv-space-1) var(--cp-gutter) 0;

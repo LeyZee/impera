@@ -13,7 +13,6 @@ import {
   type FanStanding,
   type RejectReason,
 } from '@impera/contracts';
-import { fireAt } from '@impera/design-system';
 
 import {
   CUT_LINES,
@@ -620,7 +619,7 @@ function statusBand(
     { class: 'cp-band', 'data-halo': calm ? 'true' : undefined },
     who,
     badges,
-    heat === null ? null : heatRow(heat, sparks),
+    ...(heat === null ? [] : heatRow(heat, sparks)),
   );
 }
 
@@ -638,9 +637,6 @@ function nextFoot(next: NextFan): HTMLElement {
     next.more === 0 ? null : h('span', { class: 'cp-next__more' }, `+${String(next.more)}`),
   );
 }
-
-/** The flame's colour while the sparks fly: burning. */
-const SPARK_LEVEL = 90;
 
 /** A sheaf of sparks out of the flame, fanned upward (maquette v4, cadre 9): fixed ways, nothing from data. */
 const SPARK_WAYS: readonly (readonly [number, number, number, number])[] = Array.from(
@@ -671,8 +667,8 @@ function sparksOf(): HTMLElement {
 }
 
 /**
- * « Vendu », for a few seconds under the band (maquette v4, cadre 9): what was sold, then what he spent with her in all.
- * In the colour of sale, never a commission, nothing to click.
+ * « Vendu », for a few seconds under the band (maquette v4, cadre 9): what was sold, in the colour of sale, never a
+ * commission, nothing to click. What he spent in all is already in the band above (Design 27/11).
  */
 function soldLine(sold: Sold): HTMLElement {
   return h(
@@ -685,12 +681,6 @@ function soldLine(sold: Sold): HTMLElement {
       sold.stepName === null ? null : `«\u00a0${sold.stepName}\u00a0», `,
       h('span', { class: 'nv-num' }, eurosOf(sold.amountMinor)),
     ),
-    h(
-      'p',
-      { class: 'cp-sold__why' },
-      'Avec elle en tout\u00a0: ',
-      h('span', { class: 'nv-num' }, eurosOf(sold.totalMinor)),
-    ),
   );
 }
 
@@ -698,10 +688,8 @@ function soldLine(sold: Sold): HTMLElement {
  * His desire as fire, the whole width under his name (maquette v4, 27/11; design system `nv-heat`): the flame and the
  * word take the colour of the tip of the fill; the line is the moment to sell. Never a figure.
  */
-function heatRow(shown: Heat, sparks: boolean): HTMLElement {
-  // While the sparks fly the flame burns, then it calms to what it says (maquette v4, cadre 9).
-  const heat: Heat = sparks ? { ...shown, lit: true, rest: false, color: fireAt(SPARK_LEVEL) } : shown;
-  return h(
+function heatRow(heat: Heat, sparks: boolean): HTMLElement[] {
+  const row = h(
     'div',
     {
       class: 'nv-heat cp-band__heat',
@@ -709,6 +697,8 @@ function heatRow(shown: Heat, sparks: boolean): HTMLElement {
       'aria-label': heat.label,
       'data-lit': heat.lit ? 'true' : 'false',
       'data-rest': heat.rest ? 'true' : undefined,
+      // While the sparks fly only the flame burns; the track and the word keep saying the truth (Design 27/11).
+      'data-party': sparks ? 'true' : undefined,
       style: [
         `--_w:${String(heat.level)}%`,
         `--_wn:${String(heat.level)}`,
@@ -728,6 +718,9 @@ function heatRow(shown: Heat, sparks: boolean): HTMLElement {
     ),
     h('span', { class: 'nv-heat__word', 'aria-hidden': 'true' }, heat.word),
   );
+  return heat.note === null
+    ? [row]
+    : [row, h('p', { class: 'nv-heat__note cp-band__heat', 'aria-hidden': 'true' }, heat.note)];
 }
 
 /**

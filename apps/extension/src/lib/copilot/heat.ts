@@ -35,6 +35,8 @@ export interface Heat {
   readonly rest: boolean;
   /** « chaud », « brûlant », « après achat · pause 48 h ». */
   readonly word: string;
+  /** What is missing to sell, said under the track when there is one (« il manque sa dispo »). */
+  readonly note: string | null;
   /** What a screen reader says. */
   readonly label: string;
 }
@@ -63,6 +65,7 @@ export function heatOf({ standing, money, assist, cut, now }: HeatInput): Heat |
       lit: false,
       rest: true,
       word: 'après achat · pause 48 h',
+      note: null,
       label: 'Son envie : après un achat, pause de 48 heures',
     };
   if (verdict === 'good')
@@ -72,6 +75,7 @@ export function heatOf({ standing, money, assist, cut, now }: HeatInput): Heat |
       lit: true,
       rest: false,
       word: 'brûlant',
+      note: null,
       label: 'Son envie : brûlant, c’est le moment de vendre',
     };
   const band = standing.band;
@@ -80,13 +84,15 @@ export function heatOf({ standing, money, assist, cut, now }: HeatInput): Heat |
   const nudge = trend === 'up' ? NUDGE : trend === 'down' ? -NUDGE : 0;
   const level = Math.min(HEAT_MARK - 2, Math.max(4, LEVELS[band] + nudge));
   const missing = assist?.saleMoment == null ? null : missingWords(assist.saleMoment);
-  const word = missing === null ? DESIRE_WORDS[band] : `${DESIRE_WORDS[band]} · il manque ${missing}`;
+  const word = DESIRE_WORDS[band];
+  const note = missing === null ? null : `il manque ${missing}`;
   return {
     level,
     color: fireAt(level),
     lit: false,
     rest: false,
     word,
-    label: `Son envie : ${word}${trend === 'up' ? ', en hausse' : trend === 'down' ? ', en baisse' : ''}`,
+    note,
+    label: `Son envie : ${word}${note === null ? '' : `, ${note}`}${trend === 'up' ? ', en hausse' : trend === 'down' ? ', en baisse' : ''}`,
   };
 }

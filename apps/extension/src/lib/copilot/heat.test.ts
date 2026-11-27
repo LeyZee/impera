@@ -80,7 +80,9 @@ describe('his desire as fire (maquette v4, 27/11)', () => {
         }),
       }),
     );
-    expect(heat?.word).toBe('chaud · il manque sa dispo');
+    expect(heat?.word).toBe('chaud');
+    // Under the track, so the track keeps its width (Design 27/11).
+    expect(heat?.note).toBe('il manque sa dispo');
     expect(heat?.label).not.toMatch(/\d/u);
   });
 

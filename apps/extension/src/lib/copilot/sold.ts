@@ -20,8 +20,6 @@ export interface Sold {
   readonly amountMinor: number;
   /** The step's name when the code had offered one at that very price, else null. */
   readonly stepName: string | null;
-  /** What he spent with her now. */
-  readonly totalMinor: number;
   /** When the panel saw it, in ms since the epoch. */
   readonly seenAt: number;
 }
@@ -39,7 +37,6 @@ export function soldBetween(
   return {
     amountMinor,
     stepName: next !== null && next.priceMinor === amountMinor ? next.name : null,
-    totalMinor: after.money.spentMinor,
     seenAt,
   };
 }

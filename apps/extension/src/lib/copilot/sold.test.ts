@@ -22,7 +22,7 @@ describe('a sale paid, seen by the panel (maquette v4, cadre 9)', () => {
   it('sees a purchase when what he spent goes up and his last purchase moves', () => {
     expect(
       soldBetween(seen(4_500, '2026-11-26T20:00:00Z'), seen(6_000, '2026-11-27T21:02:00Z'), offered, 10),
-    ).toEqual({ amountMinor: 1_500, stepName: 'Étape 3', totalMinor: 6_000, seenAt: 10 });
+    ).toEqual({ amountMinor: 1_500, stepName: 'Étape 3', seenAt: 10 });
   });
 
   it('names the step only when its price is the amount paid', () => {

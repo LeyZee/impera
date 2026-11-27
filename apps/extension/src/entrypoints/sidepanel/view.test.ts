@@ -1265,12 +1265,16 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
   });
 
   it('lets the flame burn while the sparks of a sale fly, then rest', () => {
-    const sold = { amountMinor: 1_500, stepName: null, totalMinor: 6_000, seenAt: now.getTime() - 100 };
+    const sold = { amountMinor: 1_500, stepName: null, seenAt: now.getTime() - 100 };
     const money = { tier: null, spentMinor: 6_000, lastPurchaseAt: '2026-11-08T17:59:00Z' };
     const flying = draw(
       onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), money, sold }),
     ).root;
-    expect(flying.querySelector<HTMLElement>('.nv-heat')?.dataset['lit']).toBe('true');
+    const party = flying.querySelector<HTMLElement>('.nv-heat');
+    expect(party?.dataset['party']).toBe('true');
+    // The word keeps saying the truth: after a purchase he rests.
+    expect(party?.dataset['lit']).toBe('false');
+    expect(party?.dataset['rest']).toBe('true');
     const later = draw(
       onCard(card({}), [], {
         draft: ready(),
@@ -1280,6 +1284,7 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
       }),
     ).root;
     expect(later.querySelector<HTMLElement>('.nv-heat')?.dataset['rest']).toBe('true');
+    expect(later.querySelector<HTMLElement>('.nv-heat')?.dataset['party']).toBeUndefined();
   });
 
   it('says a block no condition says, so « Ne rien vendre » never goes without its reason', () => {
@@ -1392,13 +1397,12 @@ describe('a sale paid (maquette v4, cadre 9; Charles 27/11)', () => {
   const sold = (seenAt: number, stepName: string | null = 'Étape 3'): Sold => ({
     amountMinor: 1_500,
     stepName,
-    totalMinor: 6_000,
     seenAt,
   });
   const at = (screen: Parameters<typeof onCard>[2]): HTMLElement =>
     draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), ...screen })).root;
 
-  it('says what was sold and what he spent in all, under the band, never a commission', () => {
+  it('says what was sold, under the band, never a commission', () => {
     const root = at({ sold: sold(now.getTime()) });
     expect([...root.children].map((node) => node.className)).toEqual([
       'cp-band',
@@ -1411,7 +1415,8 @@ describe('a sale paid (maquette v4, cadre 9; Charles 27/11)', () => {
     expect(root.querySelector('.cp-sold__title')?.textContent).toBe(
       'Vendu\u00a0: «\u00a0Étape 3\u00a0», 15\u00a0€',
     );
-    expect(root.querySelector('.cp-sold__why')?.textContent).toBe('Avec elle en tout\u00a0: 60\u00a0€');
+    // What he spent in all is already in the band (Design 27/11).
+    expect(root.querySelector('.cp-sold__why')).toBeNull();
     expect(root.querySelector('.cp-sold')?.textContent).not.toMatch(/commission/iu);
     expect(at({ sold: sold(now.getTime(), null) }).querySelector('.cp-sold__title')?.textContent).toBe(
       'Vendu\u00a0: 15\u00a0€',

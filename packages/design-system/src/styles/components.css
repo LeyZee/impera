@@ -2922,6 +2922,12 @@
   color: var(--nv-fire-word);
   font-weight: 600;
 }
+.nv-heat__note {
+  margin: 0;
+  padding-left: 36px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
 .nv-heat[data-rest='true'] {
   --_c: var(--nv-ink-faint);
 }
@@ -2946,10 +2952,16 @@
   transform-origin: 50% 90%;
   transform-box: fill-box;
 }
+/* During a sale's sparks only the flame burns; the track and the word keep saying the truth (Design 27/11). */
+.nv-heat[data-party='true'] .nv-flame {
+  --_c: var(--nv-fire-burn);
+}
+.nv-heat[data-party='true'] .nv-flame,
 .nv-heat[data-lit='true'] .nv-flame {
   filter: drop-shadow(0 0 7px color-mix(in srgb, var(--_c) 75%, transparent));
   animation: nv-flicker 1.8s ease-in-out infinite;
 }
+.nv-heat[data-party='true'] .nv-flame__core,
 .nv-heat[data-lit='true'] .nv-flame__core {
   fill: color-mix(in srgb, var(--_c) 30%, #fff3c4);
   animation: nv-flame-core 1.2s ease-in-out infinite;
