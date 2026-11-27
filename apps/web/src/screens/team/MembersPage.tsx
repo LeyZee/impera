@@ -289,7 +289,7 @@ function Row({
     access === 'expired' ? (
       <span className="tm-invited tm-invited--expired">Lien expiré</span>
     ) : access !== null ? (
-      <span className="tm-invited">Invité</span>
+      <span className="tm-invited">Invitation envoyée</span>
     ) : member.status === 'active' ? null : (
       <StatusPill member={member} />
     );
