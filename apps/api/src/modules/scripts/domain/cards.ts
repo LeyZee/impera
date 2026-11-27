@@ -1,4 +1,5 @@
 import {
+  bridgeName,
   scriptCardInk,
   scriptSegmentCodes,
   SCRIPT_CARD_INKS,
@@ -23,7 +24,7 @@ import {
 /** What a card says, before it is drawn. */
 export interface CardContent {
   readonly kind: 'stage' | 'series' | 'bridge';
-  /** « ÉTAPE 2 », « PONT 2 & 3 ». */
+  /** « ÉTAPE 2 », « PONT VERS L’ÉTAPE 3 ». */
   readonly title: string;
   /** The stage's name, « Série A », or nothing for a bridge. */
   readonly subtitle: string;
@@ -152,7 +153,7 @@ export function cardContent(
     return {
       ...common,
       kind: 'bridge',
-      title: `PONT ${number(segment.from)} & ${number(segment.to)}`,
+      title: bridgeName(version.segments, segment.to).toLocaleUpperCase('fr-FR'),
       subtitle: '',
       quote: segment.teaser,
       access: 'GRATUIT',

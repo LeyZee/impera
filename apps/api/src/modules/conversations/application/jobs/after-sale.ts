@@ -102,7 +102,7 @@ export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: A
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
+        stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
         scriptRun: await tx.scriptRuns.latest(conversation.id),
       };
     });
@@ -154,6 +154,7 @@ export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: A
           createdAt: at.at,
           bubbles: result.bubbles,
           softViolations: result.softViolations,
+          ...(result.retried !== undefined && { retried: result.retried }),
           ...(result.voice !== undefined && { voice: result.voice }),
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: [],

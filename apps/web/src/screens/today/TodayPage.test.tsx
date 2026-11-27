@@ -253,6 +253,30 @@ describe('Aujourd’hui', () => {
     expect(certificate?.getAttribute('href')).toBe('/moi/dossier');
   });
 
+  it('asks a chatter with no linked browser to install and link the extension (recette 27/11, G6)', async () => {
+    const answers: Record<string, unknown> = {
+      '/v1/scheduling/my-shifts': { current: null, next: null, ended: null },
+      '/v1/team/members': { members: MEMBERS },
+      '/v1/scheduling/settings': SCHEDULING_SETTINGS,
+      '/v1/trends/extension-links': { items: [] },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const body = answers[new URL(input, 'http://localhost').pathname];
+        return Promise.resolve(
+          body === undefined
+            ? new Response('null', { status: 404 })
+            : new Response(JSON.stringify(body), { status: 200 }),
+        );
+      }),
+    );
+    renderPage();
+    const line = (await screen.findByText('Installer et relier l’extension')).closest('a');
+    expect(line?.getAttribute('href')).toBe('/aide/extension');
+    expect(line?.textContent).toContain('avant ton premier shift');
+  });
+
   it('lists what the file still asks, the texts to accept and a document never filed, beside the reports (D-03)', async () => {
     vi.stubGlobal(
       'fetch',

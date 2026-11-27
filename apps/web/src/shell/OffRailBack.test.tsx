@@ -59,6 +59,16 @@ describe('OffRailBack', () => {
     expect(back.getAttribute('href')).toBe('/moi/preferences');
   });
 
+  it.each([
+    ['a chatter', chatter],
+    ['a creator', creator],
+  ])('sends %s back from the extension’s guide to Moi › Sécurité (CHAT-08)', async (_, user) => {
+    vi.stubGlobal('scrollTo', vi.fn());
+    renderAs(user, '/aide/extension');
+    const back = await screen.findByRole('link', { name: '← Moi › Sécurité' });
+    expect(back.getAttribute('href')).toBe('/moi/securite');
+  });
+
   it('sends an account without Moi back to its first tab', async () => {
     vi.stubGlobal('scrollTo', vi.fn());
     renderAs(owner);

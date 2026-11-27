@@ -84,8 +84,9 @@ const EMPTY = (prefill?: Partial<Draft>): Draft => ({
   displayTouched: false,
   email: '',
   teamRole: 'chatter',
-  country: 'BJ',
-  timeZone: suggestedZone('BJ') ?? 'Africa/Porto-Novo',
+  // No country by default (Charles, 27/11): a chatter may live in Madagascar, in France or elsewhere.
+  country: '',
+  timeZone: '',
   zoneOpen: false,
   joinedOn: today(),
   joinedUnreadable: false,
@@ -132,7 +133,15 @@ function asOutcome(outcome: InviteOutcome): Added {
 
 type Problems = Partial<
   Record<
-    'firstName' | 'lastName' | 'displayName' | 'email' | 'timeZone' | 'joinedOn' | 'rate' | 'teamShare',
+    | 'firstName'
+    | 'lastName'
+    | 'displayName'
+    | 'email'
+    | 'country'
+    | 'timeZone'
+    | 'joinedOn'
+    | 'rate'
+    | 'teamShare',
     string
   >
 >;
@@ -147,7 +156,8 @@ export function problemsOf(step: number, draft: Draft, presetsOnly = false): Pro
     if (!EmailSchema.safeParse(draft.email.trim()).success) problems.email = 'Une adresse e-mail complète.';
   }
   if (step === 1) {
-    if (!TimezoneSchema.safeParse(draft.timeZone.trim()).success)
+    if (draft.country === '') problems.country = 'Choisis son pays.';
+    else if (!TimezoneSchema.safeParse(draft.timeZone.trim()).success)
       problems.timeZone = 'Ce fuseau n’existe pas. Choisis-en un dans la liste.';
     if (draft.joinedUnreadable) problems.joinedOn = 'Un jour comme 03/11/2026, ou 3/11.';
     else if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.joinedOn)) problems.joinedOn = 'Une date d’arrivée.';
@@ -369,7 +379,7 @@ export function AddMemberPanel({
                   ))}
                 </ol>
               ) : (
-                <p>Envoie-lui son lien : il y choisira son mot de passe.</p>
+                <p>Envoie-lui son lien : son mot de passe se choisit dessus.</p>
               )}
             </div>
             <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>
@@ -650,10 +660,12 @@ function Where({ id, draft, problems, onChange }: StepProps): JSX.Element {
         id={`${id}-country`}
         label="Pays"
         hint="Il propose le fuseau et, plus tard, le régime de ses factures."
+        problem={problems.country}
       >
         <Select
           id={`${id}-country`}
           value={draft.country}
+          placeholder="Choisir son pays"
           searchLabel="Chercher un pays"
           empty="Aucun pays ne correspond."
           options={[

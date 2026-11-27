@@ -164,6 +164,19 @@ describe('PersonaSchema', () => {
     expect(withChange((p) => p.limits.never_say.push('bébé ?')).success).toBe(true);
     expect(withChange((p) => p.limits.never_say.push('69')).success).toBe(true);
   });
+
+  it('takes her degrading words as an optional list, read by a guard, never filled in the repository (26/11)', () => {
+    expect(demo().limits.degrading_words).toBeUndefined();
+    expect(withChange((p) => Object.assign(p.limits, { degrading_words: ['motinterdit'] })).success).toBe(
+      true,
+    );
+    expect(issuePaths(withChange((p) => Object.assign(p.limits, { degrading_words: ['?'] })))[0]).toMatch(
+      /^limits\.degrading_words\./u,
+    );
+    expect(
+      withChange((p) => Object.assign(p.limits, { degrading_words: ['motinterdit', 'MOTINTERDIT'] })).success,
+    ).toBe(false);
+  });
 });
 
 describe('ageOn', () => {

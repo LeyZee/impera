@@ -1,6 +1,6 @@
 # CR-17 Coffre Impera : ce qu'elle dépose, compté par usage, ouvert en grand et décrit
 
-Statut : in_progress (vue de stock, cadeaux baleines, descriptions relues par les trois : en PR ; « À remplacer » après le serveur du module des dépôts)
+Statut : in_progress (type de vidéo à vendre au dépôt : en PR ; « À remplacer » après le serveur du module des dépôts)
 Phase : espaces (ADR 0163)
 Dépend de : CR-06 (dépôts), ADR 0159 (cadeaux), ADR 0161 (scripts) ; « À remplacer » : le serveur du module des dépôts, puis la propagation du module des scripts
 Branche : claude/project-thread-660krh
@@ -25,7 +25,7 @@ L'agence (PC) et la créatrice (téléphone) voient d'un coup d'œil ce qu'il re
 - [x] Jetons `--nv-content-11` à `13` (vidéos à vendre, deux vocaux) à la place des mélanges provisoires.
 - [x] Catégories « Vocal du bip », « Vocal bien réelle », « Vidéos à vendre » (contrats, base, demandes, coffre).
 - [x] Ce que l'agent pioche et note (`content-drops` › `reserved`) : un vocal une fois par fan, un cadeau jamais deux fois, seulement validé ; index unique partiel sur `media_sends` (`reserved-media.integration.test.ts`).
-- [ ] Type de vidéo à vendre choisi au dépôt, quand les lignes « Vidéos déjà tournées » de Sur mesure sont sur main.
+- [x] Type de vidéo à vendre choisi au dépôt (colonne `ready_video_id`, routes des types, choix dans la fiche de dépôt) ; ce que l'agent pioche, prix tiré dans la fourchette (`pickSaleVideo`). Reste à l'agent : figer le prix dans son offre et noter la vente.
 - [ ] « Ce qui part quand » : attend le moteur de publication.
 
 ## Critères d'acceptation

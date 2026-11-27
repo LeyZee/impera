@@ -29,7 +29,7 @@ const SeenBodySchema = z.object({ creatorId: ReviewShiftQuerySchema.shape.creato
 /**
  * `/v1/team/review` (ADR 0170 §§ 12 to 14, 26 to 30): « Mon bilan » of a shift, read by the member himself; his
  * « vu », his contest; the ruling of the owner or a manager. Who reads and writes what is the policies' call
- * (`withTenantMember`, migration 0281) and the service's.
+ * (`withTenantMember`, migration 0283) and the service's.
  */
 export function createReviewRoutes(reviews: ReviewService, requireRole: RequireRole): FastifyPluginAsyncZod {
   const member = requireRole('operator');

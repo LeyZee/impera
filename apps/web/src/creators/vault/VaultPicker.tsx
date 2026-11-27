@@ -1,8 +1,8 @@
 import type { CreatorId, VaultFolderView, VaultMediaView } from '@impera/contracts';
 import { useState, type CSSProperties, type JSX } from 'react';
 
-import type { ChoiceIndex } from './choice';
-import { durationLine, mediaKindLine, mediaLine, syncedLine } from './model';
+import { goneFromReveal, type ChoiceIndex } from './choice';
+import { durationLine, folderName, mediaKindLine, mediaLine, momentTag, syncedLine } from './model';
 import { ChevronIcon, FolderIcon, Preview, Sharp, SyncIcon, VoiceFace } from './parts';
 import {
   PICKER_PAGE,
@@ -15,7 +15,6 @@ import {
   pickKey,
   pickOf,
   pickedIds,
-  pickerFolderName,
   pickerMedia,
   draftLine,
   type PickDraft,
@@ -71,7 +70,8 @@ export function VaultPicker({
   const [draft, setDraft] = useState<PickDraft>(new Map());
   const [open, setOpen] = useState<string | null>(startFolder);
   const blurred = useMediaBlur();
-  const listed = folders ?? [];
+  // A folder Reveal no longer lists has nothing left to choose (REV-07).
+  const listed = (folders ?? []).filter((each) => !goneFromReveal(each));
   const opened = open === null ? undefined : listed.find((each) => pickKey(each) === open);
   const summary = draftSummary(draft, index, listed);
   const said = draftLine(draft);
@@ -113,11 +113,15 @@ export function VaultPicker({
         </ul>
       ) : listed.length === 0 ? (
         <div className="vx-empty vk-empty">
-          <p className="vx-empty__title">{reading ? 'Lecture en cours' : 'Coffre vide'}</p>
+          <p className="vx-empty__title">
+            {reading ? 'Lecture en cours' : syncedAt === null ? 'Pas encore lu' : 'Coffre vide'}
+          </p>
           <p className="ps-muted">
             {reading
               ? 'Ses dossiers apparaissent ici dès que Reveal les a donnés.'
-              : 'Reveal n’a listé aucun média à la dernière synchro.'}
+              : syncedAt === null
+                ? 'Son coffre n’a jamais été lu : reconnecte sa session depuis l’extension.'
+                : 'Reveal n’a listé aucun média à la dernière synchro.'}
           </p>
         </div>
       ) : opened === undefined ? (
@@ -208,7 +212,7 @@ function FolderCard({
   const pick = pickOf(draft, index, folder);
   const changed = draft.has(pickKey(folder));
   const media = pickerMedia(folder);
-  const name = pickerFolderName(folder);
+  const name = folderName(folder);
   // A tick not yet sent says what it will do; otherwise, where the folder stands in Impera today.
   const where = changed ? (pick.kind === 'none' ? 'À retirer' : 'À importer') : inImperaLine(pick, folder);
   const style: CSSProperties = { '--vk-order': Math.min(order, STAGGERED) };
@@ -238,6 +242,7 @@ function FolderCard({
         </span>
         <span className="vk-card__text">
           <span className="vk-card__name">{name}</span>
+          <MomentTag folder={folder} />
           <span className="vk-card__line nv-num">{mediaLine(folder.media)}</span>
         </span>
       </button>
@@ -280,7 +285,7 @@ function FolderMedia({
   const pick = pickOf(draft, index, folder);
   const ids = pickedIds(pick, folder);
   const media = pickerMedia(folder);
-  const name = pickerFolderName(folder);
+  const name = folderName(folder);
   const left = media.length - shown;
   return (
     <div className="vk-folder">
@@ -363,4 +368,11 @@ function Face({
       {sharp ? <Sharp creatorId={creatorId} media={media} /> : null}
     </>
   );
+}
+
+/** A folder's Day or Night, or « À classer » when its name says neither (PRO1-04); nothing for the vault's root. */
+export function MomentTag({ folder }: { folder: VaultFolderView }): JSX.Element | null {
+  const tag = momentTag(folder);
+  if (tag === null) return null;
+  return <span className={`nv-tag nv-tag--${tag.tone} vx-moment`}>{tag.label}</span>;
 }

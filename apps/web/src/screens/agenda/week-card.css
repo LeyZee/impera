@@ -1,7 +1,8 @@
 /* ── Ta semaine de tournage (ADR 0140) ─────────────────────────────────────────────────────────────────────────── */
 /* One card above her agenda. One thing leads, her next shooting day; each kind of thing in its own colour (Charles,
    20/11), hers to change; no bar on any side; red and amber stay for urgencies and warnings, never a kind's colour. */
-.wk-card {
+.wk-card,
+.wk-swatched {
   /* The swatches she picks from: light mid tones by night, darker ones by day (a ring at 3:1 on the plate). */
   --wk-sw-rose: #f07a94;
   --wk-sw-violet: #a395ff;
@@ -11,6 +12,8 @@
   --wk-sw-citron: #c6e35a;
   --wk-sw-lilas: #e08ee6;
   --wk-mark: #0b0b10;
+}
+.wk-card {
   padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
@@ -23,7 +26,8 @@
     var(--nv-plate);
   animation: wk-in var(--nv-dur-slow) var(--nv-ease-out) both;
 }
-:root[data-theme='light'] .wk-card {
+:root[data-theme='light'] .wk-card,
+:root[data-theme='light'] .wk-swatched {
   --wk-sw-rose: #c8385a;
   --wk-sw-violet: #6a55e0;
   --wk-sw-cyan: #127f8f;
@@ -33,29 +37,37 @@
   --wk-sw-lilas: #a03aa8;
   --wk-mark: #fff;
 }
-/* Each kind's colour: hers when she chose one, ours otherwise. */
-.wk-card [data-need='feed_shoot'] {
+/* Each kind's colour: hers when she chose one, ours otherwise. `.wk-swatched`: a kind's mark outside the card (Contenu). */
+.wk-card [data-need='feed_shoot'],
+.wk-swatched[data-need='feed_shoot'] {
   --wk-c: var(--wk-feed_shoot, var(--wk-sw-rose));
 }
-.wk-card [data-need='feed_video'] {
+.wk-card [data-need='feed_video'],
+.wk-swatched[data-need='feed_video'] {
   --wk-c: var(--wk-feed_video, var(--wk-sw-violet));
 }
-.wk-card [data-need='reveal_story'] {
+.wk-card [data-need='reveal_story'],
+.wk-swatched[data-need='reveal_story'] {
   --wk-c: var(--wk-reveal_story, var(--wk-sw-cyan));
 }
-.wk-card [data-need='script'] {
+.wk-card [data-need='script'],
+.wk-swatched[data-need='script'] {
   --wk-c: var(--wk-script, var(--wk-sw-bleu));
 }
-.wk-card [data-need='mass_dm'] {
+.wk-card [data-need='mass_dm'],
+.wk-swatched[data-need='mass_dm'] {
   --wk-c: var(--wk-mass_dm, var(--wk-sw-vert));
 }
-.wk-card [data-need='idea'] {
+.wk-card [data-need='idea'],
+.wk-swatched[data-need='idea'] {
   --wk-c: var(--wk-idea, var(--wk-sw-citron));
 }
-.wk-card [data-need='instagram'] {
+.wk-card [data-need='instagram'],
+.wk-swatched[data-need='instagram'] {
   --wk-c: var(--wk-instagram, var(--wk-sw-lilas));
 }
-.wk-card [data-need='telegram'] {
+.wk-card [data-need='telegram'],
+.wk-swatched[data-need='telegram'] {
   --wk-c: var(--wk-telegram, var(--wk-sw-citron));
 }
 @keyframes wk-in {
@@ -807,8 +819,9 @@
   height: 26px;
   margin-top: 2px;
 }
+/* 26px + 2 × 9px: the 44px target, its overflow kept inside the gap between two marks (DS-09). */
 .dy-marks[data-many] .dy-tick::before {
-  inset: -5px;
+  inset: -9px;
 }
 /* On a phone, a line of several marks puts them under its words: the words keep their width. */
 @media (max-width: 640px) {
@@ -821,6 +834,16 @@
     justify-content: flex-end;
     margin-top: 0;
     padding-right: 2px;
+  }
+  /* Under the thumb, every ring is drawn bigger and reaches 44 px with its margin. */
+  .dy-tick,
+  .dy-marks[data-many] .dy-tick {
+    width: 34px;
+    height: 34px;
+  }
+  .dy-tick::before,
+  .dy-marks[data-many] .dy-tick::before {
+    inset: -5px;
   }
 }
 .dy-line[data-done] .dy-tick {

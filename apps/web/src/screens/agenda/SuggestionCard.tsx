@@ -11,6 +11,8 @@ import { ShootBrief } from './ShootBrief';
 import { acceptSuggestion, AGENDA_KEY, NOT_SENT } from './api';
 import { CategoryMark } from './category';
 import { undatedOf } from './model';
+import { useCreatorWeek } from './week-api';
+import { heldByWeek } from './week-model';
 import { whenWords } from './words';
 
 import { lengthOf } from '@/scheduling/time';
@@ -45,6 +47,8 @@ export function SuggestionCard({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const undated = suggestion.when === null;
+  // A day of her week still to accept: one way to say yes, « Accepter ma semaine » (choice of 21/11, MOD-05).
+  const held = heldByWeek(useCreatorWeek(suggestion.week).data, suggestion.id);
   const accept = (): void => {
     setBusy(true);
     setFailed(null);
@@ -89,39 +93,45 @@ export function SuggestionCard({
           {failed}
         </p>
       )}
-      <div className="ag-proposal__actions">
-        {undated ? (
+      {held ? (
+        <p className="ag-proposal__purpose">
+          Ce jour fait partie de ta semaine de tournage : tu l’acceptes avec « Accepter ma semaine ».
+        </p>
+      ) : (
+        <div className="ag-proposal__actions">
+          {undated ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon nv-btn--sm"
+              onClick={() => {
+                onPlace(suggestion);
+              }}
+            >
+              Choisir un moment
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon nv-btn--sm"
+              disabled={busy}
+              aria-busy={busy}
+              onClick={accept}
+            >
+              Accepter
+            </button>
+          )}
           <button
             type="button"
-            className="nv-btn nv-btn--neon nv-btn--sm"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            disabled={busy}
             onClick={() => {
-              onPlace(suggestion);
+              onDecline(suggestion);
             }}
           >
-            Choisir un moment
+            Non merci
           </button>
-        ) : (
-          <button
-            type="button"
-            className="nv-btn nv-btn--neon nv-btn--sm"
-            disabled={busy}
-            aria-busy={busy}
-            onClick={accept}
-          >
-            Accepter
-          </button>
-        )}
-        <button
-          type="button"
-          className="nv-btn nv-btn--plain nv-btn--sm"
-          disabled={busy}
-          onClick={() => {
-            onDecline(suggestion);
-          }}
-        >
-          Non merci
-        </button>
-      </div>
+        </div>
+      )}
     </article>
   );
 }

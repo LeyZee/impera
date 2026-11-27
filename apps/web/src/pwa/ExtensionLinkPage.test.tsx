@@ -57,6 +57,18 @@ describe('ExtensionLinkPage', () => {
     expect(await screen.findByText(/« Relier l’extension au CRM de cet ordinateur \? »/u)).toBeDefined();
   });
 
+  // EXT-09: this computer's CRM is allowed at the install, the browser asks nothing there.
+  it('speaks of the browser’s question only where the browser asks one', async () => {
+    await renderAt('http://localhost:5173/extension/lier');
+    const local = await screen.findByText(/Clique « Relier »/u);
+    expect(local.textContent).toMatch(/Clique « Relier »\.$/u);
+    cleanup();
+    await renderAt('https://crm.exemple.fr/extension/lier');
+    expect((await screen.findByText(/Clique « Relier »/u)).textContent).toContain(
+      'puis accepte la question du navigateur.',
+    );
+  });
+
   // Avis Design du 19/11: « la barre de Chrome » was wrong in Edge; the browser is not named, in either.
   it('says the same in Edge as in Chrome, naming no browser', async () => {
     await renderAt('https://crm.exemple.fr/extension/lier', EDGE);

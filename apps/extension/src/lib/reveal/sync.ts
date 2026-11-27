@@ -142,6 +142,8 @@ export interface ReadDeps {
   readonly capture: (expected: string | null) => Promise<Captured | null>;
   /** The account's model: the CRM's `modelId`, else the model of this account's last sync; null before the first. */
   readonly expectedModel: (accountId: PlatformAccountId) => Promise<string | null>;
+  /** Another account of the CRM whose model this is (its `modelId`, or its last sync's); null when none (EXT-05). */
+  readonly accountOfModel: (modelId: string, except: PlatformAccountId) => Promise<PlatformAccountId | null>;
 }
 
 /** Reads the tab's session and holds it; the popup is told the model's id alone, to check it before sending. */
@@ -157,6 +159,11 @@ export async function readReveal(
   if (captured === null) return { state: 'no-session' };
   if (captured.state === 'several') return { state: 'several' };
   const { session } = captured;
+  // The tab shows another account's creator: said before anything is held or sent (EXT-05).
+  if (expected !== session.modelId) {
+    const other = await deps.accountOfModel(session.modelId, accountId);
+    if (other !== null) return { state: 'other-account', accountId: other };
+  }
   hold.keep(accountId, session);
   return {
     state: 'held',

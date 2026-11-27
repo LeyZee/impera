@@ -14,12 +14,15 @@ import {
   type PersonaSheet,
   type PersonaStrategies,
   type StoredPersona,
+  type VoiceFormSettings,
 } from '@impera/contracts';
 import { parse, stringify } from 'yaml';
 
 import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain/desire';
+import { resolveForm } from '../domain/form';
 import { DEFAULT_GUARD_SETTINGS, type GuardSettings } from '../domain/guards';
 import { askableSlots } from '../domain/kyc';
+import { DEFAULT_AFTER_PURCHASE_HOURS } from '../domain/policy';
 import type { OfferLimits } from '../domain/policy';
 import type { SexualizationLimits } from '../domain/sexualization';
 
@@ -32,6 +35,8 @@ export interface PersonaForModels {
   readonly forbiddenTerms: readonly string[];
   /** What she never does (`never_do`): a custom order that asks for one is declined, never taken (audit du 16/11, M3). */
   readonly neverDo?: readonly string[];
+  /** The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): a guard blocks them. */
+  readonly degradingWords?: readonly string[];
   /**
    * Her pace of scripts and the heat they wait for (`agent.strategies.script_launch`), applied by `offerDecision`, never by a
    * prompt.
@@ -46,12 +51,23 @@ export interface PersonaForModels {
   readonly followUps: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
   /** False: her answer goes out as one message, whatever the voice wrote (`behavior.split_messages`). */
   readonly splitMessages: boolean;
+  /** She may play the jealous one when he speaks of another woman (`behavior.plays_jealous`); absent, she is not. */
+  readonly playsJealous: boolean;
+  /** She may write stage directions (`behavior.stage_directions`, Charles 27/11); absent, she does not. */
+  readonly stageDirections: boolean;
   /** The only pet names she gives fans (`behavior.pet_names`); a guard flags any other. */
   readonly petNames: readonly string[];
   /** Her alert keywords (`notifications.alert_keywords`): one written by a fan pauses the agent for him (P4-01). */
   readonly alertKeywords: readonly string[];
   /** Emojis she never uses (`agent.rules.emojis_forbidden`): a guard blocks them. */
   readonly forbiddenEmojis: readonly string[];
+  /** Her words kept for close fans (`agent.rules.close_only_words`, Charles 26/11): a guard refuses them below the tier. */
+  readonly closeOnlyWords?: GuardSettings['closeOnlyWords'];
+  /**
+   * The form of her bubbles and her emoji streak as her persona sets them (`agent.behavior`, Charles 26/11): each rule
+   * absent is her agency's base style's, then the code's (`resolveForm`).
+   */
+  readonly form?: VoiceFormSettings;
   /** The canvas lines she tries to learn of each fan, in her order (`strategies.kyc.collect`, P5-01). */
   readonly kycSlots: readonly KycSlot[];
   /**
@@ -60,9 +76,23 @@ export interface PersonaForModels {
    */
   readonly objectionReplies: ObjectionReplies;
   /** Her languages (`spoken_languages`), in her order: code decides the language of each answer among them (ADR 0168). */
-  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  readonly spokenLanguages: readonly [Language, ...Language[]];
   /** Her messages per language (`agent.language_examples`), read by the voice only in that language (ADR 0168 § 3). */
-  readonly languageExamples?: LanguageExamples;
+  readonly languageExamples: LanguageExamples;
+}
+
+/** Her languages and her messages in each, as every caller of `composeTurn` gives them (ADR 0168). */
+export interface PersonaLanguages {
+  readonly spokenLanguages: readonly [Language, ...Language[]];
+  readonly languageExamples: LanguageExamples;
+}
+
+/**
+ * Her languages for the composer, read the same way by the drafts, the playground and the evals: a caller that forgot
+ * them made her answer in French only (l1-l3 of the evals failed for that).
+ */
+export function languagesOf(persona: PersonaForModels): PersonaLanguages {
+  return { spokenLanguages: persona.spokenLanguages, languageExamples: persona.languageExamples };
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
@@ -171,9 +201,11 @@ export function personaForModels(
     personaSheet: stringify(forModels).trim(),
     forbiddenTerms: [...rules.disgusts, ...rules.never_say].filter((term) => !isPlaceholder(term)),
     neverDo: rules.never_do.filter((term) => !isPlaceholder(term)),
+    degradingWords: (rules.degrading_words ?? []).filter((term) => !isPlaceholder(term)),
     offerLimits: {
       cooldownHours: agent.strategies.script_launch.cooldown_hours,
       minDesire: scriptMinDesire,
+      afterPurchaseHours: agent.strategies.script_launch.after_purchase_hours ?? DEFAULT_AFTER_PURCHASE_HOURS,
     },
     sexualizationLimits: {
       initiateAfterHours: agent.strategies.sexualization.initiate_after_hours,
@@ -190,9 +222,19 @@ export function personaForModels(
       spirit: agent.follow_ups.text,
     },
     splitMessages: agent.behavior.split_messages,
+    playsJealous: agent.behavior.plays_jealous ?? false,
+    stageDirections: agent.behavior.stage_directions ?? false,
     petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,
+    ...(rules.close_only_words !== undefined &&
+      rules.close_only_words.length > 0 && {
+        closeOnlyWords: rules.close_only_words.map((group) => ({
+          words: group.words.filter((word) => !isPlaceholder(word)),
+          minTier: group.min_tier,
+        })),
+      }),
+    form: formOf(agent.behavior),
     kycSlots,
     objectionReplies: agent.objection_replies,
     spokenLanguages: spokenOf(sheet.identity.spoken_languages),
@@ -206,13 +248,34 @@ function spokenOf(languages: readonly Language[]): readonly [Language, ...Langua
   return first === undefined ? ['french'] : [first, ...rest];
 }
 
-/** The guards with her disgusts, her forbidden words and emojis, and her pet names. */
-export function guardSettingsOf(persona: PersonaForModels): GuardSettings {
+/** Her form settings as her persona sets them: only those she set, so a lower layer decides the rest. */
+function formOf(behavior: VoiceFormSettings): VoiceFormSettings {
+  const { capitalization, strip_final_period, mark_spacing, emoji_streak_max } = behavior;
+  return {
+    ...(capitalization !== undefined && { capitalization }),
+    ...(strip_final_period !== undefined && { strip_final_period }),
+    ...(mark_spacing !== undefined && { mark_spacing }),
+    ...(emoji_streak_max !== undefined && { emoji_streak_max }),
+  };
+}
+
+/**
+ * The guards with her disgusts, her forbidden words and emojis, her pet names, and her form: her persona's settings
+ * first, then her agency's base style's (ADR 0173), then the code's.
+ */
+export function guardSettingsOf(persona: PersonaForModels, baseStyle: VoiceFormSettings = {}): GuardSettings {
+  const { form, emojiStreakMax } = resolveForm([persona.form ?? {}, baseStyle]);
   return {
     ...DEFAULT_GUARD_SETTINGS,
     forbiddenTerms: persona.forbiddenTerms,
     forbiddenEmojis: persona.forbiddenEmojis,
     ...(persona.neverDo !== undefined && persona.neverDo.length > 0 && { neverDo: persona.neverDo }),
     ...(persona.petNames.length > 0 && { petNames: persona.petNames }),
+    ...(persona.degradingWords !== undefined &&
+      persona.degradingWords.length > 0 && { degradingWords: persona.degradingWords }),
+    ...(persona.stageDirections && { stageDirections: true }),
+    ...(persona.closeOnlyWords !== undefined && { closeOnlyWords: persona.closeOnlyWords }),
+    form,
+    ...(emojiStreakMax !== undefined && { emojiStreakMax }),
   };
 }

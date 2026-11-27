@@ -256,6 +256,14 @@ describe('Paie › Objectifs', () => {
         .map((one) => valueOf(one)),
     ).toEqual(['80', '100']);
     fireEvent.change(target, { target: { value: '1 600' } });
+    // A higher tier that pays less is refused before anything is sent (COUV-03).
+    const bonuses = within(dialog).getAllByLabelText(/^Prime par chatteur/u);
+    const [, high] = bonuses;
+    if (high === undefined) throw new Error('two tiers');
+    fireEvent.change(high, { target: { value: '5' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(within(dialog).getByText('Un palier plus haut donne une prime plus haute.')).toBeTruthy();
+    fireEvent.change(high, { target: { value: '25' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     expect(text(await within(dialog).findByText(/de net pour l’équipe sur la quinzaine/u))).toBe(
       '1 600,00 € de net pour l’équipe sur la quinzaine du 1er au 15 novembre : à 80 %, +10,00 € par chatteur ; à 100 %, +25,00 €.',

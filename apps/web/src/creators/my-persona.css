@@ -79,6 +79,8 @@
   font-size: var(--nv-text-body);
   line-height: var(--nv-text-body-leading);
   overflow-wrap: anywhere;
+  /* Her lines kept: « Ne fait jamais » and « Ne montre jamais » are two lines, never one (recette MOD-04). */
+  white-space: pre-line;
 }
 /* A phone: label above its value. */
 @media (max-width: 640px) {

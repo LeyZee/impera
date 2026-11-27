@@ -1,6 +1,6 @@
 # 0136. Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait
 
-Statut : accepted (Charles, 16/11/2026, 16 h 11 Paris, « OK 0136 », avec ses précisions : feed réservé aux abonnés, publications publiques laissées ouvertes ; demande du même jour, 15 h 45 et 15 h 50, fil « Publier posts et stories automatiquement » ; « une séance = un post », 16 h 02)
+Statut : accepted (Charles, 16/11/2026, 16 h 11 Paris, « OK 0136 », avec ses précisions : feed réservé aux abonnés, publications publiques laissées ouvertes ; demande du même jour, 15 h 45 et 15 h 50, fil « Publier posts et stories automatiquement » ; « une séance = un post », 16 h 02 ; avenant du 27/11/2026, § 11 : la story reprend la vidéo du feed vidéo)
 Date : 2026-11-16
 Amende : ADR 0044 § 3 (cadence, visibilité, acceptation humaine obligatoire), ADR 0044 § 4 (ce qu'on mesure), ADR 0055 § 5 (seuils du stock).
 Précise : ADR 0044 § 6 (formes du connecteur, d'après la capture du 16/11), ADR 0083 (la légende part de la description), ADR 0126 (l'agent ne cite que ce qui est fait).
@@ -84,6 +84,16 @@ La capture du 16/11 (lue pour sa forme seulement) montre que Reveal sait créer,
 - Capacités facultatives du port (ADR 0044 § 6), d'après la capture du 16/11 : `publishPost` (médias du coffre ou téléversés, ordre, heure programmée, public), `deletePost`, `listPosts`, `publishStory`, `deleteStory`, `listStories`, `publicFeedStats`. `FakeReveal` d'abord ; formes arrêtées par le propriétaire de `packages/contracts` et du module `connectors`.
 - Clé d'idempotence par publication ; avant de recréer une publication dont la réponse s'est perdue, le code relit la liste des publications programmées. Un échec ne republie jamais à l'aveugle : ambre avec sa raison.
 - Pendant le développement, **rien ne part sur un vrai compte**. La première publication réelle attend le mot écrit de Charles dans le fil qui l'exécute, qui nomme l'action et le compte.
+
+### 11. Avenant du 27/11/2026 : la story reprend la vidéo du feed vidéo
+
+Décision de Charles (27/11/2026, 2 h 53 Paris, fil « Recette complète ») : le but est de faire gagner le plus de temps possible à la créatrice. Elle ne dépose que les médias qu'on lui demande, et Impera planifie et publie lui-même la story et le feed vidéo.
+
+- **La story du jour est la vidéo du feed vidéo.** La même vidéo (dépôt `feed_video`) part au feed vidéo de Reveal, vu en dehors de ses fans, avec sa légende. Elle part aussi en story, vue par ses fans, avec une légende propre aux stories (§ 4 : une phrase au plus, une question ouverte sur ce qu'on voit). Cela remplace le § 3 : plus de dépôt Story Reveal (`reveal_story`) demandé à la créatrice. Le refus de faire passer un média d'une sortie à l'autre ne vaut plus entre le feed vidéo et la story ; il vaut toujours entre une séance réservée aux abonnés et une sortie publique.
+- **Plus de stock ni d'alerte propres aux stories** (§ 7, seuil de 4 jours) : la story suit la vidéo. Un jour sans vidéo prévue, aucune story ne part et aucune alerte ne se lève. Le stock suivi est celui des vidéos du feed. Le retrait de l'objectif et de l'alerte de stock des stories est fait côté coffre et semaine (ADR 0140, ADR 0145) avant l'ouverture.
+- **Le feed vidéo est une sortie publique du plan automatique.** Cela amende le § 5, qui gardait toute publication publique hors du plan. La séance photo reste réservée aux abonnés (`isPublic: false`). La garde « publié » du § 5 s'applique à la vidéo : une vidéo publiée au feed vidéo ou en story ne se vend jamais.
+- **À vérifier avec Charles avant le lot**, sans rien supposer : les drapeaux exacts de Reveal pour chaque sortie (`videoFeedOnly`, `isPublic` de la publication et de la story, vus dans la capture du 16/11), et le rythme des vidéos qu'il veut pour tenir une story par jour.
+- **Calendrier** : le lot (légende story, planification commune vidéo et story) vient après l'ouverture du 1er décembre 2026, pas avant. L'écriture vers Reveal reste éteinte par défaut, et aucune vraie publication ne part sans le mot écrit de Charles dans le fil qui l'exécute.
 
 ## Conséquences
 

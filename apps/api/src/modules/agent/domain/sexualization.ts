@@ -33,6 +33,11 @@ export interface SexualizationContext {
    * evening, never a second. Absent, not known: as not tried.
    */
   readonly triedThisEvening?: boolean;
+  /**
+   * Inside the pause after his last purchase (ADR 0128 § 2): she does relation and does not open it herself; she still
+   * follows him if he goes there. Absent, no pause.
+   */
+  readonly afterPurchase?: boolean;
 }
 
 export type SexualizationDecision =
@@ -57,7 +62,8 @@ export function sexualizationDecision(context: SexualizationContext): Sexualizat
     context.noExplicit ||
     hours < limits.initiateAfterHours ||
     context.desire < limits.minDesireToOpen ||
-    context.triedThisEvening === true
+    context.triedThisEvening === true ||
+    context.afterPurchase === true
   )
     return { kind: 'no_opening' };
   return { kind: 'free' };
@@ -254,14 +260,15 @@ const BRAKE = new RegExp(
 
 /**
  * She never slows down a fan who does not go there (Charles, 20/11): a compliment, even an insistent one, is welcomed,
- * with a thank-you and a tease. Read when the cursor did not steer him back; blocking, so the voice writes it again.
+ * with a thank-you and a tease. Read when the cursor did not steer him back; soft since 27/11 (Sécurité, #1043): a
+ * style fault the calibration reads, never a hard line.
  */
 export function checkWelcome(bubbles: readonly string[]): GuardViolation[] {
   const violations: GuardViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
     const match = BRAKE.exec(normalise(bubble))?.[0];
     if (match !== undefined)
-      violations.push({ code: 'unwarranted_brake', severity: 'blocking', bubbleIndex, match });
+      violations.push({ code: 'unwarranted_brake', severity: 'soft', bubbleIndex, match });
   });
   return violations;
 }

@@ -1,4 +1,4 @@
-import type { TeamMember } from '@impera/contracts';
+import type { MemberDepartureId, TeamMember, UserId } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -17,7 +17,9 @@ import type {
   ShiftRemarkSource,
 } from './domain/ports';
 import { createDrizzleAnnouncementStore } from './infra/announcement-store';
+import { createDepartureStore } from './infra/departure-store';
 import { createAnnouncementRoutes } from './infra/http/announcement-routes';
+import { createDepartureRoutes } from './infra/http/departure-routes';
 import { createReviewRoutes } from './infra/http/review-routes';
 import { createTeamRoutes, type RequireRole } from './infra/http/routes';
 import { membersForPay, type MemberForPay } from './infra/pay-reads';
@@ -44,8 +46,8 @@ const NO_REMARKS: ShiftRemarkSource = {
 export interface TeamModule {
   readonly name: 'team';
   /**
-   * Mounted under `/v1` by the server: `/team/members` and `/team/commission-presets` (EQ-01); `recentLogin` guards
-   * every write of the owner (EQ-15).
+   * Mounted under `/v1` by the server: `/team/members` and `/team/commission-presets` (EQ-01), `/team/departures`
+   * (ADR 0166); `recentLogin` guards every write of the owner (EQ-15).
    */
   routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   /** Mounted under `/v1` by the server: `/team/announcements` (EQ-12), the owner's and the team's accounts. */
@@ -71,6 +73,12 @@ export interface TeamModule {
      * for access; how many changed.
      */
     applyRoles(): Promise<number>;
+    /**
+     * `team.member_departure`, at the hour a departure ends (ADR 0166 § 2), in the name of the owner who set it or of an
+     * owner in office:
+     * whether it applied now (false when cancelled or already applied).
+     */
+    applyDeparture(id: MemberDepartureId, scheduledBy: UserId): Promise<boolean>;
   };
 }
 
@@ -113,6 +121,8 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
     excerpts: deps.remarkExcerpts ?? (() => Promise.resolve([])),
     now,
   });
+  const today = (at: Date): string => calendarDayIn(at, DEFAULT_AGENCY_TIME_ZONE);
+  const departures = createDepartureStore(deps.db, deps.adminDb, now, today);
   const announcements = createAnnouncementService(
     createDrizzleAnnouncementStore(deps.db, now),
     deps.creatorNames,
@@ -121,16 +131,22 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
     name: 'team',
     announcementRoutes: (requireRole) => createAnnouncementRoutes(announcements, requireRole),
     reviewRoutes: (requireRole) => createReviewRoutes(reviews, requireRole),
-    routes: (requireRole, recentLogin) =>
-      createTeamRoutes(service, requireRole, deps.platformRemovals, recentLogin),
+    routes: (requireRole, recentLogin) => {
+      const members = createTeamRoutes(service, requireRole, deps.platformRemovals, recentLogin);
+      const leaving = createDepartureRoutes(departures, requireRole, recentLogin);
+      return async (app) => {
+        await app.register(members);
+        await app.register(leaving);
+      };
+    },
     pay: { members: membersForPay },
     invites: (links) => {
       const invites = createDrizzleTeamInvites(deps.db, links);
       return { fromPlatform: (actor, input) => service.inviteFromPlatform(actor, input, invites) };
     },
     jobs: {
-      applyRoles: async () =>
-        (await applyRolesUnscoped(deps.adminDb, calendarDayIn(now(), DEFAULT_AGENCY_TIME_ZONE))).length,
+      applyRoles: async () => (await applyRolesUnscoped(deps.adminDb, today(now()))).length,
+      applyDeparture: (id, scheduledBy) => departures.apply(id, scheduledBy),
     },
   };
 }

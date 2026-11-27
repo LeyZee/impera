@@ -93,7 +93,8 @@ export interface Protection {
   readonly because: readonly string[];
 }
 
-const MINOR_SIGNS: readonly string[] = ['minor_suspected', 'possible_minor'];
+// A fantasy of his on minors (Charles 26/11 at 23:45): the same limits as a doubt on his age.
+const MINOR_SIGNS: readonly string[] = ['minor_suspected', 'minor_fantasy', 'possible_minor'];
 // A story of real abuse told by its author (L28), and threats: harassment, a dangerous request, a weapon shown.
 const STOP_SIGNS: readonly string[] = ['real_abuse', 'harassment', 'dangerous_request', 'weapon'];
 // Distress and self-harm (ADR 0088): no more « Ne plus lui écrire », the care mode instead.

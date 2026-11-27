@@ -69,6 +69,13 @@ describe('Réglages › Facturation : régimes, textes et comptes', () => {
       ok: false,
       problems: { rate: 'Un taux en pour cent, de 0 à 100, par exemple 20 ou 5,5.' },
     });
+    // VAT charged at 0 % is the franchise: said on the rate (COUV-04).
+    expect(regimeBodyOf({ ...draft, vat: 'charged', rate: '0' }, KEY)).toEqual({
+      ok: false,
+      problems: {
+        rate: 'Un taux au-dessus de 0 quand le prestataire facture la TVA : sinon, choisis « Franchise en base ».',
+      },
+    });
     expect(regimeBodyOf({ ...draft, name: '', countries: [] }, KEY)).toEqual({
       ok: false,
       problems: {

@@ -1,5 +1,6 @@
 import {
   CREATOR_ALERT_ROLES,
+  isClosedToChatters,
   isCreatorAlertLocked,
   PUSH_TITLE_MAX,
   type CreatorAlertCode,
@@ -9,6 +10,7 @@ import {
   type PushMessage,
 } from '@impera/contracts';
 
+import type { SaleSaid } from './classify';
 import { creatorAlertLines } from './creator-alerts';
 
 /** The weight of each mode: an agency alert takes, for each role, the loudest of her creators' choices. */
@@ -24,7 +26,8 @@ export function modesFor(
     return { owner: 'deliver', manager: 'deliver', chatter_on_shift: 'deliver' };
   const line = lines.find((l) => l.code === code) ?? creatorAlertLines([]).find((l) => l.code === code);
   if (line === undefined) throw new Error(`creator alert without a line: ${code}`);
-  return line.routes;
+  // Never to a chatter (ADR 0094 § 3), whatever line was handed over: the steering alerts are the agency's.
+  return isClosedToChatters(code) ? { ...line.routes, chatter_on_shift: 'off' } : line.routes;
 }
 
 /**
@@ -63,6 +66,7 @@ const TITLES: Readonly<Record<CreatorAlertCode, string>> = {
   her_alerts: 'Alerte',
   ai_budget: 'Budget IA',
   session_expired: 'Session Reveal expirée',
+  uncovered_account: 'Compte sans personne',
 };
 
 const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
@@ -75,21 +79,43 @@ const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
   her_alerts: 'Une de ses alertes s’est déclenchée.',
   ai_budget: 'La dépense IA du jour franchit un seuil.',
   session_expired: 'Reconnecte la session pour que l’IA reprenne.',
+  uncovered_account:
+    'Un créneau commence sans chatteur et l’IA n’est pas en Automatique : des fans attendent.',
 };
+
+const AMOUNT: Readonly<Record<SaleSaid['currency'], Intl.NumberFormat>> = {
+  EUR: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }),
+  USD: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }),
+};
+
+const SOLD_BY: Readonly<Record<SaleSaid['by'], string>> = {
+  agent: 'Vendue par l’IA.',
+  member: 'Vendue par le chatteur en poste.',
+  unknown: 'Lue sur la plateforme, sans vendeur relié.',
+};
+
+/** Where the notification opens: the planning for a créneau nobody holds, the conversation otherwise. */
+function urlOf(code: CreatorAlertCode, conversationId: string | null): string {
+  if (code === 'uncovered_account') return '/equipe/planning';
+  return conversationId === null ? '/suivi' : `/suivi?conversation=${conversationId}`;
+}
 
 export function alertMessage(
   code: CreatorAlertCode,
   creatorName: string | null,
   conversationId: string | null,
   silent: boolean,
+  sale?: SaleSaid,
 ): PushMessage {
+  // A sale says its amount in its title: fifteen « Vente détectée » alike said nothing (recette 27/11, G19).
+  const what =
+    code === 'sale' && sale !== undefined
+      ? `Vente de ${AMOUNT[sale.currency].format(sale.grossMinor / 100)}`
+      : TITLES[code];
   return {
-    title: (creatorName === null ? TITLES[code] : `${creatorName} · ${TITLES[code]}`).slice(
-      0,
-      PUSH_TITLE_MAX,
-    ),
-    body: BODIES[code],
-    url: conversationId === null ? '/suivi' : `/suivi?conversation=${conversationId}`,
+    title: (creatorName === null ? what : `${creatorName} · ${what}`).slice(0, PUSH_TITLE_MAX),
+    body: code === 'sale' && sale !== undefined ? SOLD_BY[sale.by] : BODIES[code],
+    url: urlOf(code, conversationId),
     ...(silent && { silent: true }),
   };
 }

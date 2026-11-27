@@ -5,10 +5,11 @@ import { herFiguresOf } from './model';
 
 import { useCreatorFanInsights } from '@/screens/sales/api';
 
-/** Three figures of her fans under her day, and the way into Ventes for the rest. Quiet while nothing is read. */
+/** Up to three figures of her fans under her day, and the way into Ventes for the rest. Quiet while none is known. */
 export function HerFigures(): JSX.Element | null {
   const insights = useCreatorFanInsights().data;
-  if (insights === undefined) return null;
+  const figures = insights === undefined ? [] : herFiguresOf(insights);
+  if (figures.length === 0) return null;
   return (
     <section className="nv-plate sc-figures nv-enter" aria-labelledby="sc-figures-title">
       <div className="sc-figures__head">
@@ -20,7 +21,7 @@ export function HerFigures(): JSX.Element | null {
         </Link>
       </div>
       <div className="sc-figures__tiles">
-        {herFiguresOf(insights).map((figure) => (
+        {figures.map((figure) => (
           <div key={figure.key} className="nv-tile">
             <span className="nv-tile__label">{figure.label}</span>
             <span className="nv-tile__value nv-num">{figure.value}</span>

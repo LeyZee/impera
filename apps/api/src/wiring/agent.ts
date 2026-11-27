@@ -24,7 +24,7 @@ import { createDbVoiceExampleBank } from '../modules/playground';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
 
-import { createAgentScriptSource, createLastOfferAt } from './agent-scripts';
+import { createAgentScriptSource, createLastOfferAt, createLastPurchaseAt } from './agent-scripts';
 import type { Shared } from './shared';
 
 export interface WiredAgent {
@@ -78,6 +78,8 @@ export function wireAgent(
     startDraftComposer({
       gateway: deps.llm.gateway,
       activePersona,
+      // The agency's base style, read at each draft beside her persona (ADR 0173).
+      baseStyleOf: () => persona.agencyStyle.activeUnscoped(),
       fans: deps.fans,
       onDroppedNotes: (event) => {
         logger.warn(event, 'fan notes shaped like an order kept out of the prompt');
@@ -98,6 +100,7 @@ export function wireAgent(
       // Her clock is the creator's (`creators.timezone`); Paris when the row cannot be read.
       scripts: createAgentScriptSource(scriptReads),
       lastOfferAt: createLastOfferAt(scriptReads),
+      lastPurchaseAt: createLastPurchaseAt(scriptReads),
       gridOf: (creatorId) => deps.customOrders.gridOf(CreatorIdSchema.parse(creatorId)),
       // Her bio on her platform profile, as the poll last read it (ADR 0154): beside her persona, it wins where they differ.
       profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),

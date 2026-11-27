@@ -28,6 +28,17 @@ describe('bubble guard (approval of edited bubbles)', () => {
     });
   });
 
+  it('lets a chatter write a word kept for close fans, and misplaced emojis: the chatter sees the fan (26/11)', () => {
+    const close = createBubbleGuard({
+      ...DEFAULT_GUARD_SETTINGS,
+      closeOnlyWords: [{ words: ['mon cœur'], minTier: 4 }],
+    });
+    expect(close.check(['😘 bonne nuit mon cœur'], { previousTurns: [] })).toEqual({
+      isBlocked: false,
+      codes: [],
+    });
+  });
+
   it('reads the care guard on a chatter’s words while a care episode is open (ADR 0088 § 3, § 5)', () => {
     const explicit = ['Viens on se change les idées, je suis toute mouillée'];
     expect(guard.check(explicit)).toEqual({ isBlocked: false, codes: [] });

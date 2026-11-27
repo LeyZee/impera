@@ -192,7 +192,7 @@ function Day({
         {/* Where he stands in the game, and the way to Moi › Trophées (ADR 0134, lot 1). */}
         <MyProgressCard user={user} />
         {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
-        <RewardRevealGate user={user} />
+        <RewardRevealGate user={user} held={state.kind === 'soon' || state.kind === 'on'} />
         <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
         {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       </div>

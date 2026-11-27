@@ -189,9 +189,31 @@ export class ReviewRulingForbidden extends DomainError {
   }
 }
 
+/** ADR 0166 § 1: one departure waiting per member, and only a waiting one is cancelled. */
+export class MemberDepartureConflict extends DomainError {
+  constructor(message = 'Ce membre a déjà un départ prévu') {
+    super('member_departure_conflict', message);
+  }
+}
+
+export class MemberDepartureDateInvalid extends DomainError {
+  constructor(maxDays: number) {
+    super(
+      'member_departure_date_invalid',
+      `L’heure de fin est maintenant ou plus tard, dans les ${String(maxDays)} jours`,
+    );
+  }
+}
+
 /** « Mon bilan » of a shift that is not his, or that does not exist: the same answer (ADR 0170 § 12). */
 export class ReviewShiftNotFound extends DomainError {
   constructor() {
     super('review_shift_not_found', 'Shift introuvable');
+  }
+}
+
+export class MemberDepartureNotFound extends DomainError {
+  constructor() {
+    super('member_departure_not_found', 'Départ introuvable');
   }
 }

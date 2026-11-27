@@ -15,6 +15,7 @@ import {
   PersonaStrategiesSchema,
   type Persona,
 } from './persona';
+import { VoiceFormSettingsSchema } from './voice-form';
 
 /**
  * The persona sheet at format 2 (ADR 0079): Desirali's sheet, section by section and question by question, with its
@@ -89,7 +90,7 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('place_of_life', 'Lieu de vie', 'short', 'half'),
       q('timezone', 'Fuseau horaire', 'timezone', 'half'),
       q('spoken_languages', 'Langues parlées', 'languages', 'half', {
-        help: 'Sélectionnez les langues que le modèle parle couramment',
+        help: 'Les langues qu’elle parle couramment.',
         required: true,
       }),
     ],
@@ -133,7 +134,7 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('roleplaying_description', 'Description du jeu de rôle', 'long', 'full'),
       q('favourite_emojis', 'Émojis favoris', 'short', 'full'),
       q('conversation_description', 'Description de la conversation', 'long', 'full', {
-        help: 'Décrivez le ton, le style ou les sujets de conversation typiques.',
+        help: 'Le ton, le style ou les sujets de ses conversations.',
       }),
       q('spelling_description', "Style d'orthographe", 'long', 'full'),
       q('compliment_description', 'Style de compliments', 'long', 'full'),
@@ -331,6 +332,21 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
   /** The only pet names she gives fans: guards refuse any other. */
   pet_names: PersonaSchema.shape.behavior.shape.pet_names,
   response_delay_minutes: PersonaSchema.shape.behavior.shape.response_delay_minutes,
+  /**
+   * She may play the jealous one when he speaks of another woman (Charles 27/11). Absent or false: she is not jealous,
+   * and the voice is told so; never a prompt's choice.
+   */
+  plays_jealous: z.boolean().optional(),
+  /**
+   * She may write stage directions (« *rougit* », « (rires) »), a style of hers (Charles 27/11). Absent or false: the
+   * guards read one as a soft `stage_direction`.
+   */
+  stage_directions: z.boolean().optional(),
+  /**
+   * The form of her bubbles (Charles 26/11): first letter, final period, space before « ? » and « ! », and her emoji
+   * streak (`emoji_misuse`). Each absent: her agency's base style decides, then the code's default.
+   */
+  ...VoiceFormSettingsSchema.shape,
 });
 
 /** The most examples of her messages per language, and the longest one. */

@@ -388,7 +388,7 @@ function TiersPanel({
         {tiers.length === 0 ? (
           <p className="py-quiet">
             Pas de prime de palier sur cette quinzaine.{' '}
-            {owner ? '« Nouveaux paliers » en pose à partir d’une quinzaine pas encore validée.' : ''}
+            {owner ? '« Nouveaux paliers » partent d’une quinzaine qui n’a pas encore commencé.' : ''}
           </p>
         ) : (
           <ul className="py-tiers">

@@ -1,5 +1,5 @@
 # CR-13 Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion
-Statut : todo (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 3, acceptée le 02/11/2026). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : todo (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 3, acceptée le 02/11/2026). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
 Phase : espaces (ADR 0045)
 Dépend de : CR-12 ; les notifications de ces gestes passent par EQ-12
 Branche : task/cr-13-shift-calendar-editing

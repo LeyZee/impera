@@ -1,6 +1,7 @@
 import { decryptSecret, schema, sql, type Database, type EncryptionKey } from '@impera/db';
 
 import { checkSalesFeedKeys } from './modules/connectors';
+import { checkPayoutDestinations } from './modules/contractors';
 import { checkProviderKeys } from './modules/providers';
 import { checkTelegramTokens } from './modules/telegram';
 
@@ -51,16 +52,18 @@ export async function checkEncryptionKeys(
   adminDb: Database,
   keys: { readonly session: readonly EncryptionKey[]; readonly credentials: readonly EncryptionKey[] },
 ): Promise<readonly SealedFamily[]> {
-  const [sessions, providers, bots, feeds] = await Promise.all([
+  const [sessions, providers, bots, feeds, payouts] = await Promise.all([
     checkPlatformSessions(adminDb, keys.session),
     checkProviderKeys(adminDb, keys.credentials),
     checkTelegramTokens(adminDb, keys.credentials),
     checkSalesFeedKeys(adminDb, keys.credentials),
+    checkPayoutDestinations(adminDb, keys.credentials),
   ]);
   return [
     sessions,
     { label: 'Clés des services IA', keys: 'CREDENTIALS_ENCRYPTION_KEYS', ...providers },
     { label: 'Jetons des bots Telegram', keys: 'CREDENTIALS_ENCRYPTION_KEYS', ...bots },
     { label: 'Clés de lecture des ventes', keys: 'CREDENTIALS_ENCRYPTION_KEYS', ...feeds },
+    { label: 'Coordonnées de versement', keys: 'CREDENTIALS_ENCRYPTION_KEYS', ...payouts },
   ];
 }

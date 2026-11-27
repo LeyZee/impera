@@ -103,5 +103,13 @@ export function canDraftBecome(from: DraftStatus, to: DraftStatus): boolean {
   return DRAFT_TRANSITIONS[from].includes(to);
 }
 
-/** Sends tried per draft before the conversation goes to `error` and waits for a human (message-flow.md §3). */
-export const MAX_SEND_ATTEMPTS = 3;
+/**
+ * Sends tried per draft before the conversation goes to `error` and waits for a human (message-flow.md §3). Graphile
+ * waits e^n seconds after the n-th failure: the last of 5 attempts comes about 85 s after the first, past the 30 s
+ * a connector holds back a send it may have made (Reveal may list it late). With 3, a single outage of the platform
+ * failed the draft for good while every retry was still held back (recette REV-01).
+ */
+export const MAX_SEND_ATTEMPTS = 5;
+
+/** What `MAX_SEND_ATTEMPTS` was when `send_failed` did not say `isFinal` yet: those events are replayed with it. */
+export const LEGACY_MAX_SEND_ATTEMPTS = 3;

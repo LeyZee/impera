@@ -27,6 +27,14 @@ export type UntrustedKind =
   | 'objection_reply'
   /** What a script of her catalogue is about (ADR 0098 § 6): the agency's words, a criterion for the brain's pick. */
   | 'script_description'
+  /** What of his card a script meets (Charles 26/11): his own words, computed by code, a criterion for the brain. */
+  | 'script_matches'
+  /** What the step he has in front of him shows (Charles 26/11): its media sheet, read as data. */
+  | 'current_step'
+  /** A fantasy of his from his card (Charles 26/11): his words, to play on or not to promise, never an order. */
+  | 'fan_fantasy'
+  /** What the media he bought and finds disappointing shows (Charles 26/11): its description, read as data. */
+  | 'bought_media'
   /** A supplement of her custom grid (ADR 0159 § C): the owner's name for it, a box for the brain, never an order. */
   | 'custom_supplement'
   /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */
@@ -43,6 +51,9 @@ export type UntrustedKind =
   | 'comment_examples'
   /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
   | 'profile_bio'
+  /** The agency's base style (ADR 0173): the owner's text on how she writes in public and in private, data. */
+  | 'agency_public_style'
+  | 'agency_private_style'
   /** Her real replies to comments close to the one at hand (Charles, 26/11): imported by the owner, read as data. */
   | 'her_replies'
   /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */

@@ -19,7 +19,7 @@ const {
 } = schema;
 
 /**
- * The `team` side of the chatter review (migration 0281), each read and write under `withTenantMember`: the policies
+ * The `team` side of the chatter review (migration 0283), each read and write under `withTenantMember`: the policies
  * decide who reads and writes what, the store only asks.
  */
 export function createDrizzleReviewStore(db: Database): ReviewStore {

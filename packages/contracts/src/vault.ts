@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { BlurhashSchema, PlatformScriptMomentSchema } from './connector';
 import { PlatformSchema } from './enums';
-import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
+import { CreatorIdSchema, MediaDescriptionIdSchema, PlatformAccountIdSchema } from './ids';
 
 /**
  * `GET /v1/creators/:creatorId/vault` (ADR 0099 § 2 to 4, fiche vault-sync): her vault as the last sync read it,
@@ -91,6 +91,12 @@ export const VaultMediaChoiceSchema = z.strictObject({
   description: VaultDescriptionStateSchema,
   /** The beginning of its latest description, plain text; `null` while it has none. */
   excerpt: z.string().max(VAULT_EXCERPT_MAX).nullable(),
+  /** Its latest description, to validate or correct from its sheet; `null` while it has none. */
+  descriptionId: MediaDescriptionIdSchema.nullable(),
+  /** That description's words whole, the start of a correction. */
+  detailed: z.string().max(6000).nullable(),
+  /** That description validated by a person: what a prepared script asks of each of its media (ADR 0145 § 5). */
+  validated: z.boolean(),
 });
 export type VaultMediaChoice = z.infer<typeof VaultMediaChoiceSchema>;
 
@@ -152,3 +158,23 @@ export const VaultDescribeAnswerSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('asked'), count: z.number().int().min(0) }),
 ]);
 export type VaultDescribeAnswer = z.infer<typeof VaultDescribeAnswerSchema>;
+
+/**
+ * `POST /v1/creators/:creatorId/vault/media/:platformMediaId/description`, from a media's sheet: its latest description
+ * validated as shown, or rewritten by hand and validated by whoever writes it (a new row, the table is append-only).
+ * Named by its id: a description that changed meanwhile is refused, never another one validated in its place.
+ */
+export const VaultDescriptionReviewSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('validate'),
+    platformAccountId: PlatformAccountIdSchema,
+    descriptionId: MediaDescriptionIdSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('correct'),
+    platformAccountId: PlatformAccountIdSchema,
+    descriptionId: MediaDescriptionIdSchema,
+    detailed: z.string().trim().min(1).max(6000),
+  }),
+]);
+export type VaultDescriptionReview = z.infer<typeof VaultDescriptionReviewSchema>;

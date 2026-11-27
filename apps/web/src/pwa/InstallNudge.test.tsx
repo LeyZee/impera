@@ -11,6 +11,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { InstallNudge } from './InstallNudge';
+import { INSTALLED_KEY } from './install';
 
 const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 Version/19.0 Mobile/15E148 Safari/604.1';
@@ -20,12 +21,12 @@ async function renderAt(path: string): Promise<void> {
   const root = createRootRoute({
     component: () => (
       <>
-        <InstallNudge />
+        <InstallNudge home="/aujourdhui" />
         <Outlet />
       </>
     ),
   });
-  const pages = ['/aujourdhui', '/notifications', '/aide/installer'].map((at) =>
+  const pages = ['/aujourdhui', '/planning', '/notifications', '/aide/installer'].map((at) =>
     createRoute({ getParentRoute: () => root, path: at, component: () => <h1>{at}</h1> }),
   );
   const router = createRouter({
@@ -44,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -55,11 +57,29 @@ describe('InstallNudge', () => {
   });
 
   // Recette 11/11 (CRE-36): on Notifications, the card said twice what « Cet appareil » offers below it.
-  it.each(['/notifications', '/aide/installer'])(
-    'stays off %s, which offers the install itself',
+  // Choice of 21/11: only the role's home screen, never at the head of the others.
+  it.each(['/planning', '/notifications', '/aide/installer'])(
+    'stays off %s, which is not the role’s home',
     async (path) => {
       await renderAt(path);
       expect(screen.queryByRole('complementary', { name: 'Installer Impera' })).toBeNull();
     },
   );
+
+  it('never shows again once the device is known to have the app', async () => {
+    window.localStorage.setItem(INSTALLED_KEY, '1');
+    await renderAt('/aujourdhui');
+    expect(screen.queryByRole('complementary', { name: 'Installer Impera' })).toBeNull();
+  });
+
+  it('never shows in the installed app', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    await renderAt('/aujourdhui');
+    expect(screen.queryByRole('complementary', { name: 'Installer Impera' })).toBeNull();
+  });
+
+  it('leads to the steps with a soft button', async () => {
+    await renderAt('/aujourdhui');
+    expect(screen.getByRole('link', { name: 'Comment faire' }).className).toContain('nv-btn--soft');
+  });
 });

@@ -7,6 +7,7 @@ import type {
   CopilotTrace,
   DraftTranslation,
   FanFlags,
+  FanTier,
   HandoffCause,
   Language,
   MediaDescription,
@@ -36,6 +37,7 @@ import {
   type FiredAlert,
   type PhraseAlert,
 } from '../domain/alerts';
+import type { TimeWasterLevel } from '../domain/attention';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
 import { copilotTrace } from '../domain/copilot-trace';
@@ -62,6 +64,7 @@ import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
+import { spenderRegisterOf } from '../domain/spender-register';
 import { handoffCauseOf } from '../domain/traps';
 
 import {
@@ -96,6 +99,8 @@ function withOriginNote(origin: MessageOrigin | null | undefined): { originNote?
 }
 
 export interface AgentComposeInput {
+  /** He is a time-waster at this level (ADR 0135), read by code before the AI; absent, he is not. */
+  readonly timeWaster?: TimeWasterLevel;
   readonly creatorId: string;
   readonly conversationId: string;
   readonly fanId: string;
@@ -130,6 +135,14 @@ export interface AgentComposeInput {
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
     readonly firstMessageAt: Date | null;
+    /**
+     * His tier in « Fans » (`fanTierOf`, the owner's thresholds), when the caller reads it: good, very good or whale
+     * makes him eligible to a sexting without a sale (Charles 26/11); absent or `null`, she is warm as with everyone
+     * (ADR 0132) and his scripts alone decide.
+     */
+    readonly tier?: FanTier | null;
+    /** His last purchase in her sales register (ADR 0128 § 1); absent, not read. */
+    readonly lastPurchaseAt?: Date | null;
   };
   /** His desire score as stored on the conversation (P3-12), and when it was counted; absent, he starts at 0. */
   readonly desire?: { readonly score: number; readonly at: Date };
@@ -227,6 +240,8 @@ type AgentComposeResult = (
       readonly kind: 'draft';
       readonly bubbles: readonly string[];
       readonly softViolations: readonly string[];
+      /** The blocking codes of a first answer set aside and written again (IA-08): kept in `guard_trace`. */
+      readonly retried?: readonly string[];
       readonly costUsd: number;
       /** Absent when no model is known: no voice is better than a false one on the live rate (ADR 0019). */
       readonly voice?: { readonly voicePrompt: string; readonly voiceModel: string };
@@ -327,6 +342,8 @@ export interface ComposerPersonaFields {
 
 export interface DraftComposerDeps {
   readonly gateway: LlmGateway;
+  /** The random source of the draw of a sexting without a sale (Charles 26/11); absent, `Math.random`. */
+  readonly random?: () => number;
   /**
    * A fixed persona, with the fields below, when nothing reads hers per creator (`personaOf`): tests and the terminal.
    * Absent beside `personaOf`: a composer that reads hers has no other persona to fall back on.
@@ -358,6 +375,11 @@ export interface DraftComposerDeps {
    * the cooldown cannot be read, so she offers nothing.
    */
   readonly lastOfferAt?: (creatorId: string, fanId: string) => Promise<Date | null>;
+  /**
+   * When he last bought a priced step of hers (ADR 0128 § 1), for the pause after a purchase. Without it, or unreadable,
+   * no pause: she sells as before.
+   */
+  readonly lastPurchaseAt?: (creatorId: string, fanId: string) => Promise<Date | null>;
   /** A limit the policy could not save without holding the draft (his declared age): counted, never silent. */
   readonly onLimitsNotSaved?: (event: {
     readonly conversationId: string;
@@ -647,6 +669,22 @@ async function stopped(
 }
 
 /**
+ * Platform clocks may run behind ours: a message dated up to this much before the confirmation is still read, the
+ * safe side (IA-02).
+ */
+const CLOCK_SLACK_MS = 2 * 60_000;
+
+/** What he wrote since a human confirmed his age (all of it while it is not confirmed), as one text. */
+function sinceAgeConfirmed(messages: AgentComposeInput['history'], flags: FanFlags | undefined): string {
+  const confirmed = flags?.ageConfirmedAt;
+  const from = confirmed === undefined ? Number.NaN : Date.parse(confirmed) - CLOCK_SLACK_MS;
+  return messages
+    .filter((m) => Number.isNaN(from) || m.at.getTime() >= from)
+    .map((m) => m.text)
+    .join('\n');
+}
+
+/**
  * His age is in doubt (`ageDisputed`, set by the policy on a sign of a minor or by a human): the agent writes nothing to
  * him until the owner or a manager confirms it (Charles, 16/11), and each new message of his goes to a human, as on
  * the message the doubt opened on. His score drops to 0, as the brain would have counted it.
@@ -669,6 +707,26 @@ function ageInDoubt(input: AgentComposeInput, lastFanAt: Date | undefined): Agen
   return { ...held, desire: { before, score, signals, weightsVersion } };
 }
 
+/** The later of two dates, either unknown (`undefined`) or never (`null`). */
+function latestKnown(a: Date | null | undefined, b: Date | null | undefined): Date | null | undefined {
+  if (a === undefined) return b;
+  if (b === undefined || b === null) return a;
+  return a === null || b > a ? b : a;
+}
+
+/** His last purchase, or `undefined` when it cannot be read: the pause is then not applied (ADR 0128 § 1). */
+async function lastPurchaseOf(
+  deps: DraftComposerDeps,
+  input: AgentComposeInput,
+): Promise<Date | null | undefined> {
+  if (deps.lastPurchaseAt === undefined) return undefined;
+  try {
+    return await deps.lastPurchaseAt(input.creatorId, input.fanId);
+  } catch {
+    return undefined;
+  }
+}
+
 /** What the policy needs to let her offer; any of it unknown, there is no offer to decide on (fail closed). */
 async function offerInput(
   deps: DraftComposerDeps,
@@ -679,7 +737,15 @@ async function offerInput(
     return undefined;
   try {
     const lastOfferAt = await deps.lastOfferAt(input.creatorId, input.fanId);
-    return { now: input.now, lastOfferAt, hasNoBudget: false, flags, limits: deps.offerLimits };
+    const lastPurchaseAt = latestKnown(await lastPurchaseOf(deps, input), input.fan.lastPurchaseAt);
+    return {
+      now: input.now,
+      lastOfferAt,
+      ...(lastPurchaseAt !== undefined && { lastPurchaseAt }),
+      hasNoBudget: false,
+      flags,
+      limits: deps.offerLimits,
+    };
   } catch {
     return undefined;
   }
@@ -830,6 +896,7 @@ async function quietTurn(
     bubbles: composed.bubbles,
     ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: [],
     ...(composed.model !== undefined && {
@@ -1003,6 +1070,7 @@ async function settleCare(
     // The help bubble is the code's own: its French beside the voice's (ADR 0168 § 9).
     ...translationFor(composed, help ? helpBubble('french') : undefined),
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
     ...(composed.model !== undefined && {
@@ -1105,6 +1173,7 @@ async function settle(
     bubbles: composed.bubbles,
     ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: withoutOrders(composed.brief.factsProposed),
     ...(composed.model !== undefined && {
@@ -1148,11 +1217,26 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
       // His kept language (ADR 0168 § 4): a bare number in a short message of his is read by his covered language.
       const keptLanguage = await keptLanguageOf(deps.limits, input);
-      const signs = safetySigns(fanText, input.now, keptLanguage?.value ?? null);
-      if (signs.includes('minor_suspected')) {
+      const kept = keptLanguage?.value ?? null;
+      const herLastTurn = input.history[lastAnswer]?.text;
+      // Once a human confirmed his age, a sign of a minor read before that decision is settled: only what he wrote
+      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress and a fantasy of
+      // his on minors read it all.
+      const signs = safetySigns(fanText, input.now, herLastTurn, kept).filter(
+        (sign) =>
+          sign !== 'minor_suspected' ||
+          safetySigns(sinceAgeConfirmed(sinceAnswer, stop.flags), input.now, herLastTurn, kept).includes(
+            'minor_suspected',
+          ),
+      );
+      // A fantasy of his on minors: the same, the alert names the reason, never his words (Charles 26/11 at 23:45).
+      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
       }
+      // Asked to be like his own child (Sécurité, #1054): a human takes it, his limits untouched.
+      if (signs.includes('his_child_role'))
+        return { ...HANDOFF, cause: 'other', detail: ['safety_net', ...signs] };
       // His card gives an age under 18 (recette AGE-13): the same, until a human corrects it.
       if (input.fan.cardAge !== undefined && input.fan.cardAge < ADULT_AGE) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['card_age', 'minor_suspected'] };
@@ -1212,6 +1296,12 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         ...(input.fan.brainNotes !== undefined &&
           input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
+        ...(input.timeWaster !== undefined && { timeWaster: input.timeWaster }),
+        spenderRegister: spenderRegisterOf(input.fan.tier, {
+          fragile: stop.flags?.fragile === true,
+          care: careForced,
+          moneyTrouble: stop.flags?.salesFrozen?.reason === 'money_trouble',
+        }),
         ...(withHer.sexualizationLimits !== undefined && {
           sexualization: {
             limits: withHer.sexualizationLimits,
@@ -1272,6 +1362,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
         ...(input.meeting !== undefined && { meeting: input.meeting }),
+        ...(deps.random !== undefined && { random: deps.random }),
+        ...(input.fan.tier !== undefined && { fanTier: input.fan.tier }),
         ...(input.herRecent !== undefined && { herRecent: input.herRecent }),
         saleTrouble: {
           seen: input.saleTrouble ?? NO_SALE_TROUBLE,

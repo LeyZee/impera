@@ -259,6 +259,12 @@
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-faint);
 }
+/* Sales reported and not validated yet: said beside the gain, in plain ink, so the figure never reads as all he made. */
+.mf-figure__waiting {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
 .mf-card .mf-change {
   font-size: var(--nv-text-footnote);
 }

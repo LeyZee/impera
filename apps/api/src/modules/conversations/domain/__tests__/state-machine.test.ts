@@ -1,7 +1,7 @@
 import { ConversationStateSchema, DraftStatusSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { canDraftBecome, nextState, statesAllowing } from '../state-machine';
+import { canDraftBecome, MAX_SEND_ATTEMPTS, nextState, statesAllowing } from '../state-machine';
 
 describe('conversation state machine', () => {
   it('moves a fan message to pending, except where a human or a pause holds the conversation', () => {
@@ -72,5 +72,14 @@ describe('conversation state machine', () => {
   it('lists the states a command is allowed in, as a search for such conversations filters on them', () => {
     expect([...statesAllowing('release')].sort()).toEqual(['error', 'human']);
     for (const state of statesAllowing('takeover')) expect(nextState(state, 'takeover')).toBe('human');
+  });
+});
+
+describe('send attempts (recette REV-01)', () => {
+  it('reach past the 30 s a connector holds back a send it may have made', () => {
+    // Graphile waits e^n seconds after the n-th failure.
+    let waited = 0;
+    for (let failed = 1; failed < MAX_SEND_ATTEMPTS; failed += 1) waited += Math.exp(failed);
+    expect(waited).toBeGreaterThan(60);
   });
 });

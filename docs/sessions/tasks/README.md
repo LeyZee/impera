@@ -93,9 +93,11 @@ Branche : task/<id>-<slug>
 | EQ-21 | Rappel du rapport de fin de shift sur le téléphone du chatteur | équipe | in_progress | ADR 0077, CR-01, EQ-03 |
 | EQ-22 | Donner ou partager une vente avec le chatteur qui a été décisif | équipe | in_progress | ADR 0101, CRM-03, CRM-05 |
 | EQ-23 | Retour de fin de shift et suivi de ses incidents | équipe | in_review | ADR 0050 § 10, EQ-03, CR-01 |
+| EQ-24 | « Où te verser » : où un membre reçoit ses virements | équipe | in_review | ADR 0165, EQ-05, EQ-15, CR-01 |
 | EQ-25 | « J'ai été décisif sur une vente » : le chatteur signale son shift, le manager répond | équipe | in_review | ADR 0101 §§ 18 à 22, EQ-22 |
-| EQ-27 | Retour de fin de shift léger | équipe | done | ADR 0170, EQ-23 |
-| EQ-28 | Mon bilan : cartes de faute, niveaux, contestation | équipe | in_progress | ADR 0170, EQ-27 |
+| EQ-26 | Dispos hebdomadaires, et qui est dispo sur chaque place libre | équipe | in_review | ADR 0171, EQ-02 |
+| EQ-27 | Retour de fin de shift léger | équipe | in_review | ADR 0170, EQ-23 |
+| EQ-28 | Mon bilan : cartes de faute, niveaux, contestation | équipe | in_review | ADR 0170, EQ-27 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
@@ -103,10 +105,10 @@ Branche : task/<id>-<slug>
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
 | CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | in_progress (lot a fait) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
-| CR-08 | Plan de publication du feed : la semaine préparée, acceptée d'un geste, programmée dans Reveal | espaces | blocked (capture Reveal) | CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la garde d'écriture (ADR 0018) |
+| CR-08 | Feed et stories Reveal : la semaine préparée, validée puis publiée seule, avec droit de retrait | espaces | todo (lot a) | CR-06, ADR 0136, ADR 0145, la garde d'écriture (ADR 0018) |
 | CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (total inhabituel) ; blocked (signaux par vente, rapprochement) | EQ-03 ; CR-03 pour les signaux par vente ; CRM-01 et CRM-03 pour le rapprochement |
 | CR-10 | Retours de l'IA aux chatteurs, chaque semaine, sans effet sur la paie | espaces | blocked (lecture des messages de Reveal avec leur auteur, clé du fournisseur) | le connecteur Reveal (messages et auteur), la passerelle LLM, la rubrique des évaluations |
-| CR-11 | Mass DM : les médias déposés, envoyés aux listes de fans, jamais deux fois | espaces | blocked (capture Reveal) | CR-06, CR-08, la capture Reveal |
+| CR-11 | Mass DM automatiques : annonce après chaque publication, réveil, et jamais un fan submergé | espaces | todo (lot a) | CR-06, CR-08 lot b, ADR 0137, ADR 0145 |
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
@@ -209,6 +211,7 @@ Branche : task/<id>-<slug>
 | ARC-06 | Les factures et avoirs sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-05 |
 | ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
 | ARC-08 | Ordre des virements écartés du journal et relance d'émission par son index | exploitation | done | ARC-07 |
+| ARC-09 | `composeTurn` découpé en étapes nommées, sans rien changer à ce qu'il fait | exploitation | done | — |
 | REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
 | PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |

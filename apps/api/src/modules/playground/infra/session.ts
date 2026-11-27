@@ -10,6 +10,7 @@ import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from
 import {
   asSent,
   checkVoiceOutput,
+  checkYouthWords,
   composeTurn,
   followUpDecision,
   guardContextOf,
@@ -17,6 +18,7 @@ import {
   isBlocked,
   type GuardSettings,
   type GuardViolation,
+  type PersonaLanguages,
   type VoiceExample,
   type FollowUpDecision,
   measureDesire,
@@ -101,6 +103,7 @@ interface PlaygroundExchange {
   readonly turn: PlaygroundTurn;
   readonly moment: RatedMoment;
   readonly voiceInput?: VoiceInput;
+  readonly sexualTurn?: boolean;
 }
 
 /** A follow-up asked with /relance: written, or why not (not due yet, her quiet hours, none left). */
@@ -211,6 +214,8 @@ export interface PlaygroundDeps {
    * read, as her real drafts do (`examplesForTurn`).
    */
   readonly voiceExamples?: readonly VoiceExample[];
+  /** Her languages and her messages in each (`languagesOf`), as her real drafts read them (ADR 0168). */
+  readonly languages: PersonaLanguages;
   readonly timeZone?: string;
   readonly now?: () => Date;
   /**
@@ -275,6 +280,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   let lastExchange: PlaygroundExchange | undefined;
   // When the policy last let her offer, on the simulated clock: the cooldown is tested with `advance`.
   let lastOfferAt: Date | null = null;
+  // His last fictive purchase on the simulated clock: the pause after a purchase (ADR 0128 § 1) is tested with `advance`.
+  let lastPurchaseAt: Date | null = null;
   // His age, unknown until he states an adult one, as for a real fan (P3-09).
   let ageConfirmedAt: Date | null = null;
   // ADR 0090: an order of his waits once she answered it; the replies of her bank he already received.
@@ -413,6 +420,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       : {
           now,
           lastOfferAt,
+          lastPurchaseAt,
           hasNoBudget: false,
           flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
           limits: deps.offerLimits,
@@ -453,6 +461,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       fanNotes.length = 0;
       lastExchange = undefined;
       lastOfferAt = null;
+      lastPurchaseAt = null;
       ageConfirmedAt = null;
       lastFanAt = null;
       followUpsSince = 0;
@@ -521,6 +530,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       });
       if (!bought.ok) return 'nothing_waiting';
       played(open.run.scriptRef).bought.add(open.step.stepIndex);
+      lastPurchaseAt = situation.now;
       moveRun(bought.run);
       const price = open.step.priceMinor ?? 0;
       scripts = { ...scripts, fictiveSpentCents: scripts.fictiveSpentCents + price };
@@ -616,8 +626,12 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       if (input === undefined) return undefined;
       const voice = await gateway.voice(input);
       const written = voice.ok ? voice.value.output.bubbles : [];
-      const violations = checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history));
-      const bubbles = asSent(written, deps.splitMessages);
+      // Guarded as the main answer (Sécurité, #1043): a sexual turn reads her words of youth and a minor named.
+      const violations = [
+        ...checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history)),
+        ...checkYouthWords(written, lastExchange?.sexualTurn === true),
+      ];
+      const bubbles = asSent(written, deps.splitMessages, deps.guardSettings.form);
       return {
         bubbles,
         violations,
@@ -655,6 +669,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
           ...(voiceExamples.length > 0 && { voiceExamples }),
+          ...deps.languages,
         },
         {
           history: dated(),
@@ -713,9 +728,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           .slice(lastAnswer + 1)
           .map((t) => t.text)
           .join('\n'),
+        undefined,
+        history[lastAnswer]?.text,
       );
-      if (signs.includes('minor_suspected')) {
-        scripts = { ...scripts, salesFrozen: true };
+      // A doubt on his age freezes the sales; asked to be like his own child, a human takes it, nothing frozen
+      // (Sécurité, #1054).
+      const minor = signs.includes('minor_suspected') || signs.includes('minor_fantasy');
+      if (minor || signs.includes('his_child_role')) {
+        if (minor) scripts = { ...scripts, salesFrozen: true };
         const held: PlaygroundTurn = {
           bubbles: [],
           violations: [],
@@ -739,6 +759,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
           ...(voiceExamples.length > 0 && { voiceExamples }),
+          ...deps.languages,
         },
         {
           history: dated(),
@@ -839,11 +860,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         }
       }
       const read = composed.desireRead;
+      // A first score of 0 is not stored (it moved nothing): the next message still reads from it, never as a
+      // second « première note » (IA-10).
+      const earlier = desireTrail.slice(0, -1).findLast((r) => r !== undefined);
       const reading: PlaygroundDesireReading | undefined =
         read === undefined
           ? undefined
           : {
-              before: read.before,
+              before: read.before ?? earlier?.score ?? null,
               score: read.score,
               band: desireBandOf(read.score),
               signals: read.signals,
@@ -890,6 +914,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         turn,
         moment: composed.voiceBrief === undefined ? moment : { ...moment, brief: composed.voiceBrief },
         ...(composed.voiceInput !== undefined && { voiceInput: composed.voiceInput }),
+        ...(composed.sexualTurn !== undefined && { sexualTurn: composed.sexualTurn }),
       };
       return turn;
     },

@@ -47,6 +47,19 @@ describe('« À traiter » on the screen (recette AGT-05)', () => {
     expect(group.latest.waitingMinutes).toBe(41);
   });
 
+  it('no longer counts an outage over as an urgency, and ranks it with the other failures (IA-07)', () => {
+    const back = Array.from({ length: 3 }, (_, i) => todo('llm_unavailable', 60 - i, { voiceBack: true }));
+    const draft = todo('awaiting_approval', 2);
+    expect(back.map(toneOf)).toEqual(['warn', 'warn', 'warn']);
+    expect(urgencies(back)).toBe(0);
+    expect(urgencies([todo('llm_unavailable', 5), todo('llm_unavailable', 4)])).toBe(1);
+    expect(
+      queueEntries([...back, draft]).map((e) =>
+        e.kind === 'one' ? e.todo.kind : `${e.cause} × ${String(e.todos.length)}`,
+      ),
+    ).toEqual(['awaiting_approval', 'llm_unavailable × 3']);
+  });
+
   it('keeps one line alone, and groups a missing persona per creator', () => {
     const entries = queueEntries([
       todo('persona_inactive', 10),

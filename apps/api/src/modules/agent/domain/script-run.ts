@@ -9,6 +9,7 @@ import type {
   ScriptStepOutcome,
 } from '@impera/contracts';
 
+import type { ScriptCarriesView } from './fantasy-match';
 import { offerDecision, sameEvening, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
 
@@ -32,6 +33,11 @@ interface PlatformScriptStepView {
   readonly mediaSheet?: string;
   /** The vault media the step sends, by their platform ref: a media he already received rules out a script (§ 6). */
   readonly mediaRefs: readonly string[];
+  /**
+   * What the step's media carry in the closed vocabulary, when the catalogue gives it (lot Scripts, after #1029): its
+   * intensities set how frank she may be once he has seen it (`registerOf`). Absent today.
+   */
+  readonly carries?: ScriptCarriesView;
 }
 
 /**
@@ -51,6 +57,11 @@ export interface PlatformScriptView {
   readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
+  /**
+   * What it carries in the media's closed vocabulary, the union of its steps, when the catalogue gives it: read first
+   * by the fantasy score (Charles 26/11). Absent today: the description and the media sheets are read.
+   */
+  readonly carriesAll?: ScriptCarriesView;
   /** The language its texts are written in (ADR 0168 § 8). Absent: French, as every script before its versions. */
   readonly language?: Language;
   /**
@@ -382,6 +393,28 @@ export function permittedScripts(
   );
 }
 
+/**
+ * Whether a script may still open with him at this message, whatever the brain reads in it (recette REV-13): never in
+ * the care mode, never while a run is open (that message only moves it: an answer, a refusal, its next step), and
+ * never when the policy refuses even a hot fan who asks for paid content himself (he is not to be written to, his
+ * sales are frozen, his age is not confirmed). The brain is shown her scripts only then: the prompt says what the code
+ * permits, the code still decides.
+ */
+export function mayOpenScript(input: {
+  readonly offer: Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks'>;
+  readonly latest: Pick<ScriptRun, 'status' | 'startedAt'> | null;
+  readonly careMode: boolean;
+}): boolean {
+  if (input.careMode || input.latest?.status === 'open') return false;
+  return offerDecision({
+    ...input.offer,
+    lastOfferAt: later(input.offer.lastOfferAt, input.latest?.startedAt ?? null),
+    desire: Number.POSITIVE_INFINITY,
+    fanAsksForPaid: true,
+    risks: [],
+  }).allowed;
+}
+
 /** What goes to `sendScriptStep(conversationRef, scriptRef, stepIndex, key)`, with the price it was decided at. */
 export interface ScriptStepToSend {
   readonly scriptRef: string;
@@ -557,7 +590,8 @@ function nextInOpenRun(
     return { kind: 'none', reason: 'in_tension' };
   if (step.kind === 'paid') {
     // The cooldown is between two scripts, not between two steps of the same one: the staircase climbs in one session.
-    const decision = offerDecision({ ...input.offer, lastOfferAt: null });
+    // So is the pause after a purchase (ADR 0128 § 1): it stops a new script, never the next step of his.
+    const decision = offerDecision({ ...input.offer, lastOfferAt: null, lastPurchaseAt: null });
     if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   }
   return { kind: 'send_step', step };

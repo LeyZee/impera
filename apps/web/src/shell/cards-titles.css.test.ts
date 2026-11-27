@@ -343,6 +343,8 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
     '.rw-reveal__title',
     '.tc-hero__name',
     '.rw-member__name',
+    // The welcome of a first sign-in, a line said to her (maquette validée par Charles le 27/11).
+    '.fw__title',
   ]);
 
   it('keep Instrument Serif for the empty states, never for a title', () => {

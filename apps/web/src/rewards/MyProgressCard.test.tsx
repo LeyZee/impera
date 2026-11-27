@@ -61,6 +61,7 @@ describe('MyProgressCard', () => {
     expect(screen.getByText('Expert')).toBeTruthy();
     expect(screen.getByText('4 shifts')).toBeTruthy();
     expect(screen.getByText('· record 9')).toBeTruthy();
+    expect(document.querySelector('.rw-quest__head .rw-quest__go')).not.toBeNull();
     const gauge = screen.getByRole('progressbar', { name: 'Avancée vers le rang Expert' });
     expect(gauge.getAttribute('aria-valuenow')).toBe('25');
     expect(document.querySelector('.rw-quest__percent')?.textContent).toBe('25 %');
@@ -112,6 +113,9 @@ describe('MyProgressCard', () => {
     expect(screen.getByText('Encore 1 shift')).toBeTruthy();
     expect(screen.getByText('Presque')).toBeTruthy();
     expect(screen.getByText('Encore 6 shifts')).toBeTruthy();
+    // Neither rank nor series: no empty head, « Mes trophées » beside « Ma progression » (CHAT-11).
+    expect(document.querySelector('.rw-quest__head')).toBeNull();
+    expect(document.querySelector('.nv-panel__head .rw-quest__go')?.textContent).toBe('Mes trophées');
   });
 
   it('says what was gained since the last visit, and nothing on a first one', async () => {

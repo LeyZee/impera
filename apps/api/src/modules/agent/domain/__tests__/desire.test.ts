@@ -59,6 +59,19 @@ describe('desireScore', () => {
     expect(desireScore({ ...hot, previous: { score: 5, at: NOW } }).score).toBe(0);
   });
 
+  it('keeps his heat when he is about to come: no rest level, nothing over (Charles 26/11)', () => {
+    const close = {
+      ...turn,
+      previous: { score: 90, at: NOW },
+      signals: ['close_to_coming'],
+      intent: 'sexting',
+    };
+    const withIt = desireScore(close);
+    const without = desireScore({ ...close, signals: [] });
+    expect(withIt.score).toBe(without.score);
+    expect(withIt.signals).not.toContain('rest_new');
+  });
+
   it('counts each of the brain’s signals once, and ignores any it does not know', () => {
     expect(desireScore({ ...turn, signals: ['roleplay', 'roleplay', 'made_up'] }).signals).toEqual([
       'roleplay',

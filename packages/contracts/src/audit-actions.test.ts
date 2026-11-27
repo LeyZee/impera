@@ -627,6 +627,22 @@ const MONEY: readonly MoneyCase[] = [
     link: { kind: 'member', id: NORA },
   },
   {
+    action: 'payout_destination.update',
+    entity: 'payout_destination',
+    entityId: NORA,
+    details: { method: 'mobile_money', version: '0199f2a0-0000-7000-8000-000000000501' },
+    label: 'a changé les coordonnées de versement de Nora',
+    link: { kind: 'member', id: NORA },
+  },
+  {
+    action: 'payout_destination.reveal',
+    entity: 'payout_destination',
+    entityId: NORA,
+    details: {},
+    label: 'a affiché les coordonnées de versement de Nora',
+    link: { kind: 'member', id: NORA },
+  },
+  {
     action: 'contractor_profile.verify',
     entity: 'contractor_profile',
     entityId: NORA,

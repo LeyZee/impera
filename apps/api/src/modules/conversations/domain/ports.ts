@@ -1,7 +1,9 @@
 import type {
   Actor,
   FanStanding,
+  FanTier,
   FanTiersSetting,
+  TimeWasterSetting,
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
@@ -216,7 +218,8 @@ interface MessageRepository {
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
-  fanStats(fanId: FanId): Promise<FanStats>;
+  /** His spend and first message; his tier and last purchase from her sales register (ADR 0132, 0128) at `now`. */
+  fanStats(fanId: FanId, now: Date): Promise<FanStats>;
 }
 
 /** The voice prompt version and the model that wrote a draft: what the live rate is read by (ADR 0019). */
@@ -244,6 +247,8 @@ interface DraftRepository {
     bubbles?: readonly string[];
     /** Soft guard findings the operator should see next to the draft. */
     softViolations?: readonly string[];
+    /** The blocking codes of a first answer set aside and written again (IA-08), shown under the draft. */
+    retried?: readonly string[];
     /** The voice that wrote it, for the live rate (ADR 0019). */
     voice?: DraftVoice;
     /**
@@ -481,6 +486,8 @@ interface ScriptRunRepository {
   save(stored: StoredScriptRun): Promise<boolean>;
   /** His runs that went cold (`stalled`), latest first: a run he left there makes her tease him (Charles 20/11). */
   stalled(conversationId: ConversationId): Promise<StoredScriptRun[]>;
+  /** His ended runs where he bought nothing: her scripts he never entered (ADR 0135 § 1). */
+  unbought(conversationId: ConversationId): Promise<number>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -649,6 +656,14 @@ interface FanStats {
   /** Paid messages (PPV bought), in minor units. */
   readonly spentMinor: number;
   readonly firstMessageAt: Date | null;
+  /** His tier from her sales register and her thresholds (`fanTierOf`); absent when it cannot be read. */
+  readonly tier?: FanTier | null;
+  /** His last purchase in her sales register (ADR 0128 § 1); `null` never; absent, not read. */
+  readonly lastPurchaseAt?: Date | null;
+  /** What he spent in her sales register, refunds out (ADR 0132 § 1); absent, not read. */
+  readonly registerSpentMinor?: number;
+  /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */
+  readonly timeWaster?: TimeWasterSetting;
 }
 
 interface FanContext extends FanStats {
@@ -672,6 +687,8 @@ export interface ProposedFact {
 }
 
 export interface ComposeInput {
+  /** He is a time-waster at this level (ADR 0135), as code read it before the AI: she writes short, busy, kind. */
+  readonly timeWaster?: 'slowed' | 'dormant';
   readonly creatorId: CreatorId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;
@@ -800,6 +817,8 @@ export type ComposeResult =
       readonly kind: 'draft';
       readonly bubbles: readonly string[];
       readonly softViolations: readonly string[];
+      /** The blocking codes of a first answer set aside and written again (IA-08). */
+      readonly retried?: readonly string[];
       readonly costUsd: number;
       readonly voice?: DraftVoice;
       /** Her persona version it was written with (ADR 0019): never the one active when it is saved. */
@@ -1042,6 +1061,8 @@ export interface ConversationReader {
   desireCurve(creatorId: CreatorId, id: ConversationId): Promise<DesireCurve | null>;
   /** Whether the latest global or creator-wide emergency stop of hers is on (recette CHAT-07). */
   sendingStopped(creatorId: CreatorId): Promise<boolean>;
+  /** The platforms where a session of one of her accounts expired (recette REV-05), each once. */
+  expiredSessions(creatorId: CreatorId): Promise<readonly Platform[]>;
 }
 
 /** The conversation open on the platform, as the copilot panel reads it (ADR 0086 § 3, § 9). */

@@ -294,6 +294,7 @@ export const EVENT_TYPES = [
   'sales_feed_mismatch',
   'agency_share_mismatch',
   'agency_share_changed',
+  'account_uncovered',
   'connection_state_changed',
   'security_alert',
   'content_drop_received',
@@ -412,9 +413,10 @@ export const EVENT_PAYLOADS = {
   }),
   /**
    * Out of her reply slots, with nobody on shift (P3-14): no draft, his message waits for `until`, the opening of her
-   * next slot, when the answer is tried again. The conversation stays pending.
+   * next slot, when the answer is tried again. The conversation stays pending. `time_waster`: his answer waits his
+   * turn (ADR 0135 § 6), the same way.
    */
-  reply_deferred: z.object({ reason: z.enum(['outside_hours']), until: z.iso.datetime() }),
+  reply_deferred: z.object({ reason: z.enum(['outside_hours', 'time_waster']), until: z.iso.datetime() }),
   /**
    * The engine's desire score of the fan changed (P3-12): written with the result it came with, only when it moved.
    * The conversation projects the last one; `before` is the stored score cooled down to that moment, `null` for the
@@ -706,6 +708,20 @@ export const EVENT_PAYLOADS = {
       .max(SALES_FEED_MISMATCH_DAYS_MAX),
   }),
   /**
+   * ADR 0094 § 1 (lot a), « compte sans personne »: a créneau of the planning began on this account with no chatter in
+   * post and the agent not answering in Automatique, while a fan wrote to the account in the 24 hours before. Published
+   * once per account and créneau (unique index); the zone is the planning's, to say the créneau's hours. For the
+   * owner and the managers only: never a chatter, never her.
+   */
+  account_uncovered: z.strictObject({
+    creatorId: CreatorIdSchema,
+    platform: PlatformSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    slotStartsAt: z.iso.datetime(),
+    slotEndsAt: z.iso.datetime(),
+    timeZone: z.string().min(1),
+  }),
+  /**
    * CRM-04 lot d3 (ADR 0054 § 2, question 5): on the fortnight just over, a creator's part as the platform reads it
    * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale and per refund, on
    * one account and in one currency. Only the days a percentage covers are compared, each with its own; `sales` and
@@ -838,6 +854,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('sales_feed_mismatch'),
   typedEvent('agency_share_mismatch'),
   typedEvent('agency_share_changed'),
+  typedEvent('account_uncovered'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('content_drop_received'),

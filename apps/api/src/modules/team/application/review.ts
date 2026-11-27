@@ -35,7 +35,7 @@ export interface StoredContest {
   readonly ruling: 'upheld' | 'dropped' | null;
 }
 
-/** The `team` side of the review, under `withTenantMember` (migration 0281). */
+/** The `team` side of the review, under `withTenantMember` (migration 0283). */
 export interface ReviewStore {
   /** The signed-in account's member, or null for the owner or a creator. */
   memberOf(creatorId: CreatorId, userId: UserId): Promise<TeamMemberId | null>;

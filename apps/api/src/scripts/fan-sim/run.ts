@@ -27,8 +27,10 @@ export interface SimSession {
   handleFanMessage(text: string): Promise<{
     readonly bubbles: readonly string[];
     readonly isBlocked: boolean;
+    readonly violations?: readonly { readonly code: string; readonly severity: string }[];
+    readonly desire?: { readonly signals: readonly string[] };
     readonly costUsd: number;
-    readonly hold?: { readonly kind: string };
+    readonly hold?: { readonly kind: string; readonly detail: readonly string[] };
     readonly offerRefused?: string;
   }>;
   advance(ms: number): void;
@@ -62,8 +64,15 @@ export type SimEvent =
       readonly priceEuros: number;
       readonly decision: BuyDecision;
     }
-  | { readonly kind: 'agent_hold'; readonly day: number; readonly hold: string }
-  | { readonly kind: 'agent_blocked'; readonly day: number }
+  | {
+      readonly kind: 'agent_hold';
+      readonly day: number;
+      readonly hold: string;
+      readonly detail: readonly string[];
+    }
+  | { readonly kind: 'agent_blocked'; readonly day: number; readonly codes: readonly string[] }
+  /** The brain read a possible minor on his message, whatever the draft became: the alarm a false-alarm fan must never ring. */
+  | { readonly kind: 'agent_minor_signal'; readonly day: number }
   | { readonly kind: 'failure'; readonly day: number; readonly code: string };
 
 export interface SimResult {
@@ -219,8 +228,16 @@ export async function runSimulation(deps: SimDeps): Promise<SimResult> {
       emit({ kind: 'fan', day: planned.day, text });
       const turn = await session.handleFanMessage(text);
       seenTurns = Math.max(seenTurns, session.history.findLastIndex((t) => t.from === 'fan') + 1);
-      if (turn.hold !== undefined) emit({ kind: 'agent_hold', day: planned.day, hold: turn.hold.kind });
-      if (turn.isBlocked) emit({ kind: 'agent_blocked', day: planned.day });
+      if (turn.hold !== undefined)
+        emit({ kind: 'agent_hold', day: planned.day, hold: turn.hold.kind, detail: turn.hold.detail });
+      if (turn.isBlocked)
+        emit({
+          kind: 'agent_blocked',
+          day: planned.day,
+          codes: (turn.violations ?? []).flatMap((v) => (v.severity === 'blocking' ? [v.code] : [])),
+        });
+      if (turn.desire?.signals.includes('minor_suspected') === true)
+        emit({ kind: 'agent_minor_signal', day: planned.day });
       flushHer(false);
       advanceTo(new Date(now.getTime() + (REPLY_GAP_MS[pick(REPLY_GAP_MS.length)] ?? MINUTE)));
     }
