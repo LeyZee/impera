@@ -434,12 +434,14 @@
   padding: 0;
 }
 
-/* A narrow phone: the legend goes under the donut, still two by two. */
+/* A narrow phone: the legend stays beside the donut, on one column of four tight lines. */
 @media (max-width: 400px) {
-  .nv-donut-row.cw-kinds {
-    flex-wrap: wrap;
-  }
   .cw-legend {
-    flex: 1 1 100%;
+    grid-template-columns: minmax(0, max-content);
+    row-gap: 0;
+  }
+  .cw-legend .nv-breakdown__row {
+    min-height: 32px;
+    padding-block: 2px;
   }
 }
