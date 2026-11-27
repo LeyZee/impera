@@ -61,6 +61,29 @@ describe('the copilot’s lines beside the draft (ADR 0141 lot a)', () => {
     expect(CopilotAssistSchema.parse(assist)).toEqual(assist);
   });
 
+  it('says the staircase’s step, its price and why, from the trace (ADR 0098, avenant du 27/11/2026)', () => {
+    const trace: CopilotTrace = {
+      ...TRACE,
+      stepPrice: {
+        stepIndex: 2,
+        priceMinor: 2_000,
+        reason: 'next_step',
+        previousPaidMinor: 1_500,
+        capMinor: null,
+      },
+    };
+    const assist = copilotAssist({ ...LIVE, trace }, NOW, true);
+    expect(assist.stepPrice).toEqual({
+      stepName: 'Étape 3',
+      priceMinor: 2_000,
+      reason: 'next_step',
+      label: 'Plus chère que la dernière étape qu’il a prise',
+    });
+    expect(CopilotAssistSchema.parse(assist)).toEqual(assist);
+    expect(copilotAssist({ ...LIVE, trace }, NOW, false).stepPrice).toBeUndefined();
+    expect(copilotAssist(LIVE, NOW, true).stepPrice).toBeUndefined();
+  });
+
   it('says why nothing is sold with the code’s own label', () => {
     const trace: CopilotTrace = { ...TRACE, move: { kind: 'no_sale', priceMinor: null, block: 'cooldown' } };
     expect(copilotAssist({ ...LIVE, trace }, NOW, true).nextMove).toEqual({

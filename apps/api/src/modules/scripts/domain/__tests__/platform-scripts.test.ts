@@ -16,6 +16,7 @@ import {
   planPlatformScripts,
   platformScriptFingerprint,
   platformScriptGaps,
+  priceNotAbovePrevious,
   priceWarnings,
   stepTotalsOf,
   type KnownPlatformScript,
@@ -193,6 +194,44 @@ describe('the price warnings of P6-01, never a refusal', () => {
     // An offered branch at rank 1 carries the 1 000 of rank 0 to rank 2: 2 100 is more than double on that path.
     expect(priceWarnings([at(0, 1_000), at(1, 0), at(1, 1_500), at(2, 2_100)])).toEqual([
       { code: 'price_more_than_double', position: 3 },
+    ]);
+  });
+});
+
+describe('the staircase of paid steps (ADR 0098 and ADR 0112 § 14, avenant du 27/11/2026)', () => {
+  const at = (platformIndex: number, priceMinor: number, spendBranch?: boolean) => ({
+    platformIndex,
+    priceMinor,
+    currency: 'EUR' as const,
+    ...(spendBranch !== undefined && { spendBranch }),
+  });
+
+  it('asks each paid step to cost strictly more than the last paid one, free bridges skipped, nothing more', () => {
+    expect(
+      priceNotAbovePrevious([at(0, 0), at(1, 1_000), at(2, 0), at(3, 1_100), at(4, 0), at(5, 1_200)]),
+    ).toEqual([]);
+    // The same price as the last paid step, across a free bridge: refused; cheaper: refused.
+    expect(priceNotAbovePrevious([at(0, 1_000), at(1, 0), at(2, 1_000), at(3, 900)])).toEqual([2, 3]);
+  });
+
+  it('reads branches path by path, a free branch carrying the paid step before it', () => {
+    // Rank 1: a free branch and a paid one. On the free branch's path, 1 100 follows 1 000; on the other, 1 200.
+    expect(priceNotAbovePrevious([at(0, 1_000), at(1, 0), at(1, 1_200), at(2, 1_100)])).toEqual([3]);
+    expect(priceNotAbovePrevious([at(0, 1_000), at(1, 0), at(1, 1_200), at(2, 1_300)])).toEqual([]);
+  });
+
+  it('reads a branch on his spend against the agency’s jump setting, and as any step without it', () => {
+    // Invented setting.
+    const options = { spendBranchJumpMultiple: 2.4 };
+    expect(priceWarnings([at(0, 1_000), at(1, 2_400, true)], options)).toEqual([]);
+    expect(priceWarnings([at(0, 1_000), at(1, 2_500, true)], options)).toEqual([
+      { code: 'price_jump_over_setting', position: 1 },
+    ]);
+    expect(priceWarnings([at(0, 1_000), at(1, 2_400, true)])).toEqual([
+      { code: 'price_more_than_double', position: 1 },
+    ]);
+    expect(priceWarnings([at(0, 1_000), at(1, 2_400)], options)).toEqual([
+      { code: 'price_more_than_double', position: 1 },
     ]);
   });
 });

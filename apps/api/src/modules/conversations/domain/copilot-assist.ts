@@ -1,6 +1,7 @@
 import {
   COPILOT_DRAFT_REASON_LABELS,
   OBJECTION_KIND_LABELS,
+  STEP_PRICE_REASON_LABELS,
   copilotNextMove,
   copilotStepName,
   type BankedObjectionKind,
@@ -108,5 +109,14 @@ export function copilotAssist(live: CopilotLive, now: Date, withDraft: boolean):
     },
     signals: { desireTrend: trace?.desireTrend ?? null, followUpDue: live.followUpDue },
     ...(withDraft && trace !== null && { saleMoment: trace.saleMoment }),
+    ...(withDraft &&
+      trace?.stepPrice !== undefined && {
+        stepPrice: {
+          stepName: copilotStepName(trace.stepPrice.stepIndex),
+          priceMinor: trace.stepPrice.priceMinor,
+          reason: trace.stepPrice.reason,
+          label: STEP_PRICE_REASON_LABELS[trace.stepPrice.reason],
+        },
+      }),
   };
 }

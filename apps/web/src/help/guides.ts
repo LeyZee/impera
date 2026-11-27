@@ -560,7 +560,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
       },
       {
         q: 'Je peux changer le prix qu’elle propose ?',
-        a: 'Non. Le prix vient du code, dans la fourchette de la créatrice. « Réécrire avec une consigne » ne change que le ton et le contenu.',
+        a: 'Non. Le prix est celui de l’étape du script ; le code décide seulement si l’étape suivante peut partir (toujours plus chère que la dernière qu’il a prise). « Réécrire avec une consigne » ne change que le ton et le contenu.',
       },
       {
         q: 'Telegram n’envoie plus rien ?',

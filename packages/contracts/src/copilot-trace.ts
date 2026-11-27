@@ -11,6 +11,7 @@ import {
   type CopilotSaleBlock,
 } from './copilot';
 import { LanguageSchema } from './fan-language';
+import { StepPriceTraceSchema } from './step-price';
 
 /**
  * ADR 0141 lot a: what the agent decided with a draft, kept beside it in `drafts.policy_trace` (codes and numbers only,
@@ -56,6 +57,8 @@ export const CopilotTraceSchema = z.strictObject({
       humanOnly: z.boolean(),
     })
     .optional(),
+  /** The staircase's decision on the paid step at this draft (ADR 0098, avenant du 27/11/2026). Absent on older drafts. */
+  stepPrice: StepPriceTraceSchema.optional(),
 });
 export type CopilotTrace = z.infer<typeof CopilotTraceSchema>;
 

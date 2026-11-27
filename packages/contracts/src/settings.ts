@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { LlmRoleSchema } from './enums';
+import { StaircaseSettingSchema } from './step-price';
 import { FanTiersSettingSchema } from './to-talk';
 
 /**
@@ -65,5 +66,7 @@ export const CreatorSettingsSchema = z.object({
   fanTiers: FanTiersSettingSchema.prefault({}),
   /** Her time-waster rule (ADR 0135), set by the owner or a manager; absent, nobody is a time-waster. */
   timeWaster: TimeWasterSettingSchema.optional(),
+  /** The staircase of her scripts' paid steps (ADR 0098, avenant du 27/11/2026), set by the owner; empty, all off. */
+  staircase: StaircaseSettingSchema.prefault({}),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;

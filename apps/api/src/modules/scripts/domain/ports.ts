@@ -6,6 +6,7 @@ import type {
   DescriptionReviewReason,
   MediaSlotKind,
   SaveScriptStructureBody,
+  StaircaseSetting,
   PersonaLimits,
   Platform,
   PlatformAccountId,
@@ -466,6 +467,11 @@ type UpdatePreparedOutcome = 'updated' | 'stale' | 'closed' | 'not_found';
  */
 export interface PreparedScriptStore {
   list(creatorId: CreatorId, userId: string): Promise<readonly StoredPreparedScript[] | null>;
+  /**
+   * Her staircase settings (`creators.settings.staircase`, ADR 0112 § 14, avenant du 27/11/2026), for the warnings;
+   * absent or unreadable: none set.
+   */
+  staircase?(creatorId: CreatorId): Promise<StaircaseSetting | undefined>;
   one(creatorId: CreatorId, id: PreparedScriptId, userId: string): Promise<StoredPreparedScript | null>;
   /** Under the client's id: the same content again replays, another is a conflict. */
   create(

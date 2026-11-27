@@ -100,6 +100,8 @@ export interface SextingMoment {
   /** He came and bought nothing of the evening's run: no step, a little vexed (ADR 0156 § 6, guide 26/11). */
   readonly heCameUnpaid: boolean;
   readonly inTension: boolean;
+  /** His staircase is at its top (ADR 0098, avenant du 27/11/2026): no paid step tonight, she ends it warmly. */
+  readonly limitReached: boolean;
   readonly opensItHerself: boolean;
   /** How frank her words may be: suggestive until the action is engaged, then her own crude words (Charles 21/11). */
   readonly register: Register | null;
@@ -167,6 +169,7 @@ export function sextingMomentOf(facts: {
     eveningRun !== null &&
     !eveningRun.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought');
   const inTension = scripts?.decision.kind === 'none' && scripts.decision.reason === 'in_tension';
+  const limitReached = scripts?.decision.kind === 'none' && scripts.decision.reason === 'limit_reached';
   const opensItHerself =
     brief !== undefined &&
     facts.sexualization?.kind === 'free' &&
@@ -279,6 +282,7 @@ export function sextingMomentOf(facts: {
   return {
     heCameUnpaid,
     inTension,
+    limitReached,
     opensItHerself,
     register,
     running,

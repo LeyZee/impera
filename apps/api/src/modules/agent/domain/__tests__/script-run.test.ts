@@ -428,7 +428,7 @@ describe('nextScriptStep', () => {
         latest: { run: bridged, script: NIGHT },
         offer: { ...offer, lastOfferAt: at(-30) },
       }),
-    ).toEqual({ kind: 'send_step', step: toSend(NIGHT, 2) });
+    ).toMatchObject({ kind: 'send_step', step: toSend(NIGHT, 2) });
   });
 
   it('waits on a paid step not bought, and goes on once it is', () => {
@@ -443,7 +443,7 @@ describe('nextScriptStep', () => {
       sent(2, -2),
       { type: 'step_bought', stepIndex: 2, at: at(-1) },
     ]);
-    expect(nextScriptStep({ ...base, latest: { run: bought, script: NIGHT } })).toEqual({
+    expect(nextScriptStep({ ...base, latest: { run: bought, script: NIGHT } })).toMatchObject({
       kind: 'send_step',
       step: toSend(NIGHT, 3),
     });
@@ -461,7 +461,7 @@ describe('nextScriptStep', () => {
       kind: 'none',
       reason: 'in_tension',
     });
-    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 2 })).toEqual({
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 2 })).toMatchObject({
       kind: 'send_step',
       step: toSend(NIGHT, 3),
     });
@@ -620,7 +620,7 @@ describe("Reveal's script history (ADR 0018 § 5)", () => {
     ]);
     expect(caught.steps[0]?.sentAt).toEqual(at(-3));
     expect(caught.steps[1]?.sentAt).toEqual(NOW);
-    expect(nextScriptStep({ ...base, latest: { run: caught, script: NIGHT } })).toEqual({
+    expect(nextScriptStep({ ...base, latest: { run: caught, script: NIGHT } })).toMatchObject({
       kind: 'send_step',
       step: toSend(NIGHT, 3),
     });
@@ -720,5 +720,97 @@ describe('mayOpenScript (recette REV-13)', () => {
       salesFrozen: { reason: 'operator' as const, since: '2026-11-01T10:00:00Z' },
     };
     expect(mayOpenScript({ offer: { ...offer, flags: frozen }, latest: null, careMode: false })).toBe(false);
+  });
+});
+
+describe('the staircase of paid steps (ADR 0098, avenant du 27/11/2026)', () => {
+  const bought = (script: PlatformScriptView): ScriptRun =>
+    play([sent(0, -4), sent(1, -3), sent(2, -2), { type: 'step_bought', stepIndex: 2, at: at(-1) }], script);
+
+  it('sends the next paid step strictly above the last one he bought, with its reason for the copilot', () => {
+    expect(nextScriptStep({ ...base, latest: { run: bought(NIGHT), script: NIGHT } })).toEqual({
+      kind: 'send_step',
+      step: toSend(NIGHT, 3),
+      stepPrice: {
+        stepIndex: 3,
+        priceMinor: 2_500,
+        reason: 'next_step',
+        previousPaidMinor: 1_500,
+        capMinor: null,
+      },
+    });
+  });
+
+  it('stops the paid steps for tonight when the next one is not strictly above: limit reached', () => {
+    const flat: PlatformScriptView = {
+      ...NIGHT,
+      steps: NIGHT.steps.map((step, index) => (index === 3 ? { ...step, priceMinor: 1_500 } : step)),
+    };
+    expect(nextScriptStep({ ...base, latest: { run: bought(flat), script: flat } })).toEqual({
+      kind: 'none',
+      reason: 'limit_reached',
+      stepPrice: {
+        stepIndex: 3,
+        priceMinor: null,
+        reason: 'limit_reached',
+        previousPaidMinor: 1_500,
+        capMinor: null,
+      },
+    });
+  });
+
+  it('never caps inside the run: past his biggest purchase, the staircase still climbs', () => {
+    expect(
+      nextScriptStep({
+        ...base,
+        latest: { run: bought(NIGHT), script: NIGHT },
+        pricing: { biggestPurchaseMinor: 500, setting: { startCapMultiple: 1.25 } },
+      }),
+    ).toMatchObject({ kind: 'send_step', stepPrice: { reason: 'next_step', capMinor: null } });
+  });
+
+  it('caps the first paid step of the run at the agency’s multiple of his biggest purchase before', () => {
+    const bridged = play([sent(0, -3), sent(1, -2)]);
+    expect(
+      nextScriptStep({
+        ...base,
+        latest: { run: bridged, script: NIGHT },
+        pricing: { biggestPurchaseMinor: 1_100, setting: { startCapMultiple: 1.25 } },
+      }),
+    ).toMatchObject({ kind: 'none', reason: 'capped_at_start', stepPrice: { capMinor: 1_375 } });
+    expect(
+      nextScriptStep({
+        ...base,
+        latest: { run: bridged, script: NIGHT },
+        pricing: { biggestPurchaseMinor: 1_200, setting: { startCapMultiple: 1.25 } },
+      }),
+    ).toMatchObject({ kind: 'send_step', stepPrice: { priceMinor: 1_500, capMinor: 1_500 } });
+    expect(
+      nextScriptStep({
+        ...base,
+        latest: { run: bridged, script: NIGHT },
+        pricing: { biggestPurchaseMinor: 1_100 },
+      }),
+    ).toMatchObject({ kind: 'send_step', stepPrice: { capMinor: null } });
+  });
+
+  it('opens no script whose first paid step is over the cap, and says why when none is left', () => {
+    const cheap: PlatformScriptView = {
+      ...NIGHT,
+      scriptRef: 'script-cheap',
+      steps: NIGHT.steps.map((step, index) => (index === 2 ? { ...step, priceMinor: 1_000 } : step)),
+    };
+    const pricing = { biggestPurchaseMinor: 900, setting: { startCapMultiple: 1.25 } };
+    const options = { moment: 'night' as const, history: NO_HISTORY };
+    expect(permittedScripts([NIGHT, cheap], { ...options, pricing }).map((s) => s.scriptRef)).toEqual([
+      'script-cheap',
+    ]);
+    expect(
+      permittedScripts([NIGHT, cheap], { ...options, pricing: { ...pricing, setting: {} } }),
+    ).toHaveLength(2);
+    expect(
+      permittedScripts([NIGHT, cheap], { ...options, pricing: { ...pricing, biggestPurchaseMinor: null } }),
+    ).toHaveLength(2);
+    expect(nextScriptStep({ ...base, pricing })).toEqual({ kind: 'none', reason: 'capped_at_start' });
   });
 });

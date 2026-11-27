@@ -10,6 +10,7 @@ import {
   PreparedScriptContentSchema,
   PreparedScriptIdSchema,
   PreparedScriptStateSchema,
+  CreatorSettingsSchema,
   type CreatorId,
   type PreparedScriptContent,
 } from '@impera/contracts';
@@ -19,6 +20,7 @@ import {
   onCreatorList,
   schema,
   sql,
+  withTenant,
   withTenantMember,
   type Database,
   type Transaction,
@@ -132,6 +134,16 @@ async function mayRead(
  */
 export function createDrizzlePreparedScriptStore(db: Database): PreparedScriptStore {
   return {
+    staircase: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const [creator] = await tx
+          .select({ settings: schema.creators.settings })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        const settings = CreatorSettingsSchema.safeParse(creator?.settings ?? {});
+        return settings.success ? settings.data.staircase : undefined;
+      }),
+
     list: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         if (!(await mayRead(tx, scope, userId, creatorId))) return null;

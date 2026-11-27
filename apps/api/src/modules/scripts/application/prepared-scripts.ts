@@ -6,6 +6,7 @@ import type {
   PreparedScriptGap,
   PreparedScriptId,
   PreparedScriptWarning,
+  StaircaseSetting,
 } from '@impera/contracts';
 
 import type {
@@ -35,12 +36,16 @@ interface Deps {
   readonly limitsOf: LimitsOf;
 }
 
-function viewOf(script: StoredPreparedScript, limits: Awaited<ReturnType<LimitsOf>>): PreparedScriptView {
+function viewOf(
+  script: StoredPreparedScript,
+  limits: Awaited<ReturnType<LimitsOf>>,
+  staircase?: StaircaseSetting,
+): PreparedScriptView {
   const { vault, natives, ...rest } = script;
   return {
     ...rest,
     gaps: preparedScriptGaps(script.content, vault, limits),
-    warnings: preparedScriptWarnings(script.content),
+    warnings: preparedScriptWarnings(script.content, staircase),
     copyDifferences: natives === null ? null : copyDifferences(script.content, natives),
   };
 }
@@ -54,7 +59,8 @@ export async function listPreparedScripts(
   const scripts = await deps.store.list(creatorId, userId);
   if (scripts === null) return null;
   const limits = await deps.limitsOf(creatorId);
-  return scripts.map((script) => viewOf(script, limits));
+  const staircase = await deps.store.staircase?.(creatorId);
+  return scripts.map((script) => viewOf(script, limits, staircase));
 }
 
 export async function preparedScript(
@@ -65,7 +71,7 @@ export async function preparedScript(
 ): Promise<PreparedScriptView | null> {
   const script = await deps.store.one(creatorId, id, userId);
   if (script === null) return null;
-  return viewOf(script, await deps.limitsOf(creatorId));
+  return viewOf(script, await deps.limitsOf(creatorId), await deps.store.staircase?.(creatorId));
 }
 
 export function createPreparedScript(

@@ -774,6 +774,11 @@ export type ScriptIdentityView = z.infer<typeof ScriptIdentityViewSchema>;
 export const PLATFORM_SCRIPT_WARNING_CODES = [
   /** Path by path (ADR 0112 § 14): more than twice the paid step before it on some path. */
   'price_more_than_double',
+  /**
+   * A branch on his past spend (the tier's branch, ADR 0132 § 12 bis) that jumps further above the paid step before it
+   * than the agency's setting allows (ADR 0112 § 14, avenant du 27/11/2026). Without the setting, it is read as any step.
+   */
+  'price_jump_over_setting',
   'price_above_ceiling',
   /** A step with branches and none by default (ADR 0112 § 14): on a fan no condition fits, the run ends `no_branch`. */
   'step_without_default',

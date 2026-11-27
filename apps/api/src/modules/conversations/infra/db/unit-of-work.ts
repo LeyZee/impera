@@ -34,7 +34,7 @@ import { z } from 'zod';
 
 import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
-import { fanStanding, timeWasterSettingOf } from './fan-standing';
+import { fanStanding, staircaseSettingOf, timeWasterSettingOf } from './fan-standing';
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
@@ -46,6 +46,9 @@ const PlatformMediaSchema = z.array(ExternalMediaSchema);
 const SwitchStateRowsSchema = z.array(
   z.object({ scope: z.string(), active: z.boolean(), until: z.coerce.date().nullable() }),
 );
+
+/** His biggest single paid message (ADR 0098, avenant du 27/11/2026); none, or nothing paid: `null`. */
+const biggestOf = (minor: number | null): number | null => (minor === null || minor <= 0 ? null : minor);
 
 /** The repositories of one tenant transaction (`withTenant`: RLS scopes every statement to the creator). */
 function bind(tx: DbTransaction, creatorId: string): Transaction {
@@ -213,6 +216,9 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .select({
             spentMinor: sql<number>`coalesce(sum(${schema.messages.priceMinor}) filter (where ${schema.messages.isPaid}), 0)::int`,
             firstMessageAt: sql<string | null>`min(${schema.messages.platformCreatedAt})`,
+            biggestMinor: sql<
+              number | null
+            >`(max(${schema.messages.priceMinor}) filter (where ${schema.messages.isPaid}))::int`,
           })
           .from(schema.messages)
           .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
@@ -221,15 +227,18 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         // His tier and last purchase from her sales register (ADR 0132 § 1), the figures « Fans » shows.
         const standing = await fanStanding(tx, CreatorIdSchema.parse(creatorId), fanId, now);
         const timeWaster = await timeWasterSettingOf(tx, CreatorIdSchema.parse(creatorId));
+        const staircase = await staircaseSettingOf(tx, CreatorIdSchema.parse(creatorId));
         return {
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
+          biggestPurchaseMinor: biggestOf(totals?.biggestMinor ?? null),
           ...(standing !== null && {
             tier: standing.tier,
             lastPurchaseAt: standing.lastPurchaseAt === null ? null : new Date(standing.lastPurchaseAt),
             registerSpentMinor: standing.spentMinor,
           }),
           ...(timeWaster !== undefined && { timeWaster }),
+          ...(staircase !== undefined && { staircase }),
         };
       },
     },

@@ -95,6 +95,9 @@ const REFUSALS: Readonly<Record<EngineRefusal, RefusalReading>> = {
   no_script: { lasts: 'tonight' },
   scripts_exhausted: { lasts: 'tonight' },
   price_mismatch: { lasts: 'tonight' },
+  // The staircase (ADR 0098, avenant du 27/11/2026): nothing above his last paid step, or above the cap at the start.
+  limit_reached: { lasts: 'tonight' },
+  capped_at_start: { lasts: 'tonight' },
   // She picked none of the scripts allowed: the engine refused nothing.
   no_pick: { lasts: 'none' },
 };
@@ -255,5 +258,6 @@ export function copilotTrace(input: CopilotTraceInput): CopilotTrace {
         humanOnly: input.language.humanOnly,
       },
     }),
+    ...(input.scripts?.stepPrice !== undefined && { stepPrice: input.scripts.stepPrice }),
   };
 }

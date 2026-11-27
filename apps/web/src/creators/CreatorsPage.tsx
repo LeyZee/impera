@@ -41,6 +41,7 @@ import {
   type CreatorSheet,
   type CreatorTabName,
 } from './search';
+import { StaircaseSection } from './staircase/StaircaseSection';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 import { VaultPage } from './vault/VaultPage';
 import './sheet.css';
@@ -428,6 +429,11 @@ export function CreatorsPage({
           {isOwner ? (
             <div id="paliers" className="cr-account__card">
               <FanTiersSection creatorId={current.id} />
+            </div>
+          ) : null}
+          {isOwner ? (
+            <div id="escalier" className="cr-account__card">
+              <StaircaseSection creatorId={current.id} />
             </div>
           ) : null}
           <div id={accountCardId('profile')} className="cr-account__card">

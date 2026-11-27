@@ -7,10 +7,11 @@ import {
   type PreparedScriptGapCode,
   type PreparedScriptState,
   type PreparedScriptWarning,
+  type StaircaseSetting,
 } from '@impera/contracts';
 
 import { branchGaps, type BranchSetting } from './branches';
-import { priceWarnings } from './platform-scripts';
+import { priceNotAbovePrevious, priceWarnings } from './platform-scripts';
 
 /**
  * Scripts in preparation (ADR 0112 §§ 20-23): what keeps one from « prêt à copier », and its price warnings, with the
@@ -35,6 +36,7 @@ function asPlatformSteps(content: PreparedScriptContent) {
       priceMinor: branch.priceMinor,
       currency: branch.currency,
       soldMediaRefs: branch.media.map((media) => media.ref),
+      spendBranch: branch.condition?.kind === 'structured' && branch.condition.rule.kind === 'spent_at_least',
     })),
   );
 }
@@ -125,15 +127,26 @@ export function preparedScriptGaps(
       }
     }
   });
+  // The staircase (avenant du 27/11/2026), path by path: a paid branch above the last paid step of each of its paths.
+  const flat = asPlatformSteps(content);
+  for (const position of priceNotAbovePrevious(flat)) {
+    const branch = flat[position];
+    if (branch !== undefined) gaps.push(gap('price_not_above_previous', branch.platformIndex, branch.ref));
+  }
   const shared = new Set<string>(branchGaps(asPlatformSteps(content), settingsOf(content)));
   for (const code of SHARED) if (shared.has(code)) gaps.push(gap(code));
   return gaps;
 }
 
 /** The price warnings of § 14, path by path, on the branch they concern; `step_without_default` on its step. */
-export function preparedScriptWarnings(content: PreparedScriptContent): PreparedScriptWarning[] {
+export function preparedScriptWarnings(
+  content: PreparedScriptContent,
+  staircase?: StaircaseSetting,
+): PreparedScriptWarning[] {
   const flat = asPlatformSteps(content);
-  const warnings: PreparedScriptWarning[] = priceWarnings(flat).map((warning) => {
+  const jump = staircase?.spendBranchJumpMultiple;
+  const options = jump === undefined ? {} : { spendBranchJumpMultiple: jump };
+  const warnings: PreparedScriptWarning[] = priceWarnings(flat, options).map((warning) => {
     const branch = flat[warning.position];
     return { code: warning.code, step: branch?.platformIndex ?? 0, branch: branch?.ref ?? null };
   });

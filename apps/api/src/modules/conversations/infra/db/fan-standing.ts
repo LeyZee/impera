@@ -5,6 +5,7 @@ import {
   type FanId,
   type FanStanding,
   type FanTiersSetting,
+  type StaircaseSetting,
   type TimeWasterSetting,
 } from '@impera/contracts';
 import { eq, schema, sql, type Transaction } from '@impera/db';
@@ -59,6 +60,19 @@ export async function timeWasterSettingOf(
     .where(eq(schema.creators.id, creatorId));
   const settings = CreatorSettingsSchema.safeParse(creator?.settings ?? {});
   return settings.success ? settings.data.timeWaster : undefined;
+}
+
+/** Her staircase settings (ADR 0098, avenant du 27/11/2026), or `undefined` when they no longer read: all off. */
+export async function staircaseSettingOf(
+  tx: Transaction,
+  creatorId: CreatorId,
+): Promise<StaircaseSetting | undefined> {
+  const [creator] = await tx
+    .select({ settings: schema.creators.settings })
+    .from(schema.creators)
+    .where(eq(schema.creators.id, creatorId));
+  const settings = CreatorSettingsSchema.safeParse(creator?.settings ?? {});
+  return settings.success ? settings.data.staircase : undefined;
 }
 
 /** His euros and his dollars at that rate, in euro cents, never below zero. */

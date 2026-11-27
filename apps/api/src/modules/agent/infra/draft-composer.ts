@@ -8,6 +8,7 @@ import type {
   DraftTranslation,
   FanFlags,
   FanTier,
+  StaircaseSetting,
   HandoffCause,
   Language,
   MediaDescription,
@@ -143,6 +144,13 @@ export interface AgentComposeInput {
     readonly tier?: FanTier | null;
     /** His last purchase in her sales register (ADR 0128 § 1); absent, not read. */
     readonly lastPurchaseAt?: Date | null;
+    /**
+     * His biggest single paid message, in cents (ADR 0098, avenant du 27/11/2026): the cap of a script's first paid
+     * step. `null` never bought; absent, not read: no cap.
+     */
+    readonly biggestPurchaseMinor?: number | null;
+    /** The agency's staircase settings for her (ADR 0098, avenant du 27/11/2026); absent, only the strict rise. */
+    readonly staircase?: StaircaseSetting;
   };
   /** His desire score as stored on the conversation (P3-12), and when it was counted; absent, he starts at 0. */
   readonly desire?: { readonly score: number; readonly at: Date };
@@ -441,6 +449,11 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
     history: null,
     latest: input.scriptRun ?? null,
     countsHisMessage: (input.waited ?? 0) === 0,
+    pricing: {
+      biggestPurchaseMinor: input.fan.biggestPurchaseMinor ?? null,
+      ...(input.fan.tier !== undefined && { fanTier: input.fan.tier }),
+      ...(input.fan.staircase !== undefined && { setting: input.fan.staircase }),
+    },
     ...(input.scriptAbandon !== undefined && {
       earlier: input.scriptAbandon.earlier,
       teased: input.scriptAbandon.teased,

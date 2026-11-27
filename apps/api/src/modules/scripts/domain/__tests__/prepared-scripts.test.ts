@@ -193,6 +193,45 @@ describe('the price warnings of a script in preparation', () => {
   });
 });
 
+describe('the staircase of a script in preparation (avenant du 27/11/2026)', () => {
+  const spend: BranchCondition = {
+    kind: 'structured',
+    rule: { kind: 'spent_at_least', amountMinor: 5_000, currency: 'EUR' },
+  };
+
+  it('refuses a paid branch that costs no more than the paid step before it, free bridges skipped', () => {
+    const content = script([
+      [branch(1, { priceMinor: 1_000 })],
+      [branch(2)],
+      [branch(3, { priceMinor: 1_000 })],
+    ]);
+    expect(preparedScriptGaps(content, described(['m1', 'm2', 'm3']), noLimits)).toEqual([
+      { code: 'price_not_above_previous', step: 2, branch: key(3), term: null },
+    ]);
+    const climbing = script([
+      [branch(1, { priceMinor: 1_000 })],
+      [branch(2)],
+      [branch(3, { priceMinor: 1_100 })],
+    ]);
+    expect(preparedScriptGaps(climbing, described(['m1', 'm2', 'm3']), noLimits)).toEqual([]);
+  });
+
+  it('reads a branch on his spend against the agency’s jump setting', () => {
+    const content = script([
+      [branch(1, { priceMinor: 1_000 })],
+      [branch(2, { condition: none, priceMinor: 1_500 }), branch(3, { condition: spend, priceMinor: 2_400 })],
+    ]);
+    // Invented setting.
+    expect(preparedScriptWarnings(content, { spendBranchJumpMultiple: 2.4 })).toEqual([]);
+    expect(preparedScriptWarnings(content, { spendBranchJumpMultiple: 2.3 })).toEqual([
+      { code: 'price_jump_over_setting', step: 1, branch: key(3) },
+    ]);
+    expect(preparedScriptWarnings(content)).toEqual([
+      { code: 'price_more_than_double', step: 1, branch: key(3) },
+    ]);
+  });
+});
+
 describe('the states of a script in preparation', () => {
   it('becomes ready only without a gap, and goes back to editing on a save', () => {
     expect(preparedTransition('editing', 'ready', 0)).toEqual({ ok: true, next: 'ready_to_copy' });
