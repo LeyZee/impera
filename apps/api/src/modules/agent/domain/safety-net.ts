@@ -74,7 +74,7 @@ function bornMinor(text: string, year: number): boolean {
 // right after she asked what he does or his age.
 const CLASS = '(?:(?:6|5|4|3)e?(?:me)?|sixieme|cinquieme|quatrieme|troisieme|seconde|premiere|terminale)';
 const NOT_A_CLASS =
-  "(?!\\s*(?:annee|annees|an\\b|classe|ligne|main|fois|place|position|rang|partie|vitesse|etage|div|zone|chance|round|periode|mi-temps|semaine|jour|de |d'|des |du ))";
+  "(?!\\s*(?:annee|annees|an\\b|classe|ligne|main|fois|place|position|rang|partie|equipe|vitesse|etage|div|zone|chance|round|periode|mi-temps|semaine|jour|de |d'|des |du ))";
 const NOT_A_RANK =
   '(?<!arrivee? |fini |finie |termine |terminee |sorti |sortie |classee? |passee? la ligne |ranked )';
 const CLASS_OF_HIS = new RegExp(
@@ -142,9 +142,13 @@ const DURATION = new RegExp(
   'gu',
 );
 
+// A school costume between adults (Sécurité, #1043): « joue une lycéenne », « toi en écolière », « ta jupe d'écolière »
+// raise nothing. Only a real minor does: « une vraie lycéenne », « une écolière de 15 ans », « lycéenne mineure ».
+const COSTUME =
+  '(?:collegien(?:ne)?s?|lyceen(?:ne)?s?|ecolier(?:e)?s?|eleves?|schoolgirls?|scolarett[ae]|liceal[ei]|colegialas?)';
+const REAL_COSTUME = `(?:(?:vraie?s?|veritables?|real|vera|vere|verdaderas?) ${COSTUME}|${COSTUME} (?:mineure?s?|underage|minorenni?|menor(?:es)?|de (?:1[0-7]|[1-9]) ?ans|(?:1[0-7]|[1-9]) ?(?:ans|yo|years? old|anni|anos)))`;
 // A minor or an age under 18, as the object of a verb or a role (Sécurité, #1043): the word, with its article.
-const MINOR_TERM =
-  '(?:(?:une?|a|an|una?|uno|des|la|le|les|the|une petite|a una|a un) )?(?:enfants?|gamine?s?|gosses?|momes?|fillettes?|petites? filles?|petit garcon|mineure?s?|ados?|adolescente?s?|collegien(?:ne)?s?|lyceen(?:ne)?s?|ecolier(?:e)?s?|eleves?|jeunettes?|lolitas?|kids?|child(?:ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?|young girls?|ragazzin[aeio]|bambin[aeio]|scolarett[ae]|liceal[ei]|nin[ao]s?|jovencitas?|colegialas?|(?:fille|girl|ragazza|chica|garcon|boy|one|una|uno) (?:de |of |di )?(?:1[0-7]|[1-9])(?: ?(?:ans|years? old|yo|anni|anos))?|(?:1[0-7]|[1-9]) ?(?:ans|year old|years old|yo|anni|anos))';
+const MINOR_TERM = `(?:(?:une?|a|an|una?|uno|des|la|le|les|the|une petite|a una|a un) )?(?:${REAL_COSTUME}|enfants?|gamine?s?|gosses?|momes?|fillettes?|petites? filles?|petit garcon|mineure?s?|ados?|adolescente?s?|jeunettes?|lolitas?|kids?|child(?:ren)?|teens?|teenagers?|minors?|little girls?|young girls?|ragazzin[aeio]|bambin[aeio]|nin[ao]s?|jovencitas?|(?:fille|girl|ragazza|chica|garcon|boy|one|una|uno) (?:de |of |di )?(?:1[0-7]|[1-9])(?: ?(?:ans|years? old|yo|anni|anos))?|(?:1[0-7]|[1-9]) ?(?:ans|year old|years old|yo|anni|anos))`;
 // A sexual act or a desire carried onto him or her: « toucher », « baiser », « fantasmer sur » (fr/en/it/es).
 const SEX_VERBS =
   '(?:te prendre|te prends|te prend|je te prends|baiser|baise|baises|baiserais|baiserai|niquer|nique|toucher|touche|tripoter|caresser|caresse|sucer|lecher|leche|deshabiller|coucher avec|couche avec|faire l amour (?:a|avec)|bander (?:sur|pour)|bande (?:sur|pour)|fantasme (?:sur|de)|fantasmer (?:sur|de)|fantasmes (?:sur|de)|mater|fuck|fucking|touch|touching|kiss|kissing|lick|licking|sleep with|have sex with|bang|fantasi[sz]e (?:about|on)|scopare|scopo|toccare|tocco|baciare|leccare|follar|follo|coger|tocar|toco|besar|lamer)';
@@ -173,6 +177,20 @@ const HER_AS_MINOR = new RegExp(
   `\\b(?:toi|te voir|t imaginer|imagine toi|you|te|ti|tu) (?:habillee |deguisee |dressed |vestita |vestida )?(?:en|as|as a|da|de|come|como) ${MINOR_TERM}\\b`,
   'u',
 );
+// A school role he asks of her, with no age (Sécurité, #1043): no alert, but she does not play it; a hint brings her
+// back to the outfit (« joue une lycéenne », « toi en écolière »).
+const SCHOOL_ROLE = new RegExp(
+  `\\b(?:${ROLE_VERBS}(?: (?:moi|me|pour moi|for me|per me|para mi|la|le))?(?: (?:une?|a|an|la|una?|uno|l))?|(?:toi|te voir|t imaginer|imagine toi|you|te|ti|tu) (?:en|as|as a|da|de|come|como)(?: (?:une?|a|an|una?))?) ${COSTUME}\\b`,
+  'u',
+);
+
+/** He asks her to play a pupil, with no age (Sécurité, #1043): she does not, she brings him back to the outfit. */
+export function asksSchoolRole(fanText: string): boolean {
+  return normalise(fanText)
+    .split(/[,;:.!?\n]+/u)
+    .some((clause) => SCHOOL_ROLE.test(normaliseWords(clause)));
+}
+
 // His own child as the object of a sexual verb, or of his desire: the one case where his children count.
 const HIS_CHILD =
   '(?:ma|mon|my|mia|mio|mi|la mia|il mio) (?:fille|fils|petite fille|belle fille|daughter|son|stepdaughter|figlia|figlio|figliastra|hija|hijo|hijastra)';
@@ -227,7 +245,8 @@ function minorFantasy(fanText: string): boolean {
 export function safetySigns(fanText: string, now: Date = new Date(), herLastTurn?: string): SafetySign[] {
   const text = normalise(fanText);
   const signs: SafetySign[] = [];
-  const his = clausesOfHis(text);
+  // A pupil's role he asks of her is about her costume, never his class (Sécurité, #1043).
+  const his = clausesOfHis(text).filter((clause) => !SCHOOL_ROLE.test(normaliseWords(clause)));
   // A trade said in the same message cancels a school or a minor's word (Sécurité, #1043): « je suis au lycée, je
   // suis prof ». An age under 18 still counts.
   const atWork = HIS_TRADE.test(text);

@@ -58,7 +58,7 @@ describe('his card read by the agent (ADR 0085 § 7)', () => {
       ...INPUT,
       card: [],
       messages: [
-        { number: 1, from: 'fan', text: 'je fantasme sur une écolière', isNew: true },
+        { number: 1, from: 'fan', text: 'je fantasme sur une vraie écolière', isNew: true },
         { number: 2, from: 'fan', text: 'j’adore la lingerie noire', isNew: true },
       ],
     });

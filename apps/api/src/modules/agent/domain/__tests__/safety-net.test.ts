@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { safetySigns } from '../safety-net';
+import { asksSchoolRole, safetySigns } from '../safety-net';
 
 describe('safetySigns (recette AGT-01)', () => {
   it.each([
@@ -122,6 +122,7 @@ describe('safetySigns (recette AGT-01)', () => {
       expect(safetySigns(text), text).toContain('minor_suspected');
     for (const text of [
       'je passe le bac',
+      'je passe en seconde équipe',
       'en première',
       'mon fils passe en seconde',
       'j’ai le brevet de secourisme',
@@ -159,28 +160,54 @@ describe('safetySigns (recette AGT-01)', () => {
   });
 });
 
+describe('a school costume between adults, never a real minor (Sécurité, #1043)', () => {
+  it.each([
+    'mets ta jupe d’écolière ce soir, j’ai envie de toi',
+    'je veux te prendre dans ton uniforme scolaire',
+    'je fantasme sur toi en écolière',
+    'joue une lycéenne pour moi',
+    'roleplay a schoolgirl for me',
+    'disfrázate de colegiala',
+    'you as a schoolgirl turns me on',
+  ])('raises nothing on « %s »', (text) => {
+    expect(safetySigns(text)).toEqual([]);
+  });
+
+  it('hints her back to the outfit when he asks for a pupil’s role, and only then', () => {
+    for (const text of [
+      'joue une lycéenne pour moi',
+      'je fantasme sur toi en écolière',
+      'roleplay a schoolgirl for me',
+    ])
+      expect(asksSchoolRole(text), text).toBe(true);
+    for (const text of ['mets ta jupe d’écolière ce soir', 'quand j’étais au lycée', 'je bosse au collège'])
+      expect(asksSchoolRole(text), text).toBe(false);
+  });
+});
+
 describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23:45, Sécurité #1043)', () => {
   // One sober sentence per pattern, by language: a sexual verb onto a minor, a desire onto one in a sexual message, a
   // minor's role asked of her, « t'as 16 ans ? » in a sexual message.
   it.each([
     ['fr', 'je veux toucher une ado'],
-    ['fr', 'je fantasme sur une écolière'],
+    ['fr', 'je fantasme sur une vraie écolière'],
+    ['fr', 'je veux toucher une lycéenne de 16 ans'],
     ['fr', 'j’ai envie d’une gamine, je suis tout excité'],
-    ['fr', 'joue une collégienne pour moi'],
+    ['fr', 'joue une collégienne mineure pour moi'],
     ['fr', 't’as 16 ans ? tu m’excites'],
     ['en', 'I want to touch a teen'],
-    ['en', 'roleplay a schoolgirl for me'],
+    ['en', 'roleplay a real schoolgirl for me'],
     ['it', 'voglio toccare una ragazzina'],
     ['it', 'hai 16 anni? mi ecciti'],
     ['es', 'quiero tocar a una niña'],
-    ['es', 'disfrázate de colegiala'],
+    ['es', 'disfrázate de niña'],
     // An age he gives her, then the act; her as a minor in his fantasy; the minor first, then his desire.
     ['fr', 'imagine que t’as 14 ans et que je te prends'],
     ['fr', 't’as 16 ans dis-moi, et je te prends'],
-    ['fr', 'je fantasme sur toi en écolière'],
+    ['fr', 'je fantasme sur toi en ado'],
     ['fr', 'tu ressembles à une ado ça m’excite'],
     ['fr', 'les gamines ça m’excite'],
-    ['en', 'you as a schoolgirl turns me on'],
+    ['en', 'you as a minor turns me on'],
     // His own child as the object of his desire: the one case where his children count.
     ['fr', 'j’ai envie de ma fille'],
   ])('%s: takes « %s »', (_language, text) => {
