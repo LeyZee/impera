@@ -131,6 +131,7 @@ const ACTIONS: Readonly<Record<string, string>> = {
 };
 const RISKS: Readonly<Record<string, string>> = {
   minor_suspected: 'Mineur suspecté',
+  minor_fantasy: 'Fantasme sur des mineurs',
   distress: 'Détresse',
   meet_request: 'Demande de rencontre',
   off_platform_payment: 'Paiement hors plateforme',

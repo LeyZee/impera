@@ -10,6 +10,7 @@ import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from
 import {
   asSent,
   checkVoiceOutput,
+  checkYouthWords,
   composeTurn,
   followUpDecision,
   guardContextOf,
@@ -102,6 +103,7 @@ interface PlaygroundExchange {
   readonly turn: PlaygroundTurn;
   readonly moment: RatedMoment;
   readonly voiceInput?: VoiceInput;
+  readonly sexualTurn?: boolean;
 }
 
 /** A follow-up asked with /relance: written, or why not (not due yet, her quiet hours, none left). */
@@ -624,7 +626,11 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       if (input === undefined) return undefined;
       const voice = await gateway.voice(input);
       const written = voice.ok ? voice.value.output.bubbles : [];
-      const violations = checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history));
+      // Guarded as the main answer (Sécurité, #1043): a sexual turn reads her words of youth and a minor named.
+      const violations = [
+        ...checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history)),
+        ...checkYouthWords(written, lastExchange?.sexualTurn === true),
+      ];
       const bubbles = asSent(written, deps.splitMessages, deps.guardSettings.form);
       return {
         bubbles,
@@ -722,8 +728,10 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           .slice(lastAnswer + 1)
           .map((t) => t.text)
           .join('\n'),
+        undefined,
+        history[lastAnswer]?.text,
       );
-      if (signs.includes('minor_suspected')) {
+      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         scripts = { ...scripts, salesFrozen: true };
         const held: PlaygroundTurn = {
           bubbles: [],
@@ -903,6 +911,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         turn,
         moment: composed.voiceBrief === undefined ? moment : { ...moment, brief: composed.voiceBrief },
         ...(composed.voiceInput !== undefined && { voiceInput: composed.voiceInput }),
+        ...(composed.sexualTurn !== undefined && { sexualTurn: composed.sexualTurn }),
       };
       return turn;
     },

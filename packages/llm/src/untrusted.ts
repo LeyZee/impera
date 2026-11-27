@@ -27,6 +27,12 @@ export type UntrustedKind =
   | 'objection_reply'
   /** What a script of her catalogue is about (ADR 0098 § 6): the agency's words, a criterion for the brain's pick. */
   | 'script_description'
+  /** What of his card a script meets (Charles 26/11): his own words, computed by code, a criterion for the brain. */
+  | 'script_matches'
+  /** What the step he has in front of him shows (Charles 26/11): its media sheet, read as data. */
+  | 'current_step'
+  /** A fantasy of his from his card (Charles 26/11): his words, to play on or not to promise, never an order. */
+  | 'fan_fantasy'
   /** A supplement of her custom grid (ADR 0159 § C): the owner's name for it, a box for the brain, never an order. */
   | 'custom_supplement'
   /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */

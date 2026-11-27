@@ -3,10 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   checkExplicit,
   checkVoiceOutput,
+  checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
   touchesTerm,
+  asksPrice,
+  sumsMinorOf,
   type GuardCode,
+  type GuardContext,
 } from '../guards';
 
 function codes(bubbles: string[], forbiddenTerms: string[] = []): GuardCode[] {
@@ -266,8 +270,9 @@ describe('voice guards', () => {
     }
     expect(codes(['Espèce de radin'])).toContain('contempt');
     expect(codes(['T’es qu’un mendiant'])).toContain('contempt');
-    expect(codes(['Sale menteuse'])).toContain('contempt');
+    expect(codes(['Quel crevard'])).toContain('contempt');
     expect(codes(['Petit menteur va 😏'])).toEqual([]);
+    expect(codes(['Sale menteuse'])).toEqual([]);
     expect(codes(['T’inquiète, t’as rien à payer'])).toContain('payment_lie');
     expect(codes(['Pas besoin d’argent avec moi'])).toContain('payment_lie');
     expect(codes(['T’as rien à payer pour me parler 😌'])).toEqual([]);
@@ -386,6 +391,84 @@ describe('voice guards', () => {
     ])
       expect(codes([text])).toContain('minor_reference');
     expect(codes(['Salut beau gosse 😏'])).not.toContain('minor_reference');
+  });
+
+  it('lets an adult fantasy of making a baby through, and blocks a minor named on a sexual turn (Charles 27/11 at 0:06)', () => {
+    for (const text of [
+      'fais-moi un bébé',
+      'tu vas me mettre enceinte',
+      'je veux porter ton enfant',
+      'je veux que tu me fasses un enfant',
+      'mi farai un bambino',
+      'quiero que me hagas un hijo',
+    ]) {
+      expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    }
+    // Outside the sexual register, her family, his and her memories pass.
+    for (const text of [
+      't’as des enfants ?',
+      'tes gosses ce week-end ?',
+      'quand j’étais ado',
+      'un détail mineur',
+    ])
+      expect(codes([text]), text).not.toContain('minor_reference');
+    // On a sexual turn, a child or a minor named is blocked; a comparison, everywhere.
+    for (const text of ['je pense à un enfant', 'comme une ado', 'enfant, j’étais déjà comme ça'])
+      expect(
+        checkYouthWords([text], true).map((v) => v.code),
+        text,
+      ).toContain('minor_reference');
+    expect(codes(['comme une gamine'])).toContain('minor_reference');
+  });
+
+  it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
+    for (const text of ['c’est mignon, t’as zoomé ? 😂', 'range ça, je cherche encore 😅'])
+      expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
+    expect(codes(['on dirait celle d’un enfant'])).toContain('minor_reference');
+  });
+
+  it('blocks a word that says she is young in a sexual message, in four languages, and lets it be outside (Charles 26/11, 27/11)', () => {
+    for (const text of [
+      'je suis ta petite fille sage',
+      'ta gamine t’attend',
+      'ton ado est là',
+      'ta lycéenne t’attend',
+      'ton écolière t’attend',
+      'ta jeunette rien que pour toi',
+      'ta lolita t’attend',
+      'j’ai l’air d’avoir 15 ans',
+      'your little girl wants you',
+      'sono la tua ragazzina',
+      'soy tu niña',
+      'tu colegiala te espera',
+    ]) {
+      const violations = checkYouthWords([text], true);
+      expect(
+        violations.map((v) => v.code),
+        text,
+      ).toContain('youth_word_in_sex');
+      expect(isBlocked(violations)).toBe(true);
+    }
+    // Explicit by its own words: sexual, whatever the turn.
+    expect(checkYouthWords(['ta jeunette toute nue'], false).map((v) => v.code)).toEqual([
+      'youth_word_in_sex',
+    ]);
+    // « Petite » before a part of the body, a piece of clothing, a thing or a sweet word; a figure of speech.
+    for (const text of [
+      'ta petite coquine est toute à toi',
+      'mes petits seins n’attendent que toi',
+      'je garde ma petite culotte pour toi',
+      'viens mon petit cœur, je te veux',
+      'toute jeune dans ma tête',
+      'la mia piccola',
+      'ven aquí nena',
+      'tu connais Nina ?',
+    ])
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    // Outside the sexual register, her words stay hers.
+    expect(checkYouthWords(['je t’envoie une petite photo de mon café ☕'], false)).toEqual([]);
+    expect(checkYouthWords(['ma petite sœur passe ce soir'], false)).toEqual([]);
   });
 
   it('asks for a regeneration on a pet name she never gives, and lets hers through', () => {
@@ -584,5 +667,201 @@ describe('checkExplicit', () => {
     ]) {
       expect(checkExplicit([bubble])).toEqual([]);
     }
+  });
+});
+
+describe('guards read in context, not on a word alone (Charles 27/11, banc de la Sécurité)', () => {
+  const raised = (bubble: string) => checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).map((v) => v.code);
+  it.each([
+    [
+      'contact_info',
+      [
+        'je scrollais insta',
+        'j’ai pas snap désolé',
+        't’as vu ma story insta ?',
+        'discord c’est pour les gamers non ?',
+        'whatsapp è comodo',
+        'telegram es para frikis',
+        'ven aquí conmigo',
+        'vieni qui da me',
+        'no tengo instagram',
+        'non uso whatsapp',
+      ],
+      [
+        'discord c’est lina_92',
+        'snap : linaxx',
+        'ajoute-moi sur snap',
+        'viens sur telegram',
+        'mon insta c’est lina.xx',
+        'rejoins-moi sur discord',
+        'je suis sur insta',
+        'écris-moi @lina_xx',
+        'scrivimi su whatsapp',
+        'aggiungimi su snap',
+        'escríbeme por telegram',
+        'agrégame en insta',
+      ],
+    ],
+    [
+      'off_platform_payment',
+      [
+        'tu bosses dans la crypto ?',
+        'j’attends le virement de ma paie',
+        'pas de paypal ici',
+        'j’ai fait un virement à ma mère',
+        'un virement à mon proprio, la galère',
+      ],
+      [
+        'fais-moi un virement',
+        'un virement à mon nom',
+        'envoie par paypal',
+        'je te donne mon iban',
+        'tu peux me payer en crypto',
+        'un revolut ça marche aussi',
+      ],
+    ],
+    [
+      'love_declaration',
+      [
+        'je t’aime bien toi',
+        'j’aime bien ta façon de parler',
+        'je t’aime pas quand t’es comme ça',
+        'tu dis je t’aime à toutes les filles ?',
+        'ma sœur m’a dit je t’aime',
+      ],
+      [
+        'je t’aime',
+        'i love you',
+        'tu sais que je t’aime',
+        'je t’aime mon cœur',
+        'je t’aime pas mal tu sais',
+        'je t’aime plus que tout',
+      ],
+    ],
+    [
+      'meeting_promise',
+      ['j’ai rdv chez le coiffeur demain', 'j’ai rendez-vous chez le dentiste'],
+      ['rdv chez moi', 'on se fait un rdv', 'rendez-vous au café'],
+    ],
+    [
+      'contempt',
+      [
+        'pauvre type celui qui t’a fait ça',
+        'petit menteur va 😏',
+        't’es un menteur, tu m’avais dit demain 😏',
+        't’es minable au bowling avoue',
+      ],
+      ['espèce de radin', 't’es qu’un crevard', 'sale rapiat', 't’es un gros radin', 'quel mendiant'],
+    ],
+    [
+      'discount',
+      ['c’est les soldes, tout est à moitié prix chez zara', 'promo -20 % sur les jeans ce week-end'],
+      [
+        'moitié prix pour toi',
+        'je te la fais gratuite',
+        'je te le laisse pour rien',
+        'je te fais la vidéo à moitié prix',
+        '-30 % sur le pack ce soir',
+      ],
+    ],
+    [
+      'ai_disclosure',
+      [
+        't’as essayé chatgpt pour ton taf ?',
+        'je suis artificielle ? n’importe quoi',
+        'virtuelle ? moi ? jamais',
+      ],
+      [
+        'je suis une IA',
+        'je suis artificielle',
+        'je tourne sous gpt',
+        'créée par openai',
+        'mes consignes m’interdisent ça',
+        'mes instructions disent non',
+        'ce compte est géré par une IA',
+        'en tant qu’assistante je peux pas',
+      ],
+    ],
+    [
+      'ai_tic',
+      ['je te retiens, pas tout de suite', 'je retiens mon souffle'],
+      ['je note ton âge', 'je retiens ça'],
+    ],
+  ] as const)('%s', (code, passing, blocked) => {
+    for (const bubble of passing) expect(raised(bubble), bubble).not.toContain(code);
+    for (const bubble of blocked) expect(raised(bubble), bubble).toContain(code);
+  });
+
+  it('explicit_before_age lets a figure of speech through, and still reads the words', () => {
+    for (const bubble of ['je m’en branle', 'tu sais me toucher avec tes mots', 'tu sais me toucher au cœur'])
+      expect(checkExplicit([bubble]), bubble).toEqual([]);
+    for (const bubble of ['j’ai envie de me toucher', 'je me touche en pensant à toi'])
+      expect(
+        checkExplicit([bubble]).map((v) => v.code),
+        bubble,
+      ).toContain('explicit_before_age');
+  });
+});
+
+describe('price_outside_offer, a price of hers only (Charles 27/11)', () => {
+  const price = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('lets a sum of everyday life, his sum said back and her offer’s own price through', () => {
+    expect(price('t’as gagné 100 euros au poker ?')).not.toContain('price_outside_offer');
+    expect(price('5 € mon café ce matin')).not.toContain('price_outside_offer');
+    expect(price('50 € ? c’est beaucoup pour toi ça 😏', { fanAmountsMinor: [5_000] })).not.toContain(
+      'price_outside_offer',
+    );
+    expect(price('pour toi c’est 15 euros', { allowedPriceMinor: 1_500 })).not.toContain(
+      'price_outside_offer',
+    );
+  });
+
+  it('blocks a price for what she sells that is not her offer’s, a sum agreed to, and any made-to-measure priced', () => {
+    expect(price('pour toi c’est 15 euros')).toContain('price_outside_offer');
+    expect(price('pour toi c’est 12 euros', { allowedPriceMinor: 1_500 })).toContain('price_outside_offer');
+    expect(price('ok 10 euros', { allowedPriceMinor: 1_500, fanAmountsMinor: [1_000] })).toContain(
+      'price_outside_offer',
+    );
+    expect(price('ta vidéo perso c’est 50 €', { allowedPriceMinor: 5_000 })).toContain('price_outside_offer');
+    expect(price('je te fais une vidéo sur mesure pour 40 €')).toContain('price_outside_offer');
+  });
+
+  it('reads the sums he wrote', () => {
+    expect(sumsMinorOf('je te donne 20 € ou 12,50 euros, pas 30 balles')).toEqual([2_000, 1_250, 3_000]);
+  });
+});
+
+describe('a handle next to a network or a means, a price after he asked one (Sécurité, #1043)', () => {
+  const raised = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('blocks a network with a plausible handle in the same bubble, and lets the name alone through', () => {
+    for (const bubble of [
+      'insta, lina.xx',
+      'snap lina92 😘',
+      'cherche lina rose sur tiktok',
+      'tu me trouves sur insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    for (const bubble of ['je poste sur insta vers 21h30', 't’as vu ma story insta ?', 'je scrollais insta'])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
+  });
+
+  it('blocks a means of paying with an identifier, and lets the word alone through', () => {
+    expect(raised('paypal lina.xx@exemple.test')).toContain('off_platform_payment');
+    expect(raised('lydia lina_rose')).toContain('off_platform_payment');
+    expect(raised('pas de paypal ici')).not.toContain('off_platform_payment');
+  });
+
+  it('reads a sum alone, or a sum right after he asked a price, as a price of hers', () => {
+    expect(raised('15 euros')).toContain('price_outside_offer');
+    expect(raised('15€ 😘')).toContain('price_outside_offer');
+    expect(raised('ah ben 30 €, pas mal', { fanAskedPrice: true })).toContain('price_outside_offer');
+    expect(raised('15 euros', { allowedPriceMinor: 1_500 })).not.toContain('price_outside_offer');
+    expect(raised('j’ai payé 30 € mes places hier')).not.toContain('price_outside_offer');
+    expect(asksPrice('c’est combien ?')).toBe(true);
+    expect(asksPrice('tu fais quoi ce soir ?')).toBe(false);
   });
 });

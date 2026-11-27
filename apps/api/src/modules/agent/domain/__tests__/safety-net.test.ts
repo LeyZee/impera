@@ -98,6 +98,62 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns('je suis né en 2007', now)).toEqual([]);
   });
 
+  it('lets a trade cancel a school or a minor’s word, never an age (Sécurité, #1043)', () => {
+    for (const text of [
+      'je suis au lycée, je suis prof',
+      'je suis mineur de fond',
+      'au collège, je suis surveillant',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+    for (const text of ['je suis en seconde', 'j’ai 16 ans', 'je suis mineur', 'je suis prof, j’ai 16 ans'])
+      expect(safetySigns(text), text).toContain('minor_suspected');
+  });
+
+  it('hears a minor’s class said now or soon, without « je suis » (Sécurité, #1043)', () => {
+    for (const text of [
+      'moi en première',
+      'en première cette année',
+      'en terminale et toi ?',
+      'je passe en terminale',
+      'je rentre en première',
+      'j’entre en seconde en septembre',
+      'je passe le brevet',
+    ])
+      expect(safetySigns(text), text).toContain('minor_suspected');
+    for (const text of [
+      'je passe le bac',
+      'en première',
+      'mon fils passe en seconde',
+      'j’ai le brevet de secourisme',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+  });
+
+  it('reads « en première » alone as his class only after she asked what he does or his age', () => {
+    const now = new Date('2026-11-27T12:00:00Z');
+    expect(safetySigns('en première', now, 'et toi tu fais quoi dans la vie ?')).toContain('minor_suspected');
+    expect(safetySigns('seconde', now, 't’as quel âge ?')).toContain('minor_suspected');
+    expect(safetySigns('en première', now, 'tu préfères la mer ?')).not.toContain('minor_suspected');
+    expect(safetySigns('en première ligne au taf', now, 'tu fais quoi ?')).not.toContain('minor_suspected');
+  });
+
+  it('lets a set phrase about death through, and still hears distress (Sécurité, #1043)', () => {
+    for (const text of [
+      'j’ai envie de mourir de rire',
+      'je vais me tuer au boulot demain',
+      'j’ai envie de crever tellement t’es belle',
+      'je crève de chaud',
+    ])
+      expect(safetySigns(text), text).not.toContain('self_harm');
+    for (const text of [
+      'j’ai envie de me tuer',
+      'je veux en finir',
+      'je veux mourir',
+      'je meurs de rire mais je veux en finir',
+    ])
+      expect(safetySigns(text), text).toContain('self_harm');
+  });
+
   // ADR 0168 § 4: the same net in Italian, Spanish and English, invented messages.
   it.each([
     'ho 16 anni',
@@ -161,5 +217,67 @@ describe('safetySigns (recette AGT-01)', () => {
 
   it('says both, the minor first, when he says both', () => {
     expect(safetySigns('j’ai 15 ans et je veux mourir')).toEqual(['minor_suspected', 'self_harm']);
+  });
+});
+
+describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23:45, Sécurité #1043)', () => {
+  // One sober sentence per pattern, by language: a sexual verb onto a minor, a desire onto one in a sexual message, a
+  // minor's role asked of her, « t'as 16 ans ? » in a sexual message.
+  it.each([
+    ['fr', 'je veux toucher une ado'],
+    ['fr', 'je fantasme sur une écolière'],
+    ['fr', 'j’ai envie d’une gamine, je suis tout excité'],
+    ['fr', 'joue une collégienne pour moi'],
+    ['fr', 't’as 16 ans ? tu m’excites'],
+    ['en', 'I want to touch a teen'],
+    ['en', 'roleplay a schoolgirl for me'],
+    ['it', 'voglio toccare una ragazzina'],
+    ['it', 'hai 16 anni? mi ecciti'],
+    ['es', 'quiero tocar a una niña'],
+    ['es', 'disfrázate de colegiala'],
+    // An age he gives her, then the act; her as a minor in his fantasy; the minor first, then his desire.
+    ['fr', 'imagine que t’as 14 ans et que je te prends'],
+    ['fr', 't’as 16 ans dis-moi, et je te prends'],
+    ['fr', 'je fantasme sur toi en écolière'],
+    ['fr', 'tu ressembles à une ado ça m’excite'],
+    ['fr', 'les gamines ça m’excite'],
+    ['en', 'you as a schoolgirl turns me on'],
+    // His own child as the object of his desire: the one case where his children count.
+    ['fr', 'j’ai envie de ma fille'],
+  ])('%s: takes « %s »', (_language, text) => {
+    expect(safetySigns(text)).toContain('minor_fantasy');
+  });
+
+  it.each([
+    // A father, a memory of his, a length of time (Sécurité's false alarms).
+    't’es sexy, moi j’ai deux enfants',
+    'mes gosses dorment, t’es nue ?',
+    'j’ai envie de toi, je dépose mon fils à l’école et je reviens',
+    'j’ai été marié 15 ans, j’ai envie de toi',
+    'i was horny as a teen',
+    // A link never crosses a comma nor another complement.
+    'je l’ai prise ce matin, les enfants étaient chez mamie',
+    'j’ai envie de toi, les enfants sont chez mamie',
+    'je l’ai prise pendant que les enfants dormaient',
+    'j’ai envie de voir ma fille ce week-end',
+    'tu as 25 ans et je te prends',
+    // Procreation between adults, in the present, the subjunctive and the future.
+    'je veux te faire un enfant ce soir au lit',
+    'je veux que tu me fasses un enfant',
+    'te remplir pour te faire un bébé, j’ai envie de toi',
+    'tu vas tomber enceinte',
+    'I want to give you a baby in bed',
+    'voglio che tu mi faccia un figlio',
+    'quiero que me hagas un bebé',
+    // Words for her, a dress, an adult game of age.
+    'j’ai envie de toi ma petite',
+    'tu es sexy dans cette petite robe',
+    'jeu de rôle prof et étudiante, ça t’excite ?',
+    'j’ai envie de toi mon bébé',
+    'quand j’étais ado je faisais du foot',
+    'sei sexy, piccola mia',
+    'estás sexy, cariño',
+  ])('leaves « %s »', (text) => {
+    expect(safetySigns(text)).not.toContain('minor_fantasy');
   });
 });
