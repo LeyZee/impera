@@ -181,9 +181,8 @@ export const WITHHOLDING_TEXTS: Readonly<Record<Withholding, string>> = {
 export const countriesText = (countries: readonly string[]): string =>
   countries.map((code) => countryName(code)).join(', ');
 
-/** The regimes newest first, as the server gives them; the ones still to validate first among them. */
-export const regimesToShow = (regimes: readonly BillingRegime[]): BillingRegime[] =>
-  regimes.toSorted((a, b) => Number(a.validatedOn !== null) - Number(b.validatedOn !== null));
+/** The regimes newest first, as the server gives them. */
+export const regimesToShow = (regimes: readonly BillingRegime[]): BillingRegime[] => [...regimes];
 
 /** A text as typed: its body as pasted, never trimmed (its SHA-256 is the proof), and the mandate's delay. */
 export interface TextDraft {
