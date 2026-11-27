@@ -210,6 +210,7 @@ Branche : task/<id>-<slug>
 | ARC-06 | Les factures et avoirs sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-05 |
 | ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
 | ARC-08 | Ordre des virements écartés du journal et relance d'émission par son index | exploitation | done | ARC-07 |
+| ARC-09 | `composeTurn` découpé en étapes nommées, sans rien changer à ce qu'il fait | exploitation | in_progress | — |
 | REC-PAIE-01 | Recette paie : compte Reveal d'une vente en attente, comptes retirés et membres partis | exploitation | done | CRM-03, ADR 0076, ADR 0072 |
 | PIL-01 | « Mise en route » d'une créatrice et d'un membre, cochée par le serveur | exploitation | done | CRM-07 |
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
