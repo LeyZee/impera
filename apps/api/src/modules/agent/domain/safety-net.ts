@@ -229,15 +229,47 @@ function costumeOfAMinor(fanText: string): boolean {
  * fils »). Not « ma fille s'habille comme toi », « t'es belle comme ma fille », « j'ai une fille de ton âge ». Read on
  * `normaliseWords`.
  */
+const HIS_OWN_CHILD =
+  '(?:ma|mon|my|mia|mio|la mia|il mio|mi) (?:fille|fils|daughter|son|figlia|figlio|hija|hijo)';
 const LIKE_HIS_CHILD = new RegExp(
   '\\b(?:(?:habille|deguise|sape) toi|habillez vous|deguisez vous|joue|jouez|fais|faites|sois|soyez|' +
     'tu (?:t habilles|te deguises|te sapes|joues|fais|es|seras|serais)|' +
     'tu (?:veux|voudrais|peux|pourrais|vas|dois) (?:t habiller|te deguiser|jouer|faire|etre)|' +
     'dress(?: up)?|act|play|be|vestiti|travestiti|fai|sii|vistete|disfrazate|haz)' +
     '(?: (?:un peu|exactement|juste|just|exactly))? (?:comme|like|come|como) ' +
-    '(?:ma|mon|my|mia|mio|la mia|il mio|mi) (?:fille|fils|daughter|son|figlia|figlio|hija|hijo)\\b',
+    `${HIS_OWN_CHILD}\\b`,
   'u',
 );
+
+/**
+ * The direct forms of the same request, in French, English, Italian and Spanish (Sécurité, #1054): being his child
+ * (« sois ma fille ce soir », « be my daughter », « sii mia figlia », « sé mi hija »), pretending (« fais comme si
+ * t'étais ma fille », « pretend you're my daughter », « fai finta di essere mia figlia », « haz como si fueras mi
+ * hija »), playing the role (« tu peux jouer ma fille ? », « play my daughter », « fare mia figlia », « hacer de mi
+ * hija »), or wearing her clothes (« mets la robe de ma fille », « wear my daughter's dress », « mettiti il vestito
+ * di mia figlia », « ponte el vestido de mi hija »). Never what he does himself (« je mets la robe de ma fille au
+ * lavage »), nor « jouer avec ma fille ». Read on `normaliseWords`.
+ */
+const AS_HIS_CHILD = [
+  new RegExp(
+    `\\b(?:sois|soyez|tu seras|tu serais|be|sii|se|seas)(?: (?:juste|just|solo))? ${HIS_OWN_CHILD}\\b`,
+    'u',
+  ),
+  new RegExp(
+    `\\b(?:(?:fais|faites|faisons|on fait) comme si (?:t etais|tu etais|vous etiez|t es|tu es)|imagine (?:que )?(?:t es|tu es|t etais|tu etais)|` +
+      `pretend (?:to be|you re|you are|youre)|fai finta di essere|immagina di essere|(?:haz|hagamos) como si (?:fueras|eres)|imagina que eres) ${HIS_OWN_CHILD}\\b`,
+    'u',
+  ),
+  new RegExp(
+    `\\b(?:joue|jouer|jouez|joues|play|interpreta|interpretare|fai|fare|haz|hacer|juega|jugar)(?: (?:a|the role of|il ruolo di|el papel de|de))? ${HIS_OWN_CHILD}\\b(?! s\\b)`,
+    'u',
+  ),
+  new RegExp(
+    `(?<!\\b(?:je|j|i|io|yo|me) )\\b(?:mets|metez|porte|portez|enfile|wear|put on|mettiti|metti|indossa|ponte|pon|usa)\\b[^,;.!?]{0,30}\\b(?:de|di|of|del|della|dello) ${HIS_OWN_CHILD}\\b`,
+    'u',
+  ),
+  new RegExp(`(?<!\\b(?:i) )\\b(?:wear|put on)\\b[^,;.!?]{0,20}\\bmy (?:daughter|son) s\\b`, 'u'),
+];
 
 // His own child as the object of a sexual verb, or of his desire: the one case where his children count.
 const HIS_CHILD =
@@ -319,7 +351,9 @@ export function safetySigns(fanText: string, now: Date = new Date(), herLastTurn
   if (realMinorInRole && !signs.includes('minor_suspected')) signs.push('minor_suspected');
   if (realMinorInRole || minorFantasy(fanText)) signs.push('minor_fantasy');
   // Asked to be like his own child: a human reads it, without the age freeze (Sécurité, #1054).
-  if (LIKE_HIS_CHILD.test(normaliseWords(text))) signs.push('his_child_role');
+  const words = normaliseWords(text);
+  if (LIKE_HIS_CHILD.test(words) || AS_HIS_CHILD.some((pattern) => pattern.test(words)))
+    signs.push('his_child_role');
   // Set phrases are no distress (Sécurité, #1043): « mourir de rire », « me tuer au boulot », « crever de chaud »,
   // « crever tellement t'es belle ». Everything else still alerts.
   if (SELF_HARM.some((pattern) => pattern.test(text.replace(SET_PHRASES, ' ')))) signs.push('self_harm');

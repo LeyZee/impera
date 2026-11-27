@@ -224,6 +224,22 @@ describe('the doubt on his age, completed (Sécurité, #1054)', () => {
       'tu veux jouer comme ma fille',
       'dress like my daughter',
       'vestiti come mia figlia',
+      'sois ma fille ce soir',
+      'fais comme si t’étais ma fille',
+      'tu peux jouer ma fille ?',
+      'mets la robe de ma fille',
+      'be my daughter tonight',
+      'pretend you’re my daughter',
+      'can you play my daughter?',
+      'wear my daughter’s dress',
+      'sii mia figlia stasera',
+      'fai finta di essere mia figlia',
+      'puoi fare mia figlia?',
+      'mettiti il vestito di mia figlia',
+      'sé mi hija esta noche',
+      'haz como si fueras mi hija',
+      '¿puedes hacer de mi hija?',
+      'ponte el vestido de mi hija',
     ])
       expect(safetySigns(text), text).toEqual(['his_child_role']);
     for (const text of [
@@ -232,6 +248,10 @@ describe('the doubt on his age, completed (Sécurité, #1054)', () => {
       'j’ai une fille de ton âge',
       'habille-toi en rouge ce soir',
       'ma fille dort, mets ta robe noire',
+      'je mets la robe de ma fille au lavage',
+      'je vais jouer avec ma fille',
+      'i play my daughter’s favourite game',
+      'ma fille sera là ce soir',
     ])
       expect(safetySigns(text), text).toEqual([]);
   });
