@@ -1,5 +1,5 @@
 # SC-09 Séries proposées par l'IA
-Statut : todo (idée acceptée par Charles le 03/11/2026, 13 h 38 ; attend la clé xAI)
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo (idée acceptée par Charles le 03/11/2026, 13 h 38 ; attend la clé xAI)
 Phase : scripts (ADR 0056)
 Dépend de : SC-01 lot c2, clé xAI (`packages/llm`), persona active
 Branche : task/sc-09-ai-series-ideas

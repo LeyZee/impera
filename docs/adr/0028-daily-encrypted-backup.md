@@ -1,5 +1,13 @@
 # 0028. Export quotidien chiffré de la base, hors de Neon
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0029 · L'export garde les droits de la base, et s'outille sans binaire hors d'Alpine](0029-backup-export-tooling.md) : Remplace : dans l'ADR 0028, le drapeau `--no-privileges` du § 2, et au § 1 `rclone` et `supercronic`
+>
+> Toutes les décisions du même sujet : [`docs/regles/exploitation.md`](../regles/exploitation.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 27/10 17h27) ; § 1 outils et § 2 `--no-privileges` remplacés par l’ADR 0029 ; § 6 amendé par « ok 5 » de Charles le 21/11/2026 (fil de la grande recette) : l'essai de restauration ne bloque jamais la paie
 Date : 2026-10-27
 

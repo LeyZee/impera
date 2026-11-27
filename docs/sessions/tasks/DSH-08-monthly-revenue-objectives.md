@@ -1,5 +1,5 @@
 # DSH-08 Le Dashboard de l'agence suit les objectifs mensuels par créatrice
-Statut : in-progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in-progress
 Phase : pilotage
 Dépend de : DSH-07, ADR 0092 § 6
 Branche : claude/project-thread-v704ot
