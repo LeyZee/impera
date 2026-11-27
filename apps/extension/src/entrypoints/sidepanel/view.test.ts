@@ -10,6 +10,8 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { NextFan } from '../../lib/copilot/next';
+import type { Sold } from '../../lib/copilot/sold';
 import { standingOf, type Standing } from '../../lib/copilot/standing';
 
 import {
@@ -83,6 +85,8 @@ const onCard = (
     assist?: CopilotAssist | null;
     discoverOpen?: boolean;
     signalsOpen?: boolean;
+    sold?: Sold | null;
+    next?: NextFan | null;
   } = {},
 ): PanelScreen => ({
   kind: 'conversation',
@@ -98,6 +102,8 @@ const onCard = (
   assist: patch.assist ?? null,
   discoverOpen: patch.discoverOpen ?? false,
   signalsOpen: patch.signalsOpen ?? false,
+  sold: patch.sold ?? null,
+  next: patch.next ?? null,
   now: patch.now ?? now,
 });
 type PanelScreenStanding = Extract<PanelScreen, { kind: 'conversation' }>['standing'];
@@ -944,7 +950,11 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
   ] as const)('draws the gesture %s, and still without a draft waiting', (kind, label) => {
     const assist = base({ nextMove: { kind, label, priceMinor: null, block: null }, reasons: [] });
     for (const draft of [ready(), { kind: 'hidden' } as const]) {
-      const root = with_(assist, { draft });
+      // A plain « Répondre » is said only where no fire says his desire (maquette v4, cadre 1).
+      const root = with_(assist, {
+        draft,
+        standing: kind === 'reply' ? standingOf({}, null) : standingOf({}, 'hot'),
+      });
       expect(root.querySelector<HTMLElement>('.cp-move')?.dataset['move']).toBe(kind);
       expect(root.querySelector('.cp-move__what')?.textContent).toBe(label);
       expect(root.querySelector('.cp-move__why')).toBeNull();
@@ -1165,7 +1175,12 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
       standing: standingOf({ fragile: true, noExplicit: true }, 'hot'),
       signalsOpen: true,
     });
-    expect(badgeLabels(opened)).toEqual(['Fan fragile', 'Rien d’explicite', 'Relance due', 'Offre sans réponse']);
+    expect(badgeLabels(opened)).toEqual([
+      'Fan fragile',
+      'Rien d’explicite',
+      'Relance due',
+      'Offre sans réponse',
+    ]);
     // What forbids or holds back is never folded, even past three.
     const many = with_(lively, {
       standing: standingOf({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, 'hot'),
@@ -1232,12 +1247,39 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
     expect(one.querySelector('.cp-moment .cp-badges__more')).toBeNull();
   });
 
-  it.each([
-    ['good', [true, true, true], 'Bon moment'],
-    ['soon', [true, false, true], 'Bientôt · il manque le ton coquin'],
-  ] as const)("words the verdict %s from the panel's closed list", (verdict, met, text) => {
-    const root = drawn(assistOf({ saleMoment: moment(verdict, [...met]) }));
-    expect(root.querySelector('.cp-moment__text')?.textContent).toBe(text);
+  it("words the verdict soon from the panel's closed list", () => {
+    const root = drawn(assistOf({ saleMoment: moment('soon', [true, false, true]) }));
+    expect(root.querySelector('.cp-moment__text')?.textContent).toBe('Bientôt · il manque le ton coquin');
+  });
+
+  it('says a good moment as the title, with the step and its price, and why under it (maquette v4, 27/11)', () => {
+    const root = drawn(assistOf({ saleMoment: moment('good', [true, true, true]) }));
+    const move = root.querySelector<HTMLElement>('.cp-move');
+    expect(move?.dataset['tone']).toBe('good');
+    expect(move?.querySelector('.cp-move__what')?.textContent).toBe(
+      'C’est le moment\u00a0: «\u00a0Étape 3\u00a0» à 15\u00a0€',
+    );
+    expect(move?.querySelector('.cp-move__why')?.textContent).toBe('Désir chaud, étape 2 sur 4');
+    expect(root.querySelector('.cp-moment')).toBeNull();
+    expect(root.querySelector<HTMLElement>('.nv-heat')?.dataset['lit']).toBe('true');
+  });
+
+  it('lets the flame burn while the sparks of a sale fly, then rest', () => {
+    const sold = { amountMinor: 1_500, stepName: null, totalMinor: 6_000, seenAt: now.getTime() - 100 };
+    const money = { tier: null, spentMinor: 6_000, lastPurchaseAt: '2026-11-08T17:59:00Z' };
+    const flying = draw(
+      onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), money, sold }),
+    ).root;
+    expect(flying.querySelector<HTMLElement>('.nv-heat')?.dataset['lit']).toBe('true');
+    const later = draw(
+      onCard(card({}), [], {
+        draft: ready(),
+        standing: standingOf({}, 'hot'),
+        money,
+        sold: { ...sold, seenAt: now.getTime() - 4_000 },
+      }),
+    ).root;
+    expect(later.querySelector<HTMLElement>('.nv-heat')?.dataset['rest']).toBe('true');
   });
 
   it('says a block no condition says, so « Ne rien vendre » never goes without its reason', () => {
@@ -1346,6 +1388,73 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
 });
 
 // ADR 0168 § 9: a draft that is not in French comes with its French, read by the chatter and never sent.
+describe('a sale paid (maquette v4, cadre 9; Charles 27/11)', () => {
+  const sold = (seenAt: number, stepName: string | null = 'Étape 3'): Sold => ({
+    amountMinor: 1_500,
+    stepName,
+    totalMinor: 6_000,
+    seenAt,
+  });
+  const at = (screen: Parameters<typeof onCard>[2]): HTMLElement =>
+    draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot'), ...screen })).root;
+
+  it('says what was sold and what he spent in all, under the band, never a commission', () => {
+    const root = at({ sold: sold(now.getTime()) });
+    expect([...root.children].map((node) => node.className)).toEqual([
+      'cp-band',
+      'cp-sold',
+      'cp-draft',
+      'cp-tabs',
+      'cp-scroll',
+    ]);
+    expect(root.querySelector('.cp-sold')?.getAttribute('role')).toBe('status');
+    expect(root.querySelector('.cp-sold__title')?.textContent).toBe(
+      'Vendu\u00a0: «\u00a0Étape 3\u00a0», 15\u00a0€',
+    );
+    expect(root.querySelector('.cp-sold__why')?.textContent).toBe('Avec elle en tout\u00a0: 60\u00a0€');
+    expect(root.querySelector('.cp-sold')?.textContent).not.toMatch(/commission/iu);
+    expect(at({ sold: sold(now.getTime(), null) }).querySelector('.cp-sold__title')?.textContent).toBe(
+      'Vendu\u00a0: 15\u00a0€',
+    );
+  });
+
+  it('makes the sparks fly out of the flame only on the draw right after the sale, never again', () => {
+    expect(
+      at({ sold: sold(now.getTime() - 200) }).querySelectorAll('.nv-heat .nv-spark-dot').length,
+    ).toBeGreaterThan(8);
+    expect(at({ sold: sold(now.getTime() - 4_000) }).querySelector('.nv-sparks')).toBeNull();
+    expect(at({ sold: sold(now.getTime() - 4_000) }).querySelector('.cp-sold')).not.toBeNull();
+  });
+
+  it('is never celebrated under a cut', () => {
+    const root = at({
+      sold: sold(now.getTime()),
+      assist: assistOf({ cuts: ['sales_frozen'] }),
+      standing: standingOf({ salesFrozen: { reason: 'distress', since: now.toISOString() } }, 'hot'),
+    });
+    expect(root.querySelector('.cp-sold')).toBeNull();
+    expect(root.querySelector('.nv-sparks')).toBeNull();
+  });
+});
+
+describe('« Ensuite » at the foot (maquette v4, 27/11)', () => {
+  it('says who waits the longest, in amber, and how many behind him, at the very end of the panel', () => {
+    const root = draw(
+      onCard(card({}), [], { draft: ready(), next: { name: 'Marco_demo', waitingMinutes: 4, more: 1 } }),
+    ).root;
+    const foot = root.lastElementChild;
+    expect(foot?.className).toBe('cp-next');
+    expect(foot?.querySelector('.cp-next__name')?.textContent).toBe('Marco_demo');
+    expect(foot?.querySelector('.cp-next__wait')?.textContent).toBe('attend depuis 4\u00a0min');
+    expect(foot?.querySelector('.cp-next__more')?.textContent).toBe('+1');
+    expect(foot?.getAttribute('aria-label')).toBe('Ensuite : Marco_demo, attend depuis 4\u00a0min');
+  });
+
+  it('draws no foot when nobody waits past two minutes', () => {
+    expect(draw(onCard(card({}), [], { draft: ready() })).root.querySelector('.cp-next')).toBeNull();
+  });
+});
+
 describe('the French of a draft in another language', () => {
   const spanish = {
     bubbles: ['hola guapo 😘', '¿qué haces esta noche?'],

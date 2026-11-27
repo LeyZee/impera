@@ -13,6 +13,7 @@ import {
   type FanStanding,
   type RejectReason,
 } from '@impera/contracts';
+import { fireAt } from '@impera/design-system';
 
 import {
   CUT_LINES,
@@ -28,7 +29,6 @@ import {
   stepDots,
 } from '../../lib/copilot/assist';
 import { bandBadges, type Badge } from '../../lib/copilot/band';
-import { HEAT_MARK, heatOf, type Heat } from '../../lib/copilot/heat';
 import {
   entryOf,
   ESSENTIALS,
@@ -44,6 +44,9 @@ import {
   toDiscover,
   valueText,
 } from '../../lib/copilot/card';
+import { HEAT_MARK, heatOf, type Heat } from '../../lib/copilot/heat';
+import { waitWords, type NextFan } from '../../lib/copilot/next';
+import { SPARKS_WITHIN_MS, type Sold } from '../../lib/copilot/sold';
 import { REJECT_WORDS, withheldOf, type Standing, type Withheld } from '../../lib/copilot/standing';
 import type { VerdictSent } from '../../lib/copilot/verdict';
 import { h } from '../../lib/dom';
@@ -96,6 +99,10 @@ export type PanelScreen =
       readonly discoverOpen: boolean;
       /** The band past its first three badges (§ 14). */
       readonly signalsOpen: boolean;
+      /** A sale paid seen in the last seconds (maquette v4, cadre 9); null otherwise or from an older caller. */
+      readonly sold?: Sold | null;
+      /** « Ensuite »: who of hers waits the longest past two minutes; null when nobody does or it is not read. */
+      readonly next?: NextFan | null;
       readonly now: Date;
     };
 
@@ -563,6 +570,7 @@ function statusBand(
   money: FanStanding | null,
   now: Date,
   heat: Heat | null,
+  sparks = false,
 ): HTMLElement {
   const badges = h('div', { class: 'cp-badges', 'aria-label': 'Où on en est' });
   let calm = false;
@@ -612,7 +620,77 @@ function statusBand(
     { class: 'cp-band', 'data-halo': calm ? 'true' : undefined },
     who,
     badges,
-    heat === null ? null : heatRow(heat),
+    heat === null ? null : heatRow(heat, sparks),
+  );
+}
+
+/**
+ * « Ensuite », at the foot (maquette v4, 27/11): who waits the longest, in amber, and how many behind him. Information
+ * only: the chatter goes to him in Reveal himself.
+ */
+function nextFoot(next: NextFan): HTMLElement {
+  return h(
+    'footer',
+    { class: 'cp-next', 'aria-label': `Ensuite : ${next.name}, ${waitWords(next.waitingMinutes)}` },
+    h('span', { class: 'cp-next__label' }, 'Ensuite'),
+    h('span', { class: 'cp-next__name' }, next.name),
+    h('span', { class: 'cp-next__wait' }, waitWords(next.waitingMinutes)),
+    next.more === 0 ? null : h('span', { class: 'cp-next__more' }, `+${String(next.more)}`),
+  );
+}
+
+/** The flame's colour while the sparks fly: burning. */
+const SPARK_LEVEL = 90;
+
+/** A sheaf of sparks out of the flame, fanned upward (maquette v4, cadre 9): fixed ways, nothing from data. */
+const SPARK_WAYS: readonly (readonly [number, number, number, number])[] = Array.from(
+  { length: 16 },
+  (_, index) => {
+    const angle = -Math.PI / 2 + (index - 7.5) * 0.2;
+    const reach = 34 + ((index * 7) % 5) * 6;
+    return [
+      Math.round(Math.cos(angle) * reach),
+      Math.round(Math.sin(angle) * reach),
+      ((index * 3) % 5) * 0.05,
+      3 + ((index * 5) % 4),
+    ] as const;
+  },
+);
+
+function sparksOf(): HTMLElement {
+  return h(
+    'span',
+    { class: 'nv-sparks', 'aria-hidden': 'true' },
+    ...SPARK_WAYS.map(([dx, dy, delay, size]) =>
+      h('i', {
+        class: 'nv-spark-dot',
+        style: `--dx:${String(dx)}px;--dy:${String(dy)}px;--d:${String(delay)}s;--s:${String(size)}px`,
+      }),
+    ),
+  );
+}
+
+/**
+ * « Vendu », for a few seconds under the band (maquette v4, cadre 9): what was sold, then what he spent with her in all.
+ * In the colour of sale, never a commission, nothing to click.
+ */
+function soldLine(sold: Sold): HTMLElement {
+  return h(
+    'section',
+    { class: 'cp-sold', role: 'status' },
+    h(
+      'p',
+      { class: 'cp-sold__title' },
+      'Vendu\u00a0: ',
+      sold.stepName === null ? null : `«\u00a0${sold.stepName}\u00a0», `,
+      h('span', { class: 'nv-num' }, eurosOf(sold.amountMinor)),
+    ),
+    h(
+      'p',
+      { class: 'cp-sold__why' },
+      'Avec elle en tout\u00a0: ',
+      h('span', { class: 'nv-num' }, eurosOf(sold.totalMinor)),
+    ),
   );
 }
 
@@ -620,7 +698,9 @@ function statusBand(
  * His desire as fire, the whole width under his name (maquette v4, 27/11; design system `nv-heat`): the flame and the
  * word take the colour of the tip of the fill; the line is the moment to sell. Never a figure.
  */
-function heatRow(heat: Heat): HTMLElement {
+function heatRow(shown: Heat, sparks: boolean): HTMLElement {
+  // While the sparks fly the flame burns, then it calms to what it says (maquette v4, cadre 9).
+  const heat: Heat = sparks ? { ...shown, lit: true, rest: false, color: fireAt(SPARK_LEVEL) } : shown;
   return h(
     'div',
     {
@@ -638,6 +718,7 @@ function heatRow(heat: Heat): HTMLElement {
         .filter((part): part is string => part !== null)
         .join(';'),
     },
+    sparks ? sparksOf() : null,
     flame(),
     h(
       'span',
@@ -658,6 +739,7 @@ function moveBand(
   assist: CopilotAssist | null,
   cut: CopilotCut | null,
   band: DesireBand | null,
+  fire = false,
 ): HTMLElement | null {
   if (cut !== null) {
     const { text, tone } = CUT_LINES[cut];
@@ -673,8 +755,13 @@ function moveBand(
     sale: assist.sale,
     moment: assist.saleMoment?.verdict ?? null,
   });
-  // The moment to sell takes the place of « pourquoi » when the server says it (§ 4 bis): not one block more.
-  const moment = assist.saleMoment == null ? null : momentLine(assist.saleMoment, assist.nextMove);
+  // A plain « Répondre » says nothing the draft does not: with the fire on top saying his desire and what is missing,
+  // the core starts with the text (maquette v4, cadre 1).
+  if (fire && assist.nextMove.kind === 'reply' && why === null) return null;
+  // The moment to sell takes the place of « pourquoi » when the server says it (§ 4 bis): not one block more. When it
+  // is good, the title says it already; the line under it says why this step.
+  const moment =
+    assist.saleMoment == null || tone === 'good' ? null : momentLine(assist.saleMoment, assist.nextMove);
   return h(
     'section',
     { class: 'cp-move', 'data-tone': tone, 'data-move': assist.nextMove.kind, 'aria-label': 'Quoi faire' },
@@ -1528,6 +1615,8 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
   if (screen.kind === 'conversation') {
     const reading = readingOf(screen);
     const { cut, assist } = reading;
+    // A sale is never celebrated under a cut: the panel then says only the cut (§ 9).
+    const sold = cut === null ? (screen.sold ?? null) : null;
     // Under the core: the tabs, what he does not want, the open tab. With a long draft, the tab is what goes under the
     // fold, never the button.
     const under = lowerPart(screen, reading, actions);
@@ -1539,7 +1628,8 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
     // by the draft when its own line already says it, otherwise by the sentence in the gesture's place, and the draft
     // then adds no line. It never lets the sale gesture through.
     const draftSaysCut = cut !== null && sameAsDraft(cut, screen.draft, withheld);
-    const move = draftSaysCut ? null : moveBand(assist, cut, screen.standing?.band ?? null);
+    const heat = heatOf({ standing: screen.standing, money: screen.money, assist, cut, now: screen.now });
+    const move = draftSaysCut ? null : moveBand(assist, cut, screen.standing?.band ?? null, heat !== null);
     const stops: DraftStops = {
       withheld,
       stops: screen.standing?.stops ?? [],
@@ -1556,9 +1646,11 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       screen.signalsOpen,
       screen.money,
       screen.now,
-      heatOf({ standing: screen.standing, money: screen.money, assist, cut, now: screen.now }),
+      heat,
+      sold !== null && screen.now.getTime() - sold.seenAt < SPARKS_WITHIN_MS,
     );
-    const pinned = move === null ? [] : [move];
+    const pinned = [...(sold === null ? [] : [soldLine(sold)]), ...(move === null ? [] : [move])];
+    const foot = screen.next == null ? [] : [nextFoot(screen.next)];
     const key = draftKey(screen.draft, stops);
     const shown = root.querySelector(':scope > .cp-draft');
     if (shown !== null && drawnDrafts.get(shown) === key) {
@@ -1566,9 +1658,9 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       // its text and its caret while the rest is drawn again (recette du 16/11, EXT-01).
       for (const child of [...root.children]) if (child !== shown) child.remove();
       shown.before(band, ...pinned);
-      shown.after(...under);
+      shown.after(...under, ...foot);
       if (body !== undefined) body.scrollTop = kept;
-      for (const node of [band, ...under, ...pinned]) wire(node, actions);
+      for (const node of [band, ...under, ...pinned, ...foot]) wire(node, actions);
       refocus(root, focused);
       return;
     }
@@ -1586,7 +1678,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       )
         for (const node of [draft, ...pinned]) node.dataset['fresh'] = 'true';
     }
-    root.replaceChildren(band, ...pinned, ...(draft === null ? [] : [draft]), ...under);
+    root.replaceChildren(band, ...pinned, ...(draft === null ? [] : [draft]), ...under, ...foot);
     // The panel draws over itself, without scrolling back up (§ 10).
     if (body !== undefined) body.scrollTop = kept;
     const typed = root.querySelector<HTMLInputElement>('.cp-draft__note');

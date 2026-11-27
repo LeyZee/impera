@@ -1,0 +1,7 @@
+# 2026-11-27 — Copilote v4, lot 1 : le feu, le moment, la vente, « Ensuite » — done
+Fait : brique `nv-heat` du design system (flamme, piste du froid au brûlant, trait du moment de vendre, étincelles) avec les jetons `--nv-fire-*`, jamais rouges, et `fireAt` ; dans le panneau, son envie dite par le feu sous son nom (bande et verdict du code, aucun chiffre), au repos 48 h après un achat, absente sous un arrêt ou un âge contesté ; « C’est le moment : « étape » à X € » en titre quand le code le dit ; une vente payée vue entre deux lectures fait voler les étincelles une fois et dit « Vendu » quelques secondes (jamais de commission) ; pied « Ensuite » lu sur « À qui parler maintenant ». Maquette v4 validée par Charles le 27/11 (« ok maquette »), OK Design sur la maquette.
+Pas fait : lot 2 serveur (3 réponses, avis sur son message, langue du fan et ligne « réponds en anglais », champ « ce qu’elle lui a dit », traduction à la demande) ; total de la soirée du chatteur dans « Vendu » (pas de donnée côté panneau).
+Décisions : aucune nouvelle ; un « Répondre » sans raison n’est plus dit quand le feu est là (cadre 1 de la maquette).
+Découvertes : la fourchette de prix par étape du 20/11 n’a jamais été codée (prix fixe du script Reveal), carte posée à Charles par le fil Agent ; l’aide `apps/web/src/help/guides.ts` parle encore de « fourchette de la créatrice ».
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, tests extension ✓, tests design system ✓.

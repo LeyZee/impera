@@ -19,7 +19,11 @@ const assist = (patch: Partial<CopilotAssist> = {}): CopilotAssist =>
     ...patch,
   });
 
-const money = (lastPurchaseAt: string | null): FanStanding => ({ tier: null, spentMinor: 4_500, lastPurchaseAt });
+const money = (lastPurchaseAt: string | null): FanStanding => ({
+  tier: null,
+  spentMinor: 4_500,
+  lastPurchaseAt,
+});
 
 const input = (patch: Partial<HeatInput> = {}): HeatInput => ({
   standing: standingOf({}, 'hot'),

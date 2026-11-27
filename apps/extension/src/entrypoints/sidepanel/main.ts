@@ -10,9 +10,11 @@ import {
 } from '@impera/contracts';
 import { browser } from 'wxt/browser';
 
-import { readDraftView, readFanCard, readStanding, type CardRead } from '../../lib/copilot/api';
+import { readDraftView, readFanCard, readStanding, readToTalk, type CardRead } from '../../lib/copilot/api';
 import { newestOf } from '../../lib/copilot/card';
+import { nextFanOf, type NextFan } from '../../lib/copilot/next';
 import { openConversationOf } from '../../lib/copilot/open-conversation';
+import { SOLD_SHOWN_MS, soldBetween, type MoneySeen, type Sold } from '../../lib/copilot/sold';
 import { standingOf, withheldOf, type Standing } from '../../lib/copilot/standing';
 import { VerdictSentSchema, type FromPanel } from '../../lib/copilot/verdict';
 import { changedOrigin, DEFAULT_CRM_ADDRESS } from '../../lib/crm-address';
@@ -34,6 +36,8 @@ import { panelTabs, render, type DraftPart, type GestureDone, type PanelScreen, 
 const DRAFT_EVERY_MS = 5_000;
 const CARD_EVERY_MS = 30_000;
 const STANDING_EVERY_MS = 30_000;
+/** Who waits next (« Ensuite »): as often as where things stand with him. */
+const NEXT_EVERY_MS = 30_000;
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 
 function applyTheme(): void {
@@ -81,6 +85,13 @@ let discoverOpen = false;
 let signalsOpen = false;
 /** The French of a draft in another language, unfolded: kept for the whole shift, a chatter who needs it needs it on every draft. */
 let translationOpen = false;
+/** What he spent at the last read, to see a sale paid between two reads (maquette v4, cadre 9). */
+let moneySeen: MoneySeen | null = null;
+/** The last sale seen, said for a few seconds. */
+let sold: Sold | null = null;
+/** « Ensuite » (maquette v4): who of hers waits the longest past two minutes, read every 30 s. */
+let nextFan: NextFan | null = null;
+let nextReadAt = 0;
 let screen: PanelScreen = { kind: 'loading' };
 let drawn = '';
 /** Each read carries the turn it started on: a late answer for a conversation left since is dropped. */
@@ -336,6 +347,8 @@ function cardScreen(cardOn: boolean): PanelScreen {
     assist: view?.state === 'none' || view?.state === 'ready' ? (view.assist ?? null) : null,
     discoverOpen,
     signalsOpen,
+    sold: sold !== null && Date.now() - sold.seenAt < SOLD_SHOWN_MS ? sold : null,
+    next: nextFan,
     now: new Date(),
   };
 }
@@ -365,6 +378,8 @@ async function refresh(): Promise<void> {
     tab = 'essentials';
     discoverOpen = false;
     signalsOpen = false;
+    moneySeen = null;
+    sold = null;
   }
   if (conversationId === null) {
     show({ kind: 'no_conversation' });
@@ -380,14 +395,27 @@ async function refresh(): Promise<void> {
     show({ kind: 'unknown' });
     return;
   }
+  const offered = view?.state === 'none' || view?.state === 'ready' ? (view.assist?.sale ?? null) : null;
   view = read.view;
   const { creatorId, fanId, switches } = read.view.conversation;
+  const money = read.view.conversation.standing;
+  if (money !== null) {
+    const seen = { fanId, money };
+    sold = soldBetween(moneySeen, seen, offered, Date.now()) ?? sold;
+    moneySeen = seen;
+  }
   if (fan?.fanId !== fanId || fan.creatorId !== creatorId) {
     fan = { creatorId, fanId };
     card = null;
     standing = null;
     fanName = null;
     newSince = null;
+  }
+  if (Date.now() - nextReadAt >= NEXT_EVERY_MS) {
+    nextReadAt = Date.now();
+    const answer = await readToTalk(origin, creatorId);
+    if (mine !== turn) return;
+    nextFan = answer === null ? null : nextFanOf(answer, read.view.conversation.conversationId);
   }
   if (standing === null || Date.now() - standingReadAt >= STANDING_EVERY_MS) {
     const answer = await readStanding(origin, creatorId, read.view.conversation.conversationId, fanId);

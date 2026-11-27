@@ -69,7 +69,9 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
     // Not before the code says the moment is good, nor without a step to offer.
     expect(moveLines(offer, [], { band: 'hot', sale, moment: 'soon' }).tone).toBe('neutral');
     expect(moveLines(offer, [], { band: 'hot', sale: null, moment: 'good' }).what).toBe(offer.label);
-    expect(moveLines(move('reply', 'Répondre'), [], { band: 'hot', sale, moment: 'good' }).tone).toBe('neutral');
+    expect(moveLines(move('reply', 'Répondre'), [], { band: 'hot', sale, moment: 'good' }).tone).toBe(
+      'neutral',
+    );
   });
 
   // Design 16/11: the why of a proposal is the reason to propose, from what is known, no number invented.

@@ -240,7 +240,11 @@ export function icon(name: IconName, size = 18): SVGSVGElement {
  */
 export function flame(): SVGSVGElement {
   const svg = document.createElementNS(SVG, 'svg');
-  for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', 'aria-hidden': 'true', class: 'nv-flame' }))
+  for (const [key, value] of Object.entries({
+    viewBox: '0 0 24 24',
+    'aria-hidden': 'true',
+    class: 'nv-flame',
+  }))
     svg.setAttribute(key, value);
   for (const [cls, d] of [
     [

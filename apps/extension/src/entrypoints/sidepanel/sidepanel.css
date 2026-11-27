@@ -314,6 +314,60 @@ body {
 .cp-condition[data-met='true'] .cp-notch {
   background: var(--nv-trend-up);
 }
+/* « Ensuite » (maquette v4): who waits next, at the foot, on the plate; the wait in amber. */
+.cp-next {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-2) var(--cp-gutter);
+  border-top: 1px solid var(--nv-hairline);
+  background: var(--nv-plate);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cp-next__label {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+}
+.cp-next__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--nv-ink);
+}
+.cp-next__wait {
+  flex: 1;
+  white-space: nowrap;
+  color: var(--nv-warning);
+}
+.cp-next__more {
+  color: var(--nv-ink-muted);
+}
+/* A sale paid (maquette v4, cadre 9): a few seconds under the band, in the colour of sale (Design 27/11), rising in. */
+.cp-sold {
+  flex: none;
+  margin: var(--nv-space-1) var(--cp-gutter) 0;
+  padding: var(--nv-space-2) 10px;
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-sale) 16%, transparent);
+  animation: cp-rise var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.cp-sold__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  color: var(--nv-sale);
+}
+.cp-sold__why {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
 /* The moment to sell (maquette v4, 27/11): the step and its price as the title, on a soft plate of success, rising in. */
 .cp-move[data-tone='good'] {
   margin: var(--nv-space-1) var(--cp-gutter) 0;
@@ -337,6 +391,7 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .cp-sold,
   .cp-move[data-tone='good'] {
     animation: none;
   }

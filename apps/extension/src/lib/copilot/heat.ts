@@ -22,7 +22,7 @@ const REST = 30;
 const NUDGE = 5;
 
 /** The pause after a purchase (méthode : « pause 48 h après un achat »). */
-export const PAUSE_AFTER_PURCHASE_MS = 48 * 60 * 60 * 1000;
+const PAUSE_AFTER_PURCHASE_MS = 48 * 60 * 60 * 1000;
 
 export interface Heat {
   /** The fill, 0 to 100, for `--_w`: a place on the track, never shown as a number. */
