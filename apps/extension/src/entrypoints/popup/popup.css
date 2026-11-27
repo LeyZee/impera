@@ -517,6 +517,12 @@ body {
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-faint);
 }
+/* The way out a member cannot take alone, under the gesture he can (avis Design du 27/11). */
+.pp-sync__otherwise {
+  display: block;
+  margin-top: var(--nv-space-1);
+}
+
 .pp-hint--amber {
   color: var(--nv-warning);
 }

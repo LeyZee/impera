@@ -147,6 +147,12 @@ const configSchema = z
      * production (below); unset elsewhere, error reporting stays inert: no client, no network.
      */
     SENTRY_DSN: optionalValue,
+    /**
+     * The address a watcher outside the machine gives for the worker's pulse (OPS-22, deploy.md § 1.6): pinged at most
+     * once a minute after a heartbeat written in the database. A secret: whoever has it can ping in the worker's place.
+     * Unset, nothing leaves; in production it must be https.
+     */
+    WORKER_HEARTBEAT_URL: optionalValue,
   })
   .superRefine((config, context) => {
     // ADR 0075: never outside a developer's machine. Production refuses it, and so does any address that is not
@@ -242,6 +248,10 @@ const configSchema = z
   .refine((config) => config.SENTRY_DSN === undefined || sentryDsnOf(config.SENTRY_DSN) !== null, {
     message: 'SENTRY_DSN must be an https Sentry DSN, https://<key>@<host>/<project>',
     path: ['SENTRY_DSN'],
+  })
+  .refine((config) => config.WORKER_HEARTBEAT_URL === undefined || heartbeatUrlAllowed(config), {
+    message: 'WORKER_HEARTBEAT_URL must be a URL, https in production (OPS-22)',
+    path: ['WORKER_HEARTBEAT_URL'],
   })
   .refine((config) => config.NODE_ENV !== 'production' || config.SENTRY_DSN !== undefined, {
     message: 'SENTRY_DSN is required in production: its errors must reach Sentry (OPS-18)',
@@ -362,6 +372,19 @@ function sentryDsnOf(value: string): URL | null {
     /^\/(?:[^/]+\/)*\d+$/u.test(url.pathname)
     ? url
     : null;
+}
+
+/** The worker's pulse address (OPS-22): an http(s) URL without credentials, https in production. */
+function heartbeatUrlAllowed(config: {
+  readonly NODE_ENV: string;
+  readonly WORKER_HEARTBEAT_URL?: string | undefined;
+}): boolean {
+  const value = config.WORKER_HEARTBEAT_URL;
+  if (value === undefined || !URL.canParse(value)) return false;
+  const url = new URL(value);
+  if (url.username !== '' || url.password !== '') return false;
+  if (url.protocol === 'https:') return true;
+  return url.protocol === 'http:' && config.NODE_ENV !== 'production';
 }
 
 /** Where an endpoint points, as the store builds its URLs (`<endpoint>/<bucket>/<key>`). */
