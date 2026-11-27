@@ -25,6 +25,7 @@ import type {
   DropDescriber,
   DropStorage,
   IdeaContentRequest,
+  ReadyVideoLines,
   ScriptContentRequest,
   ScriptVersions,
 } from './domain/ports';
@@ -156,7 +157,7 @@ interface DescribedDrop extends DropOfMedium {
   readonly description: string;
 }
 
-export type { DropStorage, IdeaContentRequest, ScriptVersions } from './domain/ports';
+export type { DropStorage, IdeaContentRequest, ReadyVideoLines, ScriptVersions } from './domain/ports';
 /** @public Her drops and requests as the creator's game counts them (ADR 0107), for the composition root. */
 export { dropsForGameUnscoped, type DropsForGame } from './infra/db/game-reads';
 /** @public Her stock, her open scripts and what of her delivery arrived (ADR 0140 § 4 and § 25), for the week's job and reads. */
@@ -182,6 +183,11 @@ export interface ContentDropsDeps {
    * a model here.
    */
   readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
+  /**
+   * The owner's « Vidéos déjà tournées » (custom orders, ADR 0163 § 7): the types a video to sell takes at the drop.
+   * Without it, none is offered and no video to sell is dropped.
+   */
+  readonly readyVideos?: ReadyVideoLines;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
   /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
@@ -199,14 +205,14 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
   const summaries = createDrizzleScriptSummaryStore(deps.db);
   const thumbnails = createDrizzleThumbnailQueue(deps.db, deps.adminDb);
-  const agency = createDrizzleAgencyContentStore(deps.db);
+  const agency = createDrizzleAgencyContentStore(deps.db, deps.readyVideos);
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
     name: 'content-drops',
     routes: async (app) => {
       await app.register(
         createContentDropRoutes(
-          createDrizzleCreatorContentStore(deps.db),
+          createDrizzleCreatorContentStore(deps.db, deps.readyVideos),
           agency,
           storage,
           { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
@@ -218,7 +224,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       // Coffre Impera (ADR 0163): her stock by use, and her own review of her media.
       await app.register(
         createStockRoutes(
-          createDrizzleStockStore(deps.db),
+          createDrizzleStockStore(deps.db, deps.readyVideos),
           createDrizzleCreatorDescriptionReview(deps.db),
           storage,
           deps.requireRole,
@@ -321,7 +327,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
     },
     unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
-    reserved: createDrizzleReservedMedia(deps.db),
+    reserved: createDrizzleReservedMedia(deps.db, deps.readyVideos),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),
       last: (creatorId) => lastScriptRequest(deps.adminDb, creatorId),

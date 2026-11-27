@@ -1,0 +1,3 @@
+-- ADR 0163 § 7: a video to sell carries the type the owner named in « Vidéos déjà tournées », by its id, never its name.
+ALTER TABLE "content_drops" ADD COLUMN "ready_video_id" text;--> statement-breakpoint
+ALTER TABLE "content_drops" ADD CONSTRAINT "content_drops_ready_video_check" CHECK ("content_drops"."ready_video_id" is null or ("content_drops"."category" = 'sale_video' and "content_drops"."ready_video_id" ~ '^rv_[0-9a-f]{8}$'));

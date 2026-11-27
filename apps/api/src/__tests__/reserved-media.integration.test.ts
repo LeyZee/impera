@@ -15,6 +15,8 @@ import {
   type DropMediaDescription,
   type DropMediaKind,
   type FanId,
+  readyVideoPriceMinor,
+  type ReadyVideoLine,
   type ReservedMediaAsk,
 } from '@impera/contracts';
 import { schema, withAdmin } from '@impera/db';
@@ -69,13 +71,14 @@ describe('pickReservedMedia and recordReservedMediaSent', () => {
     category: DropCategory,
     kind: DropMediaKind,
     files: readonly Shown[],
+    readyVideoId: string | null = null,
   ) {
     const dropId = newId(ContentDropIdSchema);
     const media: string[] = [];
     await withAdmin(test.admin.db, async (tx) => {
       await tx
         .insert(schema.contentDrops)
-        .values({ id: dropId, creatorId, category, state: 'ready', createdBy: reviewer });
+        .values({ id: dropId, creatorId, category, state: 'ready', createdBy: reviewer, readyVideoId });
       for (const [position, shown] of files.entries()) {
         const mediaAssetId = randomUUID();
         const mime = kind === 'audio' ? 'audio/mpeg' : 'image/jpeg';
@@ -234,5 +237,62 @@ describe('pickReservedMedia and recordReservedMediaSent', () => {
       mediaAssetId: inesBeep[0],
       kind: 'audio',
     });
+  });
+
+  it('sells a video of a type still offered, never twice to a fan, at a price drawn in its range', async () => {
+    const lines: ReadyVideoLine[] = [
+      { id: 'rv_0000000a', label: 'Type A', offered: true, minMinor: 3000, maxMinor: 5000 },
+      { id: 'rv_0000000b', label: 'Type B', offered: false, minMinor: 3000, maxMinor: 5000 },
+    ];
+    const sales = createDrizzleReservedMedia(test.app.db, (creatorId) =>
+      Promise.resolve(creatorId === nora ? lines : []),
+    );
+    const offered = await drop(
+      nora,
+      'sale_video',
+      'video',
+      [
+        { intensity: 'explicit', validated: true },
+        { intensity: 'explicit', validated: true },
+      ],
+      'rv_0000000a',
+    );
+    await drop(nora, 'sale_video', 'video', [{ intensity: 'explicit', validated: true }], 'rv_0000000b');
+    await drop(nora, 'sale_video', 'video', [{ intensity: 'explicit', validated: false }], 'rv_0000000a');
+    const basile = { creatorId: nora, fanId: fans.basile.fanId };
+    const [first, second] = offered;
+    const line = lines[0];
+    if (first === undefined || second === undefined || line === undefined) throw new Error('fixture');
+    const picked = await sales.pickSaleVideo(basile);
+    expect(picked).toEqual({
+      mediaAssetId: first,
+      readyVideoId: 'rv_0000000a',
+      label: 'Type A',
+      priceMinor: readyVideoPriceMinor(line, first),
+    });
+    expect(picked?.priceMinor).toBeGreaterThanOrEqual(3000);
+    expect(picked?.priceMinor).toBeLessThanOrEqual(5000);
+    expect((picked?.priceMinor ?? 1) % 100).toBe(0);
+    // Sold to Basile by the agent: the next one is another video, then none.
+    const sold = async (mediaAssetId: string) =>
+      withAdmin(test.admin.db, (tx) =>
+        tx.insert(schema.mediaSends).values({
+          id: randomUUID(),
+          creatorId: nora,
+          mediaAssetId,
+          ...fans.basile,
+          priceMinor: 4000,
+          currency: 'EUR',
+          sentAt: new Date(),
+        }),
+      );
+    await sold(first);
+    expect((await sales.pickSaleVideo(basile))?.mediaAssetId).toBe(second);
+    await sold(second);
+    expect(await sales.pickSaleVideo(basile)).toBeNull();
+    expect((await sales.pickSaleVideo({ ...basile, fanId: fans.theo.fanId }))?.mediaAssetId).toBe(first);
+    // A video to sell is never a free medium of the AI's.
+    expect(await sent(first, 'theo')).toBe(false);
+    expect(await sales.pickSaleVideo({ creatorId: ines, fanId: fans.theo.fanId })).toBeNull();
   });
 });
