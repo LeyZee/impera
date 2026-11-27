@@ -19,6 +19,7 @@ import { followUpIdempotencyKey, followUpRetry } from '../../domain/rules';
 import { readProposedFacts } from '../facts';
 import { enqueueFollowUp, followUpJobKey } from '../follow-ups';
 import { appendEvent } from '../journal';
+import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
 
 import { DEFAULT_CAUSES, fanNotesOf, handoffDetail, HISTORY_LIMIT } from './respond';
 
@@ -111,11 +112,28 @@ export function createFollowUpJob({ uow, clock, fans, composer, followUps, reply
         await cancel(tx, conversation, stale ?? 'not_found');
         return null;
       }
-      return {
-        conversation,
-        history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
-      };
+      const history = await tx.messages.history(conversation.id, HISTORY_LIMIT);
+      const stats = await tx.messages.fanStats(conversation.fanId, clock.now());
+      // No follow-up to a time-waster (ADR 0135 § 10): it is up to him to come back.
+      const timeWaster = timeWasterWait({
+        now: clock.now(),
+        timeZone: DEFAULT_TIME_ZONE,
+        conversationId: conversation.id,
+        setting: stats.timeWaster,
+        flags: await tx.gate.fanFlags(conversation),
+        careOpen: conversation.careSince !== null,
+        firstMessageAt: stats.firstMessageAt,
+        spentMinor: Math.max(stats.spentMinor, stats.registerSpentMinor ?? 0),
+        lastPurchaseAt: stats.lastPurchaseAt,
+        unboughtRuns: await tx.scriptRuns.unbought(conversation.id),
+        stalledRuns: await tx.scriptRuns.stalled(conversation.id),
+        history,
+      });
+      if (timeWaster !== null) {
+        await cancel(tx, conversation, 'time_waster');
+        return null;
+      }
+      return { conversation, history, stats };
     });
     if (read === null || composer === undefined) return;
 

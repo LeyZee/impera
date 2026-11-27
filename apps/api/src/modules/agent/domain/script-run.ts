@@ -579,7 +579,8 @@ function nextInOpenRun(
     return { kind: 'none', reason: 'in_tension' };
   if (step.kind === 'paid') {
     // The cooldown is between two scripts, not between two steps of the same one: the staircase climbs in one session.
-    const decision = offerDecision({ ...input.offer, lastOfferAt: null });
+    // So is the pause after a purchase (ADR 0128 § 1): it stops a new script, never the next step of his.
+    const decision = offerDecision({ ...input.offer, lastOfferAt: null, lastPurchaseAt: null });
     if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   }
   return { kind: 'send_step', step };

@@ -23,6 +23,7 @@ import type { AlertSettings } from '../../domain/alerts';
 import { helpBubble } from '../../domain/care';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
+import { FRENCH_ONLY, NO_EMOJI_HINT } from '../compose';
 import {
   createDraftComposer,
   type AgentComposeInput,
@@ -33,6 +34,9 @@ import {
   type ScriptSource,
 } from '../draft-composer';
 import type { FanLimits } from '../fan-limits';
+
+/** Her languages where the test means French only, as `composeTurn` requires them said. */
+const FRENCH = { spokenLanguages: FRENCH_ONLY, languageExamples: {} };
 
 const PHOTO: MediaDescription = {
   vocabularyVersion: '1.0.0',
@@ -113,7 +117,7 @@ function composer(
   const draftComposer = createDraftComposer({
     onDroppedNotes: (event) => seen.dropped?.push(event),
     gateway: gateway(script, seen),
-    persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+    persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS, ...FRENCH },
     timeZoneOf: () => Promise.resolve('Europe/Paris'),
     voicePrompt: '1.2.0',
     ...(sight !== undefined && { sight }),
@@ -189,6 +193,7 @@ describe('createDraftComposer', () => {
         creatorName: 'Lina',
         personaSheet: 'fiche',
         guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
         voiceExamples: [
           { id: 'example-2', text: 'Hey toi' },
           { id: 'example-1', text: 'Coucou toi' },
@@ -328,6 +333,88 @@ describe('createDraftComposer', () => {
     expect(still.seen.voiceCalls).toBe(2);
   });
 
+  it('writes once more an answer whose emojis break her rules, then lets the second go (Charles 26/11)', async () => {
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] },
+      voiceAfter: { bubbles: ['Tranquille, et toi ? 😌'] },
+    });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Tranquille, et toi ? 😌'],
+    });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('ses emojis');
+
+    // Still misused once rewritten: it goes, nobody is called for it.
+    const still = composer({ voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('sends her bubbles in her form once the guards read them, her persona first (Charles 26/11)', async () => {
+    const { draftComposer } = composer({ voice: { bubbles: ['Ça te dit?', 'à demain.'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({ bubbles: ['Ça te dit?', 'à demain'] });
+
+    const french = await createDraftComposer({
+      gateway: gateway({ voice: { bubbles: ['ça te dit?', 'à demain.'] } }, { voiceCalls: 0, traces: [] }),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        ...FRENCH,
+        guardSettings: {
+          ...DEFAULT_GUARD_SETTINGS,
+          form: { capitalization: 'capital', stripFinalPeriod: false, markSpacing: 'space' },
+        },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(french).toMatchObject({ bubbles: ['Ça te dit ?', 'À demain.'] });
+  });
+
+  it('tells the voice up front to leave emojis out once her last answers all carried one (Charles 26/11)', async () => {
+    const at = (minute: number) => new Date(`2026-10-17T09:${String(minute).padStart(2, '0')}:00Z`);
+    const turns = (emojis: readonly string[]) => ({
+      ...INPUT,
+      history: [
+        ...emojis.flatMap((emoji, i) => [
+          { direction: 'inbound' as const, text: `message ${String(i)}`, at: at(40 + i * 2) },
+          {
+            direction: 'outbound' as const,
+            text: `réponse ${String(i)} ${emoji}`.trim(),
+            at: at(41 + i * 2),
+          },
+        ]),
+        ...INPUT.history,
+      ],
+    });
+    const due = composer();
+    await due.draftComposer.compose(turns(['😏', '🙈', '✨']));
+    expect(due.seen.voiceInputs?.[0]?.brief.toneHints).toContain(NO_EMOJI_HINT);
+
+    const notDue = composer();
+    await notDue.draftComposer.compose(turns(['😏', '', '✨']));
+    expect(notDue.seen.voiceInputs?.[0]?.brief.toneHints).not.toContain(NO_EMOJI_HINT);
+  });
+
+  it('never sends a word she keeps for close fans while his tier cannot be computed (Charles 26/11)', async () => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draft = await createDraftComposer({
+      gateway: gateway({ voice: { bubbles: ['Bonne nuit mon coeur'] } }, seen),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        ...FRENCH,
+        guardSettings: { ...DEFAULT_GUARD_SETTINGS, closeOnlyWords: [{ words: ['mon cœur'], minTier: 2 }] },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(draft).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('garde pour ses proches');
+  });
+
   it('drops a hollow bubble, and writes again an answer left with none (passe 2, conversation 37)', async () => {
     const dotted = composer({ voice: { bubbles: ['Trop fière de toi', '.'] } });
     expect(await dotted.draftComposer.compose(INPUT)).toMatchObject({
@@ -445,6 +532,39 @@ describe('createDraftComposer', () => {
     );
   });
 
+  it('writes one short bubble, busy and kind, to a time-waster (ADR 0135 § 7, Charles 26/11)', async () => {
+    const slowed = composer({ brief: BRIEF });
+    await slowed.draftComposer.compose({ ...INPUT, timeWaster: 'slowed' });
+    const hints = slowed.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('très sollicitée'))).toBe(true);
+    expect(slowed.seen.voiceInputs?.[0]?.maxBubbles).toBe(1);
+
+    const usual = composer({ brief: BRIEF });
+    await usual.draftComposer.compose(INPUT);
+    expect(usual.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('sollicitée'))).toBe(
+      false,
+    );
+  });
+
+  it('is closer with those who count: girlfriend with a whale, close with a very good payer (ADR 0132, Charles 26/11)', async () => {
+    const hintsFor = async (tier: 'whale' | 'very_good' | 'good' | null) => {
+      const run = composer({ brief: BRIEF });
+      await run.draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, spentMinor: 2_000, tier } });
+      return run.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    };
+    const whale = await hintsFor('whale');
+    expect(whale.some((hint) => hint.includes('petite amie complice'))).toBe(true);
+    const veryGood = await hintsFor('very_good');
+    expect(veryGood.some((hint) => hint.includes('il compte pour elle'))).toBe(true);
+    expect(veryGood.some((hint) => hint.includes('petite amie'))).toBe(false);
+    for (const tier of ['good', null] as const) {
+      const hints = await hintsFor(tier);
+      expect(hints.some((hint) => hint.includes('petite amie') || hint.includes('il compte pour elle'))).toBe(
+        false,
+      );
+    }
+  });
+
   it('answers by rule his asking if she is an AI, his love, his partner, his proof and his photo (Charles 21/11)', async () => {
     const hintsFor = async (brief: Brief, input: AgentComposeInput = INPUT) => {
       const { draftComposer, seen } = composer({ brief });
@@ -508,7 +628,12 @@ describe('createDraftComposer', () => {
     const asked: string[] = [];
     const draftComposer = createDraftComposer({
       gateway: gateway({}, { voiceCalls: 0, traces: [] }),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: (creatorId) => {
         asked.push(creatorId);
         return Promise.resolve('America/Montreal');
@@ -951,7 +1076,12 @@ describe('createDraftComposer, her alerts (P4-01)', () => {
     const { alerts, chatter } = options;
     const draftComposer = createDraftComposer({
       gateway: gateway(options.script ?? {}, seen),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       alertKeywords: keywords,
@@ -2029,7 +2159,12 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     const notSaved: { conversationId: string; limit: string }[] = [];
     const draftComposer = createDraftComposer({
       gateway: gateway({ brief: AGE }, { voiceCalls: 0, traces: [] }),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       limits: limitsOf({}, { failWrite: true }).limits,
@@ -2285,6 +2420,7 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
       creatorName: 'Nora',
       personaSheet: 'fiche active de Nora',
       guardSettings: DEFAULT_GUARD_SETTINGS,
+      ...FRENCH,
     },
     followUpSpirit: null,
     offerLimits: { cooldownHours: 10, minDesire: 70 },
@@ -2298,7 +2434,12 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     const draftComposer = createDraftComposer({
       gateway: gateway({}, seen),
       // The fixed persona is never read once hers is: a test that sees « Lina » fails.
-      persona: { creatorName: 'Lina', personaSheet: 'fiche fixe', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche fixe',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       ...(personaOf !== undefined && {
         personaOf: (creatorId, now) => {
           asked.push(creatorId);
@@ -2541,7 +2682,12 @@ describe('createDraftComposer, his custom order kept box by box (ADR 0159 § A.2
         },
         seen,
       ),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       limits: limitsOf(options.flags ?? adult).limits,
@@ -2668,6 +2814,7 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
           ...DEFAULT_GUARD_SETTINGS,
           ...(options.neverDo !== undefined && { neverDo: options.neverDo }),
         },
+        ...FRENCH,
       },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
@@ -2769,7 +2916,12 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       gateway: gateway({ brief: { ...BRIEF, intent: 'price_objection', objection: 'too_expensive' } }, seen),
       personaOf: () =>
         Promise.resolve({
-          persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+          persona: {
+            creatorName: 'Lina',
+            personaSheet: 'fiche',
+            guardSettings: DEFAULT_GUARD_SETTINGS,
+            ...FRENCH,
+          },
           followUpSpirit: null,
           offerLimits: { cooldownHours: 10, minDesire: 70 },
           sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
@@ -2798,7 +2950,12 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
         gateway: gateway({ brief: { ...BRIEF, intent: 'small_talk' } }, seen),
         personaOf: () =>
           Promise.resolve({
-            persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+            persona: {
+              creatorName: 'Lina',
+              personaSheet: 'fiche',
+              guardSettings: DEFAULT_GUARD_SETTINGS,
+              ...FRENCH,
+            },
             followUpSpirit: null,
             offerLimits: { cooldownHours: 10, minDesire: 70 },
             sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },

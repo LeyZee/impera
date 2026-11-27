@@ -41,6 +41,7 @@ import {
   type ComposedTurn,
   guardSettingsOf,
   holdDecision,
+  languagesOf,
   measureDesire,
   readPersonaFile,
   UNKNOWN_AVAILABILITY,
@@ -334,6 +335,8 @@ async function runTurn(
       ...(scenario.profile_bio !== undefined && { profileBio: scenario.profile_bio }),
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
+      // Her languages as the real path reads them (`composerFields`): without them, l1-l3 failed in French only.
+      ...languagesOf(persona),
     },
     {
       history,
