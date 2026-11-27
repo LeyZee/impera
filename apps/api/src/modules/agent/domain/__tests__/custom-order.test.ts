@@ -1,12 +1,15 @@
+import type { CustomOrderReading } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
   checkNoCommitment,
+  CUSTOM_ORDER_ASK_BRIEF,
   CUSTOM_ORDER_DECLINE_BRIEF,
   CUSTOM_ORDER_OPEN_BRIEF,
   CUSTOM_ORDER_WAIT_BRIEF,
   customOrderDecision,
   customOrderStop,
+  saysWhatHeWants,
   type CustomOrderContext,
 } from '../custom-order';
 
@@ -16,6 +19,7 @@ const asks: CustomOrderContext = {
   orderOpen: false,
   risks: [],
   flags: { ageConfirmedAt: '2026-10-01T10:00:00Z' },
+  saysWhatHeWants: true,
 };
 
 describe('customOrderDecision (ADR 0090 § A)', () => {
@@ -77,9 +81,72 @@ describe('customOrderDecision (ADR 0090 § A)', () => {
   });
 
   it('keeps every brief free of a yes, a price or a delay', () => {
-    for (const brief of [CUSTOM_ORDER_WAIT_BRIEF, CUSTOM_ORDER_OPEN_BRIEF, CUSTOM_ORDER_DECLINE_BRIEF]) {
+    for (const brief of [
+      CUSTOM_ORDER_WAIT_BRIEF,
+      CUSTOM_ORDER_OPEN_BRIEF,
+      CUSTOM_ORDER_DECLINE_BRIEF,
+      CUSTOM_ORDER_ASK_BRIEF,
+    ]) {
       expect(brief).toContain('sans rien promettre');
     }
+  });
+});
+
+describe('modalities before the order (Charles 27/11)', () => {
+  const vague = { ...asks, saysWhatHeWants: false };
+
+  it('with nobody on shift, asks what he imagines before noting anything; a chatter on shift talks it himself', () => {
+    expect(customOrderDecision(vague)).toEqual({
+      kind: 'reply',
+      brief: CUSTOM_ORDER_ASK_BRIEF,
+      opens: false,
+    });
+    expect(customOrderDecision({ ...vague, chatterOnShift: true })).toEqual({ kind: 'handoff' });
+  });
+
+  it('a fan who never bought anything and asks for a cam himself is never refused', () => {
+    // Nothing of his purchases enters the decision: the custom path, not a refusal.
+    expect(customOrderDecision(vague)).toMatchObject({ brief: CUSTOM_ORDER_ASK_BRIEF });
+    expect(customOrderDecision(asks)).toEqual({ kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: true });
+  });
+
+  it('« pas d’argent » is no decline; real money trouble still is', () => {
+    expect(customOrderDecision({ ...vague, risks: ['no_budget'] })).toMatchObject({
+      brief: CUSTOM_ORDER_ASK_BRIEF,
+    });
+    expect(customOrderDecision({ ...vague, risks: ['money_trouble'] })).toMatchObject({
+      brief: CUSTOM_ORDER_DECLINE_BRIEF,
+    });
+  });
+
+  it('weakens no decline nor hold: they come before the modalities', () => {
+    const declined = { kind: 'reply', brief: CUSTOM_ORDER_DECLINE_BRIEF, opens: false };
+    expect(customOrderDecision({ ...vague, flags: { doNotContact: true } })).toEqual(declined);
+    expect(
+      customOrderDecision({
+        ...vague,
+        flags: { salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00Z' } },
+      }),
+    ).toEqual(declined);
+    expect(customOrderDecision({ ...vague, neverDoes: true })).toEqual(declined);
+    expect(customOrderDecision({ ...vague, ageConfirmed: false })).toMatchObject({
+      brief: CUSTOM_ORDER_WAIT_BRIEF,
+      opens: false,
+    });
+  });
+
+  it('reads what he wants from the brain’s boxes: the kind, and for a photo, a video or an intimate cam, a detail', () => {
+    const reading: CustomOrderReading = { format: null, supplements: [], minutes: null, details: {} };
+    expect(saysWhatHeWants(undefined)).toBe(false);
+    expect(saysWhatHeWants(reading)).toBe(false);
+    expect(saysWhatHeWants({ ...reading, format: 'video_call_talk' })).toBe(true);
+    expect(saysWhatHeWants({ ...reading, format: 'call' })).toBe(true);
+    expect(saysWhatHeWants({ ...reading, format: 'video_call_sexual' })).toBe(false);
+    expect(saysWhatHeWants({ ...reading, format: 'video' })).toBe(false);
+    expect(saysWhatHeWants({ ...reading, format: 'video', details: { name_to_say: 'Léo' } })).toBe(true);
+    expect(
+      saysWhatHeWants({ ...reading, format: 'video_call_sexual', details: { what: 'en lingerie' } }),
+    ).toBe(true);
   });
 });
 
