@@ -1,4 +1,4 @@
-import type { KycSlot, Language } from '@impera/contracts';
+import type { AgencyStyleContent, KycSlot, Language } from '@impera/contracts';
 import { loadPrompt, type LlmGateway } from '@impera/llm';
 
 import type { FansModule } from '../fans';
@@ -16,7 +16,7 @@ import {
   type ScriptSource,
 } from './infra/draft-composer';
 import { createFanLimits } from './infra/fan-limits';
-import { guardSettingsOf, type PersonaForModels } from './infra/persona-file';
+import { guardSettingsOf, languagesOf, type PersonaForModels } from './infra/persona-file';
 
 /** Public entry point of the `agent` module (ADR 0002). Other modules import this file only. */
 export {
@@ -28,6 +28,14 @@ export {
 } from './domain/guards';
 /** @public The one reading of a persona's limits, for `scripts` too (SC-02, ADR 0056 § 1): whole words, plurals folded. */
 export { touchesTerm } from './domain/guards';
+/** @public The emoji rule (Charles 26/11), pure, for another surface of hers (her public replies): the chat's own reading. */
+export {
+  checkEmojiUse,
+  DEFAULT_EMOJI_STREAK_MAX,
+  emojisIn,
+  type EmojiUse,
+  type EmojiViolation,
+} from './domain/emojis';
 export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision, type HoldDecision } from './domain/hold';
@@ -93,13 +101,20 @@ export { CalibrationRecordSchema, createJsonlCalibrationStore } from './infra/js
 export {
   asSent,
   composeTurn,
+  FRENCH_ONLY,
   guardContextOf,
   withExamples,
   type ComposedTurn,
   type OfferInput,
   type ScriptsInput,
 } from './infra/compose';
-export { guardSettingsOf, readPersonaFile, type PersonaForModels } from './infra/persona-file';
+export {
+  guardSettingsOf,
+  languagesOf,
+  readPersonaFile,
+  type PersonaForModels,
+  type PersonaLanguages,
+} from './infra/persona-file';
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 /** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
@@ -177,6 +192,34 @@ export interface DraftComposerStartOptions {
   readonly voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
   /** Her bank could not be read: she wrote from her sheet alone, the log says so. */
   readonly onExamplesUnread?: (event: { readonly creatorId: string }) => void;
+  /**
+   * The agency's active base style (ADR 0173, `persona` module), read at each draft: its texts before her sheet, its
+   * form under hers. `null`: none. A failed read writes without it, never stops the draft.
+   */
+  readonly baseStyleOf?: BaseStyleSource;
+}
+
+/** Reads the agency's active base style (ADR 0173); `null` without one. */
+export type BaseStyleSource = () => Promise<AgencyStyleContent | null>;
+
+/** The active base style, or none when there is none or it cannot be read: a draft never waits on it. */
+async function baseStyleOrNone(source: BaseStyleSource | undefined): Promise<AgencyStyleContent | null> {
+  if (source === undefined) return null;
+  try {
+    return await source();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @public The public part of the agency's base style (ADR 0173), for her public replies (Instagram comments): trimmed, `null`
+ * when empty, absent or unreadable. The private part never leaves the chat.
+ */
+export async function publicBaseStyleOf(source: BaseStyleSource): Promise<string | null> {
+  const style = await baseStyleOrNone(source);
+  const text = style?.publicStyle.trim() ?? '';
+  return text === '' ? null : text;
 }
 
 /**
@@ -187,8 +230,10 @@ function composerFields(
   persona: PersonaForModels,
   bank: readonly VoiceExample[],
   profileBio: string | null = null,
+  baseStyle: AgencyStyleContent | null = null,
 ): ComposerPersonaFields {
-  const guardSettings = guardSettingsOf(persona);
+  // Her persona's form first, then the base style's, then the code's (ADR 0173).
+  const guardSettings = guardSettingsOf(persona, baseStyle?.form);
   // Each turn takes the twelve this fan may read among them (`examplesForTurn`): his age decides the explicit ones.
   const examples = pickVoiceExamples(bank, guardSettings, bank.length);
   return {
@@ -198,9 +243,11 @@ function composerFields(
       guardSettings,
       splitMessages: persona.splitMessages,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
+      ...(baseStyle !== null && {
+        agencyStyle: { publicStyle: baseStyle.publicStyle, privateStyle: baseStyle.privateStyle },
+      }),
       ...(examples.length > 0 && { voiceExamples: examples }),
-      ...(persona.spokenLanguages !== undefined && { spokenLanguages: persona.spokenLanguages }),
-      ...(persona.languageExamples !== undefined && { languageExamples: persona.languageExamples }),
+      ...languagesOf(persona),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -237,7 +284,13 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
       const persona = await activePersonaForModels(options.activePersona, creatorId, now);
       if (persona === null) return null;
       const profileBio = await (options.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
-      return composerFields(persona, await bankOf(options, creatorId, persona.versionId), profileBio);
+      const baseStyle = await baseStyleOrNone(options.baseStyleOf);
+      return composerFields(
+        persona,
+        await bankOf(options, creatorId, persona.versionId),
+        profileBio,
+        baseStyle,
+      );
     },
     timeZoneOf: options.timeZoneOf,
     voicePrompt: loadPrompt('voice').header.version,

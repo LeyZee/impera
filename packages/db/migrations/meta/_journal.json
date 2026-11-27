@@ -1454,7 +1454,21 @@
     {
       "idx": 207,
       "version": "7",
-      "when": 1795740837336,
+      "when": 1795738731611,
+      "tag": "0276_agency_styles",
+      "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1795743200515,
+      "tag": "0277_notification_kinds_and_uncovered_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
+      "when": 1795744834642,
       "tag": "0283_payout_destinations",
       "breakpoints": true
     }
