@@ -216,10 +216,23 @@ describe('the doubt on his age, completed (Sécurité, #1054)', () => {
       expect(safetySigns(text), text).not.toContain('minor_fantasy');
   });
 
-  it('hands « habille-toi comme ma fille » to a human, without reading a fantasy in it', () => {
-    for (const text of ['habille-toi comme ma fille', 'mets la robe de ma fille'])
-      expect(safetySigns(text), text).toEqual(['minor_suspected']);
-    for (const text of ['habille-toi en rouge ce soir', 'ma fille dort, mets ta robe noire'])
+  it('hands a request to be like his own child to a human, without the age freeze (Sécurité, #1054)', () => {
+    for (const text of [
+      'habille-toi comme ma fille',
+      'tu te déguises comme mon fils ?',
+      'sois comme ma fille ce soir',
+      'tu veux jouer comme ma fille',
+      'dress like my daughter',
+      'vestiti come mia figlia',
+    ])
+      expect(safetySigns(text), text).toEqual(['his_child_role']);
+    for (const text of [
+      'ma fille s’habille comme toi',
+      't’es belle comme ma fille',
+      'j’ai une fille de ton âge',
+      'habille-toi en rouge ce soir',
+      'ma fille dort, mets ta robe noire',
+    ])
       expect(safetySigns(text), text).toEqual([]);
   });
 

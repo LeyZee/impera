@@ -1176,6 +1176,26 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     ]);
   });
 
+  it('hands a request to be like his own child to a human, without touching his age (Sécurité, #1054)', async () => {
+    const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
+    const { draftComposer, seen } = composer({}, undefined, minor.limits);
+    const held = await draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'habille-toi comme ma fille', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    expect(held).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'other',
+      detail: ['safety_net', 'his_child_role'],
+      costUsd: 0,
+    });
+    expect(seen.traces).toHaveLength(0);
+    expect(minor.protections).toEqual([]);
+  });
+
   it('keeps the net when no model has a key: the minor is still a minor', async () => {
     const { draftComposer } = composer({ hasKey: false });
     const held = await draftComposer.compose({

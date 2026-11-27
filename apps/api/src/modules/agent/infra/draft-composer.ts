@@ -1101,6 +1101,9 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
       }
+      // Asked to be like his own child (Sécurité, #1054): a human takes it, his limits untouched.
+      if (signs.includes('his_child_role'))
+        return { ...HANDOFF, cause: 'other', detail: ['safety_net', ...signs] };
       // His card gives an age under 18 (recette AGE-13): the same, until a human corrects it.
       if (input.fan.cardAge !== undefined && input.fan.cardAge < ADULT_AGE) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['card_age', 'minor_suspected'] };

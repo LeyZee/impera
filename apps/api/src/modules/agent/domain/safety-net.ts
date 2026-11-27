@@ -8,9 +8,10 @@ import { checkExplicit, withoutProcreation } from './guards';
  * reads the risks it alone can see; this net only catches what is written plainly, so that a model's miss never
  * leaves the bot chatting with a minor or a fan in danger. A false alarm costs one handoff to a chatter. A fantasy of
  * his that puts a child or a minor in a sexual act (`minor_fantasy`, Charles 26/11 at 23:45) is read the same way and
- * has the same effect as a doubt on his age.
+ * has the same effect as a doubt on his age. Asked to be like his own child (`his_child_role`, Sécurité, #1054), a
+ * human takes the conversation, without the age freeze.
  */
-export type SafetySign = 'minor_suspected' | 'minor_fantasy' | 'self_harm';
+export type SafetySign = 'minor_suspected' | 'minor_fantasy' | 'his_child_role' | 'self_harm';
 
 // An age under 18, in digits or in words: « 16 », « seize », « dix-sept ».
 const UNDER_18 = '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?)';
@@ -222,16 +223,21 @@ function costumeOfAMinor(fanText: string): boolean {
 
 // His own child in an outfit he asks of her (Sécurité, #1054): « habille-toi comme ma fille ». A human takes over
 // (`minor_suspected`); no fantasy is read in it.
-const OUTFIT_ASKED =
-  /\b(?:habille toi|habille|deguise toi|deguise|mets|porte|enfile|sape toi|dress|wear|put on|vestiti|mettiti|vistete|ponte)\b/u;
-
-/** He asks her to dress like his own child, in one clause. */
-function dressedAsHisChild(fanText: string): boolean {
-  return normalise(fanText)
-    .split(/[,;:.!?\n]+/u)
-    .map((sentence) => normaliseWords(sentence))
-    .some((sentence) => OUTFIT_ASKED.test(sentence) && new RegExp(`\\b${HIS_CHILD}\\b`, 'u').test(sentence));
-}
+/**
+ * A request to her to be like his own child (Sécurité, #1054): an imperative, or « tu », with dressing up, playing,
+ * doing or being, then « comme ma fille / mon fils » (« habille-toi comme ma fille », « tu te déguises comme mon
+ * fils »). Not « ma fille s'habille comme toi », « t'es belle comme ma fille », « j'ai une fille de ton âge ». Read on
+ * `normaliseWords`.
+ */
+const LIKE_HIS_CHILD = new RegExp(
+  '\\b(?:(?:habille|deguise|sape) toi|habillez vous|deguisez vous|joue|jouez|fais|faites|sois|soyez|' +
+    'tu (?:t habilles|te deguises|te sapes|joues|fais|es|seras|serais)|' +
+    'tu (?:veux|voudrais|peux|pourrais|vas|dois) (?:t habiller|te deguiser|jouer|faire|etre)|' +
+    'dress(?: up)?|act|play|be|vestiti|travestiti|fai|sii|vistete|disfrazate|haz)' +
+    '(?: (?:un peu|exactement|juste|just|exactly))? (?:comme|like|come|como) ' +
+    '(?:ma|mon|my|mia|mio|la mia|il mio|mi) (?:fille|fils|daughter|son|figlia|figlio|hija|hijo)\\b',
+  'u',
+);
 
 // His own child as the object of a sexual verb, or of his desire: the one case where his children count.
 const HIS_CHILD =
@@ -310,9 +316,10 @@ export function safetySigns(fanText: string, now: Date = new Date(), herLastTurn
   )
     signs.push('minor_suspected');
   const realMinorInRole = costumeOfAMinor(fanText);
-  if ((realMinorInRole || dressedAsHisChild(fanText)) && !signs.includes('minor_suspected'))
-    signs.push('minor_suspected');
+  if (realMinorInRole && !signs.includes('minor_suspected')) signs.push('minor_suspected');
   if (realMinorInRole || minorFantasy(fanText)) signs.push('minor_fantasy');
+  // Asked to be like his own child: a human reads it, without the age freeze (Sécurité, #1054).
+  if (LIKE_HIS_CHILD.test(normaliseWords(text))) signs.push('his_child_role');
   // Set phrases are no distress (Sécurité, #1043): « mourir de rire », « me tuer au boulot », « crever de chaud »,
   // « crever tellement t'es belle ». Everything else still alerts.
   if (SELF_HARM.some((pattern) => pattern.test(text.replace(SET_PHRASES, ' ')))) signs.push('self_harm');
