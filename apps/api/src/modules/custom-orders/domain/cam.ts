@@ -10,7 +10,7 @@ export const CAM_NOTICE_MINUTES = 15;
 /** Between two cams, the time to breathe: a booked cam holds this much more on each side. */
 export const CAM_MARGIN_MINUTES = 15;
 /** A cam that can start within this is « tout de suite » for the fan; later, it is another slot. */
-export const CAM_SOON_MINUTES = 60;
+const CAM_SOON_MINUTES = 60;
 /** How many of her absences in a row the search steps over before it gives up. */
 const CAM_ABSENCE_STEPS = 8;
 

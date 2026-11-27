@@ -20,9 +20,8 @@ import { createCustomPriceGridReader, createDrizzleCustomPriceGridStore } from '
 import { createDrizzleCustomOrderStore, type CustomOrderStore } from './infra/db/order-store';
 import { createCustomOrderRoutes, createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
 
-/** @public A cam's slot as the code proposes it, and where her cams are looked for. */
+/** @public A cam's slot as the code proposes it. */
 export type { CamSlot } from './domain/cam';
-export type { CamAgenda } from './infra/db/agency-store';
 /** @public His orders for the agent's turn: read and written in the turn's own transaction, under her RLS. */
 export type { CustomOrderRecord, CustomOrderStore } from './infra/db/order-store';
 

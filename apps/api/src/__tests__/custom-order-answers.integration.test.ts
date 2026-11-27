@@ -70,6 +70,13 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     details: { what: 'test', when: 'test' },
   };
 
+  const CAM: CustomOrderReading = {
+    format: 'video_call_talk',
+    supplements: [],
+    minutes: 30,
+    details: { duration: 'test', availability: 'test' },
+  };
+
   /** The agent's turn opens his order and sends her the card (a video unless said, every essential box filled). */
   async function cardReady(reading: CustomOrderReading = VIDEO): Promise<string> {
     counter += 1;
@@ -215,6 +222,32 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     expect(all.orders.find((one) => one.id === id)?.state).toBe('delivered');
   });
 
+  it('never books a cam in another creator’s dispo cam (ADR 0159 § 5)', async () => {
+    const [someone] = await test.admin.db.select({ id: schema.user.id }).from(schema.user).limit(1);
+    if (someone === undefined) throw new Error('no user');
+    const hour = 3_600_000;
+    const opens = new Date(Math.ceil((Date.now() + 2 * hour) / hour) * hour);
+    // Ines opens a dispo cam; Nora has none.
+    await test.admin.db.insert(schema.creatorAvailabilities).values({
+      id: newId(AvailabilityIdSchema),
+      creatorId: ines,
+      kind: 'once',
+      startsAt: opens,
+      endsAt: new Date(opens.getTime() + 2 * hour),
+      opensTo: 'cam',
+      createdBy: someone.id,
+    });
+    const id = await cardReady(CAM);
+    await call('POST', `${nora}/custom-orders/${id}/decision`, 'owner', {
+      decision: 'yes',
+      priceMinor: 5000,
+    });
+    const paid = await call('POST', `${nora}/custom-orders/${id}/advance`, 'owner', { to: 'deposit_paid' });
+    expect(CustomOrderViewSchema.parse(paid.json())).toMatchObject({ state: 'deposit_paid', cam: null });
+    // Delivered, so the next test starts with no cam of Nora's booked.
+    await call('POST', `${nora}/custom-orders/${id}/advance`, 'owner', { to: 'delivered' });
+  });
+
   it('a video call paid in full takes its slot in her dispo cam, the next one waits its margin (ADR 0159 § 5)', async () => {
     const hour = 3_600_000;
     const opens = new Date(Math.ceil((Date.now() + 2 * hour) / hour) * hour);
@@ -233,14 +266,8 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
       },
     });
     expect(dispo.statusCode).toBe(200);
-    const cam: CustomOrderReading = {
-      format: 'video_call_talk',
-      supplements: [],
-      minutes: 30,
-      details: { duration: 'test', availability: 'test' },
-    };
     const paidCam = async (): Promise<unknown> => {
-      const id = await cardReady(cam);
+      const id = await cardReady(CAM);
       const yes = await call('POST', `${nora}/custom-orders/${id}/decision`, 'owner', {
         decision: 'yes',
         priceMinor: 5000,
