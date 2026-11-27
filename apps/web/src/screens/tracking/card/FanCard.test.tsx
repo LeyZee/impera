@@ -9,6 +9,7 @@ import {
   type FanCardOther,
   type FanCardValue,
   type FanCardView,
+  type FanFlagsView,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -48,10 +49,12 @@ function card(entries: Partial<Record<FanCardEntry['field'], Omit<FanCardEntry, 
 }
 
 let view: FanCardView;
+let flagsView: FanFlagsView;
 let puts: { path: string; body: unknown }[];
 let answer: { status: number; body: unknown } | null;
 
 beforeEach(() => {
+  flagsView = { fanId, flags: {}, mayConfirmDisputedAge: false };
   puts = [];
   answer = null;
   vi.stubGlobal(
@@ -85,6 +88,8 @@ beforeEach(() => {
           ),
         };
       }
+      if (input.includes('/flags'))
+        return Promise.resolve(new Response(JSON.stringify(flagsView), { status: 200 }));
       return Promise.resolve(new Response(JSON.stringify(view), { status: 200 }));
     }),
   );
@@ -145,6 +150,13 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
     ).toBe('Q');
     expect(within(field(him, /^Son métier/u)).getByText('Pas encore su')).toBeTruthy();
     expect(within(field(him, /^Ses humeurs fréquentes/u)).getByText('Pas encore deviné')).toBeTruthy();
+  });
+
+  it('says he is an adult when a human confirmed his age and the card gives none (IA-12)', async () => {
+    view = card({});
+    flagsView = { fanId, flags: { ageConfirmedAt: '2026-10-23T10:00:00.000Z' }, mayConfirmDisputedAge: true };
+    renderCard();
+    expect(await within(field(await essentials(), /^Son âge/u)).findByText('Majeur (confirmé)')).toBeTruthy();
   });
 
   it('corrects a field in one gesture and shows the card the server answers', async () => {

@@ -1,5 +1,13 @@
 # 0046. Accès au dashboard : deuxième facteur, connexions bornées, alertes de sécurité
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0160 · Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures](0160-session-length-by-role.md) : Amende : l'ADR 0046 § 6 (« 12 heures sans activité » et 7 jours au plus, pour tous). La limite de 7 jours reste celle de tous les rôles sauf la créatrice.
+>
+> Toutes les décisions du même sujet : [`docs/regles/acces-et-agents.md`](../regles/acces-et-agents.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 2026-11-02 17h08, « ok 0046 »)
 Date : 2026-11-02
 Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.

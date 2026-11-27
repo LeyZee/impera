@@ -4,6 +4,7 @@ import {
   CREATOR_ALERT_DEFAULTS,
   CREATOR_ALERT_FAMILY,
   SetCreatorAlertBodySchema,
+  isClosedToChatters,
   isCreatorAlertLocked,
   type CreatorAlertLine,
 } from '@impera/contracts';
@@ -28,6 +29,7 @@ const lines = (): CreatorAlertLine[] =>
     code,
     family: CREATOR_ALERT_FAMILY[code],
     locked: isCreatorAlertLocked(code),
+    chattersClosed: isClosedToChatters(code),
     routes: CREATOR_ALERT_DEFAULTS[code],
     isDefault: true,
   }));
@@ -93,7 +95,7 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
   it('shows her alerts by family, the three roles of each, and the safety relay with words, no control', async () => {
     serve(lines());
     renderTab();
-    for (const family of ['Sécurité', 'Ventes', 'Conversation', 'Système']) {
+    for (const family of ['Sécurité', 'Ventes', 'Conversation', 'Pilotage', 'Système']) {
       expect(await screen.findByRole('heading', { name: family })).toBeTruthy();
     }
     const safety = await lineOf('Relais de sécurité');
@@ -113,6 +115,29 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
         .getByRole('radio', { name: 'Sourdine' })
         .getAttribute('aria-checked'),
     ).toBe('true');
+  });
+
+  it('shuts « Compte sans personne » to the chatters, the owner and the manager still to choose (ADR 0094 § 3)', async () => {
+    const writes = serve(lines());
+    renderTab();
+    const uncovered = await lineOf('Compte sans personne');
+    const groups = within(uncovered).getAllByRole('radiogroup');
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Compte sans personne, Propriétaire',
+      'Compte sans personne, Manager',
+    ]);
+    const closed = uncovered.querySelector('.ca-role__closed');
+    expect(closed?.textContent).toBe('Chatteur en shift : Jamais');
+    expect(closed?.getAttribute('tabindex')).toBeNull();
+    expect(within(uncovered).getByText(/Jamais envoyée à un chatteur/u)).toBeTruthy();
+    fireEvent.click(within(groups[1] ?? uncovered).getByRole('radio', { name: 'Sourdine' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(writes[0]).toEqual({
+      path: `/v1/creators/${CREATOR}/alerts/uncovered_account`,
+      body: { routes: { owner: 'deliver', manager: 'muted', chatter_on_shift: 'off' } },
+    });
   });
 
   it('saves a role’s choice at once, the three roles whole', async () => {
@@ -170,8 +195,56 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
     fireEvent.click(within(manager).getByRole('radio', { name: 'Rien' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toBe('Le serveur ne répond pas. Réessaie dans un instant.');
-    expect(within(manager).getByRole('radio', { name: 'Sourdine' }).getAttribute('aria-checked')).toBe(
-      'true',
+    await waitFor(() => {
+      expect(within(manager).getByRole('radio', { name: 'Sourdine' }).getAttribute('aria-checked')).toBe(
+        'true',
+      );
+    });
+  });
+
+  it('keeps a change saved since when an earlier one of the same line fails (CODE-04)', async () => {
+    // The server keeps what it saved; the first write fails only once the second one went through.
+    let held = lines();
+    const gate: { fail: (() => void) | null } = { fail: null };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string, init?: RequestInit) => {
+        if (init?.method === undefined || init.method === 'GET')
+          return Promise.resolve(new Response(JSON.stringify({ creatorId: CREATOR, alerts: held })));
+        const code = new URL(input, 'http://localhost').pathname.split('/').at(-1);
+        const { routes } = SetCreatorAlertBodySchema.parse(
+          JSON.parse(typeof init.body === 'string' ? init.body : 'null'),
+        );
+        if (gate.fail === null && routes.manager === 'off')
+          return new Promise<Response>((resolve) => {
+            gate.fail = () => {
+              resolve(new Response('{}', { status: 503 }));
+            };
+          });
+        held = held.map((each) => (each.code === code ? { ...each, routes, isDefault: false } : each));
+        const saved = held.find((each) => each.code === code);
+        return Promise.resolve(new Response(JSON.stringify(saved)));
+      }),
     );
+    renderTab();
+    const sale = await lineOf('Vente');
+    const owner = within(sale).getByRole('radiogroup', { name: 'Vente, Propriétaire' });
+    fireEvent.click(
+      within(within(sale).getByRole('radiogroup', { name: 'Vente, Manager' })).getByRole('radio', {
+        name: 'Rien',
+      }),
+    );
+    await waitFor(() => {
+      expect(gate.fail).not.toBeNull();
+    });
+    fireEvent.click(within(owner).getByRole('radio', { name: 'Sourdine' }));
+    expect(await screen.findByText('Vente : enregistré.')).toBeTruthy();
+    gate.fail?.();
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    await waitFor(() => {
+      expect(within(owner).getByRole('radio', { name: 'Sourdine' }).getAttribute('aria-checked')).toBe(
+        'true',
+      );
+    });
   });
 });

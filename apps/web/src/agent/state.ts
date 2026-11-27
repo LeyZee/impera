@@ -18,9 +18,19 @@ export interface AgentStateInput {
   readonly pausedUntil: string | null;
   readonly hoursNow: AgentHoursNow | null;
   readonly resumesAs: ResumeMode;
+  /**
+   * Whether a persona is active for her: without one the agent writes nothing, whatever its mode (PRO1-03). Absent
+   * when the reader cannot know it (her « Mise en route » is the owner's alone): the mode alone is said then.
+   */
+  readonly hasActivePersona?: boolean;
+  /**
+   * The platforms where her session expired (REV-05): nothing is read nor sent there until it is captured again from
+   * the extension, so « IA active » would be false. Empty from a server that does not say it yet.
+   */
+  readonly expiredSessions?: readonly string[] | undefined;
 }
 
-export type AgentStateKind = 'on' | 'out' | 'paused' | 'off' | 'global';
+export type AgentStateKind = 'on' | 'out' | 'idle' | 'expired' | 'paused' | 'off' | 'global';
 
 export interface AgentState {
   readonly kind: AgentStateKind;
@@ -52,6 +62,11 @@ export function untilWords(instant: string, zone: string, now: Date): string {
   return `jusqu’à ${word === null ? '' : `${word} `}${clockAt(instant, zone)}`;
 }
 
+/** Her state with what is known of her persona; unknown, the state as the server gave it. */
+export function withPersona(input: AgentStateInput, hasActivePersona: boolean | undefined): AgentStateInput {
+  return hasActivePersona === undefined ? input : { ...input, hasActivePersona };
+}
+
 export function agentStateOf(input: AgentStateInput, zone: string, now: Date): AgentState {
   if (input.globalStop) {
     return {
@@ -71,6 +86,22 @@ export function agentStateOf(input: AgentStateInput, zone: string, now: Date): A
       };
     }
     return { kind: 'off', label: 'IA coupée', detail: 'jusqu’à ce qu’on la rallume', tone: 'warn' };
+  }
+  if ((input.expiredSessions?.length ?? 0) > 0) {
+    return {
+      kind: 'expired',
+      label: 'Session Reveal expirée',
+      detail: 'reconnecte-la depuis l’extension : rien n’est lu ni envoyé d’ici là',
+      tone: 'warn',
+    };
+  }
+  if (input.hasActivePersona === false) {
+    return {
+      kind: 'idle',
+      label: 'IA en attente de sa persona',
+      detail: 'aucun brouillon tant qu’aucune persona n’est active',
+      tone: 'warn',
+    };
   }
   const mode = MODE_LABEL[input.mode];
   if (input.hoursNow !== null && !input.hoursNow.open) {

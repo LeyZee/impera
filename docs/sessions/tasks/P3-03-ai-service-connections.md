@@ -1,5 +1,5 @@
 # P3-03 Connecter Grok, Gemini et ElevenLabs depuis le dashboard
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : 3
 Dépend de : P0-03 (base, chiffrement), P0-04 (serveur, SSE), P0-07a (Better Auth, rôles), P3-01 (passerelle), D-01 (design system dans `apps/web`)
 Branche : task/p3-03-ai-service-connections

@@ -1,5 +1,5 @@
 # OPS-09 Un fournisseur d'IA payé par l'abonnement, alerte au quota épuisé
-Statut : in_progress (« ok 0091 abonnement » de Charles, 13/11/2026, 2 h 03 ; ADR 0091 § 6)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress (« ok 0091 abonnement » de Charles, 13/11/2026, 2 h 03 ; ADR 0091 § 6)
 Phase : exploitation
 Dépend de : OPS-08 (Réglages › Consommation IA), ADR 0091
 Branche : claude/project-thread-md4sab

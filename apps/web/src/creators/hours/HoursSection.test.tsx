@@ -66,13 +66,14 @@ function serve(routes: { get?: () => Reply; put?: (body: unknown) => Reply }): u
   return puts;
 }
 
-function renderSection(): void {
+function renderSection(): QueryClient {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
       <HoursSection creatorId={CREATOR} creatorName="Nora Vidal" />
     </QueryClientProvider>,
   );
+  return client;
 }
 
 beforeEach(() => {
@@ -131,6 +132,17 @@ describe('Créatrices › Heures (P3-14)', () => {
       { day: 7, startMinute: 540, endMinute: 60, enabled: false },
     ]);
     expect(await screen.findByText('Enregistré : l’agent suit ces heures dès maintenant.')).toBeDefined();
+  });
+
+  it('reads her card again once saved, so her switch says her hours at once (CODE-03)', async () => {
+    serve({ put: (body) => ({ status: 200, body: echo(body) }) });
+    const client = renderSection();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    fireEvent.click(await screen.findByRole('radio', { name: 'Par créneaux' }));
+    fireEvent.click(save());
+    expect(await screen.findByText('Enregistré : l’agent suit ces heures dès maintenant.')).toBeDefined();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['dashboard', 'creators'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['dashboard', CREATOR] });
   });
 
   it('marks the slot that overlaps another, and keeps the save shut', async () => {

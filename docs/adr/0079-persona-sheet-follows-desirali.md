@@ -1,5 +1,13 @@
 # 0079. La fiche persona reprend la fiche Desirali, onglet par onglet et question par question
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0090 · Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence](0090-custom-order-handoff-and-objection-replies.md) : Amende : l'ADR 0079 § 4 et § 6 (deux questions de plus dans la section « Conversation », une partie de plus dans « Réglages de l'agent »).
+>
+> Toutes les décisions du même sujet : [`docs/regles/agent.md`](../regles/agent.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 06/11/2026 20h13, « ok 0079 », fil Agent)
 Date : 2026-11-06
 Précise : l'ADR 0010 (la persona est une donnée versionnée, hors dépôt pour les vraies créatrices).

@@ -95,6 +95,11 @@ export const DashboardTodoSchema = z.object({
   waitingMinutes: count,
   conversationId: ConversationIdSchema,
   fanId: FanIdSchema,
+  /**
+   * An `llm_unavailable` line once a voice model answers again (IA-07): no longer an outage, a person gives these fans
+   * back to the agent. Absent otherwise.
+   */
+  voiceBack: z.literal(true).optional(),
 });
 export type DashboardTodo = z.infer<typeof DashboardTodoSchema>;
 

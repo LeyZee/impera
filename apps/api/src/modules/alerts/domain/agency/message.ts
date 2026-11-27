@@ -29,6 +29,7 @@ const SUBJECTS: Readonly<Record<Signal['kind'], string>> = {
   connection_back: 'Service rétabli',
   agency_share_mismatch: 'Part de l’agence',
   agency_share_changed: 'Part de l’agence',
+  account_uncovered: 'Compte sans personne',
 };
 
 const cut = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);

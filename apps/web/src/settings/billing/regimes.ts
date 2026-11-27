@@ -126,6 +126,7 @@ export function regimeBodyOf(
       if (field === 'countries' && problems.countries === undefined)
         problems.countries = draft.countries.length === 0 ? 'Au moins un pays.' : issue.message;
       if (field === 'documents' && problems.documents === undefined) problems.documents = issue.message;
+      if (field === 'vat' && problems.rate === undefined) problems.rate = issue.message;
       if (field === 'mentions' && problems.mentions === undefined)
         problems.mentions = `Au plus ${String(INVOICE_MENTIONS_MAX)} mentions de 400 caractères chacune.`;
     }

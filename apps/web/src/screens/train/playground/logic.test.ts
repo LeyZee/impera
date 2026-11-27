@@ -17,6 +17,7 @@ import {
   personaShort,
   rateTone,
   scriptsHint,
+  noPersonaText,
   stepOf,
 } from './logic';
 import {
@@ -50,6 +51,20 @@ const answer = (patch: Partial<Answer> = {}): Answer => ({
   costEur: 0.0009,
   isFallback: false,
   ...patch,
+});
+
+describe('noPersonaText', () => {
+  it('tells the owner where to activate one, and a manager who does it (MAN-01)', () => {
+    expect(noPersonaText('Nina', true)).toBe(
+      'Nina n’a pas de persona en vigueur : active-en une dans Créatrices › Persona.',
+    );
+    expect(noPersonaText('Nina', false)).toBe(
+      'Nina n’a pas de persona en vigueur : le propriétaire en active une.',
+    );
+    expect(noPersonaText(null, false)).toBe(
+      'Aucune créatrice n’a de persona en vigueur : le propriétaire en active une.',
+    );
+  });
 });
 
 describe('rateTone', () => {

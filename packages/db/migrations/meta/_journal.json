@@ -1461,6 +1461,13 @@
     {
       "idx": 208,
       "version": "7",
+      "when": 1795743200515,
+      "tag": "0277_notification_kinds_and_uncovered_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
       "when": 1795743310474,
       "tag": "0289_telegram_channels_only",
       "breakpoints": true

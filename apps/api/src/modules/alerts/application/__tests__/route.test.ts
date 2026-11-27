@@ -120,6 +120,7 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
         code: 'safety_handoff',
         family: 'safety',
         locked: true,
+        chattersClosed: false,
         routes: { owner: 'off', manager: 'off', chatter_on_shift: 'off' },
         isDefault: false,
       },

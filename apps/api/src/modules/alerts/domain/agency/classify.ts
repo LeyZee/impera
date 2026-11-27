@@ -52,6 +52,7 @@ export const AGENCY_EVENT_TYPES = [
   'agency_share_mismatch',
   'agency_share_changed',
   'sales_feed_signal',
+  'account_uncovered',
 ] as const;
 
 const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
@@ -133,6 +134,26 @@ const periodText = (period: PayPeriod): string => {
   const first = period.endsWith('-01') ? '1er' : '16';
   return `la quinzaine du ${first} au ${String(Number(last.slice(8)))} ${month}`;
 };
+
+/** « de 14 h à 20 h », or « de 22 h 30 à 4 h », on the planning's clock. */
+function slotText(slot: {
+  readonly slotStartsAt: string;
+  readonly slotEndsAt: string;
+  readonly timeZone: string;
+}): string {
+  const clock = (at: string): string => {
+    const parts = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: slot.timeZone,
+      hour: 'numeric',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(at));
+    const hour = String(Number(parts.find((part) => part.type === 'hour')?.value ?? '0'));
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+    return minute === '00' ? `${hour} h` : `${hour} h ${minute}`;
+  };
+  return `de ${clock(slot.slotStartsAt)} à ${clock(slot.slotEndsAt)}`;
+}
 
 const countText = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
@@ -401,7 +422,7 @@ export function classify(signal: Signal): Notice | null {
         topic: 'important',
         threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
         title: 'Important',
-        body: `${signal.cause === null ? 'L’agent passe la main.' : CAUSE_TEXT[signal.cause]} Il n’écrit plus à ce fan et attend un humain.`,
+        body: `${signal.cause === null ? 'L’agent passe la main.' : CAUSE_TEXT[signal.cause]} L’agent n’écrit plus à ce fan et attend un humain.`,
         link: conversationLink(signal.conversationId),
       };
     }
@@ -411,7 +432,7 @@ export function classify(signal: Signal): Notice | null {
         topic: 'important',
         threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
         title: 'Important',
-        body: 'Un message de l’agent n’a pas pu partir. Il n’écrit plus à ce fan et attend un humain.',
+        body: 'Un message de l’agent n’a pas pu partir. L’agent n’écrit plus à ce fan et attend un humain.',
         link: conversationLink(signal.conversationId),
       };
     // The cap reached stops every generation until midnight: red (Charles, 03/11/2026); the 80 % warning stays amber.
@@ -632,6 +653,17 @@ export function classify(signal: Signal): Notice | null {
           label: 'Ouvrir la part de l’agence',
           path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
         },
+      };
+    // Important to the owners (ADR 0094 § 3, ADR 0176): never to a chatter nor to her; once per account and créneau.
+    case 'account_uncovered':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        oncePerThread: true,
+        threadKey: `account_uncovered:${signal.platformAccountId}:${signal.slotStartsAt}`,
+        title: 'Important',
+        body: `Compte sans personne chez ${PLATFORM_NAMES[signal.platform]} : le créneau ${slotText(signal)} a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.`,
+        link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
       };
     case 'connection_down':
       return {

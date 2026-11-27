@@ -1,6 +1,7 @@
+import { CreatorOverviewSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { agentStateOf, pauseChoices, type AgentStateInput } from './state';
+import { agentStateOf, pauseChoices, withPersona, type AgentStateInput } from './state';
 
 const PARIS = 'Europe/Paris';
 /** Thursday 19/11/2026, 16:30 in Paris (UTC+1). */
@@ -59,6 +60,44 @@ describe('agentStateOf (ADR 0148 § 1)', () => {
       kind: 'global',
       label: 'IA coupée pour toute l’agence',
     });
+  });
+
+  it('without an active persona, waits for it, never « IA active »; an Arrêt is still said (PRO1-03)', () => {
+    expect(agentStateOf(input({ hasActivePersona: false }), PARIS, NOW)).toEqual({
+      kind: 'idle',
+      label: 'IA en attente de sa persona',
+      detail: 'aucun brouillon tant qu’aucune persona n’est active',
+      tone: 'warn',
+    });
+    expect(agentStateOf(input({ mode: 'stop', hasActivePersona: false }), PARIS, NOW).kind).toBe('off');
+    expect(agentStateOf(input({ hasActivePersona: true }), PARIS, NOW).kind).toBe('on');
+    // Unknown to the reader: the mode alone, as before.
+    expect(withPersona(input(), undefined)).toEqual(input());
+    expect(agentStateOf(withPersona(input(), false), PARIS, NOW).kind).toBe('idle');
+  });
+
+  it('a Reveal session expired says so, never « IA active »; a pause or an Arrêt is still said (REV-05)', () => {
+    expect(agentStateOf(input({ expiredSessions: ['reveal'] }), PARIS, NOW)).toEqual({
+      kind: 'expired',
+      label: 'Session Reveal expirée',
+      detail: 'reconnecte-la depuis l’extension : rien n’est lu ni envoyé d’ici là',
+      tone: 'warn',
+    });
+    expect(agentStateOf(input({ mode: 'stop', expiredSessions: ['reveal'] }), PARIS, NOW).kind).toBe('off');
+    expect(agentStateOf(input({ expiredSessions: [] }), PARIS, NOW).kind).toBe('on');
+  });
+
+  it('a manager reads it from her card, without her « Mise en route » (PRO1-03)', () => {
+    const card = CreatorOverviewSchema.parse({
+      creatorId: '018f0000-0000-7000-8000-000000000001',
+      mode: 'copilot',
+      hasActivePersona: false,
+      sales: null,
+      onShift: [],
+      requests: null,
+    });
+    expect(agentStateOf(withPersona(card, undefined), PARIS, NOW).kind).toBe('idle');
+    expect(agentStateOf(withPersona(card, true), PARIS, NOW).kind).toBe('on');
   });
 
   it('a far day is named', () => {

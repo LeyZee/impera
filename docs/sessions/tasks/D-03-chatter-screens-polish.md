@@ -1,6 +1,6 @@
 # D-03 Peaufiner les écrans du chatteur
 
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : 4
 Dépend de : D-01, D-02
 Branche : claude/project-thread-xxi5nz (un commit par lot, une PR)

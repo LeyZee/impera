@@ -292,6 +292,54 @@ describe('à traiter', () => {
   });
 });
 
+describe('an AI outage over (IA-07)', () => {
+  const held = (
+    fanName: string,
+    kind: WaitingConversation['kind'] = 'llm_unavailable',
+  ): WaitingConversation => ({
+    conversationId: CONVERSATION,
+    fanId: FAN,
+    fanName,
+    kind,
+    since: minutesAgo(36),
+  });
+
+  it('says the AI answers again and to give these fans back, once a voice model answers', () => {
+    const [down] = todos([held('A')], NOW);
+    expect(down?.why).toBe('Aucun modèle IA n’a répondu. Un chatteur prend le relais.');
+    expect(down).not.toHaveProperty('voiceBack');
+    const [back] = todos([held('A')], NOW, { stopped: false, voiceAnswers: true });
+    expect(back).toMatchObject({
+      kind: 'llm_unavailable',
+      why: 'L’IA répond de nouveau : rends la main à ces fans.',
+      voiceBack: true,
+    });
+    // Another cause is left as it was.
+    const [other] = todos([held('B', 'meeting')], NOW, { stopped: false, voiceAnswers: true });
+    expect(other).not.toHaveProperty('voiceBack');
+  });
+
+  it('reads the voice’s health on the Dashboard and in « À traiter », a missing key never « back »', () => {
+    const facts = { waiting: [held('A')] };
+    expect(
+      assemble(facts, undefined, undefined, { voice: { ok: true, keyMissing: false } }).todos[0],
+    ).toMatchObject({ voiceBack: true });
+    expect(
+      assemble(facts, undefined, undefined, { voice: { ok: false, keyMissing: false } }).todos[0],
+    ).not.toHaveProperty('voiceBack');
+    const queue = (voice?: VoiceHealth) =>
+      creatorQueue(
+        CreatorIdSchema.parse('0192f3a0-0000-7000-8000-00000000c002'),
+        { ...FACTS, ...facts },
+        NOW,
+        voice,
+      ).todos[0];
+    expect(queue({ ok: true, keyMissing: false })).toMatchObject({ voiceBack: true });
+    expect(queue({ ok: true, keyMissing: true })).not.toHaveProperty('voiceBack');
+    expect(queue()).not.toHaveProperty('voiceBack');
+  });
+});
+
 describe('à traiter sur Arrêt (choix de Charles, 28/10)', () => {
   const line = (
     fanName: string,

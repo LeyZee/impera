@@ -1,5 +1,13 @@
 # 0052. Le chatteur sous l'œil de la persona : chaque message qu'il écrit dans Reveal est relu, chaque écart lui est signalé, rien n'est bloqué ni retenu sur sa paie
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0059 · Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom](0059-persona-slips-on-telegram.md) : Remplace : dans l'ADR 0052 § 5, la phrase « Un aveu d'IA, des coordonnées ou une promesse de rencontre partent aussi sur Telegram, en `important`, sans le nom du fan. »
+>
+> Toutes les décisions du même sujet : [`docs/regles/chatteurs.md`](../regles/chatteurs.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 02/11/2026 21h34, « ok 0052 » ; précisions des relectures Équipe et Extension validées à 21h47, « ok » ; demande du même jour à 20h17)
 Date : 2026-11-02
 Précise : l'ADR 0025 (§ Conséquences, « ce que le chatteur tape dans Reveal est hors des gardes de Nirvana » : toujours sans blocage, mais désormais relu et signalé) et l'ADR 0043 § 6 (les retours de l'IA de la semaine choisissent d'abord parmi les écarts relevés ici).

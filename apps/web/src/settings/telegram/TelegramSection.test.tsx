@@ -4,10 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TelegramSection } from './TelegramSection';
-import { TelegramForbidden, TelegramOff, fetchOverview, removeChat } from './api';
+import { TelegramForbidden, TelegramOff, addBot, fetchOverview, removeChat } from './api';
 
 vi.mock('./api', async (actual) => ({
   ...(await actual<typeof import('./api')>()),
+  addBot: vi.fn(),
   fetchOverview: vi.fn(),
   removeChat: vi.fn(),
 }));
@@ -113,6 +114,36 @@ describe('Réglages › Bots Telegram without a bot', () => {
     const [add, ...more] = screen.getAllByRole('button', { name: 'Ajouter un bot' });
     expect(more).toHaveLength(0);
     expect(add?.className).toContain('nv-btn--neon');
+  });
+});
+
+describe('Réglages › Bots Telegram, the first bot (recette MED-02)', () => {
+  const firstBot = {
+    id: TelegramBotIdSchema.parse('01900000-0000-7000-8000-0000000000b3'),
+    username: 'premier_bot',
+    displayName: 'Premier',
+    state: 'active' as const,
+    lastPolledAt: null,
+    chats: [],
+  };
+
+  it('keeps the sheet on its step when the page turns from empty to its first bot', async () => {
+    vi.mocked(fetchOverview).mockResolvedValue({ bots: [] });
+    vi.mocked(addBot).mockImplementation(() => {
+      vi.mocked(fetchOverview).mockResolvedValue({ bots: [firstBot] });
+      return Promise.resolve({ ok: true, value: firstBot });
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un bot' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'J’ai le jeton' }));
+    fireEvent.paste(screen.getByLabelText('Jeton du bot'), {
+      clipboardData: { getData: () => '123456789:AAFabcdefghijklmnopqrstuvwxyz0123456' },
+    });
+    // The page has read its first bot behind the sheet, and the sheet is not back at its first step.
+    await waitFor(() => {
+      expect(screen.queryByText('Aucun bot pour l’instant')).toBeNull();
+    });
+    expect(screen.queryByText('Crée ton bot')).toBeNull();
   });
 });
 

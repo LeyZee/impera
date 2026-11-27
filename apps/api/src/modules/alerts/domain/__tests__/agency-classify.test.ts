@@ -49,7 +49,7 @@ describe('agency alerts (ADR 0020 §2, kept for the owners)', () => {
   });
   it('says a silent model in the alert, without the fan’s text', () => {
     expect(classify({ kind: 'handoff', conversationId, cause: 'llm_unavailable' })).toMatchObject({
-      body: 'Le modèle ne répond plus. Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Le modèle ne répond plus. L’agent n’écrit plus à ce fan et attend un humain.',
     });
   });
 
@@ -144,6 +144,29 @@ describe('agency alerts (ADR 0020 §2, kept for the owners)', () => {
         label: 'Ouvrir la part de l’agence',
         path: `/creatrices?onglet=pourcentage&creatrice=${creatorId}`,
       },
+    });
+  });
+
+  it('tells a créneau begun with nobody to the owners, on the planning’s clock (ADR 0094, ADR 0176)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'account_uncovered',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        slotStartsAt: '2026-11-20T21:30:00.000Z',
+        slotEndsAt: '2026-11-21T05:00:00.000Z',
+        timeZone: 'Europe/Paris',
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      oncePerThread: true,
+      threadKey: 'account_uncovered:018f3e5c-0000-7000-8000-0000000000a1:2026-11-20T21:30:00.000Z',
+      title: 'Important',
+      body: 'Compte sans personne chez Reveal : le créneau de 22 h 30 à 6 h a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.',
+      link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
     });
   });
 
@@ -412,7 +435,7 @@ describe('agency alerts (ADR 0020 §2, kept for the owners)', () => {
       topic: 'important',
       threadKey: `conversation:${conversationId}`,
       title: 'Important',
-      body: 'Un message de l’agent n’a pas pu partir. Il n’écrit plus à ce fan et attend un humain.',
+      body: 'Un message de l’agent n’a pas pu partir. L’agent n’écrit plus à ce fan et attend un humain.',
       link: { label: 'Ouvrir la conversation', path: `/suivi?conversation=${conversationId}` },
     });
   });

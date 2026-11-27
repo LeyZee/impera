@@ -112,10 +112,12 @@ export function TelegramSection(): JSX.Element {
   const sheetView =
     sheet === null ? null : <BotSheet mode={sheet} onChanged={() => void refresh()} onClose={closeSheet} />;
 
-  if (overview.bots.length === 0) {
-    return (
-      <section className="tg-page">
-        {lede}
+  // One tree for both, so that the sheet adding the first bot is not remounted, and so not sent back to its first
+  // step, when the bot arrives (recette MED-02).
+  return (
+    <section className="tg-page">
+      {lede}
+      {overview.bots.length === 0 ? (
         <Empty
           plate
           icon={<TelegramGlyph />}
@@ -129,21 +131,15 @@ export function TelegramSection(): JSX.Element {
           Un bot Telegram se crée en une minute avec @BotFather, puis tu le fais administrateur du canal de la
           modèle. Impera te guide pas à pas.
         </Empty>
-        {sheetView}
-      </section>
-    );
-  }
-
-  return (
-    <section className="tg-page">
-      {lede}
-      <BotsList
-        overview={overview}
-        now={now}
-        onSheet={setSheet}
-        onChanged={() => void refresh()}
-        onAdd={openAdd}
-      />
+      ) : (
+        <BotsList
+          overview={overview}
+          now={now}
+          onSheet={setSheet}
+          onChanged={() => void refresh()}
+          onAdd={openAdd}
+        />
+      )}
       {sheetView}
     </section>
   );

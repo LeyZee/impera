@@ -1,5 +1,5 @@
 # COF-02 Médias : « À refaire » sur un dépôt
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : coffre (trou 7 du rapport « trous béants » du 21/11/2026, validé par Charles)
 Dépend de : dépôts de contenu et demandes (CR-06, ADR 0055), faits
 Branche : claude/project-thread-53kkgu

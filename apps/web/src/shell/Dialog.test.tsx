@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Dialog } from './Dialog';
+import { CLOSE_GUARD_MS, Dialog, isClickThrough } from './Dialog';
 
 afterEach(cleanup);
 
@@ -55,5 +55,28 @@ describe('Dialog', () => {
     );
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('swallows a person’s click just after it closes, the end of a double click (CHAT-05, MOD-10)', () => {
+    expect(isClickThrough({ isTrusted: true }, 120)).toBe(true);
+    expect(isClickThrough({ isTrusted: true }, CLOSE_GUARD_MS)).toBe(false);
+    // A script's click (a test's, an extension's) is never taken for the end of a gesture.
+    expect(isClickThrough({ isTrusted: false }, 120)).toBe(false);
+  });
+
+  it('lets a click reach the page once it is closed when no person made it', () => {
+    const { unmount } = render(
+      <Dialog title="Palier Or" onClose={vi.fn()}>
+        <p>Pas encore gagné</p>
+      </Dialog>,
+    );
+    unmount();
+    const onClick = vi.fn();
+    const under = document.createElement('button');
+    under.addEventListener('click', onClick);
+    document.body.append(under);
+    fireEvent.click(under);
+    expect(onClick).toHaveBeenCalledOnce();
+    under.remove();
   });
 });

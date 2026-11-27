@@ -82,7 +82,7 @@ describe('alerts.agency (27/11/2026, Telegram back to the channels only)', () =>
       reason: 'agency_alert',
       message: {
         title: 'Nora · L’agent attend un humain',
-        body: 'Le modèle ne répond plus. Il n’écrit plus à ce fan et attend un humain.',
+        body: 'Le modèle ne répond plus. L’agent n’écrit plus à ce fan et attend un humain.',
         url: `/suivi?conversation=${CONVERSATION}`,
       },
     });

@@ -299,6 +299,27 @@ describe('Paie › Factures', () => {
     });
   });
 
+  it('refuses, while typed, a credit in the agency’s favour above the invoice (recette MED-05)', async () => {
+    renderPage(OWNER);
+    const contests = await waitFor(() => panelOf('Contestations à trancher'));
+    fireEvent.click(within(rowIn(contests, LOU_CONTESTED.number)).getByRole('button', { name: 'Trancher' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Donner raison' }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'En faveur de l’agence' }));
+    fireEvent.change(within(dialog).getByLabelText('Montant hors taxes'), { target: { value: '999' } });
+    fireEvent.change(within(dialog).getByLabelText('Motif'), {
+      target: { value: 'Rapport compté deux fois.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(
+      within(dialog)
+        .getByText(/le hors taxes de la facture/u)
+        .textContent.replace(NBSP, ' '),
+    ).toContain('jusqu’à 100,00 €');
+    expect(screen.queryByText('Vérifier avant d’envoyer')).toBeNull();
+    expect(writes).toEqual([]);
+  });
+
   it('refuses a contest with a reason, and never offers to cancel and reissue a credit note', async () => {
     const contestedCredit = { ...THEO_CREDIT, acceptance: CONTESTED } satisfies InvoiceListItem;
     lists = (search) => (search.get('acceptance') === 'contested' ? [contestedCredit] : []);

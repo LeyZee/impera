@@ -189,8 +189,6 @@ export interface RestoreView {
   readonly validity: string | null;
 }
 
-const PAY_RULE = `La paie attend un essai réussi de moins de ${String(RESTORE_TEST_FRESH_DAYS)}${NBSP}jours.`;
-
 /**
  * The latest restore test (ADR 0028 § 6). Its freshness is the server's (`restoreTestFresh`, the bound the pay guard
  * reads); the page only words it. Counts only, never what the test printed.
@@ -201,7 +199,7 @@ export function restoreViewOf(status: BackupStatus, now: Date, timeZone?: string
     return {
       tone: 'warn',
       title: 'Aucun essai de restauration noté',
-      text: `Une sauvegarde qu’on n’a jamais restaurée ne prouve rien. ${PAY_RULE}`,
+      text: 'Une sauvegarde qu’on n’a jamais restaurée ne prouve rien.',
       validity: null,
     };
   }
@@ -212,7 +210,7 @@ export function restoreViewOf(status: BackupStatus, now: Date, timeZone?: string
     return {
       tone: 'warn',
       title: `L’essai du ${dayOf(test.testedAt, now, timeZone)} n’a pas tout retrouvé`,
-      text: `${restored}, mais ${tables} n’avai${test.rowCountMismatches > 1 ? 'ent' : 't'} pas le bon nombre de lignes. ${PAY_RULE}`,
+      text: `${restored}, mais ${tables} n’avai${test.rowCountMismatches > 1 ? 'ent' : 't'} pas le bon nombre de lignes.`,
       validity: null,
     };
   }
@@ -220,7 +218,7 @@ export function restoreViewOf(status: BackupStatus, now: Date, timeZone?: string
     return {
       tone: 'warn',
       title: `Le dernier essai date du ${dayOf(test.testedAt, now, timeZone)}`,
-      text: `${restored}, toutes les lignes retrouvées. Il a plus de ${String(RESTORE_TEST_FRESH_DAYS)}${NBSP}jours : la paie attend un nouvel essai réussi.`,
+      text: `${restored}, toutes les lignes retrouvées. Il a plus de ${String(RESTORE_TEST_FRESH_DAYS)}${NBSP}jours : un nouvel essai est à faire.`,
       validity: null,
     };
   }

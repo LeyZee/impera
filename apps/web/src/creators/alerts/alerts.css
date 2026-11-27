@@ -207,6 +207,30 @@
 .ca-role__name {
   display: none;
 }
+/* Read by a screen reader only: the role a closed band is for, its column header being out of reach. */
+.ca-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* A role an alert never reaches (ADR 0094 § 3): the calm band of a locked line, the size of one segmented control. */
+.ca-role__closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 132px;
+  height: 44px;
+  margin: 0;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 5%, transparent);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
 
 /* The design system's segmented control, three icons wide; the thumb slides under the choice. */
 .ca-seg {
@@ -340,7 +364,8 @@
     white-space: nowrap;
     color: var(--nv-ink-muted);
   }
-  .ca-seg {
+  .ca-seg,
+  .ca-role__closed {
     width: 100%;
   }
   .ca-seg__opt {

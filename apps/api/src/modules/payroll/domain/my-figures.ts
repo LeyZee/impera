@@ -13,6 +13,8 @@ import {
   type SaleType,
 } from '@impera/contracts';
 
+import { platformNetOfGross } from './commission-statements';
+
 /**
  * A member's own figures (ADR 0104 § A), pure: from the lines of their own statements and of their own validated
  * reports (ADR 0118 § 10, the lines the game reads), never from the register.
@@ -30,6 +32,11 @@ export interface FigureLine {
   readonly occurredAt: Date | null;
   /** What was sold; `null` on a statement written before the type was kept, and on a shift counted from its report. */
   readonly saleType: SaleType | null;
+  /**
+   * A shift counted from its validated report: the gross it declared and what the chain takes. A period's net adds
+   * the grosses of an account first and runs the chain once, as its statement does (PRO2-06).
+   */
+  readonly chain?: { readonly grossMinor: number; readonly vatBps: number; readonly platformFeeBps: number };
 }
 
 type Net = MyFigures['nets'][number];
@@ -42,6 +49,33 @@ function netsOf(lines: readonly Pick<FigureLine, 'currency' | 'netMinor'>[]): Ne
   return [...sums.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([currency, netMinor]) => ({ currency, netMinor }));
+}
+
+/**
+ * The net of a period's lines as its statement counts it (PRO2-06): the lines of reports of one account added as
+ * grosses and taken through the chain once, never their nets rounded one by one; the lines of sales as they are.
+ */
+function periodNetsOf(lines: readonly FigureLine[]): Net[] {
+  const plain: Pick<FigureLine, 'currency' | 'netMinor'>[] = [];
+  const accounts = new Map<
+    string,
+    { currency: Currency; grossMinor: number; vatBps: number; platformFeeBps: number }
+  >();
+  for (const line of lines) {
+    if (line.chain === undefined) {
+      plain.push(line);
+      continue;
+    }
+    const { grossMinor, vatBps, platformFeeBps } = line.chain;
+    const key = [line.period, line.platformAccountId, line.currency, vatBps, platformFeeBps].join('|');
+    const account = accounts.get(key) ?? { currency: line.currency, grossMinor: 0, vatBps, platformFeeBps };
+    accounts.set(key, { ...account, grossMinor: account.grossMinor + grossMinor });
+  }
+  const chained = [...accounts.values()].map((account) => ({
+    currency: account.currency,
+    netMinor: platformNetOfGross(account),
+  }));
+  return netsOf([...plain, ...chained]);
 }
 
 const dayOfLine = (line: FigureLine, timeZone: string): string | null =>
@@ -204,12 +238,16 @@ export function myFigures(input: {
   const currency = mainCurrencyOf(lines);
   const ofMain = lines.filter((line) => line.currency === currency);
   const byDay = new Map<string, number>();
-  const byPeriod = new Map<PayPeriod, number>();
   for (const line of ofMain) {
-    byPeriod.set(line.period, (byPeriod.get(line.period) ?? 0) + line.netMinor);
     const day = dayOfLine(line, agencyZone);
     if (day !== null) byDay.set(day, (byDay.get(day) ?? 0) + line.netMinor);
   }
+  const byPeriod = new Map<PayPeriod, number>(
+    [...new Set(ofMain.map((line) => line.period))].map((one) => [
+      one,
+      periodNetsOf(ofMain.filter((line) => line.period === one))[0]?.netMinor ?? 0,
+    ]),
+  );
   const bestDay = bestOf(byDay);
   const bestPeriod = bestOf(byPeriod);
 
@@ -218,12 +256,12 @@ export function myFigures(input: {
     today,
     timeZone: memberZone,
     days: daysOf(current, agencyZone, reported),
-    nets: netsOf(current),
+    nets: periodNetsOf(current),
     kinds: kindsOf(input.lines.filter((line) => line.period === period)),
     previous:
       previous.length === 0
         ? null
-        : { period: before, days: daysOf(previous, agencyZone, reported), toDateNets: netsOf(toDate) },
+        : { period: before, days: daysOf(previous, agencyZone, reported), toDateNets: periodNetsOf(toDate) },
     hours: {
       since: calendarDayAt(since, agencyZone),
       sales: recent.length,

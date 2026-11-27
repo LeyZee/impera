@@ -37,15 +37,19 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // +1 (EQ-23): the incident notice reads its facts and the agency's recipients across creators, under withAdmin.
   // +1 for the light feedback (ADR 0170, 26/11): each member's last opened shift and whether it has its feedback,
   // across creators, bounded to the members named; read only.
-  'modules/scheduling': 30,
+  // +1 for « compte sans personne » (ADR 0094 § 1): its job reads every creator's planning, agent and last fan
+  // message to publish one event per account and créneau.
+  'modules/scheduling': 31,
   'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,
   // -4 on 27/11/2026 (ADR 0176): Telegram keeps the creators' channels only.
   'modules/telegram': 6,
   'modules/trends': 8,
+  // +2 for a live worker freeing its own locks on jobs whose completion was lost (recette COUV-14): Graphile's tables,
+  // closed to the app role, as the release of dead workers' locks.
   // -1 on 27/11/2026 (ADR 0176): no « mot de passe oublié » asked from the sign-in page.
-  root: 51,
+  root: 53,
   scripts: 1,
   // -2 on 27/11/2026 (ADR 0176): no sales nor alerts wired to Telegram.
   wiring: 5,

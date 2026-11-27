@@ -1,5 +1,6 @@
 import {
   CREATOR_ALERT_ROLES,
+  isClosedToChatters,
   isCreatorAlertLocked,
   PUSH_TITLE_MAX,
   type CreatorAlertCode,
@@ -24,7 +25,8 @@ export function modesFor(
     return { owner: 'deliver', manager: 'deliver', chatter_on_shift: 'deliver' };
   const line = lines.find((l) => l.code === code) ?? creatorAlertLines([]).find((l) => l.code === code);
   if (line === undefined) throw new Error(`creator alert without a line: ${code}`);
-  return line.routes;
+  // Never to a chatter (ADR 0094 § 3), whatever line was handed over: the steering alerts are the agency's.
+  return isClosedToChatters(code) ? { ...line.routes, chatter_on_shift: 'off' } : line.routes;
 }
 
 /**
@@ -63,6 +65,7 @@ const TITLES: Readonly<Record<CreatorAlertCode, string>> = {
   her_alerts: 'Alerte',
   ai_budget: 'Budget IA',
   session_expired: 'Session Reveal expirée',
+  uncovered_account: 'Compte sans personne',
 };
 
 const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
@@ -75,7 +78,15 @@ const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
   her_alerts: 'Une de ses alertes s’est déclenchée.',
   ai_budget: 'La dépense IA du jour franchit un seuil.',
   session_expired: 'Reconnecte la session pour que l’IA reprenne.',
+  uncovered_account:
+    'Un créneau commence sans chatteur et l’IA n’est pas en Automatique : des fans attendent.',
 };
+
+/** Where the notification opens: the planning for a créneau nobody holds, the conversation otherwise. */
+function urlOf(code: CreatorAlertCode, conversationId: string | null): string {
+  if (code === 'uncovered_account') return '/equipe/planning';
+  return conversationId === null ? '/suivi' : `/suivi?conversation=${conversationId}`;
+}
 
 export function alertMessage(
   code: CreatorAlertCode,
@@ -89,7 +100,7 @@ export function alertMessage(
       PUSH_TITLE_MAX,
     ),
     body: BODIES[code],
-    url: conversationId === null ? '/suivi' : `/suivi?conversation=${conversationId}`,
+    url: urlOf(code, conversationId),
     ...(silent && { silent: true }),
   };
 }

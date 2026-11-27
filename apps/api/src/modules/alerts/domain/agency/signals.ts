@@ -209,6 +209,19 @@ export type Signal =
       readonly platform: Platform;
       readonly platformAccountId: string;
       readonly from: PayPeriod;
+    }
+  | {
+      /**
+       * A créneau began on one of her accounts with nobody answering (ADR 0094 § 1, « compte sans personne »). For the
+       * owner and the managers: no fan, no chatter.
+       */
+      readonly kind: 'account_uncovered';
+      readonly creatorId: CreatorId;
+      readonly platform: Platform;
+      readonly platformAccountId: string;
+      readonly slotStartsAt: string;
+      readonly slotEndsAt: string;
+      readonly timeZone: string;
     };
 
 export interface ScannedEvent {

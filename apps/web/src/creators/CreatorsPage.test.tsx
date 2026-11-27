@@ -9,7 +9,8 @@ import demoYaml from '../../../../personas/demo/v0.3.0.yaml?raw';
 import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
-import { viewOf } from './scripts/prepared/fixtures';
+import { SCRIPT, viewOf } from './scripts/prepared/fixtures';
+import { CREATOR_GONE } from './search';
 
 /** A version stored at format 2: the draft is the version itself, nothing moved (ADR 0079 § 5). */
 const asDraft = (persona: PersonaV2) => ({ draft: persona, moved: [] });
@@ -207,12 +208,17 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));
     await picked('Anna');
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    // The browser tab names her and the tab of her sheet (NAV-06).
+    await waitFor(() => {
+      expect(document.title).toBe('Persona · Anna · Créatrices · Impera');
+    });
     // On her sheet, nothing of the list: neither the other creators nor « Ajouter une créatrice ».
     expect(screen.queryByRole('button', { name: 'Ajouter une créatrice' })).toBeNull();
 
     fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
     await cardOf('Anna');
     expect(router.state.location.search).toEqual({});
+    expect(document.title).toBe('Créatrices · Impera');
   });
 
   it('opens the creator the address names, and the list for one it does not hold', async () => {
@@ -492,6 +498,22 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
   });
 
+  it('leads an address naming a creator the list does not hold back to the list, and says why (PRO1-16)', async () => {
+    await serve([ANNA]);
+    const gone = '0192f3a0-0000-7000-8000-0000000000ff';
+    const router = renderAt(owner, `/creatrices?onglet=agenda&creatrice=${gone}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'agenda' });
+    });
+    expect(await screen.findByText(CREATOR_GONE)).toBeDefined();
+    // Trafic too: never another creator's links in silence.
+    router.history.push(`/trafic?creatrice=${gone}`);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/trafic');
+      expect(router.state.location.search).toEqual({});
+    });
+  });
+
   it('lets an active manager read her persona, never change it (trou béant 18)', async () => {
     await serve([ANNA]);
     const router = renderAt(manager, `/creatrices?onglet=persona&creatrice=${ANNA.id}`);
@@ -556,7 +578,8 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
     expect(await screen.findByRole('radio', { name: 'À copier · 1' })).toBeDefined();
     fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ onglet: 'scripts', creatrice: ANNA.id });
+      // The script open is in the address: a reload lands on it, a step back on the list (PRO1-06).
+      expect(router.state.location.search).toEqual({ onglet: 'scripts', creatrice: ANNA.id, script: SCRIPT });
     });
     // The editor, with its way back to the list.
     expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
@@ -565,6 +588,9 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
     await screen.findByText('Son agenda');
     router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
     expect(await screen.findByRole('button', { name: /Nouveau script/u })).toBeDefined();
+    // Its own address opens it again, as a reload does.
+    router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}&script=${SCRIPT}`);
+    expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
   });
 
   it('reopens her sheet from the menu on the tab left open last on this device', async () => {

@@ -1,7 +1,7 @@
 import type { Me } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { linkCrm, type LinkDeps } from './crm-link';
+import { linkCrm, type LinkDeps, type LinkFailure } from './crm-link';
 import type { CrmSession } from './session';
 
 const ME: Me = {
@@ -61,13 +61,14 @@ describe('linkCrm', () => {
     expect(d.remove).toHaveBeenCalledWith(SITE);
   });
 
-  it.each<[string, CrmSession]>([
-    ['a page that is not the CRM', { kind: 'not_crm' }],
-    ['a redirect, never followed', { kind: 'unreachable' }],
-    ['a CRM unwell', { kind: 'server_down' }],
-  ])('saves nothing and gives the site back for %s', async (_, session) => {
+  // EXT-04: a CRM stopped or unwell is not a wrong address.
+  it.each<[string, CrmSession, LinkFailure]>([
+    ['a page that is not the CRM', { kind: 'not_crm' }, 'not_crm'],
+    ['an address where nothing answers', { kind: 'unreachable' }, 'down'],
+    ['a CRM unwell', { kind: 'server_down' }, 'down'],
+  ])('saves nothing and gives the site back for %s', async (_, session, failure) => {
     const d = deps({ readSession: vi.fn(() => Promise.resolve(session)) });
-    expect(await linkCrm('https://crm.exemple.fr', d)).toEqual({ state: 'failed', failure: 'not_crm' });
+    expect(await linkCrm('https://crm.exemple.fr', d)).toEqual({ state: 'failed', failure });
     expect(d.save).not.toHaveBeenCalled();
     expect(d.remove).toHaveBeenCalledWith(SITE);
   });
