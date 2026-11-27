@@ -183,4 +183,4 @@ Date : AAAA-MM-JJ
 | 0171 | Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre | proposed |
 | 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
 | 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |
-| 0176 | Telegram ne sert plus qu'aux canaux des créatrices ; les alertes passent par les notifications d'Impera | proposed (remplace 0020 ; amende 0046 § 8, 0059, 0068, 0080, 0088 § 5, 0150) |
+| 0176 | Telegram ne sert plus qu'aux canaux des créatrices ; les alertes passent par les notifications d'Impera | accepted (remplace 0020 ; amende 0046 § 8, 0059, 0068, 0080, 0088 § 5, 0150 ; acceptée le 27/11, code fusionné par #1052) |

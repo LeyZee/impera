@@ -37,7 +37,7 @@ Ce dépôt est conçu pour être travaillé par des sessions d'agents codeurs (C
 
 ## Où est la vérité
 
-- **Décisions** : `docs/adr/`. Un ADR accepté s'applique. Pour le contredire, on écrit un nouvel ADR qui remplace l'ancien, après accord de Charles.
+- **Décisions** : `docs/adr/`. Un ADR accepté s'applique. Pour le contredire, après accord de Charles, on l'amende en place par un avenant daté avec ses mots, ou on écrit un nouvel ADR qui remplace l'ancien (les deux voies de `docs/adr/README.md` ; avenant du 27/11/2026, l'ancienne phrase ne citait que la seconde). Le métier (ce qu'elle dit, comment elle vend) a pour source la méthode de l'agence, hors du dépôt : si un ADR la contredit, on le signale, on ne tranche pas.
 - **Architecture courante** : `docs/architecture/`. Si le code et la doc divergent, la doc est à corriger dans la même PR que le code.
 - **Historique du raisonnement** : `brainstorm/` et le cahier des charges, à la racine du dépôt, contiennent les échanges d'origine. Utile pour comprendre le pourquoi, pas une source de règles : les ADR et `docs/architecture/` priment.
 - **Roadmap** : `docs/roadmap.md`. Les fiches de tâches en découlent.
