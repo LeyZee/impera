@@ -157,23 +157,31 @@ export function createChannelVisualsReader(
         keptUntil: new Date(Date.parse(`${day}T00:00:00Z`) + 2 * DAY_MS),
       }),
     // Its newest live file among her drops, for its reduced picture in the review; read in her creator only.
-    places: (creatorId, mediaIds) =>
-      withTenantJob(db, creatorId, 'telegram_channel', async (tx) => {
-        const result = await tx.execute(sql`
+    places: async (creatorId, mediaIds) =>
+      // An empty list would read « in () »: nothing to place, no query.
+      mediaIds.length === 0
+        ? {}
+        : withTenantJob(db, creatorId, 'telegram_channel', async (tx) => {
+            const result = await tx.execute(sql`
           select distinct on (f.media_asset_id) f.media_asset_id, f.drop_id, f.id as file_id
             from content_drop_files f join content_drops d on d.id = f.drop_id and d.creator_id = f.creator_id
            where f.creator_id = ${creatorId} and f.media_asset_id in ${list(mediaIds)}
              and d.withdrawn_at is null and f.replaced_at is null and f.state in ('kept', 'duplicate')
            order by f.media_asset_id, d.created_at desc, f.position`);
-        return Object.fromEntries(
-          result.rows.flatMap((raw) => {
-            const row = PlaceRowSchema.safeParse(raw);
-            return row.success
-              ? [[row.data.media_asset_id, { dropId: row.data.drop_id, fileId: row.data.file_id }] as const]
-              : [];
+            return Object.fromEntries(
+              result.rows.flatMap((raw) => {
+                const row = PlaceRowSchema.safeParse(raw);
+                return row.success
+                  ? [
+                      [
+                        row.data.media_asset_id,
+                        { dropId: row.data.drop_id, fileId: row.data.file_id },
+                      ] as const,
+                    ]
+                  : [];
+              }),
+            );
           }),
-        );
-      }),
     telegramStock: (creatorId) =>
       read(creatorId, { categories: STOCK, keptUntil: new Date(Date.now() + STOCK_HORIZON_MS) }),
     async file(creatorId, mediaId) {
