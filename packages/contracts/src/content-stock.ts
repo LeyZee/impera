@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DropCategorySchema, DropMediaKindSchema } from './content-drops';
+import { ReadyVideoIdSchema } from './custom-prices';
 import {
   ContentDropFileIdSchema,
   ContentDropIdSchema,
@@ -126,3 +127,28 @@ export const ReservedMediaSentSchema = z.strictObject({
   sentAt: z.date(),
 });
 export type ReservedMediaSent = z.input<typeof ReservedMediaSentSchema>;
+
+/**
+ * `GET /v1/creator-space/ready-videos`: the types she may give a video to sell when she drops it, the owner's lines
+ * still offered, in his order. Their names only, never a price.
+ */
+export const ReadyVideoTypesSchema = z.strictObject({
+  types: z.array(z.strictObject({ id: ReadyVideoIdSchema, label: z.string().min(1) })),
+});
+export type ReadyVideoTypes = z.infer<typeof ReadyVideoTypesSchema>;
+
+/** The agent's ask for a video to sell this fan. */
+export const SaleVideoAskSchema = z.strictObject({ creatorId: CreatorIdSchema, fanId: FanIdSchema });
+export type SaleVideoAsk = z.input<typeof SaleVideoAskSchema>;
+
+/**
+ * A video to sell this fan, and its price drawn in its type's range (`readyVideoPriceMinor`, the video's id as seed):
+ * the agent freezes it in its offer. `label` is the owner's own words, for a delimited block, never an instruction.
+ */
+export const SaleVideoSchema = z.strictObject({
+  mediaAssetId: MediaAssetIdSchema,
+  readyVideoId: ReadyVideoIdSchema,
+  label: z.string().min(1),
+  priceMinor: z.int().min(1),
+});
+export type SaleVideo = z.infer<typeof SaleVideoSchema>;

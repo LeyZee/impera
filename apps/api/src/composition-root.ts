@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { CreatorIdSchema, JOB_PAYLOADS } from '@impera/contracts';
 import { createDbClient, withAdmin, type Database, type DbClient } from '@impera/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -446,6 +446,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
+    // The types of the videos she sells are the owner's lines of her grid (ADR 0163 § 7), read by their module.
+    readyVideos: async (creatorId) =>
+      (await customOrders.module.gridOf(CreatorIdSchema.parse(creatorId)))?.readyVideos ?? [],
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
     // Late bound: the captions read her described drops, and her drops tell them of each description.
     onDescribed: (creatorId, mediaAssetId, correlationId) =>
