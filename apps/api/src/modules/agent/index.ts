@@ -106,9 +106,14 @@ export {
   guardContextOf,
   withExamples,
   type ComposedTurn,
+  type ComposerPersona,
   type OfferInput,
   type ScriptsInput,
 } from './infra/compose';
+/** @public What a turn reads of the conversation: `conversations` loads it, the playground keeps no more (audit 27/11). */
+export { HISTORY_WINDOW } from './domain/turn-history';
+/** @public His register from his tier (ADR 0132 § 7): the playground chooses it as the composer does. */
+export { spenderRegisterOf } from './domain/spender-register';
 export {
   guardSettingsOf,
   languagesOf,
@@ -119,7 +124,7 @@ export {
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 /** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
-export type { ScriptSource } from './infra/draft-composer';
+export type { ComposerPersonaFields, ScriptSource } from './infra/draft-composer';
 export type { PlatformScriptView as AgentScriptView, ScriptHistoryView } from './domain/script-run';
 /** @public The playground plays trial scripts by the same rules (ADR 0103 § 15-17): its fictive purchase and refusal. */
 export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/script-run';
@@ -204,7 +209,9 @@ export interface DraftComposerStartOptions {
 export type BaseStyleSource = () => Promise<AgencyStyleContent | null>;
 
 /** The active base style, or none when there is none or it cannot be read: a draft never waits on it. */
-async function baseStyleOrNone(source: BaseStyleSource | undefined): Promise<AgencyStyleContent | null> {
+export async function baseStyleOrNone(
+  source: BaseStyleSource | undefined,
+): Promise<AgencyStyleContent | null> {
   if (source === undefined) return null;
   try {
     return await source();
@@ -226,8 +233,9 @@ export async function publicBaseStyleOf(source: BaseStyleSource): Promise<string
 /**
  * Her fields for the composer, from her persona: her sheet, her own sample replies in it (P5-01), and the examples of
  * her bank chosen as the playground chooses them (ADR 0102 § 2): what the owner sees there is what a fan receives.
+ * The playground and the simulated fans read her through it too (audit du 27/11): one reading, never a copy.
  */
-function composerFields(
+export function composerFields(
   persona: PersonaForModels,
   bank: readonly VoiceExample[],
   profileBio: string | null = null,

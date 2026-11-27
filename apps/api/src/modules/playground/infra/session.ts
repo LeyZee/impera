@@ -1,5 +1,8 @@
 import {
+  FanTiersSettingSchema,
   desireBandOf,
+  fanTierOf,
+  type Language,
   type DesireBand,
   type DesireSignal,
   type MediaDescription,
@@ -12,6 +15,9 @@ import {
   checkVoiceOutput,
   checkYouthWords,
   composeTurn,
+  HISTORY_WINDOW,
+  spenderRegisterOf,
+  type ComposerPersona,
   followUpDecision,
   guardContextOf,
   withoutOrders,
@@ -216,6 +222,10 @@ export interface PlaygroundDeps {
   readonly voiceExamples?: readonly VoiceExample[];
   /** Her languages and her messages in each (`languagesOf`), as her real drafts read them (ADR 0168). */
   readonly languages: PersonaLanguages;
+  /** Whether she plays jealous (`behavior.plays_jealous`), as her real drafts read it. */
+  readonly playsJealous?: boolean;
+  /** The agency's base style (ADR 0173), its texts before her sheet, as her real drafts read it; absent: none. */
+  readonly agencyStyle?: ComposerPersona['agencyStyle'];
   readonly timeZone?: string;
   readonly now?: () => Date;
   /**
@@ -235,6 +245,12 @@ export interface PlaygroundDeps {
    */
   readonly herScripts?: () => Promise<Catalogue>;
 }
+
+/** His language as `fans` keeps it (ADR 0168 § 3): read from his messages, never set by hand here. */
+type KeptLanguage = { readonly value: Language; readonly source: 'detected' } | null;
+
+/** The tier thresholds a creator starts with (Charles, 21/11): the playground's fan is read against them. */
+const DEFAULT_FAN_TIERS = FanTiersSettingSchema.parse({});
 
 /** A fact the brain proposed, as the screen and the brain read it back: in French, never a code (recette 12/11). */
 function fanNote(fact: Brief['factsProposed'][number]): string {
@@ -268,8 +284,22 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   const history: ConversationTurn[] = [];
   // In-memory fan notes until the fans module stores facts (P3-02).
   const fanNotes: string[] = [];
-  const personaSheet = deps.personaSheet;
   const voiceExamples = deps.voiceExamples ?? [];
+  // Her persona as `composerFields` gives it to her real drafts (audit du 27/11): one shape for every turn of hers.
+  const herPersona: ComposerPersona = {
+    creatorName: deps.creatorName,
+    personaSheet: deps.personaSheet,
+    ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
+    guardSettings: deps.guardSettings,
+    ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
+    ...(deps.playsJealous !== undefined && { playsJealous: deps.playsJealous }),
+    ...(deps.agencyStyle !== undefined && { agencyStyle: deps.agencyStyle }),
+    ...(voiceExamples.length > 0 && { voiceExamples }),
+    ...deps.languages,
+  };
+  // His language as `fans` keeps it for a real fan (ADR 0168 § 3), and before each of his messages: a branch goes back.
+  let keptLanguage: KeptLanguage = null;
+  const keptLanguageBefore: KeptLanguage[] = [];
   const startedAt = (deps.now ?? (() => new Date()))();
   let situation: Situation = {
     now: startedAt,
@@ -354,6 +384,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   // The history as composeTurn reads it, each turn with its time: the trainer sees the gaps he made with `advance`.
   const dated = (): ConversationTurn[] =>
     history.map((t) => ({ ...t, at: writtenAt.get(t) ?? situation.now }));
+  // What a turn of hers reads: the last messages a real fan's conversation loads, never more (audit du 27/11).
+  const windowed = (): ConversationTurn[] => dated().slice(-HISTORY_WINDOW);
   const historyView = (): ScriptHistoryView => ({
     scripts: [...scripts.played].map(([scriptRef, played]) => ({
       scriptRef,
@@ -469,6 +501,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       desireBefore.length = 0;
       availability = null;
       availabilityBefore.length = 0;
+      keptLanguage = null;
+      keptLanguageBefore.length = 0;
       desireTrail.length = 0;
       scripts = noScripts();
       scriptsBefore.length = 0;
@@ -608,6 +642,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       desireBefore.length = fanMessageNumber - 1;
       availability = availabilityBefore[fanMessageNumber - 1] ?? null;
       availabilityBefore.length = fanMessageNumber - 1;
+      keptLanguage = keptLanguageBefore[fanMessageNumber - 1] ?? null;
+      keptLanguageBefore.length = fanMessageNumber - 1;
       desireTrail.length = fanMessageNumber - 1;
       const before = scriptsBefore[fanMessageNumber - 1];
       if (before !== undefined) {
@@ -660,26 +696,15 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         timeZone: situation.timeZone,
       });
       if (decision.kind !== 'write') return decision;
-      const composed = await composeTurn(
-        deps.gateway,
-        {
-          creatorName: deps.creatorName,
-          personaSheet,
-          ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
-          guardSettings: deps.guardSettings,
-          ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
-          ...(voiceExamples.length > 0 && { voiceExamples }),
-          ...deps.languages,
-        },
-        {
-          history: dated(),
-          fanText: '',
-          media: [],
-          fanNotes: fanNotes.join('\n'),
-          situation,
-          followUp: { silentHours: silentMs / 3_600_000, spirit: deps.followUps?.spirit ?? null },
-        },
-      );
+      const composed = await composeTurn(deps.gateway, herPersona, {
+        history: windowed(),
+        keptLanguage,
+        fanText: '',
+        media: [],
+        fanNotes: fanNotes.join('\n'),
+        situation,
+        followUp: { silentHours: silentMs / 3_600_000, spirit: deps.followUps?.spirit ?? null },
+      });
       if (!composed.isBlocked) {
         push({ from: 'creator', text: composed.bubbles.join('\n') });
         followUpsSince += 1;
@@ -708,9 +733,15 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       followUpsSince = 0;
       desireBefore.push(desire);
       availabilityBefore.push(availability);
+      keptLanguageBefore.push(keptLanguage);
       desireTrail.push(undefined);
       scriptsBefore.push(copyScripts(scripts));
-      push({ from: 'fan', text, media: media.map((description) => ({ description })) });
+      // Without media, his turn carries none, as her drafts read a real one (`draft-composer`).
+      push({
+        from: 'fan',
+        text,
+        ...(media.length > 0 && { media: media.map((description) => ({ description })) }),
+      });
       // Her catalogue as it is now, as production reads it at each message.
       await readCatalogue();
       const moment: RatedMoment = {
@@ -750,71 +781,69 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       }
       const careForced = signs.length > 0;
       const offer = offerAt(situation.now);
-      const composed = await composeTurn(
-        deps.gateway,
-        {
-          creatorName: deps.creatorName,
-          personaSheet,
-          ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
-          guardSettings: deps.guardSettings,
-          ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
-          ...(voiceExamples.length > 0 && { voiceExamples }),
-          ...deps.languages,
-        },
-        {
-          history: dated(),
-          fanText: text,
-          media,
-          fanNotes: moment.fanNotes,
-          situation,
-          ...(offer !== undefined && { offer }),
-          // Her scripts or the trial ones, read as production reads her catalogue and Reveal's history (ADR 0103 § 15):
-          // the same decision.
-          scripts: {
-            conversationRef: 'playground',
-            catalogue: catalogue.scripts.map((script) => script.view),
-            history: historyView(),
-            latest: scripts.run,
-            countsHisMessage: true,
-          },
-          // No chatter in the playground: a custom order is answered committing to nothing, as with nobody on shift.
-          customOrder: {
-            chatterOnShift: false,
-            orderOpen: customOrderOpen,
-            flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
-          },
-          ...(deps.objectionReplies !== undefined && {
-            objections: { bank: deps.objectionReplies, usedReplyIds: new Set(usedObjectionReplies) },
-          }),
-          ...(deps.sexualizationLimits !== undefined && {
-            sexualization: {
-              limits: deps.sexualizationLimits,
-              ageConfirmed: ageConfirmedAt !== null,
-              noExplicit: false,
-            },
-          }),
-          availability,
-          // The risk policy as the composer runs it (agent/domain/hold.ts): a possible minor or a dangerous request
-          // hands over and the voice does not write; distress is answered with care; without the brain's reading
-          // nobody knows the risks, so the voice does not write either (AGE-01).
-          // Called once the brain has read him, before the voice: the screen shows the reading while she writes.
-          care: (brief) => {
-            brainReading = brief;
-            return careForced || (brief !== undefined && holdDecision(brief).kind === 'care');
-          },
-          skipVoice: (brief) => {
-            if (brief === undefined) return !careForced;
-            const kind = holdDecision(brief).kind;
-            return kind === 'handoff' || (kind === 'no_reply' && !careForced);
-          },
-          desire: {
-            ...(desire !== undefined && { previous: desire }),
-            measured: measuredOnClock(),
-            ageDisputed: false,
-            counted: false,
-          },
-        },
+      // His tier from what he spent (fictive purchases included) and the default thresholds (Charles, 21/11).
+      const tier = fanTierOf(
+        { spentMinor: situation.spentCents, fanSince: situation.relationshipStartedAt },
+        DEFAULT_FAN_TIERS,
+        situation.now,
       );
+      const composed = await composeTurn(deps.gateway, herPersona, {
+        history: windowed(),
+        keptLanguage,
+        fanText: text,
+        media,
+        fanNotes: moment.fanNotes,
+        situation,
+        // His register from his tier, as the composer chooses it (ADR 0132 § 7): a whale is written to as one.
+        spenderRegister: spenderRegisterOf(tier, { fragile: false, care: careForced, moneyTrouble: false }),
+        fanTier: tier,
+        ...(offer !== undefined && { offer }),
+        // Her scripts or the trial ones, read as production reads her catalogue and Reveal's history (ADR 0103 § 15):
+        // the same decision.
+        scripts: {
+          conversationRef: 'playground',
+          catalogue: catalogue.scripts.map((script) => script.view),
+          history: historyView(),
+          latest: scripts.run,
+          countsHisMessage: true,
+        },
+        // No chatter in the playground: a custom order is answered committing to nothing, as with nobody on shift.
+        customOrder: {
+          chatterOnShift: false,
+          orderOpen: customOrderOpen,
+          flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
+        },
+        ...(deps.objectionReplies !== undefined && {
+          objections: { bank: deps.objectionReplies, usedReplyIds: new Set(usedObjectionReplies) },
+        }),
+        ...(deps.sexualizationLimits !== undefined && {
+          sexualization: {
+            limits: deps.sexualizationLimits,
+            ageConfirmed: ageConfirmedAt !== null,
+            noExplicit: false,
+          },
+        }),
+        availability,
+        // The risk policy as the composer runs it (agent/domain/hold.ts): a possible minor or a dangerous request
+        // hands over and the voice does not write; distress is answered with care; without the brain's reading
+        // nobody knows the risks, so the voice does not write either (AGE-01).
+        // Called once the brain has read him, before the voice: the screen shows the reading while she writes.
+        care: (brief) => {
+          brainReading = brief;
+          return careForced || (brief !== undefined && holdDecision(brief).kind === 'care');
+        },
+        skipVoice: (brief) => {
+          if (brief === undefined) return !careForced;
+          const kind = holdDecision(brief).kind;
+          return kind === 'handoff' || (kind === 'no_reply' && !careForced);
+        },
+        desire: {
+          ...(desire !== undefined && { previous: desire }),
+          measured: measuredOnClock(),
+          ageDisputed: false,
+          counted: false,
+        },
+      });
       brainReading = undefined;
       const decided = composed.brief === undefined ? undefined : holdDecision(composed.brief);
       const hold: PlaygroundTurn['hold'] =
@@ -831,6 +860,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       if (hold?.kind === 'handoff' || hold?.kind === 'care') scripts = { ...scripts, salesFrozen: true };
       if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
       if (composed.availability !== undefined) availability = composed.availability.record;
+      // His language kept as `keepLanguage` keeps it for a real fan.
+      const keep = composed.language?.keep ?? null;
+      if (keep !== null) keptLanguage = { value: keep, source: 'detected' };
       if (composed.customOrder?.kind === 'reply' && composed.customOrder.opens) customOrderOpen = true;
       if (composed.objectionReply !== undefined && !composed.isBlocked)
         usedObjectionReplies.push(composed.objectionReply.replyId);

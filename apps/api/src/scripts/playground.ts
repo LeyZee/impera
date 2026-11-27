@@ -110,6 +110,7 @@ const session = createPlaygroundSession({
   personaSheet: persona.personaSheet,
   guardSettings: guardSettingsOf(persona),
   splitMessages: persona.splitMessages,
+  playsJealous: persona.playsJealous,
   voiceExamples: examples,
   languages: languagesOf(persona),
   timeZone: values.fuseau,
