@@ -25,6 +25,7 @@ import {
   INVOICE_REASON_MAX,
   LEGAL_NAME_MAX,
   PAY_AMOUNT_MAX_MINOR,
+  PAYOUT_RECEIVE_METHODS,
   PAYMENT_TERMS_MAX,
   POSTAL_ADDRESS_MAX,
   RCS_CITY_MAX,
@@ -817,5 +818,40 @@ export const invoicePdfCopies = pgTable(
       sql`${textBetween(t.storageKey, STORAGE_KEY_MAX)} and ${sha256Check(t.sha256)}`,
     ),
     pgPolicy('member_read', { for: 'select', using: ofInvoice(t.invoiceId, sql`true`) }),
+  ],
+);
+
+/**
+ * « Où te verser » (ADR 0165): where a member receives his transfers, one row per version, the newest in force. The way
+ * he receives is in clear; the beneficiary, the number and the note are one block sealed by the API with
+ * CREDENTIALS_ENCRYPTION_KEYS under `payout_destination:<member>:<id>`. The member alone adds a version for himself
+ * (never the owner nor a manager for him); he and the owner read; nobody changes nor deletes a row (trigger). A key
+ * rotation adds a version marked `resealed`, never an update. The service role has no grant (ADR 0165 § 4).
+ */
+export const payoutDestinations = pgTable(
+  'payout_destinations',
+  {
+    id: id(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    method: text('method').notNull(),
+    detailsCiphertext: bytea('details_ciphertext').notNull(),
+    /** A key rotation's copy of the version before it: neither a change said to the owner nor one counted for the day. */
+    resealed: boolean('resealed').notNull().default(false),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('payout_destinations_member_idx').on(t.memberId, t.createdAt),
+    enumCheck('payout_destinations', t.method, PAYOUT_RECEIVE_METHODS),
+    check('payout_destinations_size_check', sql`octet_length(${t.detailsCiphertext}) between 1 and 4096`),
+    pgPolicy('owner_or_self_select', { for: 'select', using: sql`${isOwner} or ${isMine(t.memberId)}` }),
+    pgPolicy('self_insert', {
+      for: 'insert',
+      withCheck: sql`${isMine(t.memberId)} and ${t.createdBy} = ${currentUser} and not ${t.resealed} and ${t.createdAt} = now()`,
+    }),
   ],
 );

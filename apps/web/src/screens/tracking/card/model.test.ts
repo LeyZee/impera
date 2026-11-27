@@ -35,7 +35,12 @@ describe('the fan card (ADR 0085, lot c)', () => {
       'dislikes_about_her',
       'outfits',
     ]);
-    expect(fieldsOf('intimate').map((spec) => spec.field)).toEqual(['intensity', 'lead']);
+    expect(fieldsOf('intimate').map((spec) => spec.field)).toEqual([
+      'words_that_work',
+      'cools_him',
+      'intensity',
+      'lead',
+    ]);
     const shown = [
       ...ESSENTIALS,
       ...(['him', 'about_her', 'intimate'] as const).flatMap((g) => fieldsOf(g).map((spec) => spec.field)),
@@ -72,7 +77,7 @@ describe('the fan card (ADR 0085, lot c)', () => {
     ];
     // The first name shows on top among the essentials: the fold counts only what it holds (Design 21/11).
     expect(groupLine(entries, 'him')).toEqual({ filled: '2 sur 9', toCheck: 1 });
-    expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 2', toCheck: 0 });
+    expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 4', toCheck: 0 });
   });
 
   it('takes one line for a one-value field, one item per line for a list, and keeps the save shut when empty', () => {

@@ -111,6 +111,7 @@ const ENTITY_LINKS: Readonly<Record<string, AuditLink['kind']>> = {
   invoice: 'invoice',
   team_member: 'member',
   contractor_profile: 'member',
+  payout_destination: 'member',
   creator: 'creator',
   shift: 'shift',
 };

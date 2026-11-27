@@ -44,7 +44,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/scheduling': 31,
   'modules/scripts': 16,
   'modules/supervision': 2,
-  'modules/team': 1,
+  // +1 for a departure at its hour (ADR 0166 § 2): the owners in office, read only, so that a departure never depends
+  // on the owner who set it still being one.
+  'modules/team': 2,
   'modules/telegram': 10,
   'modules/trends': 8,
   // +2 for a live worker freeing its own locks on jobs whose completion was lost (recette COUV-14): Graphile's tables,

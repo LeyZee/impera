@@ -106,9 +106,18 @@ export const MEMBER_PASSWORD = 'staple battery horse';
 const quiet = { warn: () => undefined, error: () => undefined };
 const RefusalSchema = z.object({ error: z.object({ code: z.string(), details: z.unknown() }) });
 
-export async function startPayrollTeam(superuserUrl: string, options: AppOptions = {}): Promise<PayrollTeam> {
+export async function startPayrollTeam(
+  superuserUrl: string,
+  options: AppOptions = {},
+  /** More environment, such as `CREDENTIALS_ENCRYPTION_KEYS` for « Où te verser » (ADR 0165). */
+  environment: NodeJS.ProcessEnv = {},
+): Promise<PayrollTeam> {
   const test = await createTestDb(superuserUrl);
-  const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
+  const config = testConfig({
+    ...environment,
+    DATABASE_URL: test.appUrl,
+    DATABASE_SERVICE_URL: test.serviceUrl,
+  });
   const app = await createApp(config, createLogger(config), options);
   const server = await buildServer({
     config,
