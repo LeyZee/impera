@@ -163,6 +163,15 @@ describe('RewardRevealGate (ADR 0104 § 12)', () => {
     expect(urls.filter((url) => url.startsWith('/v1/rewards'))).toEqual([]);
   });
 
+  it('plays nothing for a member who is not active, and marks nothing seen (CHAT-13)', async () => {
+    const { urls, marked } = serve(CASE);
+    mount({ ...THEO_ME, team: { role: 'chatter', status: 'suspended' } });
+    await Promise.resolve();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(urls.filter((url) => url.startsWith('/v1/rewards'))).toEqual([]);
+    expect(marked).toEqual([]);
+  });
+
   it('marks a kind it cannot draw as seen without a show: with what is shown, or alone at once', async () => {
     const { marked } = serve({
       ...CASE,

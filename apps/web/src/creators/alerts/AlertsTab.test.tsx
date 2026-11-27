@@ -195,8 +195,56 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
     fireEvent.click(within(manager).getByRole('radio', { name: 'Rien' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toBe('Le serveur ne répond pas. Réessaie dans un instant.');
-    expect(within(manager).getByRole('radio', { name: 'Sourdine' }).getAttribute('aria-checked')).toBe(
-      'true',
+    await waitFor(() => {
+      expect(within(manager).getByRole('radio', { name: 'Sourdine' }).getAttribute('aria-checked')).toBe(
+        'true',
+      );
+    });
+  });
+
+  it('keeps a change saved since when an earlier one of the same line fails (CODE-04)', async () => {
+    // The server keeps what it saved; the first write fails only once the second one went through.
+    let held = lines();
+    const gate: { fail: (() => void) | null } = { fail: null };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string, init?: RequestInit) => {
+        if (init?.method === undefined || init.method === 'GET')
+          return Promise.resolve(new Response(JSON.stringify({ creatorId: CREATOR, alerts: held })));
+        const code = new URL(input, 'http://localhost').pathname.split('/').at(-1);
+        const { routes } = SetCreatorAlertBodySchema.parse(
+          JSON.parse(typeof init.body === 'string' ? init.body : 'null'),
+        );
+        if (gate.fail === null && routes.manager === 'off')
+          return new Promise<Response>((resolve) => {
+            gate.fail = () => {
+              resolve(new Response('{}', { status: 503 }));
+            };
+          });
+        held = held.map((each) => (each.code === code ? { ...each, routes, isDefault: false } : each));
+        const saved = held.find((each) => each.code === code);
+        return Promise.resolve(new Response(JSON.stringify(saved)));
+      }),
     );
+    renderTab();
+    const sale = await lineOf('Vente');
+    const owner = within(sale).getByRole('radiogroup', { name: 'Vente, Propriétaire' });
+    fireEvent.click(
+      within(within(sale).getByRole('radiogroup', { name: 'Vente, Manager' })).getByRole('radio', {
+        name: 'Rien',
+      }),
+    );
+    await waitFor(() => {
+      expect(gate.fail).not.toBeNull();
+    });
+    fireEvent.click(within(owner).getByRole('radio', { name: 'Sourdine' }));
+    expect(await screen.findByText('Vente : enregistré.')).toBeTruthy();
+    gate.fail?.();
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    await waitFor(() => {
+      expect(within(owner).getByRole('radio', { name: 'Sourdine' }).getAttribute('aria-checked')).toBe(
+        'true',
+      );
+    });
   });
 });

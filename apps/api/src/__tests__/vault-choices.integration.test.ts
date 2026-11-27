@@ -335,5 +335,27 @@ describe('her vault, imported and described by choice', () => {
       count: 0,
       alreadyDescribed: 1,
     });
+
+    // Validated from its sheet (REV-02), once: a second click is no error, an id no longer its latest is refused.
+    expect(b1?.validated).toBe(false);
+    const descriptionId = b1?.descriptionId;
+    if (descriptionId == null) throw new Error('b1 has its description');
+    const review = { kind: 'validate', platformAccountId: noraAccount, descriptionId };
+    const validated = await call('POST', '/media/b1/description', 'owner', review);
+    expect(validated.statusCode, validated.body).toBe(200);
+    expect(
+      VaultChoicesViewSchema.parse(validated.json()).media.find((media) => media.platformMediaId === 'b1'),
+    ).toMatchObject({ validated: true, descriptionId });
+    expect((await call('POST', '/media/b1/description', 'owner', review)).statusCode).toBe(200);
+    const stale = await call('POST', '/media/b1/description', 'owner', {
+      ...review,
+      descriptionId: crypto.randomUUID(),
+    });
+    expect(stale.statusCode).toBe(409);
+    const trail = await test.admin.db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`action = 'media_description.validated'`);
+    expect(trail).toHaveLength(1);
   });
 });

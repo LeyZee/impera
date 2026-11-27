@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 
 import { CreatorReader } from './CreatorReader';
 import { EarningsCard } from './EarningsCard';
-import { FanInsights } from './FanInsights';
+import { FanInsights, FanInsightsWaitLine } from './FanInsights';
 import { useCreatorFanInsights, useCreatorFans } from './api';
 import { fanName, seenOf, unlockedOf } from './view';
 import './sales.css';
@@ -16,9 +16,10 @@ import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
- * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her fans, what each unlocked and when he was last seen; a fan
- * opens his conversation, read only. Her part and her sales come first (CR-04, « Ta part »); beside a fan, the price
- * is said « avant parts », what he paid and not what she earns (recette 05/11, reco 20). No note of a fan:
+ * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her part and her sales first (CR-04, « Ta part »), then her fans, what
+ * each unlocked and when he was last seen; a fan opens his conversation, read only. « Qui sont tes fans » comes after
+ * them (choice of 21/11). Beside a fan, the price is said « avant parts », what he paid and not what she earns (recette
+ * 05/11, reco 20). No note of a fan:
  * what the agency knows of him is its own (Charles, 03/11).
  */
 export function CreatorSalesPage({
@@ -55,7 +56,6 @@ export function CreatorSalesPage({
         />
       ) : null}
       {silent ? null : <EarningsCard />}
-      <FanInsights silent={silent} />
       {silent ? null : (
         <div className="vt-cols">
           <div className="vt-list">
@@ -97,6 +97,7 @@ export function CreatorSalesPage({
                           {fans.isFetchingNextPage ? 'Chargement…' : 'Plus de fans'}
                         </button>
                       ) : null}
+                      <FanInsightsWaitLine />
                     </>
                   )}
                 </PanelSection>
@@ -119,6 +120,8 @@ export function CreatorSalesPage({
           </div>
         </div>
       )}
+      {/* Her fans first, what they are like after, once there is enough to say it (choice of 21/11). */}
+      <FanInsights silent={silent} />
     </Page>
   );
 }
@@ -147,8 +150,12 @@ function FanRow({
           {fan.conversationId === null ? `${seen} · pas encore de conversation` : seen}
         </span>
       </span>
-      {/* Nothing unlocked, nothing written: a dash on every line was noise (recette visuelle 16/11, CRE-02). */}
-      {unlocked === null ? null : <span className="vt-row__amount nv-num">{unlocked}</span>}
+      {/* Every fan has his amount on the right, in words when he unlocked nothing (choice of 21/11). */}
+      {unlocked === null ? (
+        <span className="vt-row__amount vt-row__amount--none">rien débloqué</span>
+      ) : (
+        <span className="vt-row__amount nv-num">{unlocked}</span>
+      )}
     </>
   );
   const { conversationId } = fan;

@@ -140,8 +140,9 @@ export const NOTIFICATION_REASONS = [
    */
   'owner_change',
   /**
-   * A question put to a creator on her « À décider » card (ADR 0164 § 9): once per question, held in the quiet hours,
-   * within the daily cap like a reminder.
+   * A question put to a creator on her « À décider » card (ADR 0164 § 9), or something the agency asked of her (a
+   * request for content, a script, a proposition for her agenda, her week validated; trou 9 du 21/11): once per thing
+   * asked, held in the quiet hours, within the daily cap like a reminder.
    */
   'decision',
   /**
@@ -155,7 +156,8 @@ export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
 
 /**
  * The sorts of notification a creator chooses herself in Moi › Notifications (ADR 0150 § 16 ter): an agency request
- * (a task of her agenda), the week to validate, her earnings (her part of a sale), her lives. Each one is on until she
+ * (a task of her agenda coming, a request for content, a script asked, a proposition for her agenda), the week to
+ * validate (her week validated by the owner, for her to accept), her earnings (her part of a sale), her lives. Each one is on until she
  * turns it off; the agency neither reads nor changes these choices, and they touch no alert of the team.
  */
 export const NOTIFICATION_KINDS = ['agency_request', 'week_to_validate', 'earnings', 'lives'] as const;

@@ -4,20 +4,20 @@ import { describe, expect, it } from 'vitest';
 import { canTickDay, DAY_DEFAULTS, dayLines, targetOf } from '../day';
 
 describe('her day (ADR 0140, second avenant of 20/11)', () => {
-  it('leads with the essentials: her Reveal story, her video, her story that leads to Reveal', () => {
+  it('leads with the essentials: her video, her story that leads to Reveal; never a Reveal story (Charles, 27/11)', () => {
     const lines = dayLines(DAY_DEFAULTS, {});
     expect(lines.filter((line) => line.essential).map((line) => line.item)).toEqual([
-      'reveal_story',
       'reveal_video',
       'insta_cta_story',
     ]);
-    expect(lines.slice(0, 3).every((line) => line.essential)).toBe(true);
+    expect(lines.slice(0, 2).every((line) => line.essential)).toBe(true);
+    // Her Reveal story is the feed's video, put out by Impera: nothing for her to post.
+    expect(lines.map((line) => line.item)).not.toContain('reveal_story');
   });
 
   it('asks Charles’s rhythm: 4 Instagram stories with the one to Reveal, 2 posts, a Reel, 3 Telegram posts', () => {
     const targets = Object.fromEntries(dayLines(DAY_DEFAULTS, {}).map((line) => [line.item, line.target]));
     expect(targets).toEqual({
-      reveal_story: 1,
       reveal_video: 1,
       insta_cta_story: 1,
       insta_stories: 3,
@@ -44,10 +44,10 @@ describe('her day (ADR 0140, second avenant of 20/11)', () => {
   });
 
   it('counts what she did up to what the line asks, never beyond nor below zero', () => {
-    const lines = dayLines(DAY_DEFAULTS, { insta_posts: 5, reveal_story: -1, insta_stories: 2 });
+    const lines = dayLines(DAY_DEFAULTS, { insta_posts: 5, insta_reel: -1, insta_stories: 2 });
     const done = new Map(lines.map((line) => [line.item, line.done]));
     expect(done.get('insta_posts')).toBe(2);
-    expect(done.get('reveal_story')).toBe(0);
+    expect(done.get('insta_reel')).toBe(0);
     expect(done.get('insta_stories')).toBe(2);
   });
 

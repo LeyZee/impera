@@ -104,7 +104,7 @@ export function createConversationRoutes(
       '/conversations/stop',
       { ...read, schema: { querystring: CreatorQuerySchema, response: { 200: SendingStopSchema } } },
       async (request) => {
-        return { stopped: await reads.stopped(viewerAt(request), request.query.creatorId) };
+        return reads.stopped(viewerAt(request), request.query.creatorId);
       },
     );
 

@@ -31,3 +31,20 @@ export class VaultDescribeOverCap extends DomainError {
     );
   }
 }
+
+/** A media of her vault without that description to review (404): nothing is validated. */
+export class VaultDescriptionNotFound extends DomainError {
+  constructor() {
+    super('vault_description_not_found', 'Description introuvable pour ce média');
+  }
+}
+
+/** The description reviewed is no longer the one shown (409): another took its place meanwhile; nothing is written. */
+export class VaultDescriptionStale extends DomainError {
+  constructor() {
+    super(
+      'vault_description_stale_conflict',
+      'Cette description a changé entre-temps : relis la nouvelle avant de la valider',
+    );
+  }
+}

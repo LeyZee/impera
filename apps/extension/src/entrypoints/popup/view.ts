@@ -10,7 +10,7 @@ import {
   awayOf,
   awayTitle,
   firstNameOf,
-  initialsOf,
+  initialOf,
   kindLabel,
   kindOf,
   shortcutsFor,
@@ -245,7 +245,7 @@ function account(me: Me, onOpen: () => void): HTMLElement {
       'aria-label': `${name}, ton compte dans le CRM`,
     },
     // No neon ring: the neon is the screen's action (V-EXT-26).
-    h('span', { class: 'nv-avatar pp-avatar', 'aria-hidden': 'true' }, initialsOf(me)),
+    h('span', { class: 'nv-avatar pp-avatar', 'aria-hidden': 'true' }, initialOf(me)),
     h(
       'span',
       { class: 'pp-account__text' },

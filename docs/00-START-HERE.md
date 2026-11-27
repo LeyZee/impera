@@ -2,6 +2,10 @@
 
 Ce dépôt est conçu pour être travaillé par des sessions d'agents codeurs (Claude Opus 5.5 via Claude Code), une tâche à la fois, sous l'architecture définie par Charles et Claude Fable 5.1. Ce fichier dit quoi lire, dans quel ordre, selon ce que tu as à faire. Compte 10 minutes de lecture avant la première ligne de code : c'est rentable.
 
+## Pour retrouver une règle (humain ou agent)
+
+`docs/regles/README.md` : la règle en vigueur, rangée par sujet (vente, paie, Reveal, équipe…), avec pour chaque décision ce qui l'a changée depuis. C'est la porte d'entrée la plus courte ; le journal des sessions ne sert qu'à savoir pourquoi.
+
 ## Toujours (5 min)
 
 1. `CLAUDE.md` : les règles.

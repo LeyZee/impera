@@ -5,7 +5,7 @@ import type { KeyActor } from '../domain/sales-feed';
 
 const REFUSALS: Readonly<Record<LinkServiceRefusalKind, string>> = {
   not_connected: 'Aucune clé du service de liens n’est enregistrée. Colle-la dans Réglages.',
-  off: 'Le service de liens n’est pas configuré sur ce serveur.',
+  off: 'Le service de liens n’est pas encore installé : ajoute ses liens à la main.',
   unauthorized: 'Le service de liens refuse cette clé. Vérifie que tu as collé la clé entière.',
   forbidden: 'Le service de liens n’ouvre pas son accès à ce compte.',
   rate_limited: 'Le service de liens demande d’attendre. Réessaie dans quelques minutes.',

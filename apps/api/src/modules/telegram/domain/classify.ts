@@ -532,7 +532,7 @@ export function classify(
         ...(causeTopic !== undefined && causeTopic !== 'important' && { fallbackTopic: 'important' }),
         threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
         title: isUrgent ? 'URGENT' : 'Important',
-        body: `${cause} Il n’écrit plus à ce fan et attend un humain.`,
+        body: `${cause} L’agent n’écrit plus à ce fan et attend un humain.`,
         link: conversationLink(signal.conversationId),
       };
     }
@@ -555,7 +555,7 @@ export function classify(
         topic: 'important',
         threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
         title: 'Important',
-        body: 'Un message de l’agent n’a pas pu partir. Il n’écrit plus à ce fan et attend un humain.',
+        body: 'Un message de l’agent n’a pas pu partir. L’agent n’écrit plus à ce fan et attend un humain.',
         link: conversationLink(signal.conversationId),
       };
     case 'takeover':

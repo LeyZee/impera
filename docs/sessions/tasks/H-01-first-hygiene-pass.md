@@ -1,6 +1,6 @@
 # H-01 Première session d'hygiène
 
-Statut : todo
+Statut : superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : knip, l'audit des dépendances et check-repo tournent dans `pnpm check` et la CI ; le rangement des docs du 27/11 a fait le reste) ; statut précédent : todo
 Phase : 0 (après P0-07b)
 Dépend de : P0-07b
 Branche : task/h-01-first-hygiene-pass

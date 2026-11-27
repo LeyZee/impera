@@ -10,18 +10,19 @@ import {
   type ContentRequest,
   type DropCategory,
   type DropMime,
+  type ReadyVideoId,
 } from '@impera/contracts';
 import { useRef, useState, type JSX } from 'react';
 
 import { Thumb } from './Thumb';
-import { Refused, createDrop } from './api';
-import { durationOf } from './media-length';
+import { Refused, createDrop, useReadyVideoTypes } from './api';
+import { factsOf } from './media-length';
 import {
-  CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   HEAVY_BYTES,
   UNKNOWN_TYPE,
   acceptOf,
+  measuredVideoRefusal,
   mediaLabel,
   mimeOf,
   moved,
@@ -80,12 +81,22 @@ export function DropSheet({
   const [failed, setFailed] = useState<string | null>(null);
   // The drop's id is drawn once: a tap replayed after a cut answers the same drop.
   const [dropId] = useState(() => ContentDropIdSchema.parse(crypto.randomUUID()));
+  // A video to sell carries its type, chosen among the owner's lines: the AI prices it in that line's range.
+  const typed = category === 'sale_video';
+  const readyTypes = useReadyVideoTypes(typed);
+  const [readyVideoId, setReadyVideoId] = useState<ReadyVideoId | null>(null);
+  // No type to give (none yet, or not read): nothing to pick, so no gallery to open.
+  const untypable = typed && (readyTypes.data?.types.length ?? 0) === 0;
 
   const countRefusal = chosen.length === 0 ? null : dropCountRefusal(category, chosen.length);
   const total = chosen.reduce((sum, item) => sum + item.file.size, 0);
   const refused = chosen.filter((item) => item.refusal !== null).length;
   const ready =
-    chosen.length > 0 && countRefusal === null && refused === 0 && chosen.every((item) => item.checked);
+    chosen.length > 0 &&
+    countRefusal === null &&
+    refused === 0 &&
+    chosen.every((item) => item.checked) &&
+    (!typed || readyVideoId !== null);
 
   /** Her files added to the list, each video's and vocal's length read after, to say « Vidéo · 8 s ». */
   const add = (picked: readonly File[]): void => {
@@ -108,8 +119,14 @@ export function DropSheet({
       }
       const kind = item.mime === null ? null : kindOfMime(item.mime);
       if (kind !== 'video' && kind !== 'audio') continue;
-      void durationOf(item.file, kind).then((ms) => {
-        setChosen((list) => list.map((one) => (one.id === item.id ? { ...one, ms } : one)));
+      void factsOf(item.file, kind).then((facts) => {
+        // A video in the wrong orientation or too long is refused here, before it goes up (recette MED-04).
+        const measured = kind === 'video' ? measuredVideoRefusal(category, facts) : null;
+        setChosen((list) =>
+          list.map((one) =>
+            one.id === item.id ? { ...one, ms: facts.ms, refusal: one.refusal ?? measured } : one,
+          ),
+        );
       });
     }
   };
@@ -126,6 +143,7 @@ export function DropSheet({
       category,
       sentence: said === '' ? null : said,
       requestId: request?.id ?? null,
+      readyVideoId: typed ? readyVideoId : null,
       files,
     })
       .then((drop) => {
@@ -149,13 +167,59 @@ export function DropSheet({
 
   return (
     <Dialog
-      title={`${CATEGORY_EMOJIS[category]} ${DROP_CATEGORY_LABELS[category]}`}
+      title={DROP_CATEGORY_LABELS[category]}
       lead={request === null ? CATEGORY_HINTS[category] : request.reason}
       busy={busy}
       className="ct-sheet"
       onClose={onClose}
     >
       <div className="ct-form">
+        {typed ? (
+          <div className="nv-field">
+            <span className="nv-field__label" id={`${dropId}-type`}>
+              Quel type de vidéo ?
+            </span>
+            {readyTypes.isPending ? (
+              <p className="ct-note">Un instant…</p>
+            ) : readyTypes.isError ? (
+              <div className="nv-note nv-note--warn">
+                <p className="nv-note__title">Les types ne se chargent pas</p>
+                <p className="ct-note">Vérifie ta connexion, puis réessaie.</p>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--soft nv-btn--sm ct-retry"
+                  onClick={() => {
+                    void readyTypes.refetch();
+                  }}
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : readyTypes.data.types.length === 0 ? (
+              <p className="nv-note">
+                L’agence n’a pas encore créé de types de vidéo : tu pourras déposer dès qu’elle l’aura fait.
+              </p>
+            ) : (
+              <div className="ct-types" role="radiogroup" aria-labelledby={`${dropId}-type`}>
+                {readyTypes.data.types.map((one) => (
+                  <button
+                    key={one.id}
+                    type="button"
+                    role="radio"
+                    className="nv-chip"
+                    aria-checked={readyVideoId === one.id}
+                    disabled={busy}
+                    onClick={() => {
+                      setReadyVideoId(one.id);
+                    }}
+                  >
+                    {one.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
         <input
           ref={picker}
           type="file"
@@ -168,14 +232,16 @@ export function DropSheet({
             add(picked);
           }}
         />
-        <button
-          type="button"
-          className={chosen.length === 0 ? 'nv-btn nv-btn--neon ct-pick' : 'nv-btn nv-btn--soft ct-pick'}
-          disabled={busy}
-          onClick={() => picker.current?.click()}
-        >
-          {chosen.length === 0 ? 'Choisir dans ma galerie' : 'Ajouter des fichiers'}
-        </button>
+        {untypable ? null : (
+          <button
+            type="button"
+            className={chosen.length === 0 ? 'nv-btn nv-btn--neon ct-pick' : 'nv-btn nv-btn--soft ct-pick'}
+            disabled={busy}
+            onClick={() => picker.current?.click()}
+          >
+            {chosen.length === 0 ? 'Choisir dans ma galerie' : 'Ajouter des fichiers'}
+          </button>
+        )}
 
         {chosen.length === 0 ? null : (
           <ul className="ct-chosen">
@@ -257,18 +323,20 @@ export function DropSheet({
           </p>
         ) : null}
 
-        <label className="nv-field">
-          <span className="nv-field__label">Un mot sur ce que tu as fait (facultatif)</span>
-          <input
-            className="nv-field__control"
-            maxLength={200}
-            value={sentence}
-            disabled={busy}
-            onChange={(event) => {
-              setSentence(event.target.value);
-            }}
-          />
-        </label>
+        {untypable ? null : (
+          <label className="nv-field">
+            <span className="nv-field__label">Un mot sur ce que tu as fait (facultatif)</span>
+            <input
+              className="nv-field__control"
+              maxLength={200}
+              value={sentence}
+              disabled={busy}
+              onChange={(event) => {
+                setSentence(event.target.value);
+              }}
+            />
+          </label>
+        )}
 
         {failed === null ? null : (
           <p className="ct-warn" role="alert">
@@ -276,14 +344,26 @@ export function DropSheet({
           </p>
         )}
         <div className="ct-form__actions">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="button" className="nv-btn nv-btn--neon" disabled={!ready || busy} onClick={send}>
-            {busy ? 'Un instant…' : 'Envoyer'}
-          </button>
+          {/* No type to give: nothing to send, one way out (relecture Design, 26/11). */}
+          {untypable && !readyTypes.isPending ? (
+            <button type="button" className="nv-btn nv-btn--soft" onClick={onClose}>
+              Fermer
+            </button>
+          ) : (
+            <>
+              <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+                Annuler
+              </button>
+              <button type="button" className="nv-btn nv-btn--neon" disabled={!ready || busy} onClick={send}>
+                {busy ? 'Un instant…' : 'Envoyer'}
+              </button>
+            </>
+          )}
         </div>
         {/* Why « Envoyer » stays grey, beside it: the refused line may be out of sight in a long list (CRE-16). */}
+        {typed && readyVideoId === null && chosen.length > 0 && refused === 0 ? (
+          <p className="ct-warn ct-form__why">Choisis le type de la vidéo pour envoyer.</p>
+        ) : null}
         {refused === 0 ? null : (
           <p className="ct-warn ct-form__why">
             {refused === 1

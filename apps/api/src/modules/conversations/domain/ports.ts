@@ -247,6 +247,8 @@ interface DraftRepository {
     bubbles?: readonly string[];
     /** Soft guard findings the operator should see next to the draft. */
     softViolations?: readonly string[];
+    /** The blocking codes of a first answer set aside and written again (IA-08), shown under the draft. */
+    retried?: readonly string[];
     /** The voice that wrote it, for the live rate (ADR 0019). */
     voice?: DraftVoice;
     /**
@@ -815,6 +817,8 @@ export type ComposeResult =
       readonly kind: 'draft';
       readonly bubbles: readonly string[];
       readonly softViolations: readonly string[];
+      /** The blocking codes of a first answer set aside and written again (IA-08). */
+      readonly retried?: readonly string[];
       readonly costUsd: number;
       readonly voice?: DraftVoice;
       /** Her persona version it was written with (ADR 0019): never the one active when it is saved. */
@@ -1057,6 +1061,8 @@ export interface ConversationReader {
   desireCurve(creatorId: CreatorId, id: ConversationId): Promise<DesireCurve | null>;
   /** Whether the latest global or creator-wide emergency stop of hers is on (recette CHAT-07). */
   sendingStopped(creatorId: CreatorId): Promise<boolean>;
+  /** The platforms where a session of one of her accounts expired (recette REV-05), each once. */
+  expiredSessions(creatorId: CreatorId): Promise<readonly Platform[]>;
 }
 
 /** The conversation open on the platform, as the copilot panel reads it (ADR 0086 § 3, § 9). */

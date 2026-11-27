@@ -128,11 +128,22 @@ function Panel({
   );
 }
 
+const written = (value: Answer | undefined): boolean => typeof value === 'string' && value.trim() !== '';
+
+/**
+ * « Zones interdites » left empty while Intimité's « Zones interdites / limites strictes » holds her limits: the empty
+ * panel would read as if the agency had noted none (recette MOD-04). It shows again once written, or alone.
+ */
+const emptyTwin = (section: SheetSection, sheet: PersonaSheet): boolean =>
+  section.key === 'boundaries' &&
+  !written(sheet.boundaries.off_limits) &&
+  written(sheet.intimacy.no_go_zones);
+
 /** Her seven panels, in Desirali's order (ADR 0079 § 6). */
 function Sheet({ sheet, correcting }: { sheet: PersonaSheet; correcting: Correcting }): JSX.Element {
   return (
     <>
-      {PERSONA_SHEET.map((section, index) => (
+      {PERSONA_SHEET.filter((section) => !emptyTwin(section, sheet)).map((section, index) => (
         <Panel key={section.key} section={section} sheet={sheet} correcting={correcting} open={index === 0} />
       ))}
     </>

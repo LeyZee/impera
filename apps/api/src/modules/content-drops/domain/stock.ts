@@ -9,7 +9,7 @@ import type { DropCategory, StockCategory, StockStatus } from '@impera/contracts
  * How a category is counted (ADR 0163 § 3):
  * - `days`: its stock in days of advance at its pace (a drop or a file each day, or a few a week);
  * - `count`: a stock that is not spent at a pace (scripts, gifts), held against a minimum;
- * - `bonus`: nothing is asked of her (Telegram rides on the feed's video), only shown.
+ * - `bonus`: nothing is asked of her (Telegram and her Reveal story ride on the feed's video), only shown.
  */
 export type StockRule =
   | {
@@ -29,7 +29,8 @@ const WEEK = 7;
 export const STOCK_RULES: Readonly<Record<DropCategory, StockRule>> = {
   feed_video: { mode: 'days', unit: 'file', perDay: 1, targetDays: 7 },
   feed_shoot: { mode: 'days', unit: 'drop', perDay: 3 / WEEK, targetDays: 7 },
-  reveal_story: { mode: 'days', unit: 'file', perDay: 1, targetDays: 7 },
+  // Her story is the feed's video with a caption of its own (Charles, 27/11): nothing more to shoot, shown only.
+  reveal_story: { mode: 'bonus', unit: 'file' },
   mass_dm: { mode: 'days', unit: 'file', perDay: 3 / WEEK, targetDays: 7 },
   // Three playable scripts for the AI to speak (ADR 0145), and one ahead.
   script: { mode: 'count', unit: 'drop', target: 4 },

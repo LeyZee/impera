@@ -22,7 +22,7 @@ Chaque dimanche à 18 h dans son fuseau, le code calcule sa **semaine** suivante
 
 ## Routes
 
-- `GET /v1/creators/:creatorId/weeks/:week` (propriétaire, manager actif) : le brouillon ou la semaine validée ; 404 avant le calcul.
+- `GET /v1/creators/:creatorId/weeks/:week` (propriétaire, manager actif) : le brouillon ou la semaine validée ; 204 avant le calcul.
 - `POST /v1/creators/:creatorId/weeks/:week/validate` (propriétaire) : la semaine corrigée (jours, lignes déplacées, retirées ou reformulées) ; un jour hors de la semaine répond 422 `creator_week_plan_unprocessable`.
 - `GET /v1/creator-space/week?week=` (créatrice) : ses jours de tournage et leurs lignes, sa livraison ligne par ligne ; vide avant la validation.
 - `POST /v1/creator-space/week/accept` (créatrice) : « Accepter ma semaine », chaque tâche par ses propres règles ; rejouable.

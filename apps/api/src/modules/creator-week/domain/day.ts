@@ -7,8 +7,6 @@ import { addDays } from '../../scheduling/pure';
  * ticks. Nothing here is ever published for her. Until her own settings come, these are the values every day reads.
  */
 export interface DaySettings {
-  /** Her story on Reveal (one a day). */
-  readonly revealStories: number;
   /** Her video of the day on Reveal's public video feed (one a day), never on Instagram. */
   readonly revealVideos: number;
   /** Her Instagram stories, the one that leads to Reveal included (at least 4). */
@@ -25,7 +23,6 @@ export interface DaySettings {
 
 /** Charles's rhythm (20/11). */
 export const DAY_DEFAULTS: DaySettings = {
-  revealStories: 1,
   revealVideos: 1,
   instaStories: 4,
   instaPosts: 2,
@@ -36,7 +33,7 @@ export const DAY_DEFAULTS: DaySettings = {
 
 interface ItemRule {
   readonly platform: DayPlatform;
-  /** One of the essentials of the day (Charles, 20/11: her Reveal story, her story to Reveal, her video). */
+  /** One of the essentials of the day (Charles, 20/11: her story to Reveal, her video). */
   readonly essential: boolean;
   readonly target: (settings: DaySettings) => number;
   readonly label: (target: number) => string;
@@ -48,10 +45,12 @@ const plural = (count: number, one: string, many: string): string =>
 
 /** Each line of her day: where, how many, her words. Her video and her stories never go from Reveal to Instagram. */
 const RULES: Readonly<Record<DayItem, ItemRule>> = {
+  // Her Reveal story is the feed's video with a caption of its own, put out by Impera (Charles, 27/11; ADR 0136 § 11):
+  // nothing for her to post, so the line asks nothing and her day leaves it out.
   reveal_story: {
     platform: 'reveal',
     essential: true,
-    target: (s) => s.revealStories,
+    target: () => 0,
     label: (n) => (n === 1 ? 'Ta story Reveal' : `${String(n)} stories Reveal`),
     sheet:
       'Un moment de ta journée, ce que tu veux. Tes abonnés voient que tu es là, et ça leur donne envie de t’écrire.',

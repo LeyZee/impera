@@ -1,4 +1,12 @@
-import type { AgeBand, FanPlace, FanSituation, JobFamily, OTHER_CASE, SpendingTier } from '@impera/contracts';
+import type {
+  AgeBand,
+  CreatorFanInsights,
+  FanPlace,
+  FanSituation,
+  JobFamily,
+  OTHER_CASE,
+  SpendingTier,
+} from '@impera/contracts';
 
 /*
  * « Qui sont tes fans » (CR-15, ADR 0065, ADR 0074): the words and the geometry of the panel. The server has ranked
@@ -160,6 +168,25 @@ export function waitingLines(blocks: readonly InsightBlock[]): string[] {
       'Moins de dix fans t’ont écrit ces 30 derniers jours : leurs heures s’afficheront à partir de dix.',
     );
   return lines;
+}
+
+const BLOCKS: readonly InsightBlock[] = ['age', 'place', 'situation', 'job', 'spending', 'activity'];
+
+/** The blocks under their threshold, in the panel's order. */
+export function waitingBlocks(data: CreatorFanInsights): InsightBlock[] {
+  return BLOCKS.filter((block) => data[block].status !== 'enough');
+}
+
+/**
+ * The line her Ventes says under the list while « Qui sont tes fans » has no figure to show (choice of 21/11): the
+ * panel only comes once one block has enough fans. `null` when the panel shows.
+ */
+export function insightsWaitLine(data: CreatorFanInsights): string | null {
+  if (waitingBlocks(data).length < BLOCKS.length) return null;
+  // Today's fans are not counted yet: said, beside a list that already holds them (recette MOD-08).
+  return data.fans.total === null
+    ? '« Qui sont tes fans » s’affichera à partir de dix fans arrivés avant aujourd’hui, pour qu’aucun ne s’y reconnaisse.'
+    : '« Qui sont tes fans » s’affichera dès que dix fans t’en auront dit assez sur eux, pour qu’aucun ne s’y reconnaisse.';
 }
 
 /** A share as the panel says it: a case the server rounds to 0 is still there, so « moins de 1 % », never « 0 % ». */

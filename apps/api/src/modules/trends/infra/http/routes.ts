@@ -8,6 +8,7 @@ import {
   DomainError,
   ExtensionLinkCreatedSchema,
   ExtensionLinkCreatorsSchema,
+  ExtensionLinkHolderSchema,
   ExtensionLinkIdSchema,
   ExtensionLinkListSchema,
   ExtensionLinkTokenSchema,
@@ -139,7 +140,7 @@ export function createTrendRoutes(
     // origin. The link is read in `preParsing`, after the rate limit's `onRequest` (a wrong token counts against the
     // limit) and before the body is parsed (401 before any 400). Its secret is in a header: the routes log nothing
     // below `warn`, and a body (what she watched) is never logged nor echoed.
-    const extensionDoor = {
+    const doorFor = (watchOnly: boolean) => ({
       logLevel: 'warn' as const,
       config: { originCheck: false, rateLimit: READINGS_LIMIT },
       preParsing: async (request: FastifyRequest, _reply: unknown, payload: unknown) => {
@@ -149,16 +150,28 @@ export function createTrendRoutes(
         const holder = token.success ? await stores.links.holder(token.data, { touch }) : null;
         if (holder === null) throw new ExtensionLinkUnauthenticated();
         // A chatter's link is for the copilot panel only: the watch stays closed to him (ADR 0060 § 2, ADR 0086 § 8).
-        if (!holder.watch) throw new TrendWatchForbidden();
+        if (watchOnly && !holder.watch) throw new TrendWatchForbidden();
         holders.set(request, holder);
         return payload;
       },
-    };
+    });
+    const extensionDoor = doorFor(true);
     const holderOf = (request: FastifyRequest): LinkHolder => {
       const holder = holders.get(request);
       if (holder === undefined) throw new ExtensionLinkUnauthenticated();
       return holder;
     };
+
+    // Whether a code names someone, asked when the extension is linked: open to every holder, a chatter's too, whose
+    // link serves the copilot's gestures (EXT-01). It says no more than whether the watch is his; it opens nothing.
+    app.get(
+      '/trends/extension-links/holder',
+      {
+        ...doorFor(false),
+        schema: { headers: LinkHeadersSchema, response: { 200: ExtensionLinkHolderSchema } },
+      },
+      (request) => Promise.resolve({ watch: holderOf(request).watch }),
+    );
 
     app.get(
       '/trends/readings/creators',

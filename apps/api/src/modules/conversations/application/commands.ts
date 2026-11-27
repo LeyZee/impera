@@ -50,7 +50,14 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt, stepCutBy } from '../domain/rules';
+import {
+  FAN_MEDIA_MAX,
+  answersHisLastMessage,
+  boundFanText,
+  fanAwaitsAnswer,
+  respondAt,
+  stepCutBy,
+} from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -263,11 +270,20 @@ async function expireOpenDrafts(
   return current;
 }
 
-/** His messages since the last one of the creator's side carry a sign the safety net answers (a minor, self-harm). */
-async function waitingSafetySign(tx: Transaction, conversation: Conversation): Promise<boolean> {
+/**
+ * A message of the creator's side written on the platform at `sentAt` answers him: none of his is dated after it (a
+ * history read late never answers him, recette REV-04), and his messages since the last one of hers carry no sign the
+ * safety net answers (a minor, self-harm).
+ */
+async function answersOnPlatform(
+  tx: Transaction,
+  conversation: Conversation,
+  sentAt: Date,
+): Promise<boolean> {
   const history = await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES);
+  if (!answersHisLastMessage(history, sentAt)) return false;
   const lastReply = history.findLastIndex((message) => message.author !== 'fan');
-  return history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
+  return !history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
 }
 
 /** Opens the lock and holds it for the transaction, or refuses Automatique with what is missing. */
@@ -305,7 +321,9 @@ export function createConversationCommands({
         displayName: input.fanDisplayName,
         seenAt: at,
       });
-      return uow.inTenant(input.creatorId, async (tx) => {
+      // A placed draft settled by what left moves the live rate, as an approval does (ADR 0019).
+      const decided = { settled: false };
+      const ingested = await uow.inTenant(input.creatorId, async (tx) => {
         let conversation = await tx.conversations.lockOrCreate({
           id: newId(ConversationIdSchema),
           creatorId: input.creatorId,
@@ -326,7 +344,7 @@ export function createConversationCommands({
           author === 'human' &&
           AWAITING_AGENT.includes(conversation.state) &&
           conversation.careSince === null &&
-          !(await waitingSafetySign(tx, conversation));
+          (await answersOnPlatform(tx, conversation, new Date(message.createdAt)));
         // Unless what he was answered with is the draft a chatter placed from the copilot panel (ADR 0086 § 5): the
         // message is that draft, sent by hand, and what left decides its verdict. Once he is answered, its next
         // bubbles are that draft too.
@@ -442,6 +460,8 @@ export function createConversationCommands({
         }
         return { conversationId: conversation.id, isNew: true };
       });
+      if (decided.settled) await afterDecision(input.creatorId, input.correlationId);
+      return ingested;
     },
 
     async approveDraft(input) {
