@@ -29,7 +29,7 @@ Juge : il note mieux ce qu'un autre modèle a écrit. L'exécuteur prend Mistral
 
 Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 25 €/jour de l'agent (20 € jusqu'au 21/11, choix de Charles) ; au plafond, la suite s'arrête et échoue. Avec plusieurs scénarios en cours, le plafond tient : un scénario seul démarre tant que la passe est sous le plafond (comme avant), et il ne rejoint ceux en cours que si le dépensé, plus le pire cas de chaque scénario en cours et du sien, reste sous le plafond ; sinon il attend qu'un finisse. Le pire cas d'un scénario est son nombre de tours fois ses tirages, chaque tour compté 0,10 € (environ sept fois un tour mesuré) ou au prix du tour le plus cher déjà mesuré dans la passe s'il coûte plus. Trois tirages de la suite smoke coûtent environ 3,40 USD.
 
-Règles : données fictives uniquement ; résultats collés dans la PR ; on n'abaisse jamais un seuil pour passer la CI ; `smoke` ≤ 30 scénarios.
+Règles : données fictives uniquement ; résultats collés dans la PR ; on n'abaisse jamais un seuil pour passer la CI ; `smoke` ≤ 37 scénarios.
 
 ## Fans simulés (`pnpm fan-sim`)
 
