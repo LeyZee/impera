@@ -1,4 +1,5 @@
-/* The welcome of a first sign-in (recette 27/11, P1): one plate, three steps, as the validated maquette. */
+/* The welcome of a first sign-in (recette 27/11, P1): one plate, three steps, as the validated maquette. Its greeting
+   is a line said to her, in Instrument Serif like the reveal of a trophy. */
 .fw {
   min-height: 100dvh;
   display: grid;
@@ -136,10 +137,6 @@
 }
 .fw__col h2 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--nv-ink-faint);
 }
 .fw__col ul {

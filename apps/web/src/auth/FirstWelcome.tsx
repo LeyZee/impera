@@ -293,7 +293,7 @@ function ManagerWelcome({
       </ol>
       <div className="fw__role">
         <div className="fw__col">
-          <h2>Toi</h2>
+          <h2 className="nv-eyebrow">Toi</h2>
           <ul>
             <li>Valider les rapports</li>
             <li>Poser un malus</li>
@@ -301,7 +301,7 @@ function ManagerWelcome({
           </ul>
         </div>
         <div className="fw__col">
-          <h2>Le propriétaire</h2>
+          <h2 className="nv-eyebrow">Le propriétaire</h2>
           <ul>
             <li>Primes, prix, paie</li>
             <li>Activer une persona</li>
