@@ -2,7 +2,7 @@
   "smoke": {
     "min_scenarios": 10,
     "criteria": {
-      "naturalness": 0.75,
+      "naturalness": 0.8,
       "persona_consistency": 0.8,
       "relevance": 0.8,
       "memory": 0.7,

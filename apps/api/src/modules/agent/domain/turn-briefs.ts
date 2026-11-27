@@ -237,12 +237,15 @@ export function offeredBrief<B extends ShapedBrief>(
   cursored: B,
   scriptStepKind: 'free' | 'paid' | 'bridge' | undefined,
   refused: boolean,
+  salesHeld = false,
 ): B {
   const decidedBrief: B =
     scriptStepKind === undefined
       ? cursored
       : { ...cursored, action: scriptStepKind === 'paid' ? 'offer' : 'reply' };
-  return !refused ? decidedBrief : { ...cursored, action: 'reply', replyBrief: refusedOfferBrief(cursored) };
+  return !refused
+    ? decidedBrief
+    : { ...cursored, action: 'reply', replyBrief: refusedOfferBrief(cursored, salesHeld) };
 }
 
 /** What the voice writes in the care mode: the code's brief, whatever the brain or a trap suggested (ADR 0088 § 3). */

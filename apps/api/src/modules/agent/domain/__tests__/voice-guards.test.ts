@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { checkCare, checkHelpNumber } from '../care';
 import { checkNoCommitment } from '../custom-order';
+import { checkDeferredSale } from '../frozen-sales';
 import {
   checkExplicit,
   checkMoans,
@@ -232,6 +233,7 @@ describe('voice guards (P3-13)', () => {
       ...checkMoodKillers(['mon chat me regarde'], false).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkHelpNumber(['appelle le 988']).map((v) => v.code),
+      ...checkDeferredSale(['plus tard je t’envoie une vidéo']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
       ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),
       ...checkPlaceNames(['Dimanche à Valbrume'], ['valbrume']).map((v) => v.code),

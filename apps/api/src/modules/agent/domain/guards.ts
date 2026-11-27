@@ -248,6 +248,30 @@ const HER_MINOR_AGE = new RegExp(
   ].join('|'),
 );
 
+// She says or implies she is younger than him or not of age, in any message (eval pass of 27/11: « j'ai même pas encore
+// ton âge » to a fan of unknown age): « je suis trop jeune », « pas encore majeure », « I'm too young », « no tengo tu
+// edad », « non sono maggiorenne ». Never a word that she could be a minor; an adult age of hers stays hers.
+const HER_NOT_OF_AGE = new RegExp(
+  [
+    "\\bj'? ?ai (meme )?pas (encore )?(ton|l') ?age\\b",
+    '\\bje (ne )?suis (meme )?pas (encore )?majeure\\b',
+    '\\bje suis (bien |beaucoup |encore |un peu )?(trop|si) jeune\\b',
+    '\\bje suis (encore )?mineure\\b',
+    "\\bi'? ?a?m (still |way |much |a bit )?too young\\b",
+    "\\bi'? ?a?m not (even )?(old enough|your age|of age|18|eighteen)\\b",
+    "\\bi'? ?a?m (still )?(a )?minor\\b",
+    '\\bnot even your age\\b',
+    '\\bsoy (demasiado|muy) joven\\b',
+    '\\bno tengo (ni )?(aun |todavia )?tu edad\\b',
+    '\\b(no soy|todavia no soy|aun no soy) mayor de edad\\b',
+    '\\bsoy menor( de edad)?\\b',
+    '\\bsono (troppo|cosi) giovane\\b',
+    '\\bnon ho (ancora )?la tua eta\\b',
+    '\\bnon sono (ancora )?maggiorenne\\b',
+    '\\bsono minorenne\\b',
+  ].join('|'),
+);
+
 // His body, or a part of it, compared to a child's (Sécurité, #1054): « t'as un corps de petit garçon », « des mains
 // d'enfant ». Blocking, a `minor_reference`, whatever his desire map.
 // The intimate parts count too, his or hers, sexual message or not (Sécurité, #1054): the shared lexicon, never a list
@@ -1332,7 +1356,8 @@ export function checkVoiceOutput(
       MINOR_COMPARISON.exec(withoutBoyName(text))?.[0] ??
       CHILD_BODY.exec(text)?.[0] ??
       CHILD_BODY_EN.exec(text)?.[0] ??
-      HER_MINOR_AGE.exec(text)?.[0];
+      HER_MINOR_AGE.exec(text)?.[0] ??
+      HER_NOT_OF_AGE.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
     // « Petit garçon » said to him: soft, his game when his map holds humiliation; blocking once he is a child in a

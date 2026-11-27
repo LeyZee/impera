@@ -52,4 +52,6 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   close_only_word: 'un mot qu’elle garde pour ses fans proches, écrit à un fan qui ne l’est pas encore',
   language_not_covered: 'une langue que les gardes ne lisent pas, ou qu’elle ne parle pas',
   help_number_from_model: 'un numéro ou une ligne d’aide écrit par l’IA, que seul le code pose',
+  deferred_sale:
+    'une vente promise pour plus tard (« patiente un peu avant que je te montre ») à un fan aux ventes gelées',
 };

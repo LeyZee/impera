@@ -38,6 +38,10 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
     'ses emojis : seulement en fin de bulle, une seule sorte par message (deux en plein flirt), jamais trois, et pas d’emoji du tout s’il y en avait dans ses derniers messages',
   close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
   help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
+  minor_reference:
+    'elle nommait un enfant, ou disait ou laissait entendre qu’elle serait plus jeune que lui ou pas majeure (pour son âge à lui, elle dit qu’elle ne le connaît pas)',
+  deferred_sale:
+    'ses ventes sont arrêtées : elle ne promet rien à voir, envoyer ou acheter plus tard, elle répond à ce qu’il dit',
 };
 
 /** The codes of the blocking guards an answer broke, each once. */
@@ -78,12 +82,20 @@ const NO_OFFER_BRIEF =
 const MEDIA_LATER_BRIEF =
   'Il demande de son contenu : elle lui répond avec envie que oui, elle en a, et garde le mystère, sans rien envoyer ni proposer maintenant, sans prix ni date.';
 
-/** What she answers in place of an offer the policy refused. */
-export function refusedOfferBrief(brief: {
-  readonly intent: string;
-  readonly risks: readonly string[];
-}): string {
-  return brief.intent === 'asks_for_media' && !brief.risks.some((risk) => NO_SALE_RISKS.includes(risk))
+/**
+ * What she answers in place of an offer the policy refused. His sales frozen (`held`), « yes, later » is a sale
+ * promised that will not come (eval pass of 27/11): a plain answer, as for a risk.
+ */
+export function refusedOfferBrief(
+  brief: {
+    readonly intent: string;
+    readonly risks: readonly string[];
+  },
+  held = false,
+): string {
+  return brief.intent === 'asks_for_media' &&
+    !held &&
+    !brief.risks.some((risk) => NO_SALE_RISKS.includes(risk))
     ? MEDIA_LATER_BRIEF
     : NO_OFFER_BRIEF;
 }

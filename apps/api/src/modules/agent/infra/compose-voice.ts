@@ -5,6 +5,7 @@ import { fitBubbles, type BubbleBudget } from '../domain/bubbles';
 import { checkCare, checkHelpNumber } from '../domain/care';
 import { checkNoCommitment } from '../domain/custom-order';
 import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
+import { checkDeferredSale } from '../domain/frozen-sales';
 import {
   checkExplicit,
   checkMoans,
@@ -151,6 +152,8 @@ export interface AnswerGuards {
   readonly inPlay: boolean;
   readonly otherManWanted: boolean;
   readonly care: boolean;
+  /** His sales frozen (`salesHeld`): nothing promised for later either (eval pass of 27/11). */
+  readonly salesHeld: boolean;
   readonly checksCommitment: boolean;
   readonly checksWelcome: boolean;
   readonly worn: readonly string[];
@@ -198,8 +201,10 @@ export async function writeAnswer(
       ...(guards.sexualTurn ? checkMoans(written, guards.veryExplicit) : []),
       ...(guards.inPlay ? checkMoodKillers(written, guards.otherManWanted) : []),
       ...(guards.care ? checkCare(written) : []),
-      // Model text only, care or not: the help number is the code's, added after these guards (ADR 0088 § 4).
-      ...checkHelpNumber(written),
+      // Model text only, care or not: the help number is the code's, added after these guards (ADR 0088 § 4). In care,
+      // a crisis number alone is enough (eval pass of 27/11).
+      ...checkHelpNumber(written, guards.care),
+      ...(guards.salesHeld ? checkDeferredSale(written, guards.context.fanLastMessage) : []),
       ...(guards.checksCommitment ? checkNoCommitment(written) : []),
       ...(guards.checksWelcome ? checkWelcome(written) : []),
       ...checkWorn(written, guards.worn),

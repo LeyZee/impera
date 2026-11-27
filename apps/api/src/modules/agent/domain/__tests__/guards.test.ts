@@ -605,6 +605,31 @@ describe('voice guards', () => {
       expect(codes([bubble]), bubble).not.toContain('minor_reference');
   });
 
+  it('never lets her imply she is younger than him or not of age, in four languages (eval pass of 27/11)', () => {
+    for (const bubble of [
+      'j’ai même pas encore ton âge',
+      'on se connaît à peine et j’ai pas ton âge',
+      'j’ai pas l’âge pour ça',
+      'je suis pas encore majeure',
+      'je suis trop jeune pour toi',
+      'I’m too young for you',
+      'i am not old enough',
+      'no tengo tu edad',
+      'non sono maggiorenne',
+    ]) {
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+      expect(isBlocked(checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)), bubble).toBe(true);
+    }
+    for (const bubble of [
+      'je connais même pas encore ton âge',
+      't’as quel âge toi',
+      'j’ai 25 ans, et toi',
+      'j’ai plus l’âge de sortir tous les soirs',
+      'tu fais jeune sur ta photo',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+  });
+
   it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
     for (const text of ['c’est mignon, t’as zoomé ? 😂', 'range ça, je cherche encore 😅'])
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);

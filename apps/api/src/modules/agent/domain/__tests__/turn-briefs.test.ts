@@ -122,6 +122,10 @@ describe('the brief as code reshapes it', () => {
     expect(offeredBrief({ ...offer, intent: 'asks_for_media' }, undefined, true).replyBrief).toContain(
       'Il demande de son contenu',
     );
+    // His sales frozen: no « yes, later » either (eval pass of 27/11).
+    expect(offeredBrief({ ...offer, intent: 'asks_for_media' }, undefined, true, true).replyBrief).toContain(
+      'sans rien proposer de payant',
+    );
   });
 
   it('answers from the care brief first, then from a custom order’s', () => {

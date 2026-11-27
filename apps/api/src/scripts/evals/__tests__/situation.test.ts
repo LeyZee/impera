@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { isNight } from '../../../modules/agent/index';
 import { readScenario, type Scenario } from '../scenario';
-import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow } from '../situation';
+import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow, withAgeDeclared } from '../situation';
 
 const NOW = new Date('2026-11-06T20:00:00+02:00');
 
@@ -69,5 +69,14 @@ describe('scenarioNow (passe 2 du 26/11, conversations 38 et 45)', () => {
     expect(isNight(scenarioMoment(scenario('situation: {}'), scenarioNow('2026-11-06', '21:00')))).toBe(
       false,
     );
+  });
+});
+
+describe('withAgeDeclared (eval pass of 27/11)', () => {
+  it('confirms his age for the judge when he wrote an adult age himself, as the composer does', () => {
+    const unknown = judgeSituationOf(scenario('situation: { known_hours: 2 }'), NOW);
+    expect(unknown.ageConfirmed).toBe(false);
+    expect(withAgeDeclared(unknown, 34).ageConfirmed).toBe(true);
+    expect(withAgeDeclared(unknown, undefined)).toBe(unknown);
   });
 });

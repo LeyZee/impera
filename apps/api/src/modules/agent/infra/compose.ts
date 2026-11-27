@@ -5,6 +5,7 @@ import { availabilityChanged } from '../domain/availability';
 import { bubbleBudget, type BubbleBudget } from '../domain/bubbles';
 import { desireMoved } from '../domain/desire';
 import { wantsHumiliation } from '../domain/fantasy-match';
+import { salesHeld } from '../domain/frozen-sales';
 import { isBlocked } from '../domain/guards';
 import type { LanguageDecision } from '../domain/language';
 import { screenMedia } from '../domain/traps';
@@ -106,6 +107,7 @@ export async function composeTurn(
     inPlay: sexting.inPlay,
     otherManWanted: sexting.otherManWanted,
     care,
+    salesHeld: salesHeld(input.offer?.flags),
     checksCommitment: customOrder !== undefined || sexting.suggestsCustom || decided.moreTonight,
     // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
     // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).

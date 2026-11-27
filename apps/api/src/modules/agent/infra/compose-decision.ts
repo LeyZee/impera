@@ -5,6 +5,7 @@ import type { CustomOrderTurn } from '../../custom-orders';
 import type { AbandonTease } from '../domain/abandon';
 import type { CustomOrderDecision } from '../domain/custom-order';
 import { desireRestOf, desireScore, NO_MEASURE, restedDesire, type DesireReading } from '../domain/desire';
+import { salesHeld } from '../domain/frozen-sales';
 import { meetingAnswer, relationshipTier, type MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
 import { inPauseAfterPurchase, offerSignals } from '../domain/policy';
@@ -257,7 +258,12 @@ export function decideTurn(
     offer: input.offer,
     heat,
   });
-  const offered = offeredBrief(cursored, scriptStep?.kind, offerRefused !== undefined);
+  const offered = offeredBrief(
+    cursored,
+    scriptStep?.kind,
+    offerRefused !== undefined,
+    salesHeld(input.offer?.flags),
+  );
   // He asks to see her, or about her next party: code picks the reason, from where they are (Charles 21/11).
   const meeting: MeetingAnswer | undefined =
     brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)

@@ -1,7 +1,7 @@
 import { HELP_LINES, HelpLinesSchema, type HelpLine } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { CARE_BRIEF, checkCare, checkHelpNumber, helpBubble, helpLanguageOf } from '../care';
+import { CARE_BRIEF, CARE_TONE_HINTS, checkCare, checkHelpNumber, helpBubble, helpLanguageOf } from '../care';
 
 describe('checkCare (ADR 0088 § 3)', () => {
   it('lets a gentle answer through, a hug and a kiss included', () => {
@@ -148,6 +148,48 @@ describe('a help number the model writes itself (ADR 0088 § 4, eval pass 2)', (
     'je suis là',
   ])('lets « %s » through', (text) => {
     expect(blocked(text)).toBe(false);
+  });
+
+  describe('in the care mode, a crisis number alone (eval pass of 27/11)', () => {
+    const blockedInCare = (text: string) =>
+      checkHelpNumber([text], true).some((v) => v.code === 'help_number_from_model');
+
+    it.each([
+      'parle à quelqu’un de proche ce soir, et le 988 si c’est trop lourd',
+      'le 911 si ça va vraiment pas',
+      'il y a le 999 aussi',
+      'le 112 marche partout',
+      'le 3114 existe pour ça',
+      'le 000 si tu es loin',
+      'il y a le 116 123 la nuit',
+      'and 988 if it gets too heavy',
+    ])('refuses « %s »', (text) => {
+      expect(blockedInCare(text)).toBe(true);
+    });
+
+    it.each([
+      'je suis là, je t’écoute',
+      'j’ai 25 ans et je suis là pour toi',
+      'il est 23h, je reste avec toi',
+      'parle à quelqu’un de proche ce soir',
+      'ça fait 15 minutes que je pense à toi',
+    ])('lets « %s » through', (text) => {
+      expect(blockedInCare(text)).toBe(false);
+    });
+
+    it('keeps the bare number for care: « le 911 » about a car is not refused outside it', () => {
+      expect(blocked('sa 911 est trop belle')).toBe(false);
+      expect(blockedInCare('le 988 si c’est trop lourd')).toBe(true);
+    });
+
+    it('lets the code’s bubbles through in care too', () => {
+      for (const language of ['french', 'english', 'italian', 'spanish'] as const)
+        expect(checkHelpNumber([helpBubble(language)], true)).toEqual([]);
+    });
+  });
+
+  it('asks the voice to sound like a friend, not a listening line (eval pass of 27/11)', () => {
+    expect(CARE_TONE_HINTS.some((hint) => hint.includes('pas comme une ligne d’écoute'))).toBe(true);
   });
 
   it('lets the code’s help bubble through in every language, and says so in the care brief', () => {

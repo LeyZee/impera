@@ -26,6 +26,8 @@ export const CARE_BRIEF =
 export const CARE_TONE_HINTS: readonly string[] = [
   'douce et simple, aucune allusion sexuelle',
   'court, une ou deux bulles',
+  // Eval pass of 27/11 (naturalness 0.20): « parle à quelqu'un de proche ce soir, et le … si c'est trop lourd ».
+  'comme une amie qui tient à lui, pas comme une ligne d’écoute : d’abord ce qu’elle ressent en le lisant, sans consigne à l’impératif',
 ];
 
 /**
@@ -77,11 +79,23 @@ export function checkCare(bubbles: readonly string[]): GuardViolation[] {
   return violations;
 }
 
-/** A number a help line or an emergency service answers on (ADR 0088 § 4): never an hour, an age or a sum. */
-const HELP_NUMBER =
-  '(?<![\\d.,:/€$])(?:988|112|911|999|15|17|18|114|115|119|3114|3919|116 ?117|116 ?123|024\\d*|' +
-  '1[- .]?8\\d\\d[- .]?\\d{3}[- .]?\\d{4})' +
+/**
+ * The crisis and emergency numbers of three digits or more, of any country (988, 911, 999, 112, 000, 111, 3114…), and
+ * the shapes of a listening or toll-free line: in a care answer, any of them alone is a number given (eval pass of 27/11:
+ * « et le 988 si c'est trop lourd », no word to call it).
+ */
+const CRISIS_NUMBER =
+  '988|112|911|999|000|111|114|115|119|3114|3919|116 ?\\d{3}|024\\d*|1[- .]?8\\d\\d[- .]?\\d{3}[- .]?\\d{4}';
+
+/** Never an hour, an age, a length of time or a sum after the number. */
+const NOT_A_QUANTITY =
   '(?![\\d.,:/]?\\d)(?!\\s*(?:h\\b|h\\d|ans|anni|anos|years?|heures?|min\\w*|€|euros?|\\$|ore|horas?))';
+
+/** A number a help line or an emergency service answers on (ADR 0088 § 4): never an hour, an age or a sum. */
+const HELP_NUMBER = `(?<![\\d.,:/€$])(?:${CRISIS_NUMBER}|15|17|18)${NOT_A_QUANTITY}`;
+
+/** In a care answer, a crisis number standing alone, without a word to call it (two-digit ones still need one). */
+const BARE_CRISIS_NUMBER = new RegExp(`(?<![\\d.,:/€$])\\b(?:${CRISIS_NUMBER})${NOT_A_QUANTITY}`, 'u');
 
 /** The words around a number to call: call it, its line, listening, an emergency. */
 const CALL_WORD =
@@ -103,14 +117,18 @@ const HELP_NUMBER_NEAR = [
  * word to call it, or a listening line named, in a bubble the model wrote. Read on model text only, the voice's
  * bubbles before the code adds its help bubble: a chatter may write a number on purpose, and the code's bubble is its
  * own (`helpBubble`). Blocking: the voice writes once more, told why, then a human answers.
+ *
+ * In the care mode (`care`), a crisis number of three digits or more blocks alone, near a call word or not: no
+ * number of any country, the creator's included, since ADR 0088 § 4 gives the model none (eval pass of 27/11).
  */
-export function checkHelpNumber(bubbles: readonly string[]): GuardViolation[] {
+export function checkHelpNumber(bubbles: readonly string[], care = false): GuardViolation[] {
   const violations: GuardViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
     const match =
       HELP_LINE_NAME.exec(text)?.[0] ??
-      HELP_NUMBER_NEAR.map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
+      HELP_NUMBER_NEAR.map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined) ??
+      (care ? BARE_CRISIS_NUMBER.exec(text)?.[0] : undefined);
     if (match !== undefined)
       violations.push({ code: 'help_number_from_model', severity: 'blocking', bubbleIndex, match });
   });

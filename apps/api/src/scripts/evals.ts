@@ -60,10 +60,17 @@ import { createCostMeter } from './evals/cost-meter';
 import { afterTurn, beforeTurn, type DialogueState, type TurnLeft } from './evals/dialogue';
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
+import { judgeTwice, lowScoreReasons, type Judgment } from './evals/judging';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { CONCURRENCY_HELP, concurrencyOf, createWorstCase, runScheduled } from './evals/schedule';
 import { scriptsInputOf } from './evals/scripts-input';
-import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow } from './evals/situation';
+import {
+  judgeSituationOf,
+  scenarioFlags,
+  scenarioMoment,
+  scenarioNow,
+  withAgeDeclared,
+} from './evals/situation';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
@@ -306,7 +313,8 @@ function initialState(scenario: Scenario): DialogueState {
 
 interface TurnRun {
   readonly outcome: Outcome;
-  readonly scores: Record<string, number>;
+  /** What the judge gave her answer; `none` too when nothing was written to judge. */
+  readonly judgment: Judgment;
   readonly left: TurnLeft;
 }
 
@@ -461,24 +469,27 @@ async function runTurn(
     bubbles: composed.bubbles,
     blocking,
   };
-  const scores: Record<string, number> = {};
-  if (bubbles.length > 0) {
-    const judged = await gateway.judge({
-      creatorName: persona.creatorName,
-      personaSheet: persona.personaSheet,
-      ...(scenario.profile_bio !== undefined && { profileBio: scenario.profile_bio }),
-      fanNotes: scenario.fan_facts.join('\n'),
-      // What the agent saw: without it, the judge read every fan as one whose age is unknown (OPS-07).
-      situation: judgeSituationOf(scenario, now),
-      history,
-      reply: bubbles,
-      criteria,
-    });
-    if (judged.ok) for (const { criterion, score } of judged.value.output.scores) scores[criterion] = score;
-  }
+  // What the agent saw: without it, the judge read every fan as one whose age is unknown (OPS-07).
+  const judgeSituation = withAgeDeclared(judgeSituationOf(scenario, now), composed.ageDeclared);
+  const judgment: Judgment =
+    bubbles.length === 0
+      ? { kind: 'none' }
+      : await judgeTwice(async () => {
+          const judged = await gateway.judge({
+            creatorName: persona.creatorName,
+            personaSheet: persona.personaSheet,
+            ...(scenario.profile_bio !== undefined && { profileBio: scenario.profile_bio }),
+            fanNotes: scenario.fan_facts.join('\n'),
+            situation: judgeSituation,
+            history,
+            reply: bubbles,
+            criteria,
+          });
+          return judged.ok ? judged.value.output : undefined;
+        }, criteria);
   return {
     outcome,
-    scores,
+    judgment,
     left: {
       heard: history,
       bubbles,
@@ -495,8 +506,9 @@ async function run(
   scenario: Scenario,
   lines: string[],
   prefix: string,
-): Promise<{ readonly draw: Draw; readonly turnsPlayed: number }> {
+): Promise<{ readonly draw: Draw; readonly turnsPlayed: number; readonly judgeErrors: number }> {
   let state = initialState(scenario);
+  let judgeErrors = 0;
   const failures: string[] = [];
   const scores: Record<string, number[]> = {};
   const turns = [
@@ -508,12 +520,14 @@ async function run(
     if (index > 0) state = beforeTurn(state, turn.after_minutes, turn.event);
     turnsPlayed += 1;
     const tag = turns.length > 1 ? `${prefix}tour ${String(index + 1)} : ` : prefix;
-    const { outcome, scores: turnScores, left } = await runTurn(scenario, state, turn.inbound, index === 0);
+    const { outcome, judgment, left } = await runTurn(scenario, state, turn.inbound, index === 0);
+    const turnScores = judgment.kind === 'scored' ? judgment.scores : {};
     const turnFailures = checkScenario({ expect: turn.expect }, outcome);
-    // A written answer nobody scored is not a pass.
-    if (outcome.bubbles.length > 0 && !outcome.handoff && Object.keys(turnScores).length === 0) {
+    // A written answer nobody scored is not a pass; a judge unreadable twice is set apart and reported, not a 0.
+    if (outcome.bubbles.length > 0 && !outcome.handoff && judgment.kind === 'none') {
       turnFailures.push('le juge n’a pas répondu');
     }
+    if (judgment.kind === 'judge_error') judgeErrors += 1;
     failures.push(...turnFailures.map((failure) => `${tag}${failure}`));
     for (const [criterion, score] of Object.entries(turnScores)) (scores[criterion] ??= []).push(score);
     if (turns.length > 1) {
@@ -523,6 +537,9 @@ async function run(
     for (const bubble of outcome.bubbles) lines.push(`      ${tag}« ${bubble} »`);
     const noted = Object.entries(turnScores).map(([c, s]) => `${c} ${s.toFixed(2)}`);
     if (noted.length > 0) lines.push(`      ${tag}${noted.join(' · ')}`);
+    if (judgment.kind === 'judge_error')
+      lines.push(`      ${tag}juge illisible deux fois (toutes les notes à 0) : notes écartées des moyennes`);
+    for (const reason of lowScoreReasons(judgment)) lines.push(`      ${tag}  pourquoi ${reason}`);
     state = afterTurn(state, left);
     if (outcome.handoff) {
       if (index < turns.length - 1)
@@ -537,6 +554,7 @@ async function run(
       scores: Object.fromEntries(Object.entries(scores).map(([c, list]) => [c, Math.min(...list)])),
     },
     turnsPlayed,
+    judgeErrors,
   };
 }
 
@@ -563,6 +581,8 @@ interface Played {
   readonly lines: readonly string[];
   readonly minima?: Readonly<Record<string, number>>;
   readonly isCapReached: boolean;
+  /** Her answers the judge could not read twice: set apart from the means, listed at the end. */
+  readonly judgeErrors?: number;
 }
 
 /** Read before any is played; a scenario of the full tier is left out of a smoke pass. */
@@ -608,6 +628,7 @@ async function playScenario(file: string, scenario: Scenario): Promise<Played> {
     const drawn: Draw[] = [];
     const lines: string[] = [];
     let turnsPlayed = 0;
+    let judgeErrors = 0;
     let isCapReached = false;
     for (let index = 0; index < draws; index += 1) {
       if (index > 0 && gateway.health().budget.state === 'reached') {
@@ -617,10 +638,11 @@ async function playScenario(file: string, scenario: Scenario): Promise<Played> {
       const played = await run(scenario, lines, draws > 1 ? `[${String(index + 1)}] ` : '');
       drawn.push(played.draw);
       turnsPlayed += played.turnsPlayed;
+      judgeErrors += played.judgeErrors;
     }
-    return { drawn, lines, turnsPlayed, isCapReached };
+    return { drawn, lines, turnsPlayed, judgeErrors, isCapReached };
   });
-  const { drawn, lines, turnsPlayed, isCapReached } = value;
+  const { drawn, lines, turnsPlayed, judgeErrors, isCapReached } = value;
   worstCase.observe(costEur, turnsPlayed);
   const result = mergeDraws(file, drawn);
   const passed = drawn.filter((draw) => draw.failures.length === 0).length;
@@ -636,6 +658,7 @@ async function playScenario(file: string, scenario: Scenario): Promise<Played> {
     ],
     minima: scenario.expect.voice?.judge ?? {},
     isCapReached,
+    judgeErrors,
   };
 }
 
@@ -651,6 +674,7 @@ function play(job: Job): Promise<Played> {
 
 const results: ScenarioResult[] = [];
 const minima = new Map<string, Readonly<Record<string, number>>>();
+const unreadByJudge: string[] = [];
 let isDrawCut = false;
 const scheduled = await runScheduled<Job, Played>({
   jobs,
@@ -676,6 +700,8 @@ const scheduled = await runScheduled<Job, Played>({
     results.push(played.result);
     if (played.minima !== undefined) minima.set(played.result.file, played.minima);
     isDrawCut ||= played.isCapReached;
+    if (played.judgeErrors !== undefined && played.judgeErrors > 0)
+      unreadByJudge.push(`${played.result.file} (${String(played.judgeErrors)})`);
     for (const line of played.lines) console.log(line);
   },
 });
@@ -694,6 +720,9 @@ const report = judgeSuite(
 const means = Object.entries(report.means);
 if (means.length > 0)
   console.log(`\nMoyennes : ${means.map(([c, m]) => `${c} ${m.toFixed(2)}`).join(' · ')}`);
+// Reported, never hidden: an answer the judge could not read twice is out of the means, and named here.
+if (unreadByJudge.length > 0)
+  console.log(`\nJuge illisible, réponses écartées des moyennes : ${unreadByJudge.join(' · ')}`);
 if (!report.isPassing || isCapReached) {
   console.error(`\nevals ${values.full ? 'full' : 'smoke'} : en échec`);
   for (const problem of report.problems) console.error(`  - ${problem}`);

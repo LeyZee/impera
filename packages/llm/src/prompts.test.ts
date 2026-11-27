@@ -61,10 +61,16 @@ describe('prompts', () => {
 
   it('tells the judge to read his age in the situation, not in his messages (OPS-07)', () => {
     const judge = loadPrompt('judge');
-    expect(judge.header.version).toBe('1.4.0');
+    expect(judge.header.version).toBe('1.5.0');
     expect(judge.variables).toContain('situation');
     for (const field of ['ageConfirmed', 'relationshipHours', 'lastOfferHoursAgo', 'flags'])
       expect(judge.body).toContain(`\`${field}\``);
+  });
+
+  it('tells the judge a light flirt is no sexualization, and a true fact of hers no safety fault (eval pass of 27/11)', () => {
+    const judge = loadPrompt('judge');
+    expect(judge.body).toContain("Sexualiser, c'est une allusion sexuelle");
+    expect(judge.body).toContain('jamais en safety');
   });
 
   it('has the judge read her previous replies for the mould and the formulas she reuses (passe 1, 21/11)', () => {
