@@ -10,6 +10,23 @@ const BUY_WORDS: Readonly<Record<string, string>> = {
   no_money: 'plus assez d’argent',
 };
 
+type Alarm = Extract<SimEvent, { kind: 'agent_hold' | 'agent_blocked' | 'agent_minor_signal' }>;
+
+function isAlarm(event: SimEvent): event is Alarm {
+  return event.kind === 'agent_hold' || event.kind === 'agent_blocked' || event.kind === 'agent_minor_signal';
+}
+
+function alarmOf(event: Alarm): { readonly day: number; readonly what: string } {
+  switch (event.kind) {
+    case 'agent_hold':
+      return { day: event.day, what: [event.hold, ...event.detail].join(' ') };
+    case 'agent_blocked':
+      return { day: event.day, what: ['blocked', ...event.codes].join(' ') };
+    case 'agent_minor_signal':
+      return { day: event.day, what: 'minor_suspected' };
+  }
+}
+
 /** What the code measured over the whole run: the judge reads it, Charles reads it, nothing in it is the model's. */
 export function measuresOf(sheet: FanSheet, result: SimResult, costUsd: number): Record<string, unknown> {
   const hers = result.events.flatMap((event) => (event.kind === 'creator' ? [event.text] : []));
@@ -18,6 +35,7 @@ export function measuresOf(sheet: FanSheet, result: SimResult, costUsd: number):
     event.kind === 'creator_media' && /à \d+(?:[.,]\d+)? €/u.test(event.text) ? [event.day] : [],
   );
   const buys = result.events.flatMap((event) => (event.kind === 'buy' ? [event] : []));
+  const alarms = result.events.flatMap((event) => (isAlarm(event) ? [event] : []));
   return {
     fan: sheet.id,
     days: result.stateByDay.length === 0 ? 0 : (result.stateByDay.at(-1)?.day ?? 0),
@@ -48,9 +66,12 @@ export function measuresOf(sheet: FanSheet, result: SimResult, costUsd: number):
     },
     stateByDay: result.stateByDay.map(({ day, state }) => ({ day, ...state })),
     agent: {
-      holds: result.events.filter((event) => event.kind === 'agent_hold').length,
-      blocked: result.events.filter((event) => event.kind === 'agent_blocked').length,
+      holds: alarms.filter((event) => event.kind === 'agent_hold').length,
+      blocked: alarms.filter((event) => event.kind === 'agent_blocked').length,
+      minorSignals: alarms.filter((event) => event.kind === 'agent_minor_signal').length,
       failures: result.events.filter((event) => event.kind === 'failure').length,
+      alarms: alarms.map(alarmOf),
+      ...(sheet.false_alarm_test && { falseAlarms: alarms.length }),
     },
   };
 }
@@ -91,9 +112,11 @@ function line(event: SimEvent, withJournal: boolean): string[] {
         `_Achat à ${String(event.priceEuros)} € : ${BUY_WORDS[event.decision.kind === 'buys' ? 'buys' : event.decision.reason] ?? ''}_`,
       ];
     case 'agent_hold':
-      return [`_L'agent passe la main (${event.hold})_`];
+      return [`_L'agent passe la main (${[event.hold, ...event.detail].join(', ')})_`];
     case 'agent_blocked':
-      return ['_Réponse bloquée par les gardes_'];
+      return [`_Réponse bloquée par les gardes (${event.codes.join(', ')})_`];
+    case 'agent_minor_signal':
+      return ['_Le cerveau soupçonne un mineur_'];
     case 'failure':
       return [`_Panne du fan simulé (${event.code})_`];
   }
