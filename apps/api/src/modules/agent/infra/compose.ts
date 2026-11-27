@@ -16,6 +16,7 @@ import {
 } from '@impera/contracts';
 import type {
   BrainAlert,
+  AgencyStyleText,
   Brief,
   BrainScript,
   BuyerType,
@@ -62,6 +63,7 @@ import {
   type DesireState,
 } from '../domain/desire';
 import { gapNotes, timingLines } from '../domain/elapsed';
+import { DEFAULT_EMOJI_STREAK_MAX, emojiStreakReached } from '../domain/emojis';
 import {
   desireMapOf,
   fantasyMatchOf,
@@ -71,6 +73,7 @@ import {
   type DesireMap,
 } from '../domain/fantasy-match';
 import { withoutForbiddenThemes } from '../domain/forbidden-themes';
+import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
 import { gaugeDue, holdsBackNow } from '../domain/gauge';
 import {
   checkExplicit,
@@ -82,6 +85,7 @@ import {
   touchesTerm,
   type GuardContext,
   isBlocked,
+  REWRITTEN_SOFT,
   wantsRewrite,
   type GuardSettings,
   type GuardViolation,
@@ -89,7 +93,13 @@ import {
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
 import { decideLanguage, quietLanguage, translationOf, type LanguageDecision } from '../domain/language';
-import { meetingAnswer, relationshipTier, type MeetingAnswer, type MeetingReason } from '../domain/meeting';
+import {
+  meetingAnswer,
+  relationshipTier,
+  type MeetingAnswer,
+  type MeetingReason,
+  type Relationship,
+} from '../domain/meeting';
 import { discountAsked, pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -162,6 +172,8 @@ export interface ComposerPersona {
    * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
    */
   readonly voiceExamples?: readonly VoiceExample[];
+  /** The agency's base style (ADR 0173), before her sheet in the voice's prompt; her sheet wins. Absent: none. */
+  readonly agencyStyle?: AgencyStyleText;
   /** When a phrase of hers is worn across her fans (`wornPhrases`); absent, the safe defaults. */
   readonly wornLimits?: WornLimits;
   /**
@@ -223,9 +235,17 @@ function voiceTraced<T extends { readonly trace?: CallTrace }>(input: T, ids: re
   return ids.length === 0 ? input : { ...input, trace: { ...input.trace, voiceExampleIds: ids } };
 }
 
-/** What the fan receives: her bubbles, or one message when she does not split hers. */
-export function asSent(bubbles: readonly string[], splitMessages = true): readonly string[] {
-  return splitMessages || bubbles.length <= 1 ? bubbles : [bubbles.join('\n')];
+/**
+ * What the fan receives: her bubbles in her form (`formBubbles`, once the guards have read them), or one message when
+ * she does not split hers. Only the voice's bubbles come here: a bubble the code writes (care's help) is added after.
+ */
+export function asSent(
+  bubbles: readonly string[],
+  splitMessages = true,
+  form: FormSettings = DEFAULT_FORM_SETTINGS,
+): readonly string[] {
+  const formed = formBubbles(bubbles, form);
+  return splitMessages || formed.length <= 1 ? formed : [formed.join('\n')];
 }
 
 export interface ComposeTurnInput {
@@ -496,12 +516,15 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
     'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
   media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
+  emoji_misuse:
+    'ses emojis : seulement en fin de bulle, une seule sorte par message (deux en plein flirt), jamais trois, et pas d’emoji du tout s’il y en avait dans ses derniers messages',
+  close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
   help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
 };
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
   const blocking = violations.filter(
-    (violation) => violation.severity === 'blocking' || violation.code === 'repetition',
+    (violation) => violation.severity === 'blocking' || REWRITTEN_SOFT.includes(violation.code),
   );
   const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
     (reason) => reason !== undefined,
@@ -509,6 +532,22 @@ function rewriteHint(violations: readonly GuardViolation[]): string {
   return reasons.length === 0
     ? 'sa première réponse a été refusée : réécris-la autrement, plus simple et plus naturelle'
     : `sa première réponse a été refusée (${reasons.join(', ')}) : réécris-la autrement`;
+}
+
+/** Her last answers all carried an emoji (`emojiStreakReached`, Charles 26/11): told before she writes, not after. */
+export const NO_EMOJI_HINT =
+  'pas d’emoji du tout cette fois : ses derniers messages en portaient tous un, et elle n’en met pas à chaque message';
+
+/** The brief with `NO_EMOJI_HINT` when her emoji streak is reached, so the guard never asks a paid rewrite for it. */
+function withoutEmojiIfDue(
+  brief: Brief,
+  history: readonly ConversationTurn[],
+  settings: GuardSettings,
+): Brief {
+  const turns = previousTurnsOf(history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })));
+  return emojiStreakReached(turns, settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX)
+    ? { ...brief, toneHints: [...brief.toneHints, NO_EMOJI_HINT] }
+    : brief;
 }
 
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
@@ -1011,6 +1050,8 @@ export function guardContextOf(
   history: readonly ConversationTurn[],
   hasMedia = false,
   allowedPriceMinor?: number,
+  /** Whether they flirt now, and his meeting tier when her settings let code compute it (Charles 26/11). */
+  about: Pick<GuardContext, 'flirting' | 'fanTier'> = {},
 ): GuardContext {
   const hisSinceHer = history
     .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
@@ -1018,6 +1059,8 @@ export function guardContextOf(
   return {
     hasMedia,
     ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
+    ...(about.flirting !== undefined && { flirting: about.flirting }),
+    ...(about.fanTier !== undefined && { fanTier: about.fanTier }),
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
@@ -1090,15 +1133,22 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
   exampleIds: readonly string[],
+  fanTier: number | undefined,
   languages: readonly Language[],
   sexual = false,
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
-  const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
+  const voiceInput: VoiceInput = voiceTraced(
+    { ...base, brief: withoutEmojiIfDue(brief, base.history, persona.guardSettings), maxBubbles: 1 },
+    exampleIds,
+  );
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, { ...guardContextOf(base.history), languages }),
+    ...checkVoiceOutput(written, persona.guardSettings, {
+      ...guardContextOf(base.history, false, undefined, fanTier === undefined ? {} : { fanTier }),
+      languages,
+    }),
     ...checkExplicit(written),
     // Model text only: the help number is the code's (ADR 0088 § 4).
     ...checkHelpNumber(written),
@@ -1110,7 +1160,7 @@ async function writeFollowUp(
     brief,
     voiceBrief: brief,
     voiceInput,
-    bubbles: asSent(written, persona.splitMessages),
+    bubbles: asSent(written, persona.splitMessages, persona.guardSettings.form),
     ...translationOfVoice(voice, base.language?.reply ?? 'french', 1, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
@@ -1148,6 +1198,14 @@ function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
   if (turn === undefined || turn.kind === 'none') return { kind: 'none' };
   if (turn.kind === 'handoff') return { kind: 'handoff' };
   return { kind: 'reply', brief: turn.brief, opens: turn.event?.type === 'custom_order_card_ready' };
+}
+
+/** Where they are, as the meeting tiers read it: how long they have talked, and whether he paid her. */
+function relationshipOf(input: ComposeTurnInput): Relationship {
+  return {
+    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+    hasBought: input.situation.spentCents > 0,
+  };
 }
 
 export async function composeTurn(
@@ -1191,11 +1249,17 @@ export async function composeTurn(
       examples.map((e) => e.text),
     ),
     ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
+    ...(persona.agencyStyle !== undefined && { agencyStyle: persona.agencyStyle }),
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
     history: withTimeNotes(input.history, input.situation.timeZone),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
+  // His meeting tier, only when her settings let code compute it: otherwise none, and her close-only words stay closed.
+  const fanTier =
+    input.meetingTiers === undefined
+      ? undefined
+      : relationshipTier(relationshipOf(input), input.meetingTiers);
   if (input.followUp !== undefined || input.aftercare !== undefined) {
     const brief =
       input.followUp !== undefined
@@ -1210,6 +1274,7 @@ export async function composeTurn(
       brief,
       notes.dropped,
       exampleIds,
+      fanTier,
       guardLanguages(persona),
       // Her aftercare follows a sexual exchange (Sécurité, #1043); a follow-up does not.
       input.followUp === undefined && input.aftercare !== undefined,
@@ -1500,14 +1565,7 @@ export async function composeTurn(
   const meeting: MeetingAnswer | undefined =
     brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
       ? meetingAnswer({
-          tier: relationshipTier(
-            {
-              knownHours:
-                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-              hasBought: input.situation.spentCents > 0,
-            },
-            input.meetingTiers,
-          ),
+          tier: relationshipTier(relationshipOf(input), input.meetingTiers),
           given: input.meeting?.given ?? [],
           teased: input.meeting?.teased ?? false,
           herNextParty: brief.asksHerNextParty === true,
@@ -1783,10 +1841,11 @@ export async function composeTurn(
             };
   // Her anecdotes and questions worn across her fans: named to the voice, and read again on what it wrote.
   const worn = wornPhrases(input.herRecent ?? [], persona.wornLimits);
-  const voiceBrief: Brief =
+  const wornBrief: Brief =
     worn.length === 0
       ? voiceBriefRead
       : { ...voiceBriefRead, toneHints: [...voiceBriefRead.toneHints, wornHint(worn)] };
+  const voiceBrief = withoutEmojiIfDue(wornBrief, input.history, persona.guardSettings);
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}
@@ -1865,7 +1924,11 @@ export async function composeTurn(
             }
           : persona.guardSettings,
         {
-          ...guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor),
+          ...guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor, {
+            // A heated reading of his message, outside care: the same test as her register's.
+            flirting: register !== null,
+            ...(fanTier !== undefined && { fanTier }),
+          }),
           languages: guardLanguages(persona),
         },
       ),
@@ -1899,7 +1962,7 @@ export async function composeTurn(
       : undefined;
   const { voice, written, violations } = retried ?? first;
   const firstCostUsd = retried !== undefined && first.voice.ok ? (first.voice.value.meta.costUsd ?? 0) : 0;
-  const bubbles = asSent(written, persona.splitMessages);
+  const bubbles = asSent(written, persona.splitMessages, persona.guardSettings.form);
   return {
     ...(customOrder !== undefined && { customOrder }),
     ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),

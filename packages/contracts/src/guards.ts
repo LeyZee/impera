@@ -50,6 +50,14 @@ export const GUARD_CODES = [
   'minor_reference',
   // Charles 26/11: in a sexual message, no word of youth for her or for anyone (« petite », « jeunette », « lolita »…).
   'youth_word_in_sex',
+  // Charles 26/11 (« go voix »): her emojis, at the end of a bubble, one kind a message (two in a flirt), never three,
+  // and not on every message. Soft: rewritten once, then her answer goes.
+  'emoji_misuse',
+  // Charles 26/11: a word of hers kept for close fans (`rules.close_only_words`), written to a fan below its tier.
+  'close_only_word',
+  // Charles 26/11: a bubble of the voice outside her form (first letter, final period, space before « ? » « ! »); soft,
+  // the code puts it right before the send.
+  'form_rule',
   // ADR 0088 § 4 (eval pass 2, 26/11): a help or emergency number, or a listening line, the model wrote itself. The
   // help bubble is the code's, never the model's.
   'help_number_from_model',

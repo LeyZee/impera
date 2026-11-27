@@ -88,6 +88,7 @@ export {
   type JudgeSituation,
   type VoiceInput,
   type VoiceFantasy,
+  type AgencyStyleText,
   type VoiceLanguage,
   type VoiceScriptStep,
   type VoiceWaitingStep,

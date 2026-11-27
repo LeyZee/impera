@@ -23,7 +23,7 @@ import type { AlertSettings } from '../../domain/alerts';
 import { helpBubble } from '../../domain/care';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
-import { FRENCH_ONLY } from '../compose';
+import { FRENCH_ONLY, NO_EMOJI_HINT } from '../compose';
 import {
   createDraftComposer,
   type AgentComposeInput,
@@ -313,6 +313,88 @@ describe('createDraftComposer', () => {
     const still = composer({ voice: { bubbles: ['Alors tu comptes faire quoi de ton week-end'] } });
     expect(await still.draftComposer.compose(asked)).toMatchObject({ kind: 'draft' });
     expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('writes once more an answer whose emojis break her rules, then lets the second go (Charles 26/11)', async () => {
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] },
+      voiceAfter: { bubbles: ['Tranquille, et toi ? 😌'] },
+    });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Tranquille, et toi ? 😌'],
+    });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('ses emojis');
+
+    // Still misused once rewritten: it goes, nobody is called for it.
+    const still = composer({ voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('sends her bubbles in her form once the guards read them, her persona first (Charles 26/11)', async () => {
+    const { draftComposer } = composer({ voice: { bubbles: ['Ça te dit?', 'à demain.'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({ bubbles: ['Ça te dit?', 'à demain'] });
+
+    const french = await createDraftComposer({
+      gateway: gateway({ voice: { bubbles: ['ça te dit?', 'à demain.'] } }, { voiceCalls: 0, traces: [] }),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        ...FRENCH,
+        guardSettings: {
+          ...DEFAULT_GUARD_SETTINGS,
+          form: { capitalization: 'capital', stripFinalPeriod: false, markSpacing: 'space' },
+        },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(french).toMatchObject({ bubbles: ['Ça te dit ?', 'À demain.'] });
+  });
+
+  it('tells the voice up front to leave emojis out once her last answers all carried one (Charles 26/11)', async () => {
+    const at = (minute: number) => new Date(`2026-10-17T09:${String(minute).padStart(2, '0')}:00Z`);
+    const turns = (emojis: readonly string[]) => ({
+      ...INPUT,
+      history: [
+        ...emojis.flatMap((emoji, i) => [
+          { direction: 'inbound' as const, text: `message ${String(i)}`, at: at(40 + i * 2) },
+          {
+            direction: 'outbound' as const,
+            text: `réponse ${String(i)} ${emoji}`.trim(),
+            at: at(41 + i * 2),
+          },
+        ]),
+        ...INPUT.history,
+      ],
+    });
+    const due = composer();
+    await due.draftComposer.compose(turns(['😏', '🙈', '✨']));
+    expect(due.seen.voiceInputs?.[0]?.brief.toneHints).toContain(NO_EMOJI_HINT);
+
+    const notDue = composer();
+    await notDue.draftComposer.compose(turns(['😏', '', '✨']));
+    expect(notDue.seen.voiceInputs?.[0]?.brief.toneHints).not.toContain(NO_EMOJI_HINT);
+  });
+
+  it('never sends a word she keeps for close fans while his tier cannot be computed (Charles 26/11)', async () => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draft = await createDraftComposer({
+      gateway: gateway({ voice: { bubbles: ['Bonne nuit mon coeur'] } }, seen),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        ...FRENCH,
+        guardSettings: { ...DEFAULT_GUARD_SETTINGS, closeOnlyWords: [{ words: ['mon cœur'], minTier: 2 }] },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(draft).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('garde pour ses proches');
   });
 
   it('drops a hollow bubble, and writes again an answer left with none (passe 2, conversation 37)', async () => {

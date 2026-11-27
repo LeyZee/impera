@@ -7,6 +7,8 @@ import {
   type Language,
 } from '@impera/contracts';
 
+import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
+import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
 import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
 
 /**
@@ -37,6 +39,15 @@ export interface GuardSettings {
    * 16/11, M3). Carried here as her other limits are, to every composer.
    */
   readonly neverDo?: readonly string[];
+  /**
+   * Her words kept for close fans (`rules.close_only_words`, Charles 26/11): one written to a fan below its `minTier`
+   * is a `close_only_word`. Absent or empty: none.
+   */
+  readonly closeOnlyWords?: readonly { readonly words: readonly string[]; readonly minTier: number }[];
+  /** Her last this-many answers all carried an emoji: this one carries none (`behavior.emoji_streak_max`). */
+  readonly emojiStreakMax?: number;
+  /** The form of her bubbles, resolved (`resolveForm`); absent, the code's default. */
+  readonly form?: FormSettings;
 }
 
 /**
@@ -61,6 +72,13 @@ export interface GuardContext {
    * § 4), decided by code. Any other sum stays a `price_outside_offer`. Absent, no price passes.
    */
   readonly allowedPriceMinor?: number;
+  /** They flirt now (a heated reading of his message, outside care): two kinds of emoji instead of one. */
+  readonly flirting?: boolean;
+  /**
+   * His meeting tier (`relationshipTier`), read against her close-only words. Absent, not computable (her tier
+   * settings not stored): below every tier, closed by default.
+   */
+  readonly fanTier?: number;
   /**
    * The sums he wrote since her last answer, in minor units (Charles 27/11): she may say one back without agreeing to
    * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
@@ -339,8 +357,9 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
       // teasing, the rest is for the judge in context.
       /\b(sale|espece de|t'?es (qu'?)?(une? )?|tu es (qu'?)?(une? )?|toi,? |quel |quelle ) ?(gros |grosse |petit |petite |vrai |vraie )?(radin|radine|rapiat|rapiate|mendiant|mendiante|crevard|crevarde)s?\b/,
   },
-  // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat.
-  { code: 'forbidden_term', pattern: /\bmdr+\b/ },
+  // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat. Nor
+  // « ahah » nor « lol », stretched or not (Charles 26/11).
+  { code: 'forbidden_term', pattern: /\b(mdr+|lo+l+|a+h+a+h+[ah]*)\b/ },
   // « Rien à payer » about a paid bundle is a lie; « pas besoin de payer pour me parler » is true.
   {
     code: 'payment_lie',
@@ -1098,7 +1117,40 @@ export function checkVoiceOutput(
   if (context.previousTurns !== undefined)
     violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
   if (bubbles.length > settings.maxBubbles) violations.push({ code: 'too_many_bubbles', severity: 'soft' });
+  // Her emojis and her form are read on an answer to him, in a conversation: not on a lone sample of her bank.
+  if (context.previousTurns !== undefined)
+    violations.push(
+      ...checkEmojis(bubbles, {
+        flirting: context.flirting === true,
+        previousTurns: context.previousTurns,
+        streakMax: settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX,
+      }),
+      ...checkForm(bubbles, settings.form ?? DEFAULT_FORM_SETTINGS),
+    );
+  violations.push(...closeOnlyWords(bubbles, settings, context.fanTier));
   return violations;
+}
+
+/** « cœur » and « coeur » are one word: no Unicode normal form unties the ligature. */
+const foldLigatures = (text: string): string => text.replace(/[œŒ]/gu, 'oe').replace(/[æÆ]/gu, 'ae');
+
+/**
+ * Her words kept for close fans (Charles 26/11, ADR 0158 § O): written to a fan below the word's tier, her answer is
+ * refused, as a forbidden word is (blocking: rewritten once, then a human). A tier not computable is below every one.
+ */
+function closeOnlyWords(
+  bubbles: readonly string[],
+  settings: GuardSettings,
+  fanTier: number | undefined,
+): GuardViolation[] {
+  const text = foldLigatures(bubbles.join('\n'));
+  return (settings.closeOnlyWords ?? []).flatMap((group) =>
+    fanTier !== undefined && fanTier >= group.minTier
+      ? []
+      : group.words
+          .filter((word) => touchesTerm(text, foldLigatures(word)))
+          .map((word): GuardViolation => ({ code: 'close_only_word', severity: 'blocking', match: word })),
+  );
 }
 
 /**
@@ -1146,9 +1198,12 @@ export function isBlocked(violations: readonly GuardViolation[]): boolean {
   return violations.some((v) => v.severity === 'blocking');
 }
 
-/** Blocked, or a formula she already used with him: her answer is written once more, then goes (passe 1, 21/11). */
+/** The soft guards that ask for one more writing of her answer (passe 1, 21/11; emojis, 26/11). */
+export const REWRITTEN_SOFT: readonly GuardCode[] = ['repetition', 'emoji_misuse'];
+
+/** Blocked, a formula she already used with him or her emojis misused: her answer is written once more, then goes (passe 1, 21/11). */
 export function wantsRewrite(violations: readonly GuardViolation[]): boolean {
-  return isBlocked(violations) || violations.some((v) => v.code === 'repetition');
+  return isBlocked(violations) || violations.some((v) => REWRITTEN_SOFT.includes(v.code));
 }
 
 // Explicit words, on the normalised text: « un baiser », « la queue au cinéma » or « ma chatte Moka » are not.

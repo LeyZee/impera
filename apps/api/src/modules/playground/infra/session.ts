@@ -631,7 +631,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         ...checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history)),
         ...checkYouthWords(written, lastExchange?.sexualTurn === true),
       ];
-      const bubbles = asSent(written, deps.splitMessages);
+      const bubbles = asSent(written, deps.splitMessages, deps.guardSettings.form);
       return {
         bubbles,
         violations,
