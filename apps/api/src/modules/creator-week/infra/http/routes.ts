@@ -84,7 +84,8 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
           response: { 200: AgencyCreatorWeekSchema, 204: z.null() },
         },
       },
-      // 204 while the Sunday job has not computed it: an ordinary state, not an error in the console (recette 27/11).
+      // 204 while the Sunday job has not computed it: an ordinary state, never a 404 the browser logs as an error
+      // (MAN-08, DS-14, recette 27/11).
       async (request, reply) => {
         const week = await deps.drafts.read(
           request.params.creatorId,

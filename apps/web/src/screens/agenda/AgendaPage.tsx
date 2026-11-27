@@ -319,6 +319,9 @@ export function AgendaPage({
           }}
           onNotice={setNotice}
           onTick={tick}
+          onShowDay={(one) => {
+            if (one !== shown) onDay(one === today ? null : one);
+          }}
         />
       )}
     </Page>
@@ -414,6 +417,7 @@ function Dialogs({
   onClose,
   onNotice,
   onTick,
+  onShowDay,
 }: {
   agenda: CreatorAgenda;
   open: NonNullable<Open>;
@@ -421,10 +425,12 @@ function Dialogs({
   onClose: () => void;
   onNotice: (notice: string) => void;
   onTick: (task: CreatorTask, on: boolean, day: string) => void;
+  /** Goes to a day, the one of a task just added (recette MOD-13). */
+  onShowDay: (day: string) => void;
 }): JSX.Element {
   switch (open.kind) {
     case 'add':
-      return <AddDialog zone={agenda.timeZone} preset={open.preset} onClose={onClose} />;
+      return <AddDialog zone={agenda.timeZone} preset={open.preset} onClose={onClose} onAdded={onShowDay} />;
     case 'task':
       return (
         <TaskDialog

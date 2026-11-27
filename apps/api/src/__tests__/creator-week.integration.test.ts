@@ -243,7 +243,8 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       outcomes: {},
       failed: [],
     });
-    expect((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode).toBe(204);
+    const none = await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner');
+    expect(none.statusCode).toBe(204);
     expect(await app.modules.creatorWeek.jobs.plan(sundayEvening)).toEqual({
       outcomes: { written: 2 },
       failed: [],

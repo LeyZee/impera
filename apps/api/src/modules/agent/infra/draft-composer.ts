@@ -236,6 +236,8 @@ type AgentComposeResult = (
       readonly kind: 'draft';
       readonly bubbles: readonly string[];
       readonly softViolations: readonly string[];
+      /** The blocking codes of a first answer set aside and written again (IA-08): kept in `guard_trace`. */
+      readonly retried?: readonly string[];
       readonly costUsd: number;
       /** Absent when no model is known: no voice is better than a false one on the live rate (ADR 0019). */
       readonly voice?: { readonly voicePrompt: string; readonly voiceModel: string };
@@ -661,6 +663,22 @@ async function stopped(
 }
 
 /**
+ * Platform clocks may run behind ours: a message dated up to this much before the confirmation is still read, the
+ * safe side (IA-02).
+ */
+const CLOCK_SLACK_MS = 2 * 60_000;
+
+/** What he wrote since a human confirmed his age (all of it while it is not confirmed), as one text. */
+function sinceAgeConfirmed(messages: AgentComposeInput['history'], flags: FanFlags | undefined): string {
+  const confirmed = flags?.ageConfirmedAt;
+  const from = confirmed === undefined ? Number.NaN : Date.parse(confirmed) - CLOCK_SLACK_MS;
+  return messages
+    .filter((m) => Number.isNaN(from) || m.at.getTime() >= from)
+    .map((m) => m.text)
+    .join('\n');
+}
+
+/**
  * His age is in doubt (`ageDisputed`, set by the policy on a sign of a minor or by a human): the agent writes nothing to
  * him until the owner or a manager confirms it (Charles, 16/11), and each new message of his goes to a human, as on
  * the message the doubt opened on. His score drops to 0, as the brain would have counted it.
@@ -872,6 +890,7 @@ async function quietTurn(
     bubbles: composed.bubbles,
     ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: [],
     ...(composed.model !== undefined && {
@@ -1045,6 +1064,7 @@ async function settleCare(
     // The help bubble is the code's own: its French beside the voice's (ADR 0168 § 9).
     ...translationFor(composed, help ? helpBubble('french') : undefined),
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
     ...(composed.model !== undefined && {
@@ -1147,6 +1167,7 @@ async function settle(
     bubbles: composed.bubbles,
     ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: withoutOrders(composed.brief.factsProposed),
     ...(composed.model !== undefined && {
@@ -1190,7 +1211,16 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
       // His kept language (ADR 0168 § 4): a bare number in a short message of his is read by his covered language.
       const keptLanguage = await keptLanguageOf(deps.limits, input);
-      const signs = safetySigns(fanText, input.now, keptLanguage?.value ?? null);
+      const kept = keptLanguage?.value ?? null;
+      // Once a human confirmed his age, a sign of a minor read before that decision is settled: only what he wrote
+      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress reads it all.
+      const signs = safetySigns(fanText, input.now, kept).filter(
+        (sign) =>
+          sign !== 'minor_suspected' ||
+          safetySigns(sinceAgeConfirmed(sinceAnswer, stop.flags), input.now, kept).includes(
+            'minor_suspected',
+          ),
+      );
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);

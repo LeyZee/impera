@@ -1,5 +1,5 @@
 # P6-01 Catalogue tarifé : index des scripts Reveal, de leurs étapes et de leurs bundles
-Statut : todo
+Statut : superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'index des scripts créés dans Reveal est retiré par « Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse » (décision du 20/11/2026) ; nos scripts sont dans l'éditeur des scripts à branches) ; statut précédent : todo
 Phase : 6
 Dépend de : P3-02, P1-02, P1-03
 Branche : task/p6-01-sales-catalog

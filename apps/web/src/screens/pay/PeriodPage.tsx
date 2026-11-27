@@ -8,7 +8,7 @@ import {
   type PayrollPeriod,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useId, useState, type JSX, type ReactNode } from 'react';
+import { useEffect, useId, useState, type JSX, type ReactNode } from 'react';
 
 import { CloseDialog } from './CloseDialog';
 import { HeldSalesPanel } from './HeldSalesPanel';
@@ -39,6 +39,13 @@ import {
   Swatch,
   Unreachable,
 } from './parts';
+import {
+  answeredValidation,
+  cutText,
+  cutValidations,
+  endValidations,
+  queueValidations,
+} from './validation-queue';
 
 import {
   useLatestPayPeriod,
@@ -178,6 +185,25 @@ function PeriodView({
   // The statement asked from a member's record: opened once the period is read, or said missing (EQ-11).
   const [asked, setAsked] = useState(member);
   const [absent, setAbsent] = useState<string | null>(null);
+  // A batch of validations the page was left during, said once the period is read again (recette COUV-13).
+  const [cut, setCut] = useState<number | null>(null);
+  const [cutRead, setCutRead] = useState(false);
+  if (!cutRead && data !== undefined) {
+    setCutRead(true);
+    setCut(cutValidations(data.period, data.statements));
+  }
+  // The validations leave one by one: leaving the page while they do asks first.
+  const underWay = sending.size > 0;
+  useEffect(() => {
+    if (!underWay) return;
+    const warn = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+    };
+  }, [underWay]);
   if (asked !== null && data !== undefined) {
     const theirs = data.statements.find((one) => one.memberId === asked);
     setAsked(null);
@@ -217,9 +243,12 @@ function PeriodView({
     let halted: PayRefusal | null = null;
     // What the password and the code must be given again for (EQ-15): the rest of the batch, from the first refused.
     let unconfirmed: readonly CommissionStatement[] = [];
+    if (data !== undefined) queueValidations(data.period, [...ids]);
+    setCut(null);
     const sentNow = leaving ? batch.map((one) => validateStatement(one.id, one.revision)) : null;
     for (const [index, one] of batch.entries()) {
       const outcome = await (sentNow?.[index] ?? validateStatement(one.id, one.revision));
+      if (outcome.kind === 'ok' || outcome.kind === 'refused') answeredValidation(one.id);
       if (outcome.kind === 'ok') {
         done += 1;
         continue;
@@ -236,6 +265,7 @@ function PeriodView({
       }
       refused.push([one, outcome]);
     }
+    endValidations();
     await refresh();
     setRefusals(
       (was) => new Map([...was, ...refused.map(([one, refusal]): [string, PayRefusal] => [one.id, refusal])]),
@@ -476,6 +506,11 @@ function PeriodView({
             ) : null}
             {absent === null ? null : (
               <p className="py-quiet">Pas de relevé de {names.member(absent).name} sur cette quinzaine.</p>
+            )}
+            {cut === null || cut === 0 ? null : (
+              <p className="py-quiet" role="status">
+                {cutText(cut)}
+              </p>
             )}
             {pickable.length === 0 ? null : (
               <SelectAll
@@ -901,15 +936,16 @@ function EndedHero({
   const notes = stale
     ? ['Plus à jour : le calcul est bloqué.']
     : [
-        !paid && sent > 0 ? `déjà versé ${amountText(sent, 'EUR')}` : null,
+        // « dont » right after the amount it is part of; what is not part of it said as such (COUV-01).
         blocked.length === 0
           ? null
           : `dont ${amountText(sumOf(blocked), 'EUR')} au versement bloqué (${statementsWord(blocked.length)})`,
+        !paid && sent > 0 ? `déjà versé ${amountText(sent, 'EUR')}` : null,
         drafts.length === 0
           ? null
           : validated.length + payments.length === 0
             ? `${statementsWord(drafts.length)} à valider`
-            : `${amountText(sumOf(drafts), 'EUR')} pas encore validé${drafts.length > 1 ? 's' : ''} (${statementsWord(drafts.length)})`,
+            : `hors ce montant : ${amountText(sumOf(drafts), 'EUR')} encore à valider (${statementsWord(drafts.length)})`,
         paid && statements.length > 0
           ? `${statementsWord(payments.length)} payé${payments.length > 1 ? 's' : ''}`
           : null,
@@ -1041,7 +1077,7 @@ function SelectAll({
         type="button"
         className="nv-btn nv-btn--neon nv-btn--sm py-validate--row"
         disabled={chosen === 0}
-        aria-label={`Valider les ${String(chosen)} relevés`}
+        aria-label={`Valider ${statementsWord(chosen)}`}
         onClick={onValidate}
       >
         Valider
@@ -1277,6 +1313,8 @@ function BlockNotice({
   }
   const count = block.reports.length;
   const toDecide = block.reports.filter((report) => awaitsDecision(report, now)).length;
+  // The reader's own (his shift, or a correction he made): waiting too, but for someone else (MAN-05, H-13).
+  const mine = block.reports.filter((report) => report.status === 'submitted' && !report.canReview).length;
   // A gap still waiting for its member cannot be validated yet, and holds the period too (ADR 0073 § 5): sending it
   // back frees the period, the report then counts on a later one once validated.
   const explaining = block.reports.filter((report) => gapWaits(report, now)).length;
@@ -1297,6 +1335,9 @@ function BlockNotice({
             {count === 1
               ? 'Un rapport de la quinzaine attend sa relecture'
               : `${String(count)} rapports de la quinzaine attendent leur relecture`}
+            {toDecide < count && mine > 0
+              ? `${count === 1 ? ', le tien' : `, dont ${String(mine)} à toi`} : un autre membre de l’agence ${mine === 1 ? 'le' : 'les'} relit`
+              : null}
           </p>
           <p className="rp-notice__text">
             {list} Tant {count === 1 ? 'qu’il attend' : 'qu’ils attendent'}, la quinzaine ne se clôt pas :{' '}

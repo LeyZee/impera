@@ -5,6 +5,7 @@ import {
   ConversationSummarySchema,
   DashboardSchema,
   DraftIdSchema,
+  GuardCodeSchema,
   MessageViewSchema,
   type ConversationDetail,
   type ConversationSummary,
@@ -121,6 +122,8 @@ function serve(routes: {
   todos?: Reply | (() => Reply);
   /** The emergency stop holds her messages (recette CHAT-07); off when not given, unread when `'down'`. */
   stopped?: boolean | 'down';
+  /** The cards of Créatrices (`/v1/dashboard/creators`): whose AI is cut, whether the general stop holds. */
+  overview?: unknown;
 }): Posted[] {
   const posted: Posted[] = [];
   vi.stubGlobal(
@@ -157,6 +160,8 @@ function serve(routes: {
           routes.stopped === 'down'
             ? { status: 500 }
             : { status: 200, body: { stopped: routes.stopped ?? false } };
+      } else if (path === '/v1/dashboard/creators' && routes.overview !== undefined) {
+        reply = { status: 200, body: routes.overview };
       } else if (path === '/v1/conversations') {
         reply = { status: 200, body: routes.conversations?.[url.searchParams.get('creatorId') ?? ''] };
       } else if (path === '/v1/dashboard/todos') {
@@ -539,6 +544,18 @@ describe('TrackingPage', () => {
     expect(document.activeElement).toBe(back);
   });
 
+  it('says to confirm his age first instead of offering to give back a fan whose age is in doubt (IA-01)', async () => {
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
+      flags: { before: { ageDisputed: { since: '2026-10-22T10:00:00.000Z', by: 'policy' } } },
+    });
+    renderPage(OPEN);
+    expect(await screen.findByText(/confirme d’abord qu’il est majeur/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Rendre la main à l’agent' })).toBeNull();
+  });
+
   it('shows the three gravest of « À traiter », and the others on demand', async () => {
     const [first] = apiDashboard().todos;
     if (first === undefined) throw new Error('the fake dashboard has a todo');
@@ -722,6 +739,60 @@ describe('the reader of Suivi', () => {
     expect(screen.getByText('Salut, ça va ?')).toBeDefined();
   });
 
+  it('says discreetly under the draft an answer the guards set aside before it (IA-08)', async () => {
+    const draft = (retried: string[]) =>
+      waiting({
+        openDrafts: [
+          {
+            id: DRAFT,
+            status: 'pending',
+            bubbles: ['Coucou toi'],
+            finalBubbles: null,
+            createdAt: '2026-10-17T20:01:00Z',
+            retried: GuardCodeSchema.array().parse(retried),
+          },
+        ],
+      });
+    serve({ ...withDraft, detail: () => ({ status: 200, body: draft(['ai_disclosure']) }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).getByText('1 réponse écartée : un aveu d’IA')).toBeDefined();
+  });
+
+  it('shows under the draft the step of her script that leaves with it (REV-03)', async () => {
+    const body = waiting({
+      openDrafts: [
+        {
+          id: DRAFT,
+          status: 'pending',
+          bubbles: ['Coucou toi'],
+          finalBubbles: null,
+          createdAt: '2026-10-17T20:01:00Z',
+          retried: [],
+          scriptStep: {
+            scriptName: 'Café inventé',
+            stepIndex: 1,
+            stepName: null,
+            priceMinor: 900,
+            currency: 'EUR',
+            hasMedia: true,
+          },
+        },
+      ],
+    });
+    serve({ ...withDraft, detail: () => ({ status: 200, body }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).getByText('Part avec : étape 2 de « Café inventé » · un média · 9 €')).toBeDefined();
+  });
+
+  it('says nothing under a draft written at once', async () => {
+    serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).queryByText(/réponse écartée/u)).toBeNull();
+  });
+
   it('sends the draft as written on Valider, then reads the conversation again', async () => {
     let approved = false;
     const posted = serve({
@@ -765,6 +836,22 @@ describe('the reader of Suivi', () => {
     expect(within(list).getByText('Arrêt actif')).toBeDefined();
     expect(within(list).queryByText('À valider')).toBeNull();
     expect(posted).toEqual([]);
+  });
+
+  it('says her AI is cut, never « arrêt d’urgence », when only her AI is off (PRO1-12)', async () => {
+    serve({
+      ...withDraft,
+      stopped: true,
+      detail: () => ({ status: 200, body: waiting() }),
+      overview: {
+        creators: [
+          { creatorId: LEA.id, mode: 'stop', globalStop: false, sales: null, onShift: null, requests: null },
+        ],
+      },
+    });
+    renderPage(OPEN);
+    expect(await screen.findByText('L’IA est coupée pour Léa.')).toBeDefined();
+    expect(screen.queryByText(/L’arrêt d’urgence est actif/u)).toBeNull();
   });
 
   it('says when the emergency stop could not be read, rather than nothing (relecture #597)', async () => {
@@ -927,7 +1014,7 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     const line = await screen.findByText('Ne plus lui écrire', { selector: '.tr-limits__sum' });
-    expect(line.className).toContain('tr-warn');
+    expect(line.className).toContain('tr-bad');
   });
 
   it('says what she has still to learn about him, in her order, next to his limits', async () => {
@@ -1188,6 +1275,7 @@ describe('the reader of Suivi', () => {
             bubbles: ['Coucou toi'],
             finalBubbles: ['Coucou toi, tu es là ?'],
             createdAt: '2026-10-17T20:01:00Z',
+            retried: [],
           },
         }),
       }),
@@ -1338,7 +1426,7 @@ describe('the reader of Suivi', () => {
     expect(flagCalls).toHaveLength(1);
   });
 
-  it('reads a disputed age as a suspected minor, in amber, and says confirming lifts the dispute', async () => {
+  it('reads a disputed age as a suspected minor, in red everywhere, and says confirming lifts the dispute', async () => {
     serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
@@ -1347,7 +1435,8 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     expect(await screen.findByText('Âge contesté', { selector: '.tr-alert--stop strong' })).toBeDefined();
-    expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-warn');
+    expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-bad');
+    expect(screen.getByText('Âge contesté', { selector: '.tr-limits__sum' }).className).toContain('tr-bad');
     expect(screen.getByText(/l’agent a relevé un signe de minorité/u)).toBeDefined();
     expect(screen.queryByText(/Pas encore confirmé/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer son âge' }));

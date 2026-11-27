@@ -10,6 +10,7 @@ import { accessOpen, type MyAwayStatus } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { addDays, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { useMembers } from '@/screens/team/api';
 import { ChatArt } from '@/shell/art/EmptyArt';
 import { Panel } from '@/shell/layout';
 import { Empty } from '@/shell/states';
@@ -21,14 +22,20 @@ import { Empty } from '@/shell/states';
  * The window is the server's (`shiftCreatorIds`, `accessStartsAt`): the page only says it.
  */
 export function ChatterTrackingPage({
+  userId,
   away = null,
   ...props
 }: Omit<ComponentProps<typeof TrackingPage>, 'offShift' | 'selfScope' | 'nothingListed'> & {
+  /** Whose record gives the clock: his, as Aujourd'hui and Planning read it (recette CHAT-01). */
+  userId: string;
   /** His status when he is away from the team (suspended, on leave…): said first and alone (CHAT-09). */
   away?: MyAwayStatus | null;
 }): JSX.Element {
   const mine = useMyShifts();
   const now = useNow();
+  // One clock with Aujourd'hui and Planning: his record's, the device's only while the record is not read (CHAT-01).
+  const members = useMembers();
+  const zone = members.data?.find((member) => member.userId === userId)?.timeZone ?? readerZone();
   const off = mine.data !== undefined && !accessOpen(mine.data, now);
   return (
     <TrackingPage
@@ -40,7 +47,7 @@ export function ChatterTrackingPage({
           ? () => <MyAwayCard status={away} />
           : off
             ? (holdsHandover: boolean) => (
-                <OffShift next={mine.data.next} holdsHandover={holdsHandover} now={now} zone={readerZone()} />
+                <OffShift next={mine.data.next} holdsHandover={holdsHandover} now={now} zone={zone} />
               )
             : undefined
       }

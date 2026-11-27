@@ -13,6 +13,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
+import { CategoryIcon } from './CategoryIcon';
 import { DropSheet } from './DropSheet';
 import {
   CONTENT_KEY,
@@ -25,7 +26,6 @@ import {
   withdrawDrop,
 } from './api';
 import {
-  CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   DROP_OUTPUTS,
   UNKNOWN_TYPE,
@@ -127,16 +127,24 @@ export function ContentPage({
   const first = dueNow(asked, today)[0];
   const firstKey = first === undefined ? null : first.kind === 'script' ? first.drop.id : first.request.id;
 
-  // Aujourd'hui's « Déposer »: the sheet opens on its request once Contenu is read, then the address forgets it.
+  // Aujourd'hui's « Déposer »: the sheet opens on its request once Contenu is read. The address forgets it only as the
+  // sheet closes: the page may be drawn again meanwhile (the shell remounts it on the way in), and opens it again then
+  // (recette MOD-03).
   const requests = content.data?.requests;
+  const openedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (askedId === null || requests === undefined) return;
+    if (askedId === null || requests === undefined || openedFor.current === askedId) return;
+    openedFor.current = askedId;
     const request = requests.find((one) => one.id === askedId && one.state === 'open' && one.dropId === null);
     // A script asked with its version is begun card by card, from its own card: the page shows it.
     if (request !== undefined && !(request.category === 'script' && request.structureVersionId !== null))
       setOpened({ category: request.category, request });
-    onAsked?.();
+    else onAsked?.();
   }, [askedId, requests, onAsked]);
+  const closeSheet = (): void => {
+    setOpened(null);
+    if (askedId !== null) onAsked?.();
+  };
   const moving = content.data === undefined ? [] : onTheirWay(content.data.drops);
   const out = content.data === undefined ? [] : published(content.data.drops);
 
@@ -244,7 +252,8 @@ export function ContentPage({
           <section className="ct-section" aria-labelledby="ct-drop">
             {/* Not « Déposer », the word of every request's button above: these tiles send without a request (CRE-13). */}
             <h2 id="ct-drop" className="nv-h2 ct-section__title">
-              Envoyer autre chose
+              {/* « Autre chose » only beside a request; alone, nothing to be other than (recette MOD-09). */}
+              {asked.length === 0 ? 'Envoyer un contenu' : 'Envoyer autre chose'}
             </h2>
             {DROP_OUTPUTS.map((output) => (
               <div key={output.name} className="ct-output">
@@ -259,9 +268,7 @@ export function ContentPage({
                         setOpened({ category, request: null });
                       }}
                     >
-                      <span className="ct-tile__emoji" aria-hidden="true">
-                        {CATEGORY_EMOJIS[category]}
-                      </span>
+                      <CategoryIcon category={category} />
                       <span className="ct-tile__name">{DROP_CATEGORY_LABELS[category]}</span>
                       <span className="ct-tile__hint">{CATEGORY_HINTS[category]}</span>
                     </button>
@@ -281,7 +288,7 @@ export function ContentPage({
               <ul className="ct-list ct-list--quiet">
                 {out.map((drop) => (
                   <li key={drop.id} className="ct-out">
-                    <span aria-hidden="true">{CATEGORY_EMOJIS[drop.category]}</span>
+                    <CategoryIcon category={drop.category} size="sm" />
                     <span className="ct-out__name">{dropName(drop)}</span>
                     <span className="ct-out__meta nv-num">{outLine(drop, today, zone)}</span>
                   </li>
@@ -296,11 +303,9 @@ export function ContentPage({
         <DropSheet
           category={opened.category}
           request={opened.request}
-          onClose={() => {
-            setOpened(null);
-          }}
+          onClose={closeSheet}
           onDropped={(drop, files) => {
-            setOpened(null);
+            closeSheet();
             setLanded(drop.id);
             client.setQueryData(CONTENT_KEY, (old: typeof content.data) =>
               old === undefined
@@ -365,9 +370,7 @@ function RequestCard({
   return (
     <li className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[request.category]}
-        </span>
+        <CategoryIcon category={request.category} size="sm" />
         <span className="ct-card__titles">
           <span className="ct-card__name">{DROP_CATEGORY_LABELS[request.category]}</span>
           <span className={dueClass(due, request, today)}>
@@ -453,9 +456,7 @@ function RedoneCard({
   return (
     <li className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[redone.category]}
-        </span>
+        <CategoryIcon category={redone.category} />
         <span className="ct-card__titles">
           <span className="ct-card__name">{DROP_CATEGORY_LABELS[redone.category]}</span>
           <span className="ct-due">Ton dernier envoi est revenu</span>
@@ -508,9 +509,7 @@ function StartedScriptCard({
   return (
     <li className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[drop.category]}
-        </span>
+        <CategoryIcon category={drop.category} size="sm" />
         <span className="ct-card__titles">
           <span className="ct-card__name">
             {script.data === undefined
@@ -644,9 +643,7 @@ function DropCard({
   return (
     <li ref={card} className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[drop.category]}
-        </span>
+        <CategoryIcon category={drop.category} size="sm" />
         <span className="ct-card__name">{dropName(drop)}</span>
         <span className={`ct-state ct-state--${tone}`}>{stateWord(drop)}</span>
       </div>
@@ -904,7 +901,7 @@ function RefuseDialog({
   return (
     <Dialog
       title="Tu ne peux pas le tourner ?"
-      lead={`${CATEGORY_EMOJIS[request.category]} ${DROP_CATEGORY_LABELS[request.category]}`}
+      lead={DROP_CATEGORY_LABELS[request.category]}
       busy={busy}
       onClose={onClose}
     >

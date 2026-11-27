@@ -1,5 +1,5 @@
 # VEI-03 Le job du matin : signaux de Grok et idées du jour
-Statut : blocked (clé xAI)
+Statut : todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : blocked (clé xAI)
 Phase : veille (ADR 0060)
 Dépend de : VEI-01, P3-01 (passerelle LLM)
 Branche : task/vei-03-morning-ideas

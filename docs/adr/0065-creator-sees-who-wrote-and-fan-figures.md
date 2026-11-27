@@ -1,5 +1,13 @@
 # 0065. La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0074 · Les chiffres de sa base : quels faits comptent, et comment âge, lieu, métier et situation se rangent en cases](0074-fan-figures-normalised-from-declared-facts.md) : Remplace : dans l'ADR 0065 § 2, les mots « avec au survol ou au toucher le nombre et la part de chaque case » (la part seule, § 8 ci-dessous).
+>
+> Toutes les décisions du même sujet : [`docs/regles/fans.md`](../regles/fans.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 06/11/2026 12h13, « ok 0065 », chat du projet ; signature des messages de l'IA choisie par Charles le 03/11 à 16h20 : « Automatique ») ; § 2, les mots « avec au survol ou au toucher le nombre et la part de chaque case » remplacés par l'ADR 0074 (la part seule), qui précise aussi le § 3 et le § 4
 Date : 2026-11-03
 Remplace : dans l'ADR 0042 § 2, la phrase « l'auteur d'un message envoyé (chatteur ou agent, ADR 0021). Elle voit le message, jamais qui l'a écrit. » ; dans l'ADR 0063 § 3, les mots « sans jamais voir qui a écrit un message (ADR 0021) ».

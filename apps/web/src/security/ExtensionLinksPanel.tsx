@@ -8,14 +8,19 @@ import {
   LINK_FAILURES,
   revokeExtensionLink,
 } from './extension-links';
-import { ago, dayText } from './view';
+import { ago } from './view';
 
 import { CopyButton } from '@/auth/BackupCodesList';
+import { withFirstOfMonth } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Panel, PanelSection } from '@/shell/layout';
 
 /** Three browsers at most (`EXTENSION_LINKS_LIVE_MAX` on the server). */
 export const EXTENSION_LINKS_MAX = 3;
+
+/** « 21 novembre », « 1er décembre »: the long day of the rest of the app, never « 21/11/2026 » (recette CHAT-12). */
+const LINKED_ON = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
+const linkedOnText = (at: string): string => withFirstOfMonth(LINKED_ON.formatToParts(new Date(at)));
 
 const MUTED = 'text-sm text-[var(--nv-ink-muted)]';
 
@@ -151,7 +156,7 @@ export function ExtensionLinksPanel({ watches }: { readonly watches: boolean }):
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{item.label}</p>
                   <p className="text-xs text-[var(--nv-ink-muted)]">
-                    Relié le {dayText(item.createdAt)} ·{' '}
+                    Relié le {linkedOnText(item.createdAt)} ·{' '}
                     {item.lastUsedAt === null
                       ? 'rien reçu encore'
                       : `dernier envoi ${ago(item.lastUsedAt, now)}`}

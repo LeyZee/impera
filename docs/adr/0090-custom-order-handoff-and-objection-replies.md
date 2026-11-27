@@ -1,5 +1,13 @@
 # 0090. Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0159 · Une demande sur mesure passe par l'accord et le prix de la créatrice ; l'IA prend la commande avec un acompte par pourboire et livre depuis un dossier rattaché au fan](0159-custom-order-creator-price-and-tip-deposit.md) : Remplace : l'ADR 0090 § A, points 1 et 2 (« l'IA ne vend jamais de sur-mesure ») ; garde le reste de l'ADR 0090 (réponse d'attente, garde `no_commitment`, objections de prix).
+>
+> Toutes les décisions du même sujet : [`docs/regles/vente-et-scripts.md`](../regles/vente-et-scripts.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 11/11/2026 17h59, « ok 0090 », fil Agent ; décisions du 11/11 à 17h51, fil « Évaluer la capacité de vente de l'IA »)
 Date : 2026-11-11
 Précise : P4-01 (alerte système `service_request`), l'ADR 0023 (passation à l'humain), l'ADR 0021 (elle reste elle-même), l'ADR 0010 (rien de réel dans le dépôt), la garde « jamais de négociation ».

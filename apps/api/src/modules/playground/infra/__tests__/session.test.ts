@@ -693,6 +693,15 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(playground.desireTrail).toHaveLength(1);
   });
 
+  it('reads his second message from a first score of 0, never as a second first score (IA-10)', async () => {
+    const playground = session([], true, 0, BRIEF);
+    await playground.handleFanMessage('Salut');
+    await playground.handleFanMessage('Ça va ?');
+    expect(playground.desireTrail[0]?.before).toBeNull();
+    expect(playground.desireTrail[0]?.score).toBe(0);
+    expect(playground.desireTrail[1]?.before).toBe(0);
+  });
+
   it('says why the policy refused an offer, and what the cursor decided', async () => {
     const playground = session([], true, 70);
     const first = await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SecondFactorPage, keyOf } from './SecondFactorPage';
 import { chosenPassword, forgetChosenPassword, holdChosenPassword } from './chosen-password';
+import { codesUnconfirmed } from './codes-pending';
 
 /** Invented values: a key and ten codes shaped like the server's, nothing real. */
 const URI = 'otpauth://totp/Impera:a%40example.test?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=Impera';
@@ -68,6 +69,11 @@ describe('SecondFactorPage', () => {
     fireEvent.submit(code.closest('form') ?? document.body);
     const list = await screen.findByLabelText('Codes de secours');
     expect(list.querySelectorAll('li')).toHaveLength(10);
+    // Until they are said kept, leaving asks first and Sécurité will say so (recette COUV-08).
+    expect(codesUnconfirmed()).toBe(true);
+    const leave = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leave);
+    expect(leave.defaultPrevented).toBe(true);
     // Impera opens only once the person says the codes are kept.
     const open = screen.getByRole('button', { name: 'Ouvrir Impera' });
     expect(open).toHaveProperty('disabled', true);
@@ -77,6 +83,7 @@ describe('SecondFactorPage', () => {
     await waitFor(() => {
       expect(onActivated).toHaveBeenCalled();
     });
+    expect(codesUnconfirmed()).toBe(false);
     expect(calls).toEqual([
       '/v1/auth/two-factor/enable {"password":"staple battery horse"}',
       '/v1/auth/two-factor/verify-totp {"code":"123456"}',

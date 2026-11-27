@@ -1,6 +1,6 @@
 # P2-06 Déploiement du connecteur Reveal
 
-Statut : todo
+Statut : todo (avec la mise en ligne sur le VPS ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo
 Phase : 2
 Dépend de : P2-05
 Branche : task/p2-06-reveal-deployment

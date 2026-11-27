@@ -90,7 +90,7 @@ describe('the workshop draft', () => {
     const titles = segmentTitles(draft.segments);
     const bridge = draft.segments.find((segment) => segment.kind === 'bridge');
     expect(titles.get(draft.segments[0]?.key ?? '')).toBe('Étape 1');
-    expect(titles.get(bridge?.key ?? '')).toBe('Pont 2 & 3');
+    expect(titles.get(bridge?.key ?? '')).toBe('Pont vers l’étape 3');
   });
 
   it('says where the server would refuse, in French', () => {
@@ -102,7 +102,7 @@ describe('the workshop draft', () => {
       name: ' ',
       segments: [{ ...first, name: '' }, ...draft.segments.slice(1)],
     });
-    expect(issues.get('name')).toEqual(['Un champ est vide']);
+    expect(issues.get('name')).toEqual(['Donne un nom à la structure.']);
     expect(issues.get(first.key)).toEqual(['Un champ est vide']);
   });
 

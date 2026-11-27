@@ -247,7 +247,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
         />
       </label>
       <label className="flex items-start gap-3 text-sm text-[var(--nv-ink-muted)]">
-        <input className="mt-1" type="checkbox" name="trust" />
+        <input className="nv-check" type="checkbox" name="trust" />
         <span>Se souvenir de cet appareil 30 jours. Le code restera demandé avant une action sensible.</span>
       </label>
       {error === null ? null : (

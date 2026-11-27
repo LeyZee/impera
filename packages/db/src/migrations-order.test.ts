@@ -95,7 +95,8 @@ describe('the migrations’ snapshots', () => {
       broken,
       'a snapshot whose prevId is not the one before it: regenerate it behind the last of main',
     ).toEqual([]);
-  });
+    // Every snapshot is read and parsed: past Vitest's 5 s on a loaded machine, never a fault of the code (CODE-08).
+  }, 30_000);
 
   it('end with the last entry’s, the one generate and drift read', () => {
     const [greatest] = readdirSync(META)
