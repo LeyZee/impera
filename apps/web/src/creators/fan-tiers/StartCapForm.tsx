@@ -20,6 +20,10 @@ export function StartCapForm({ creatorId }: { creatorId: CreatorId }): JSX.Eleme
   return <CapForm key={creatorId} creatorId={creatorId} initial={startCapTextOf(read.data)} />;
 }
 
+// French typography: a no-break space before each colon, so that « Vide : pas de plafond » never breaks before it.
+const HINT =
+  'Au lancement d’un script, sa première étape payante ne dépasse pas ce multiple du plus gros achat que le fan a pris. Par exemple 1,2\u00a0: pour un plus gros achat de 20\u00a0€, 24\u00a0€ au plus. Vide\u00a0: pas de plafond.';
+
 function CapForm({ creatorId, initial }: { creatorId: CreatorId; initial: string }): JSX.Element {
   const id = useId();
   const client = useQueryClient();
@@ -41,7 +45,7 @@ function CapForm({ creatorId, initial }: { creatorId: CreatorId; initial: string
       });
       return;
     }
-    setNotice(outcome === 'ok' ? 'Plafond enregistré.' : 'Pas enregistré : réessaie dans un instant.');
+    setNotice(outcome === 'ok' ? 'Plafond enregistré.' : 'Pas enregistré\u00a0: réessaie dans un instant.');
     if (outcome === 'ok') await client.invalidateQueries({ queryKey: startCapKey(creatorId) });
   }
 
@@ -55,11 +59,7 @@ function CapForm({ creatorId, initial }: { creatorId: CreatorId; initial: string
           void save();
         }}
       >
-        <Field
-          label="Plafond au lancement"
-          id={`${id}-cap`}
-          hint="Au lancement d’un script, sa première étape payante ne dépasse pas ce multiple du plus gros achat que le fan a pris. Par exemple 1,2 : pour un plus gros achat de 20 €, 24 € au plus. Vide : pas de plafond."
-        >
+        <Field label="Plafond au lancement" id={`${id}-cap`} hint={HINT}>
           <div className="ft-amount">
             <input
               id={`${id}-cap`}
@@ -89,7 +89,7 @@ function CapForm({ creatorId, initial }: { creatorId: CreatorId; initial: string
           <div className="ft-actions">
             <button
               type="submit"
-              className="nv-btn nv-btn--neon"
+              className="nv-btn nv-btn--soft"
               disabled={!dirty || saving || !('setting' in read)}
             >
               {saving ? 'Enregistrement…' : 'Enregistrer le plafond'}

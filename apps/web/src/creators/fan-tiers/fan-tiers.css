@@ -48,3 +48,25 @@
   padding-top: var(--nv-space-3);
   border-top: 1px solid var(--nv-hairline);
 }
+/* One field, as wide as one of the tiers' fields: the same tracks, kept even when the field is alone in its row (the
+   tiers' row is held open by their « Enregistrer », which spans it). The field's label and help line take the row; its
+   control, the first track only. */
+.ft-cap .ft-fields {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.ft-cap .ft-fields > .ps-field {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: inherit;
+  gap: 6px var(--nv-space-3);
+}
+.ft-cap .ft-fields > .ps-field > * {
+  grid-column: 1 / -1;
+}
+.ft-cap .ft-fields > .ps-field > .ft-amount {
+  grid-column: auto;
+}
+/* Refused, one signal: the amber edge, and the focus ring in amber too rather than in the focus colour. */
+.ft-cap .ps-input[aria-invalid='true']:focus-visible {
+  outline-color: var(--nv-warning);
+}

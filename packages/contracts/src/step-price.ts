@@ -41,6 +41,6 @@ export type StepPriceTrace = z.infer<typeof StepPriceTraceSchema>;
 /** One label each, for the copilot panel: the cause, in her team's words. */
 export const STEP_PRICE_REASON_LABELS: Readonly<Record<StepPriceReason, string>> = {
   next_step: 'Plus chère que la dernière étape qu’il a prise',
-  capped_at_start: 'Au lancement : pas au-delà du plafond de l’agence sur son plus gros achat',
-  limit_reached: 'Limite atteinte : plus d’étape payante ce soir',
+  capped_at_start: 'Au lancement\u00a0: pas au-delà du plafond de l’agence sur son plus gros achat',
+  limit_reached: 'Limite atteinte\u00a0: plus d’étape payante ce soir',
 };

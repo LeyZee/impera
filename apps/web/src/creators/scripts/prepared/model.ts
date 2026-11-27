@@ -154,7 +154,8 @@ const GAP_TEXTS: Readonly<Record<PreparedScriptGap['code'], string>> = {
   branch_two_defaults: 'deux branches par défaut, une seule permise',
   branch_cheaper_on_spend: 'une condition de dépense mène à une branche moins chère que celle par défaut',
   branch_previous_unknown: 'la branche suivie n’existe plus',
-  price_not_above_previous: 'prix pas plus haut que l’étape payante d’avant : monte le prix de cette branche',
+  price_not_above_previous:
+    'prix pas plus haut que l’étape payante d’avant\u00a0: monte le prix de cette branche',
   media_twice: 'le même média est vendu deux fois',
   disgust: 'un texte touche une de ses limites',
   condition_text_missing: 'la phrase que l’IA vérifie est vide',
