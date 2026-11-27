@@ -36,7 +36,7 @@ export interface WeekRoutesDeps {
   readonly days: DayTickStore;
   readonly agenda: WeekAgendaStore;
   readonly accept: AcceptSuggestion;
-  readonly facts: Pick<WeekFactsReader, 'arrivals' | 'teamArrivals'>;
+  readonly facts: Pick<WeekFactsReader, 'arrivals' | 'teamArrivals' | 'videos' | 'teamVideos'>;
   readonly requireRole: RequireRole;
   readonly clock?: () => Date;
 }
@@ -185,7 +185,14 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
       '/creator-space/day',
       { ...creatorOnly, schema: { querystring: CreatorDayQuerySchema, response: { 200: HerDaySchema } } },
       (request) =>
-        asCreator(() => herDay(deps.days, signedIn(request.user), request.query.day ?? null, clock())),
+        asCreator(() =>
+          herDay(
+            { days: deps.days, facts: deps.facts },
+            signedIn(request.user),
+            request.query.day ?? null,
+            clock(),
+          ),
+        ),
     );
 
     app.put(

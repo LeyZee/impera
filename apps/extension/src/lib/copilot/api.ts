@@ -4,10 +4,12 @@ import {
   CopilotDraftViewSchema,
   FanCardViewSchema,
   FanFlagsViewSchema,
+  ToTalkSchema,
   type CopilotDraftView,
   type DesireBand,
   type FanCardView,
   type FanFlags,
+  type ToTalk,
 } from '@impera/contracts';
 
 import type { Fetch } from '../session';
@@ -132,4 +134,20 @@ export async function readStanding(
         ? detail.data.fanDisplayName
         : null,
   };
+}
+
+/**
+ * « À qui parler maintenant » for her (maquette v4, « Ensuite »): who waits, in its order. Null when it cannot be read:
+ * the foot then says nothing, it never guesses.
+ */
+export async function readToTalk(
+  origin: string,
+  creatorId: string,
+  fetchFn: Fetch = fetch,
+): Promise<ToTalk | null> {
+  const query = new URLSearchParams({ creatorId }).toString();
+  const response = await getJson(fetchFn, `${origin}/v1/conversations/to-talk?${query}`);
+  if (response?.ok !== true) return null;
+  const parsed = ToTalkSchema.safeParse(await response.json().catch(() => null));
+  return parsed.success ? parsed.data : null;
 }

@@ -96,6 +96,18 @@ const SOLD_BY: Readonly<Record<SaleSaid['by'], string>> = {
   unknown: 'Lue sur la plateforme, sans vendeur relié.',
 };
 
+/**
+ * What her phone says when a fan wrote one of her persona’s words: that the team knows and takes care of it,
+ * never who nor which word (they stay in the team's Suivi). Opens Aujourd'hui, her space.
+ */
+export function herWordsNotice(): PushMessage {
+  return {
+    title: 'Un de tes mots d’alerte',
+    body: 'Un fan a écrit un de tes mots d’alerte. L’équipe est prévenue et s’en occupe.',
+    url: '/aujourdhui',
+  };
+}
+
 /** Where the notification opens: the planning for a créneau or a shift nobody holds, the conversation otherwise. */
 function urlOf(code: CreatorAlertCode, conversationId: string | null): string {
   if (code === 'uncovered_account' || code === 'shift_not_taken') return '/equipe/planning';

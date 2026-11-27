@@ -131,7 +131,7 @@ const judgeGateway = createFanSimulationGateway({
 
 const today = new Date().toISOString().slice(0, 10);
 const persona = readPersonaFile(
-  readFileSync(resolve(ROOT, 'personas/demo/v0.5.0.yaml'), 'utf8'),
+  readFileSync(resolve(ROOT, 'personas/demo/v0.7.0.yaml'), 'utf8'),
   'Elena',
   today,
 );

@@ -4,7 +4,7 @@
  * text (the core), then the tabs of his card and the sale, one at a time (Charles 21/11, piste C). Colour says something or is not there (Design
  * 16/11, lot 0141-5): red for a limit that forbids the sale, amber for what holds it back, the green of success for a
  * good moment and what is acquired (Design 21/11: red is an emergency to Charles), the neon for the step in progress and
- * the button, a tint of it for his desire. Nothing blinks.
+ * the button, fire for his desire (cold to burning, never red). Nothing blinks: only the lit flame breathes.
  */
 
 html,
@@ -67,6 +67,10 @@ body {
   pointer-events: none;
   background: radial-gradient(70% 120% at 50% -30%, var(--nv-aura-neon), transparent 72%);
   opacity: 0.7;
+}
+/* His desire as fire, the whole width under his name (maquette v4, 27/11; `nv-heat` of the design system). */
+.cp-band__heat {
+  flex: 1 0 100%;
 }
 .cp-band__fan {
   flex: 0 1 auto;
@@ -309,6 +313,82 @@ body {
 .cp-moment[data-verdict='good'] .cp-notch[data-met='true'],
 .cp-condition[data-met='true'] .cp-notch {
   background: var(--nv-trend-up);
+}
+/* « Ensuite » (maquette v4): who waits next, at the foot, on the plate; the wait in amber. */
+.cp-next {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-2) var(--cp-gutter);
+  border-top: 1px solid var(--nv-hairline);
+  background: var(--nv-plate);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.cp-next__label {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+}
+.cp-next__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--nv-ink);
+}
+.cp-next__wait {
+  flex: 1;
+  white-space: nowrap;
+  color: var(--nv-warning);
+}
+.cp-next__more {
+  color: var(--nv-ink-muted);
+}
+/* A sale paid (maquette v4, cadre 9): a few seconds under the band, in the colour of sale (Design 27/11), rising in. */
+.cp-sold {
+  flex: none;
+  margin: var(--nv-space-1) var(--cp-gutter) 0;
+  padding: var(--nv-space-2) 10px;
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-sale) 16%, transparent);
+  animation: cp-rise var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.cp-sold__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  color: var(--nv-sale);
+}
+/* The moment to sell (maquette v4, 27/11): the step and its price as the title, on a soft plate of success, rising in. */
+.cp-move[data-tone='good'] {
+  margin: var(--nv-space-1) var(--cp-gutter) 0;
+  padding: var(--nv-space-2) 10px;
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-success) 14%, transparent);
+  animation: cp-rise var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.cp-move[data-tone='good'] .cp-move__what {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-success);
+}
+.cp-move[data-tone='good'] .cp-move__why {
+  color: var(--nv-ink);
+}
+@keyframes cp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-sold,
+  .cp-move[data-tone='good'] {
+    animation: none;
+  }
 }
 .cp-move[data-tone='amber'] .cp-move__what,
 .cp-move[data-tone='amber'] .cp-move__cut {

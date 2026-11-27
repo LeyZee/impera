@@ -92,6 +92,26 @@ describe('the reads of alerts.route (ADR 0150 § 18)', () => {
     expect(managers.map((m) => m.userId)).not.toContain('manager-gone');
   });
 
+  it('gives her own creator accounts only, in her time zone, never a member’s (27/11/2026)', async () => {
+    const [lina, eva] = [newId(CreatorIdSchema), newId(CreatorIdSchema)];
+    await test.admin.db.insert(schema.creators).values([
+      { id: lina, nameKey: lina, displayName: 'Lina', timezone: 'America/Montreal' },
+      { id: eva, nameKey: eva, displayName: 'Eva', timezone: 'Europe/Paris' },
+    ]);
+    const account = (key: string, role: 'creator' | 'operator', creatorIds: string[]) =>
+      test.admin.db
+        .insert(schema.user)
+        .values({ id: key, name: key, email: `${key}@example.test`, role, creatorIds });
+    await account('lina-herself', 'creator', [lina]);
+    await account('lina-operator', 'operator', [lina]);
+
+    const reads = createRouterReads(test.service.db, () => Promise.resolve('Europe/Paris'));
+    expect(await reads.creatorAccounts(lina)).toEqual([
+      { userId: 'lina-herself', timeZone: 'America/Montreal' },
+    ]);
+    expect(await reads.creatorAccounts(eva)).toEqual([]);
+  });
+
   it('reads the agency’s alerts apart, and the safety relays no takeover followed (27/11/2026)', async () => {
     const creatorId = newId(CreatorIdSchema);
     await test.admin.db

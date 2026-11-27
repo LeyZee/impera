@@ -8,7 +8,7 @@ const OWNER = 'u-owner';
 const WEDNESDAY = new Date('2026-11-04T10:00:00.000Z');
 const id = (n: number): string => `0192f3a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
 
-function deps(over: { frames?: boolean; arrived?: number } = {}): ProgressDeps {
+function deps(over: { frames?: boolean; arrived?: number; waiting?: number } = {}): ProgressDeps {
   return {
     agenda: {
       teamWeek: () =>
@@ -82,11 +82,14 @@ function deps(over: { frames?: boolean; arrived?: number } = {}): ProgressDeps {
           byCategory: { feed_shoot: over.arrived ?? 1, feed_video: 1 },
           answered: new Set<string>(),
         }),
+      // A video of the feed arrived on Monday; none waits in her coffre now.
+      teamVideos: () => Promise.resolve({ byDay: new Map([['2026-11-02', 1]]), inStock: over.waiting ?? 0 }),
     },
     days: {
       teamDays: () =>
         Promise.resolve({
           today: '2026-11-04',
+          timeZone: 'Europe/Paris',
           days: new Map([
             ['2026-11-02', { reveal_story: 1, reveal_video: 1, insta_cta_story: 1, insta_stories: 2 }],
             ['2026-11-04', { reveal_video: 1 }],
@@ -112,9 +115,17 @@ describe('« Où elle en est » (trous béants n° 11)', () => {
     // A tick of a Reveal story from before 27/11 counts no more: her day no longer asks one.
     expect(monday).toMatchObject({ essentialsDone: 2, essentialsAsked: 2, done: 4, ahead: false });
     expect(tuesday).toMatchObject({ essentialsDone: 0, done: 0, ahead: false });
-    expect(wednesday).toMatchObject({ essentialsDone: 1, ahead: false });
+    // Her video of the day is done by her coffre, never by a tick (avenant du 27/11): Wednesday's tick counts nothing.
+    expect(wednesday).toMatchObject({ essentialsDone: 0, ahead: false });
     expect(thursday?.ahead).toBe(true);
     expect(monday?.asked).toBeGreaterThan(monday?.essentialsAsked ?? 0);
+  });
+
+  it('reads today’s video in her coffre as done, as she reads it herself (avenant du 27/11)', async () => {
+    const progress = await creatorProgress(deps({ waiting: 2 }), CREATOR, OWNER, '2026-11-02', WEDNESDAY);
+    expect(progress.days[2]).toMatchObject({ essentialsDone: 1 });
+    // A video waiting now says nothing of a day gone by.
+    expect(progress.days[1]).toMatchObject({ essentialsDone: 0 });
   });
 
   it('counts the lines shot of the days she kept, never those of a day she declined', async () => {

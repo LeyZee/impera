@@ -233,3 +233,33 @@ export function icon(name: IconName, size = 18): SVGSVGElement {
   }
   return svg;
 }
+
+/**
+ * The copilot's flame (maquette v4, 27/11; design system `nv-flame`): a body and its core, drawn in the colour the
+ * heat gives through CSS. A fixed drawing like the icons: nothing in it comes from data.
+ */
+export function flame(): SVGSVGElement {
+  const svg = document.createElementNS(SVG, 'svg');
+  for (const [key, value] of Object.entries({
+    viewBox: '0 0 24 24',
+    'aria-hidden': 'true',
+    class: 'nv-flame',
+  }))
+    svg.setAttribute(key, value);
+  for (const [cls, d] of [
+    [
+      'nv-flame__body',
+      'M12 1.5c.6 2.6 2.4 4.1 3.9 5.8 1.7 1.9 3.1 4 3.1 7A7 7 0 0 1 5 14.3c0-2.6 1.3-4.6 2.8-6.1.2 1.7 1 2.9 2.2 3.5-.4-3.6.3-7.2 2-10.2z',
+    ],
+    [
+      'nv-flame__core',
+      'M12 11.5c.9 1.3 2.6 2.4 2.6 4.4a2.6 2.6 0 0 1-5.2 0c0-1.2.6-2 1.3-2.6.1.7.5 1.1.9 1.3-.2-1.2 0-2.2.4-3.1z',
+    ],
+  ] as const) {
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('class', cls);
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
