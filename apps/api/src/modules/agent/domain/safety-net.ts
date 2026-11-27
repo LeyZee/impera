@@ -1,7 +1,8 @@
 import { isGuardedLanguage, normalise, normaliseWords, type Language } from '@impera/contracts';
 
 import { checkExplicit, withoutProcreation } from './guards';
-import { detectLanguage, isMostlyLatin } from './language';
+import { bareTeenReading, detectLanguage, isMostlyLatin } from './language';
+import { BARE_TEEN, HER_AGE_QUESTION, NOT_AGE_ANY, TEEN_NOT_A_THING, UNIT } from './teen-number';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -27,10 +28,6 @@ const ANY_UNDER_18 =
   '1[0-7]|[1-9]|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|once|doce|trece|catorce|quince|dieciseis|diecisiete|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen';
 const ANY_TEENS =
   '1[0-7]|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|once|doce|trece|catorce|quince|dieciseis|diecisiete|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen';
-const UNIT = '(?:anni|anos|ans?|years?|yrs?|yo|y\\/o)\\b';
-// Not his age: « di esperienza », « de casado », « of experience », « fa » (ago). « De edad », « di età », « of age »
-// are.
-const NOT_AGE_ANY = "di (?!eta)|d'|de (?!edad)|d |che |que |qu'|of (?!age)|since |ago\\b|fa\\b";
 const NOT_AGE_AFTER = `(?!\\s*(?:${NOT_AGE_ANY}))`;
 // What a number is when it is not an age: an hour, a sum, a length.
 const NOT_A_NUMBER_OF_YEARS =
@@ -307,32 +304,6 @@ function minorFantasy(fanText: string): boolean {
   });
 }
 
-/**
- * A number from 10 to 17 that is not a thing (ADR 0168 § 4): not an hour, a sum, a measure, a rank, a count of
- * objects, nor years of something else (« 15h », « 15 € », « 15 cm », « 15/20 », « 15 photos », « 16 anni di
- * esperienza »).
- */
-const TEEN_NOT_A_THING =
-  '\\b1[0-7]\\b' +
-  '(?![.,:/\\-]?\\d)(?!\\s*(?:h\\b|h\\d|%|€|\\$|£|°|x\\b|e\\b|eme\\b|er\\b|th\\b|st\\b|' +
-  '(?:min|mins|minut\\w*|sec\\w*|s|cm|mm|m|km|kg|g|l|ml|cl|euros?|eur|dollars?|usd|bucks|pounds?|zl\\w*|' +
-  'reais|lei|kr|chf|hours?|heures?|ore|horas?|uhr|stunden?|godz\\w*|jours?|days?|giorni|dias|tage|fois|times|' +
-  'volte|veces|mal|pages?|photos?|pics?|videos?|messages?|followers?|likes?)\\b))' +
-  // Years of something else, not his age: « 16 anni di esperienza », « 15 años de casado ».
-  `(?!\\s*${UNIT}\\s*(?:${NOT_AGE_ANY}))`;
-
-/**
- * A bare number from 10 to 17 in a message whose language the guards do not read (ADR 0168 § 4, closed by default):
- * without a word of his language to say it is an age, it is one until a human says otherwise.
- */
-const BARE_TEEN = new RegExp(
-  '(?<![\\d.,:/+\\-x#€$£])' +
-    '(?<!\\b(?:a|at|alle|alla|a las|las|um|vers|top|no|nr|n|num|numero|page|p|dans|in|tra|fra|en|entre|between|' +
-    'after|apres|dopo|despues|until|avant|before)\\s)' +
-    TEEN_NOT_A_THING,
-  'u',
-);
-
 /** Not a count of people, pets or money after « j'ai » or « presque » (« j'ai 15 potes », « tengo 15 amigos », « yo 15 dolares »). */
 const NOT_COUNTED =
   '(?!\\s*(?:amis?|potes?|copains?|copines?|chats?|chiens?|enfants?|gosses?|amici|figli|gatti|cani|amigos|hijos|' +
@@ -366,13 +337,18 @@ const AGE_WITHOUT_UNIT = [
 ];
 
 /**
- * Whether a bare number of a minor is read as his age (ADR 0168 § 4): his message is in a language the guards do not
- * read (`'unknown'`, another script, a language outside the coverage), or it says nothing of its language and none
- * covered is kept for him. A short message of a fan whose kept language is covered (« je rentre le 15 », « mdr 12 »)
- * is read by the patterns of his language, never by this one. Nothing kept, or not known here: closed by default.
+ * Whether a bare number of a minor is read as his age (ADR 0168 § 4). His kept language is covered: only when it is
+ * alone in its sentence, answers her question about his age, or stands with a word of a language outside the coverage
+ * (`bareTeenReading`, 27/11); among unknown words, a human reads it without the doubt (`humanOnly`). Otherwise, as
+ * before: his message, or one of its sentences, is in a language the guards do not read (`'unknown'`, another script,
+ * a language outside the coverage), or it says nothing of its language and none covered is kept for him. Nothing
+ * kept, or not known here: closed by default.
  */
-function bareNumberIsAge(fanText: string, kept: Language | null): boolean {
-  if (!isMostlyLatin(fanText)) return true;
+function bareNumberIsAge(fanText: string, kept: Language | null, herLastTurn: string | undefined): boolean {
+  const asked = herLastTurn !== undefined && HER_AGE_QUESTION.test(normalise(herLastTurn));
+  const reading = bareTeenReading(fanText, asked);
+  if (kept !== null && isGuardedLanguage(kept)) return reading === 'age';
+  if (reading === 'age' || !isMostlyLatin(fanText)) return true;
   const read = detectLanguage(fanText);
   if (read === 'unknown') return true;
   if (read === null) return kept === null || !isGuardedLanguage(kept);
@@ -386,7 +362,10 @@ function bareNumberIsAge(fanText: string, kept: Language | null): boolean {
 export function safetySigns(
   fanText: string,
   now: Date = new Date(),
-  /** Her last turn before his message: a bare class after she asked what he does or his age (Sécurité, #1043). */
+  /**
+   * Her last turn before his message: a bare class after she asked what he does or his age (Sécurité, #1043), a bare
+   * number after she asked his age (ADR 0168 § 4).
+   */
   herLastTurn?: string,
   /** His kept language (ADR 0168 § 3); `null` when none is kept, or the caller does not know it. */
   kept: Language | null = null,
@@ -399,7 +378,7 @@ export function safetySigns(
   const atWork = HIS_TRADE.test(text);
   if (
     [...MINOR_AGE, ...AGE_WITHOUT_UNIT].some((pattern) => pattern.test(text)) ||
-    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept)) ||
+    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept, herLastTurn)) ||
     (!atWork &&
       (MINOR_WORDS.some((pattern) => pattern.test(text)) ||
         his.some(
