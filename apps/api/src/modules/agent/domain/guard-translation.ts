@@ -66,20 +66,28 @@ export function needsTranslation(input: {
   return fan === 'unknown' || (fan !== null && !isGuardedLanguage(fan));
 }
 
-export type TranslationCheck = 'valid' | 'empty' | 'unchanged' | 'too_short' | 'not_french';
+export type TranslationCheck =
+  'valid' | 'empty' | 'unchanged' | 'too_short' | 'numbers_missing' | 'not_french';
+
+/** The numbers written in digits in a text, each once (« 15 », « 2009 »): an age, a year, a class hide there. */
+const numbersIn = (text: string): Set<string> =>
+  new Set([...normalise(text).matchAll(/\d+/gu)].map(([digits]) => digits.replace(/^0+(?=\d)/u, '')));
 
 /** Letters and digits only, the way two texts compare for « the same ». */
 const bare = (text: string): string => normalise(text).replace(/[^\p{L}\p{N}]+/gu, '');
 
 /**
  * Whether the French may lift `humanOnly` (Sécurité, 27/11): not empty, not his original given back, not much shorter
- * than it (`TRANSLATION_MIN_LENGTH_RATIO`), and not read plainly as another language than French.
+ * than it (`TRANSLATION_MIN_LENGTH_RATIO`), every number he wrote in digits found again in it (a translator steered
+ * into writing something else drops his « 15 »), and not read plainly as another language than French.
  */
 export function checkTranslation(original: string, french: string): TranslationCheck {
   const translated = french.trim();
   if (bare(translated) === '') return 'empty';
   if (bare(translated) === bare(original)) return 'unchanged';
   if (translated.length < TRANSLATION_MIN_LENGTH_RATIO * original.trim().length) return 'too_short';
+  const kept = numbersIn(translated);
+  if ([...numbersIn(original)].some((number) => !kept.has(number))) return 'numbers_missing';
   const read = detectLanguage(translated);
   if (read !== null && read !== 'french') return 'not_french';
   return 'valid';
