@@ -1,4 +1,8 @@
 import {
+  AvailabilityMemberParamsSchema,
+  MemberAvailabilitySchema,
+  SetAvailabilityBodySchema,
+  TeamAvailabilitySchema,
   AccountPayRulesListSchema,
   AccountPayRulesSchema,
   CreateCreatorAgencyRateBodySchema,
@@ -36,8 +40,13 @@ import {
   SchedulingSettingsSchema,
   SlotVersionInputSchema,
   SlotVersionParamsSchema,
+  ShiftFeedbackIdSchema,
+  ShiftFeedbackListSchema,
+  ShiftFeedbackPendingSchema,
+  ShiftFeedbackQuerySchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
+  ShiftIncidentStepBodySchema,
   ShiftIdSchema,
   ShiftReportContextSchema,
   ShiftReportIdSchema,
@@ -74,7 +83,7 @@ import type { PayRulesService } from '../application/pay-rules';
 import type { ShiftReportService } from '../application/reports';
 import type { SchedulingService } from '../application/scheduling';
 import type { SwapService } from '../application/swaps';
-import type { Actor } from '../domain/ports';
+import type { Actor, AvailabilityStore } from '../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -112,6 +121,7 @@ export function createSchedulingRoutes(
     calendar,
     calendarLinks,
     leaves,
+    availability,
     swaps,
     reports,
     feedback,
@@ -122,6 +132,7 @@ export function createSchedulingRoutes(
     calendar: CalendarService;
     calendarLinks: CalendarLinkService;
     leaves: LeaveService;
+    availability: AvailabilityStore;
     swaps: SwapService;
     reports: ShiftReportService;
     feedback: ShiftFeedbackService;
@@ -331,6 +342,55 @@ export function createSchedulingRoutes(
       },
     );
 
+    // ADR 0171 (trou 16): his own week for any member; every active member's for the owner and an active manager.
+    app.get(
+      '/scheduling/availability/mine',
+      { preValidation: ownerOrMember, schema: { response: { 200: MemberAvailabilitySchema } } },
+      (request) => availability.mine(userOf(request)),
+    );
+
+    app.get(
+      '/scheduling/availability',
+      { preValidation: ownerOrMember, schema: { response: { 200: TeamAvailabilitySchema } } },
+      (request) => availability.team(userOf(request)),
+    );
+
+    // 200 when the same week was already recorded: a retry of the form records one.
+    app.put(
+      '/scheduling/availability/mine',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          body: SetAvailabilityBodySchema,
+          response: { 200: MemberAvailabilitySchema, 201: MemberAvailabilitySchema },
+        },
+      },
+      async (request, reply) => {
+        const { value, created } = await availability.set(actorOf(request), 'self', request.body);
+        return reply.code(created ? 201 : 200).send(value);
+      },
+    );
+
+    app.put(
+      '/scheduling/availability/:memberId',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: AvailabilityMemberParamsSchema,
+          body: SetAvailabilityBodySchema,
+          response: { 200: MemberAvailabilitySchema, 201: MemberAvailabilitySchema },
+        },
+      },
+      async (request, reply) => {
+        const { value, created } = await availability.set(
+          actorOf(request),
+          request.params.memberId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(value);
+      },
+    );
+
     app.get(
       '/scheduling/leave-requests',
       {
@@ -464,6 +524,40 @@ export function createSchedulingRoutes(
         const made = await feedback.put(actorOf(request), request.params.shiftId, request.body);
         return reply.code(made.created ? 201 : 200).send(made.feedback);
       },
+    );
+
+    // The one feedback a member still owes (retour léger, 26/11): « Je prends mon poste » asks for it first.
+    app.get(
+      '/scheduling/shift-feedback/pending',
+      {
+        preValidation: ownerOrMember,
+        schema: { response: { 200: ShiftFeedbackPendingSchema } },
+      },
+      (request) => feedback.pending(userOf(request)),
+    );
+
+    // Équipe › Rapports (trous béants n° 1): a period's feedbacks, or the incidents still open, theirs first.
+    app.get(
+      '/scheduling/shift-feedback',
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: ShiftFeedbackQuerySchema, response: { 200: ShiftFeedbackListSchema } },
+      },
+      (request) => feedback.list(userOf(request), request.query),
+    );
+
+    // « Vu », « Réglé » on an incident: said once, the same step again gives back what is recorded.
+    app.post(
+      '/scheduling/shift-feedback/:shiftFeedbackId/incident',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: z.object({ shiftFeedbackId: ShiftFeedbackIdSchema }),
+          body: ShiftIncidentStepBodySchema,
+          response: { 200: ShiftFeedbackSchema },
+        },
+      },
+      (request) => feedback.step(actorOf(request), request.params.shiftFeedbackId, request.body.step),
     );
 
     app.get(

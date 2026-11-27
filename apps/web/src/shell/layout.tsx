@@ -2,6 +2,7 @@ import { placeTabBarLens } from '@impera/design-system';
 import { Link, useRouterState, type LinkProps } from '@tanstack/react-router';
 import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
+import { GuidesBeside } from '@/help/beside';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/shell/states';
 
@@ -64,6 +65,7 @@ export function PageHeader({
       </div>
       {actions === undefined ? null : <div className="nv-page__actions">{actions}</div>}
       {tabs === undefined ? null : <div className="nv-page__tabs">{tabs}</div>}
+      <GuidesBeside />
     </header>
   );
 }

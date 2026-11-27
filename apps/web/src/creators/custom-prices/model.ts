@@ -4,6 +4,7 @@ import {
   CUSTOM_PRICE_MAX_MINOR,
   CustomPriceGridSchema,
   isPerMinute,
+  READY_VIDEO_MIN_MINOR,
   type CustomFormat,
   type CustomPriceGrid,
   type CustomQuote,
@@ -93,9 +94,19 @@ export interface SupplementDraft {
   readonly percent: string;
 }
 
+/** The fields of a kind of video already shot, as they are typed: its name and the range its price is drawn in. */
+export interface ReadyVideoDraft {
+  readonly id: string;
+  readonly label: string;
+  readonly offered: boolean;
+  readonly min: string;
+  readonly max: string;
+}
+
 export interface GridDraft {
   readonly formats: readonly FormatDraft[];
   readonly supplements: readonly SupplementDraft[];
+  readonly readyVideos: readonly ReadyVideoDraft[];
 }
 
 const text = (value: number | null): string => (value === null ? '' : String(value));
@@ -115,6 +126,13 @@ export function draftOf(grid: CustomPriceGrid): GridDraft {
       label: line.label,
       offered: line.offered,
       percent: text(line.percent),
+    })),
+    readyVideos: grid.readyVideos.map((line) => ({
+      id: line.id,
+      label: line.label,
+      offered: line.offered,
+      min: eurosOfMinor(line.minMinor),
+      max: eurosOfMinor(line.maxMinor),
     })),
   };
 }
@@ -170,18 +188,57 @@ export function readDraft(draft: GridDraft): { grid: CustomPriceGrid | null; pro
       percent: known(percent),
     };
   });
+  const videoNames = new Set<string>();
+  const readyVideos = draft.readyVideos.map((line) => {
+    const label = line.label.trim();
+    const key = label.toLocaleLowerCase('fr');
+    if (label === '') problems.set(`${line.id}.label`, 'Donne-lui un nom.');
+    else if (videoNames.has(key)) problems.set(`${line.id}.label`, 'Une autre ligne porte déjà ce nom.');
+    videoNames.add(key);
+    const min = rangeEnd(line.min);
+    const max = rangeEnd(line.max);
+    if (min === null) problems.set(`${line.id}.min`, RANGE_PROBLEM);
+    if (max === null) problems.set(`${line.id}.max`, RANGE_PROBLEM);
+    else if (min !== null && max < min) problems.set(`${line.id}.max`, 'Au moins le bas de la fourchette.');
+    return { id: line.id, label, offered: line.offered, minMinor: min ?? 0, maxMinor: max ?? 0 };
+  });
   if (problems.size > 0) return { grid: null, problems };
-  const parsed = CustomPriceGridSchema.safeParse({ formats, supplements });
+  const parsed = CustomPriceGridSchema.safeParse({ formats, supplements, readyVideos });
   return parsed.success
     ? { grid: parsed.data, problems }
     : { grid: null, problems: new Map([['grid', 'Cette grille ne passe pas : vérifie chaque ligne.']]) };
 }
 
+const RANGE_PROBLEM = 'Un prix comme 40, d’1 € à 10 000 €.';
+
+/** One end of a ready video's range: required, at least 1 €. */
+function rangeEnd(typed: string): number | null {
+  const minor = minorOfEuros(typed);
+  return minor === null || minor === 'invalid' || minor < READY_VIDEO_MIN_MINOR ? null : minor;
+}
+
+/** Eight hex digits, drawn here once for a new line's id. */
+function freshHex(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(4));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 /** A new supplement: `sup_` and eight hex digits, drawn here once. */
 export function newSupplement(): SupplementDraft {
-  const bytes = crypto.getRandomValues(new Uint8Array(4));
-  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  return { id: `sup_${hex}`, label: '', offered: true, percent: '' };
+  return { id: `sup_${freshHex()}`, label: '', offered: true, percent: '' };
+}
+
+/** A new kind of video already shot: `rv_` and eight hex digits, drawn here once. */
+export function newReadyVideo(): ReadyVideoDraft {
+  return { id: `rv_${freshHex()}`, label: '', offered: true, min: '', max: '' };
+}
+
+/** Lines of a list the owner adds to: changed, added or removed since the saved one. */
+function listChanges(saved: readonly { id: string }[], draft: readonly { id: string }[]): number {
+  const before = new Map(saved.map((line) => [line.id, JSON.stringify(line)]));
+  const changed = draft.filter((line) => before.get(line.id) !== JSON.stringify(line)).length;
+  const removed = saved.filter((line) => !draft.some((one) => one.id === line.id)).length;
+  return changed + removed;
 }
 
 /** How many lines differ from the saved grid, for « 3 modifications ». */
@@ -189,12 +246,11 @@ export function changesBetween(saved: GridDraft, draft: GridDraft): number {
   const formats = draft.formats.filter(
     (line, index) => JSON.stringify(line) !== JSON.stringify(saved.formats[index]),
   ).length;
-  const before = new Map(saved.supplements.map((line) => [line.id, JSON.stringify(line)]));
-  const supplements = draft.supplements.filter((line) => before.get(line.id) !== JSON.stringify(line)).length;
-  const removed = saved.supplements.filter(
-    (line) => !draft.supplements.some((one) => one.id === line.id),
-  ).length;
-  return formats + supplements + removed;
+  return (
+    formats +
+    listChanges(saved.supplements, draft.supplements) +
+    listChanges(saved.readyVideos, draft.readyVideos)
+  );
 }
 
 /** What the calculator says of a quote, in one sentence. */

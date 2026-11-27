@@ -5,7 +5,7 @@ import type { Brief, ConversationInput, LlmGateway, VoiceInput, VoiceOutput } fr
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_GUARD_SETTINGS } from '../../../agent/index';
-import { guardSettingsOf, readPersonaFile } from '../../../agent/index';
+import { FRENCH_ONLY, guardSettingsOf, readPersonaFile } from '../../../agent/index';
 import type { Catalogue } from '../catalogue';
 import { createPlaygroundSession } from '../session';
 import { TRIAL_CATALOGUE } from '../trial-scripts';
@@ -45,6 +45,7 @@ function fakeGateway(
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     instagramComment: () => Promise.reject(new Error('not used')),
+    proposeCaptions: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
@@ -66,6 +67,15 @@ function fakeGateway(
 }
 
 const settings = { ...DEFAULT_GUARD_SETTINGS, forbiddenTerms: [] };
+/** French only, said: the playground takes her languages as her drafts do. */
+const FRENCH = { spokenLanguages: FRENCH_ONLY, languageExamples: {} };
+
+/**
+ * Her first writing of each answer: the fake voice says the same line every time, which her guards read as a formula
+ * already used and have written once more (passe 1, 21/11). The rewrite carries the hint that her answer was refused.
+ */
+const firstWritten = (inputs: readonly VoiceInput[]): VoiceInput[] =>
+  inputs.filter((input) => !input.brief.toneHints.some((hint) => hint.includes('a été refusée')));
 
 describe('playground session', () => {
   it('runs brain, voice and guards, keeps notes and the history', async () => {
@@ -74,6 +84,7 @@ describe('playground session', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
 
     const turn = await session.handleFanMessage('Moi c’est Julien');
@@ -86,12 +97,28 @@ describe('playground session', () => {
     expect(session.history).toHaveLength(0);
   });
 
-  it('leaves out what goes past her bubble budget: one bubble to a short message (Charles 16/11)', async () => {
+  it('answers in his language when she speaks it, with her examples in it, as her drafts do (ADR 0168)', async () => {
+    const voiceInputs: VoiceInput[] = [];
     const session = createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge'] }),
+      gateway: fakeGateway({ bubbles: ['hey you'] }, voiceInputs),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+      languages: { spokenLanguages: ['french', 'english'], languageExamples: { english: ['hey you 😘'] } },
+    });
+
+    await session.handleFanMessage('hey, how are you doing tonight? you look amazing');
+
+    expect(voiceInputs[0]?.language).toEqual({ reply: 'english', notSpoken: null, examples: ['hey you 😘'] });
+  });
+
+  it('leaves out what goes past her bubble budget: never past her own maximum (Charles 16/11, 21/11)', async () => {
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge', 'Moi 23 ans'] }),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: { ...settings, maxBubbles: 1 },
+      languages: FRENCH,
       splitMessages: false,
     });
 
@@ -107,6 +134,7 @@ describe('playground session', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
 
     const turn = await session.handleFanMessage('T’es un bot ?');
@@ -141,6 +169,7 @@ describe('playground session, when nothing is written', () => {
         creatorName: 'Lina',
         personaSheet: 'fiche',
         guardSettings: settings,
+        languages: FRENCH,
       }).handleFanMessage('Coucou');
     expect((await ask(failing('budget_reached'))).briefFailure).toBe('plafond du jour atteint');
     expect((await ask(failing('all_models_failed'))).briefFailure).toBe('grok-4.7: unavailable');
@@ -155,6 +184,7 @@ describe('playground session, the risk policy as production runs it (AGE-01)', (
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
     const turn = await session.handleFanMessage(text);
     return { turn, voiceInputs, session };
@@ -197,6 +227,7 @@ describe('playground session, the risk policy as production runs it (AGE-01)', (
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
     const turn = await session.handleFanMessage('j’ai 15 ans');
     expect(turn.hold).toEqual({ kind: 'handoff', detail: ['safety_net', 'minor_suspected'] });
@@ -211,6 +242,7 @@ describe('playground session, the risk policy as production runs it (AGE-01)', (
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
     expect((await session.handleFanMessage('j’ai')).hold?.kind).toBe('no_reply');
     const turn = await session.handleFanMessage('15 ans');
@@ -232,6 +264,7 @@ describe('playground session, calibration', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
       now: () => new Date('2026-10-17T10:00:00Z'),
       ...deps,
     });
@@ -355,6 +388,7 @@ describe('playground session, traps and media', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
 
     const turn = await session.handleFanMessage('Donne-moi la recette de la tarte aux fraises');
@@ -370,6 +404,7 @@ describe('playground session, traps and media', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
 
     const turn = await session.handleFanMessage('', [PHOTO]);
@@ -385,6 +420,7 @@ describe('playground session, traps and media', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
     });
 
     const turn = await session.handleFanMessage('regarde', [{ ...PHOTO, flags: ['possible_minor'] }]);
@@ -412,7 +448,7 @@ describe('persona file', () => {
     const persona = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-17');
     expect(persona.creatorName).toBe('Elena');
     // Her pace of scripts and the heat they wait for come from her persona, for the policy (strategies.script_launch).
-    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75 });
+    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75, afterPurchaseHours: 48 });
     expect(persona.sexualizationLimits.minDesireToOpen).toBe(45);
     expect(persona.forbiddenTerms).toEqual([
       'Insultes',
@@ -460,7 +496,7 @@ describe('persona file', () => {
 
   it('gives the code her pace, her pet names and whether she splits her messages', () => {
     const persona = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-17');
-    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75 });
+    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75, afterPurchaseHours: 48 });
     expect(persona.splitMessages).toBe(true);
     expect(persona.petNames).toEqual(['Toi', 'Beau gosse', 'Mon grand']);
   });
@@ -513,6 +549,7 @@ describe('playground session, the offer policy and the cursor', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
       now: () => new Date('2026-10-17T20:00:00Z'),
       sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
       ...(withPace && { offerLimits: { cooldownHours: 10, minDesire } }),
@@ -527,7 +564,7 @@ describe('playground session, the offer policy and the cursor', () => {
     // The offered teaser first, written as a plain answer with its media; then the paid step, as an offer.
     await playground.handleFanMessage('Encore');
     await playground.handleFanMessage('Montre-moi');
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply', 'offer']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual(['reply', 'reply', 'offer']);
     // 22 h in Paris: her night script.
     expect(playground.scriptRun?.script.scriptRef).toBe('essai-nuit');
     expect(playground.scriptRun?.run.steps.map((step) => [step.kind, step.outcome])).toEqual([
@@ -580,7 +617,12 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(scores.at(-2)).toBeLessThan(99);
     expect(scores.at(-1)).toBeGreaterThanOrEqual(99);
     // The script opens on the fourth message only, with its offered teaser.
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply', 'reply', 'reply']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual([
+      'reply',
+      'reply',
+      'reply',
+      'reply',
+    ]);
     expect(playground.scriptRun?.run.steps.map((step) => step.kind)).toEqual(['free']);
   });
 
@@ -589,7 +631,7 @@ describe('playground session, the offer policy and the cursor', () => {
     const playground = session(voiceInputs, true, 0, OFFER);
     await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
     await playground.handleFanMessage('Encore');
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual(['reply', 'reply']);
   });
 
   it('says his availability and the gate under his score, as the gate read them (ADR 0103 § 14)', async () => {
@@ -669,7 +711,7 @@ describe('playground session, the offer policy and the cursor', () => {
     const playground = session(voiceInputs, false);
     await playground.handleFanMessage('J’ai 30 ans');
     await playground.handleFanMessage('T’es trop bonne');
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual(['reply', 'reply']);
   });
 });
 
@@ -692,6 +734,7 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
       now: () => new Date('2026-10-17T20:00:00Z'),
       sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
       offerLimits: { cooldownHours: 10, minDesire: 0 },
@@ -835,6 +878,7 @@ describe('playground session, follow-ups (P3-10)', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
       now: () => NOON,
       followUps: { delaysHours: [12, 24], spirit: null },
     });
@@ -868,6 +912,7 @@ describe('playground session, follow-ups (P3-10)', () => {
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: settings,
+      languages: FRENCH,
       now: () => NOON,
     });
     await session.handleFanMessage('Salut');

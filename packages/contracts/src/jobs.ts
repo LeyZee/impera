@@ -10,6 +10,7 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   CreatorTaskIdSchema,
+  MemberDepartureIdSchema,
   DraftIdSchema,
   EventIdSchema,
   FanIdSchema,
@@ -19,6 +20,7 @@ import {
   SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
@@ -69,9 +71,12 @@ export const JOB_NAMES = [
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
+  'scheduling.check_uncovered',
   'scheduling.check_reports',
   'scheduling.remind_reports',
+  'scheduling.notify_incident',
   'team.apply_roles',
+  'team.member_departure',
   'owners.watch',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -88,6 +93,7 @@ export const JOB_NAMES = [
   'payroll.purge_refused_documents',
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
+  'payroll.notify_payout_change',
   'media.describe',
   'media.describe_vault',
   'content_drops.receive_file',
@@ -99,6 +105,7 @@ export const JOB_NAMES = [
   'content_drops.describe_backlog',
   'content_drops.make_thumbnail',
   'content_drops.thumbnail_backlog',
+  'instagram_captions.propose',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
   'providers.check_credentials',
@@ -154,9 +161,12 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
+  'scheduling.check_uncovered': 'Comptes sans personne',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
+  'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
   'team.apply_roles': 'Rôles de l’équipe',
+  'team.member_departure': 'Départ d’un membre',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
@@ -173,6 +183,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.purge_refused_documents': 'Nettoyage des documents refusés',
   'payroll.settle_documents': 'Règlement des documents',
   'payroll.lock_payout_certificate': 'Attestation de paiement',
+  'payroll.notify_payout_change': 'Où te verser changé',
   'media.describe': 'Description des médias',
   'media.describe_vault': 'Description des médias du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
@@ -182,6 +193,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'content_drops.describe_backlog': 'Rattrapage des descriptions',
+  'instagram_captions.propose': 'Légendes proposées pour ses Reels',
   'content_drops.make_thumbnail': 'Vignettes des médias déposés',
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
@@ -250,6 +262,8 @@ export const JOB_PAYLOADS = {
         kind: z.literal('operator_note'),
         note: z.string().min(1).max(300),
         at: z.iso.datetime(),
+        /** Who left it, shown on his card (trou béant 17); absent from a job queued before 21/11. */
+        userId: UserIdSchema.optional(),
       }),
     ]),
   }),
@@ -360,6 +374,12 @@ export const JOB_PAYLOADS = {
    * It writes nothing else.
    */
   'scheduling.check_agency_shares': z.object({}),
+  /**
+   * Every five minutes (ADR 0094 § 1, lot a): the créneaux that began with no chatter in post and the agent not in
+   * Automatique, on an account a fan wrote to in the 24 hours before; `account_uncovered` once per account and créneau.
+   * It writes nothing else.
+   */
+  'scheduling.check_uncovered': z.object({}),
   'scheduling.check_reports': z.object({}),
   /**
    * Every five minutes (ADR 0077): the member of a shift ended without its report is reminded on his phone, 15 minutes
@@ -367,8 +387,15 @@ export const JOB_PAYLOADS = {
    * the next one within its window, never later.
    */
   'scheduling.remind_reports': z.object({}),
+  // The creator rides with the feedback so that the read of its facts is bounded to her (Sécurité, #992).
+  'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
+  /**
+   * At the hour a departure ends (ADR 0166 § 2): applied once, replayed it does nothing more. By the owner who set it,
+   * or by an owner in office if he no longer is one; `scheduledBy` is checked against the departure before anything.
+   */
+  'team.member_departure': z.object({ departureId: MemberDepartureIdSchema, scheduledBy: UserIdSchema }),
   /**
    * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
    * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a
@@ -462,6 +489,16 @@ export const JOB_PAYLOADS = {
    * not locked yet (`null`). A bucket that does not answer fails the run, never the transfer.
    */
   'payroll.lock_payout_certificate': z.object({ statementId: CommissionStatementIdSchema.nullable() }),
+  /**
+   * A member's « Où te verser » changed (ADR 0165 § 5): told to his own devices (his account, read with the write, so
+   * that the job needs no service-role read), the version's id as its object.
+   */
+  'payroll.notify_payout_change': z.object({
+    memberId: TeamMemberIdSchema,
+    versionId: z.uuid(),
+    userId: z.string().min(1),
+    timeZone: z.string().min(1),
+  }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -522,6 +559,16 @@ export const JOB_PAYLOADS = {
    * put off by itself when the day's budget is spent or the disk short. Nothing while her switch is off (§ 9).
    */
   'content_drops.describe_file': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
+   * A medium of hers was described: three captions are proposed for each live Reel that holds it, on a decision card
+   * (ADR 0164 § 9). Enqueued after each description under `instagram_captions.propose:<id>`; put off by itself when the
+   * day's budget is spent. Replayable: a Reel already asked is left alone.
+   */
+  'instagram_captions.propose': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
     correlationId: z.string().min(1),
@@ -661,10 +708,14 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
   'scheduling.check_agency_shares': 3,
+  // Every five minutes, looking back a quarter of an hour: the next run is the retry, the event is published once.
+  'scheduling.check_uncovered': 1,
   'scheduling.check_reports': 1,
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
+  'scheduling.notify_incident': 3,
   'team.apply_roles': 1,
+  'team.member_departure': 5,
   // Every minute: the next run is the retry.
   'owners.watch': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
@@ -697,6 +748,7 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.settle_documents': 5,
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
+  'payroll.notify_payout_change': 5,
   'media.describe': 3,
   // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
   'media.describe_vault': 3,
@@ -711,6 +763,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.drop_received': 5,
   // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
   'content_drops.describe_file': 5,
+  // Every model failed: a few tries; a spent budget is not a failure, the job puts itself off.
+  'instagram_captions.propose': 5,
   // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
   'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.

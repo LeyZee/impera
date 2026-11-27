@@ -225,6 +225,30 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('tells a créneau begun with nobody to the « pour toutes » groups, on the planning’s clock (ADR 0094)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'account_uncovered',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        slotStartsAt: '2026-11-20T21:30:00.000Z',
+        slotEndsAt: '2026-11-21T05:00:00.000Z',
+        timeZone: 'Europe/Paris',
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      allCreatorsOnly: true,
+      oncePerThread: true,
+      threadKey: 'account_uncovered:018f3e5c-0000-7000-8000-0000000000a1:2026-11-20T21:30:00.000Z',
+      title: 'Important',
+      body: 'Compte sans personne chez Reveal : le créneau de 22 h 30 à 6 h a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.',
+      link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
+    });
+  });
+
   it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
     expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
       kind: 'notice',

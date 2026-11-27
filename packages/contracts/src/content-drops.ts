@@ -35,6 +35,14 @@ export const DROP_CATEGORIES = [
   'instagram_reel',
   'instagram_post',
   'telegram_post',
+  // Cadeaux baleines (ADR 0163 § 2): short, unseen, never nude, given to the biggest fans, never sold afterwards.
+  'whale_gift',
+  // For the AI to answer with her real voice (Charles, 21/11): the « leave a message after the beep » to a fan who
+  // calls her a bot, and the « I am real » proof. Never sold, once per fan.
+  'voice_beep',
+  'voice_real',
+  // Videos kept aside to sell, out of every script (Charles, 21/11): priced by the grid, never offered.
+  'sale_video',
 ] as const;
 export const DropCategorySchema = z.enum(DROP_CATEGORIES);
 export type DropCategory = z.infer<typeof DropCategorySchema>;
@@ -84,6 +92,10 @@ export const DROP_CATEGORY_LABELS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: 'Reel Insta',
   instagram_post: 'Photo Insta',
   telegram_post: 'Telegram',
+  whale_gift: 'Cadeaux baleines',
+  voice_beep: 'Vocal du bip',
+  voice_real: 'Vocal « bien réelle »',
+  sale_video: 'Vidéos à vendre',
 };
 
 export const DROP_MEDIA_KINDS = ['image', 'video', 'audio'] as const;
@@ -203,6 +215,36 @@ export const DROP_FORMAT_RULES: Readonly<Record<DropCategory, DropFormatRule>> =
     maxAudioSeconds: null,
     maxFiles: 10,
   },
+  // Short on purpose (ADR 0163 § 2): an attention, never a script step.
+  whale_gift: {
+    kinds: ['image', 'video'],
+    vertical: false,
+    maxVideoSeconds: 60,
+    maxAudioSeconds: null,
+    maxFiles: 10,
+  },
+  // Her voice, short: one beep message, one or two proofs.
+  voice_beep: {
+    kinds: ['audio'],
+    vertical: false,
+    maxVideoSeconds: null,
+    maxAudioSeconds: 30,
+    maxFiles: 1,
+  },
+  voice_real: {
+    kinds: ['audio'],
+    vertical: false,
+    maxVideoSeconds: null,
+    maxAudioSeconds: 30,
+    maxFiles: 2,
+  },
+  sale_video: {
+    kinds: ['video'],
+    vertical: false,
+    maxVideoSeconds: 600,
+    maxAudioSeconds: null,
+    maxFiles: 10,
+  },
 };
 
 const KIND_PLURALS: Readonly<Record<DropMediaKind, string>> = {
@@ -257,6 +299,28 @@ export function declaredFileRefusal(category: DropCategory, file: DeclaredDropFi
   return null;
 }
 
+const STEP_WAITS: Readonly<Record<DropMediaKind, string>> = {
+  image: 'Cette étape attend une photo',
+  video: 'Cette étape attend une vidéo',
+  audio: 'Cette étape attend un vocal',
+};
+
+/**
+ * Why the file she sends in place of a medium asked again does not go (trou 7 du 21/11), in her words; `null` when it
+ * may. It fits the drop's category as any declared file; in a script's step, it is of the step's kind, as the medium
+ * it replaces. Her phone says it before anything goes up, the server says it again.
+ */
+export function replacementRefusal(
+  category: DropCategory,
+  replaced: { readonly kind: DropMediaKind; readonly slotKey: string | null },
+  file: DeclaredDropFile,
+): string | null {
+  const refusal = declaredFileRefusal(category, file);
+  if (refusal !== null) return refusal;
+  if (replaced.slotKey !== null && kindOfMime(file.mime) !== replaced.kind) return STEP_WAITS[replaced.kind];
+  return null;
+}
+
 /** A file as the server reads it once arrived (`ffprobe`): its kind, its size in pixels, its length. */
 export interface ProbedDropFile {
   readonly kind: DropMediaKind;
@@ -306,6 +370,12 @@ export const DROP_STATES = [
 export const DropStateSchema = z.enum(DROP_STATES);
 export type DropState = z.infer<typeof DropStateSchema>;
 
+/**
+ * The states a medium of a drop is asked again and replaced in (trou 7 du 21/11): received, not scheduled nor out. A
+ * drop out is past it, except a script copied into Reveal: replaced, it is to copy again.
+ */
+export const REDOABLE_DROP_STATES: ReadonlySet<DropState> = new Set(['received', 'ready', 'blocked']);
+
 /** The states she may still withdraw a drop from herself: nothing is scheduled nor out yet. */
 export const WITHDRAWABLE_DROP_STATES: ReadonlySet<DropState> = new Set([
   'filling',
@@ -326,6 +396,17 @@ export type DropFileState = z.infer<typeof DropFileStateSchema>;
 export const DropSentenceSchema = z.string().trim().min(1).max(200);
 export const DropRefusalSchema = z.string().min(1).max(200);
 
+/**
+ * « À refaire » (trou 7 du 21/11): what the agency said when it asked her to do a drop, or one medium of it, again,
+ * and when. Also said of a
+ * drop where nothing could be kept, with that reason: it no longer answers its request.
+ */
+export const DropRedoSchema = z.strictObject({
+  sentence: DropRefusalSchema,
+  at: z.iso.datetime({ offset: true }),
+});
+export type DropRedo = z.infer<typeof DropRedoSchema>;
+
 export const ContentDropFileSchema = z.strictObject({
   id: ContentDropFileIdSchema,
   position: z.number().int().min(0),
@@ -336,6 +417,8 @@ export const ContentDropFileSchema = z.strictObject({
   refusal: DropRefusalSchema.nullable(),
   /** The slot of her script it fills (SC-02 lot b); `null` outside a script. */
   slotKey: ScriptSlotKeySchema.nullable(),
+  /** The agency's « À refaire » on this medium alone: she replaces it where it is (trou 7 du 21/11, coffre). */
+  redo: DropRedoSchema.nullable(),
 });
 export type ContentDropFile = z.infer<typeof ContentDropFileSchema>;
 
@@ -477,7 +560,10 @@ export const ContentRequestStateSchema = z.enum(CONTENT_REQUEST_STATES);
 
 export const ContentRequestReasonSchema = z.string().trim().min(1).max(160);
 
-/** A request as read: `dropId` is the drop that satisfies it, `null` while nothing does. */
+/**
+ * A request as read: `dropId` is the drop that satisfies it, `null` while nothing does. A drop where nothing could be
+ * kept satisfies nothing: her request is hers to drop again, and her new drop takes its place.
+ */
 export const ContentRequestSchema = z.strictObject({
   id: ContentRequestIdSchema,
   category: DropCategorySchema,
@@ -492,6 +578,11 @@ export const ContentRequestSchema = z.strictObject({
   state: ContentRequestStateSchema,
   refusalReason: DropRefusalSchema.nullable(),
   dropId: ContentDropIdSchema.nullable(),
+  /**
+   * Why it is hers to drop again, while nothing answers it: the agency's « À refaire » on her last drop for it, or the
+   * reason nothing of it could be kept. `null` otherwise.
+   */
+  redo: DropRedoSchema.nullable(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 export type ContentRequest = z.infer<typeof ContentRequestSchema>;
@@ -522,10 +613,42 @@ export const RefuseContentRequestBodySchema = z.strictObject({
 });
 
 /** `GET /v1/creator-space/content` and `GET /v1/creators/:creatorId/content`: her requests and her drops, newest first. */
+/** A drop of hers sent without a request that the agency asked her to do again (« À refaire »), for her screen. */
+export const RedoneDropSchema = z.strictObject({
+  dropId: ContentDropIdSchema,
+  category: DropCategorySchema,
+  redo: DropRedoSchema,
+});
+export type RedoneDrop = z.infer<typeof RedoneDropSchema>;
+
+/** How long her screen keeps a drop to do again without a request: past that, it is said by the agency again. */
+export const REDONE_SHOWN_DAYS = 14;
+
 export const CreatorContentSchema = z.strictObject({
   requests: z.array(ContentRequestSchema),
   drops: z.array(ContentDropSchema),
+  /** Her drops without a request the agency asked again in the last `REDONE_SHOWN_DAYS` days, newest first. */
+  redone: z.array(RedoneDropSchema),
 });
+
+/**
+ * `POST /v1/creators/:creatorId/drops/:id/redo` (owner, operator): « À refaire » with a sentence for her (trou 7 du
+ * 21/11). The drop is withdrawn as the agency withdraws one (not out yet: 409 `content_drop_settled_conflict`), its
+ * request opens again and her screen shows the sentence. Replayed on a drop already asked again, it answers.
+ */
+export const RedoDropBodySchema = z.strictObject({ sentence: DropSentenceSchema });
+export type RedoDropBody = z.infer<typeof RedoDropBodySchema>;
+
+/**
+ * `POST /v1/creators/:creatorId/drops/:id/files/:fileId/redo` (owner, operator) takes the same body: « À refaire » on
+ * one medium of a drop received and not out yet; the drop stays, she replaces that medium where it is.
+ *
+ * `POST /v1/creator-space/drops/:id/files/:fileId/replace` (creator): the file she sends in place of a medium the
+ * agency asked again, or of one refused, declared before it goes up; it takes its place (and its slot in a script),
+ * the old one leaves every view. Answers the drop; replayed with the same file, the same.
+ */
+export const ReplaceDropFileBodySchema = DeclaredDropFileSchema.extend({});
+export type ReplaceDropFileBody = z.infer<typeof ReplaceDropFileBodySchema>;
 export type CreatorContent = z.infer<typeof CreatorContentSchema>;
 
 export const CONTENT_DROP_NOT_FOUND = 'content_drop_not_found';
@@ -555,6 +678,8 @@ export const SCRIPT_EXPORT_REFUSALS = [
   'original_erased',
   'moment_unknown',
   'too_large',
+  // A medium of it the agency asked again (trou 7 du 21/11): the archive waits for her replacement.
+  'redo_pending',
 ] as const;
 export const ScriptExportRefusalSchema = z.enum(SCRIPT_EXPORT_REFUSALS);
 export type ScriptExportRefusal = z.infer<typeof ScriptExportRefusalSchema>;

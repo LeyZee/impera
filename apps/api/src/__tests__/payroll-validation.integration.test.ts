@@ -86,6 +86,7 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
       adminDb: app.adminDb.db,
       reads: deps.reads ?? payInputReadsOf(app.modules),
       shiftFacts: app.modules.scheduling.pay.shiftFacts,
+      endedShifts: app.modules.scheduling.pay.endedShifts,
       rateJobSince: null,
       payouts: payoutGate,
       afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },

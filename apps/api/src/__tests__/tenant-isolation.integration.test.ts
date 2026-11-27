@@ -53,6 +53,7 @@ const bodiesFor = (
   },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
     descriptionIds: ['00000000-0000-4000-8000-000000000000'],
   },
@@ -78,6 +79,7 @@ const bodiesFor = (
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
   'POST /v1/team/members/:memberId/notes': { body: 'Note inventée' },
+  'POST /v1/scheduling/shift-feedback/:shiftFeedbackId/incident': { step: 'seen' },
   'PUT /v1/scheduling/shifts/:shiftId/feedback': {
     id: newId(ShiftFeedbackIdSchema),
     nothingToReport: true,
@@ -154,6 +156,7 @@ type Seeded =
   | 'member'
   | 'shift'
   | 'report'
+  | 'feedback'
   | 'user'
   | 'template';
 
@@ -191,6 +194,10 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/team/announcements/:announcementId/read': 'an announcement to the team: announcements tests',
   'GET /v1/team/announcements/:announcementId/readers': 'an announcement to the team: announcements tests',
   'POST /v1/team/announcements/:announcementId/withdraw': 'an announcement to the team: announcements tests',
+  'POST /v1/team/departures/:departureId/cancel':
+    'a member’s departure, the owner’s only: team-departures tests',
+  'POST /v1/team/departures/:departureId/reveal-removed':
+    'a member’s departure, the owner’s only: team-departures tests',
   'DELETE /v1/scheduling/settings/versions/:id': 'an agency planning version',
   'DELETE /v1/scheduling/swap-requests/:shiftSwapRequestId': 'swap requests: leaves-swaps tests',
   'POST /v1/scheduling/swap-requests/:shiftSwapRequestId/answer': 'swap requests: leaves-swaps tests',
@@ -221,13 +228,33 @@ const RESIDUAL: Readonly<Record<string, string>> = {
     'creator space: creator-decisions tests (another creator gets 404)',
   'POST /v1/creator-space/decisions/:id/later':
     'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/other-ideas':
+    'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
+  'POST /v1/creator-space/stops/:id/withdraw':
+    'creator space: creator-limits tests (another creator’s line stays)',
+  'POST /v1/creator-space/absences/:id/cancel':
+    'creator space: creator-limits tests (another creator’s absence stays)',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
+  'GET /v1/creator-space/drops/:id/descriptions':
+    'creator space: content-stock tests (another creator gets 404)',
+  'POST /v1/creator-space/drops/:id/descriptions/validate':
+    'creator space: content-stock tests (another creator gets 404)',
+  'POST /v1/creator-space/drops/:id/descriptions/correct':
+    'creator space: content-stock tests (another creator’s drop is never found)',
+  'GET /v1/creator-space/drops/:id/files/:fileId/thumbnail':
+    'creator space: content-stock tests (another creator gets 404)',
+  'GET /v1/creator-space/drops/:id/files/:fileId/media':
+    'creator space: content-stock tests (same file read)',
+  'POST /v1/creator-space/drops/:id/files/:fileId/replace':
+    'creator space: content-drops tests (another creator gets 404)',
   'GET /v1/payroll/contractors/:memberId/documents/:documentId/file':
     'contractor documents: contractor tests',
   'POST /v1/payroll/contractors/:memberId/documents/:documentId/review':
     'contractor documents: contractor tests',
+  'POST /v1/payroll/sale-claims/:saleClaimId/answer':
+    'a claim on a sale, kept to its creator: payroll-sale-claims tests (a manager of another creator neither reads nor answers it)',
   'POST /v1/payroll/statements/:statementId/validate': 'statements: payroll tests',
   'POST /v1/payroll/statements/:statementId/pay': 'statements: payroll tests',
   'GET /v1/payroll/invoices/:invoiceId/pdf': 'invoices: invoicing tests',
@@ -260,6 +287,7 @@ function seededFor(path: string, name: string): Seeded | undefined {
     memberId: 'member',
     shiftId: 'shift',
     shiftReportId: 'report',
+    shiftFeedbackId: 'feedback',
     userId: 'user',
     templateId: 'template',
   };
@@ -448,6 +476,19 @@ describe('no route lets the people of one creator reach another one (audit des t
       .from(schema.shiftReports)
       .where(eq(schema.shiftReports.id, report));
     if (shift === undefined) throw new Error('B’s shift was not seeded');
+    // A feedback of B's shift with its incident (trous béants n° 1): one of another creator answers as unknown.
+    const feedback = newId(ShiftFeedbackIdSchema);
+    await admin.insert(schema.shiftFeedbacks).values({
+      id: feedback,
+      creatorId: bea,
+      platformAccountId: beas,
+      shiftId: shift.id,
+      memberId: chatterOfB.id,
+      period: PERIOD,
+      nothingToReport: false,
+      incident: 'Incident inventé',
+      createdBy: chatterOfB.userId,
+    });
     const accountOfB = await account('bea-compte@example.test', 'creator', [bea]);
     const template = newId(ShiftTemplateIdSchema);
     await admin.insert(schema.shiftTemplates).values({
@@ -470,6 +511,7 @@ describe('no route lets the people of one creator reach another one (audit des t
       member: chatterOfB.id,
       shift: shift.id,
       report,
+      feedback,
       user: accountOfB.userId,
       template,
     };

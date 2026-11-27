@@ -388,6 +388,7 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
     expect([...document.querySelectorAll('.cr-account__card')].map((card) => card.id)).toEqual([
       'acces',
       'part',
+      'paliers',
       'profil',
       'telegram',
     ]);
@@ -446,19 +447,23 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Médias', 'Scripts', 'Agenda']);
+    ).toEqual(['Persona', 'Médias', 'Scripts', 'Agenda']);
+    // Her persona to read (trou béant 18): named in the address, since no tab sends a manager to Médias.
+    expect(within(sheets).getByRole('link', { name: 'Persona' }).getAttribute('href')).toContain(
+      'onglet=persona',
+    );
     expect(
       within(screen.getByRole('radiogroup', { name: 'Vue de ses médias' }))
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['Coffre', 'Dépôts']);
-    // Structures and her made-to-measure prices are the owner's: a manager has her scripts and what is to copy.
+    ).toEqual(['Coffre Reveal', 'Dépôts', 'Coffre Impera']);
+    // Structures and her made-to-measure prices are the owner's; a manager reads her custom orders under « Sur mesure ».
     router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
     expect(
       within(await screen.findByRole('radiogroup', { name: 'Vue de ses scripts' }))
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['Scripts', 'À copier']);
+    ).toEqual(['Scripts', 'À copier', 'Sur mesure']);
     router.history.push(`/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
     await screen.findByText('Scripts envoyés par Anna');
     // The addresses of before the seven tabs lead to their view (ADR 0149 § 5).
@@ -485,6 +490,17 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     });
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
     expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
+  });
+
+  it('lets an active manager read her persona, never change it (trou béant 18)', async () => {
+    await serve([ANNA]);
+    const router = renderAt(manager, `/creatrices?onglet=persona&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'persona', creatrice: ANNA.id });
+    });
+    expect(
+      await screen.findByText('Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.'),
+    ).toBeDefined();
   });
 
   it('takes an operator who is not an active manager back to the persona', async () => {
@@ -621,14 +637,14 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Aide', 'Préférences']);
     cleanup();
 
     await serve([ANNA]);
     renderAt(anna, '/moi/persona');
     expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
     // She reads her sheet; the agency changes it (recette CREA-01).
-    await screen.findByText(/Ta fiche/);
+    await screen.findByText(/^Ta fiche, panneau par panneau/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 

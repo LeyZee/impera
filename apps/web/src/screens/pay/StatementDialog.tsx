@@ -12,6 +12,7 @@ import { EntryForm, type EntryAdded } from './EntryForm';
 import { useCfaFrancs, type PayNames } from './data';
 import { Chip, Delta, MoneyPath, PayoutHoldLine, Swatch } from './parts';
 
+import { PayoutLine } from '@/payroll/PayoutCard';
 import { payStatement, useLatestPayPeriod, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
   changeBps,
@@ -491,6 +492,12 @@ function PayForm({
             if (ready) onMode('check');
           }}
         >
+          {/* « Où le verser » (ADR 0165): the way he receives and his last change; the number on « Afficher ». */}
+          <PayoutLine
+            memberId={statement.memberId}
+            memberName={memberName}
+            zone={statement.window.timeZone}
+          />
           <div className="tm-pair">
             <div className="nv-field tm-field" data-invalid={touched && !dayValid ? 'true' : undefined}>
               <label className="nv-field__label" htmlFor={`${id}-day`}>

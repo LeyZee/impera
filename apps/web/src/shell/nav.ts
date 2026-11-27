@@ -225,16 +225,19 @@ const SCREENS = {
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
+  '/moi/aide': 'Aide',
   '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Plateformes',
   '/reglages/consommation-ia': 'Consommation IA',
+  '/reglages/agents-connectes': 'Agents connectés',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Bots Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
   '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
   '/reglages/securite': 'Sécurité',
+  '/reglages/aide': 'Aide',
 } as const;
 export type ScreenPath = keyof typeof SCREENS;
 

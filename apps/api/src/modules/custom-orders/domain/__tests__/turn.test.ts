@@ -21,6 +21,7 @@ function grid(): CustomPriceGrid {
       { id: 'sup_0000000a', label: 'Test A', offered: true, percent: 50 },
       { id: 'sup_0000000b', label: 'Test B', offered: false, percent: null },
     ],
+    readyVideos: [],
   };
 }
 

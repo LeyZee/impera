@@ -43,8 +43,27 @@ export type UntrustedKind =
   | 'comment_examples'
   /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
   | 'profile_bio'
+  /** The agency's base style (ADR 0173): the owner's text on how she writes in public and in private, data. */
+  | 'agency_public_style'
+  | 'agency_private_style'
+  /** Her real replies to comments close to the one at hand (Charles, 26/11): imported by the owner, read as data. */
+  | 'her_replies'
   /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
-  | 'recent_replies';
+  | 'recent_replies'
+  /**
+   * What a caption is written from (ADR 0164 § 9): her past captions, the sentence she wrote with her drop and her
+   * own hints for other ideas. Hers, still read as data, never as an order.
+   */
+  | 'caption_examples'
+  | 'creator_sentence'
+  | 'caption_hints'
+  /**
+   * The simulated fan's test (ADR 0172): her messages as the invented fan reads them, which may try to steer
+   * him; the whole conversation and his inner journal as the relationship judge reads them. Data, never an order.
+   */
+  | 'creator_message'
+  | 'simulated_conversation'
+  | 'fan_journal';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

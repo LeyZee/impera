@@ -57,6 +57,8 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_started_conflict: 'Ce shift a commencé : tu peux seulement le finir plus tôt ou l’arrêter.',
   shift_check_in_early_conflict:
     'Ton poste n’est pas encore ouvert : il s’ouvre un peu avant le début du shift.',
+  shift_check_in_feedback_due_conflict:
+    'Fais d’abord le retour de ton shift précédent : 30 secondes, puis ton poste s’ouvre.',
   shift_range_invalid: 'Ces heures ne vont pas : la fin vient après le début, et un shift dure 24 h au plus.',
   planning_range_invalid: 'Cette période ne se lit pas d’un coup.',
   shift_template_date_invalid: 'Un modèle de shift commence aujourd’hui au plus tôt.',
@@ -69,6 +71,7 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
     'Des shifts tombent encore pendant ce congé : donne-les à quelqu’un d’autre ou annule-les d’abord.',
   leave_own_decision_forbidden: 'Ton propre congé est validé par quelqu’un d’autre.',
   leave_date_invalid: 'Un congé commence aujourd’hui au plus tôt.',
+  availability_conflict: 'Ces dispos ont déjà été enregistrées autrement : elles sont relues.',
   shift_swap_not_found: 'Cet échange n’existe plus : la liste est relue.',
   shift_swap_conflict: 'Cet échange a déjà été proposé autrement : la liste est relue.',
   shift_swap_open_conflict: 'Tu as déjà proposé cet échange : il attend sa réponse.',
@@ -103,6 +106,7 @@ export const READ_AGAIN: ReadonlySet<SchedulingRefusalCode> = new Set<Scheduling
   'leave_request_not_found',
   'leave_request_conflict',
   'leave_decided_conflict',
+  'availability_conflict',
   'shift_swap_not_found',
   'shift_swap_conflict',
   'shift_swap_answered_conflict',

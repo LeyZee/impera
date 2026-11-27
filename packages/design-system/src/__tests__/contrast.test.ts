@@ -141,7 +141,7 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     },
   );
 
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])(
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])(
     'content-%i, a category of content, stands out from void and from the raised plate',
     (index) => {
       const colour = token(theme, `content-${String(index)}`);
@@ -150,7 +150,7 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     },
   );
 
-  it.each(['data-1', 'warning', 'danger', 'success'])(
+  it.each(['data-1', 'warning', 'danger', 'success', 'info'])(
     'the tick of a reached step reads on %s (nv-steps)',
     (name) => {
       expect(contrast(token(theme, 'void'), token(theme, name))).toBeGreaterThanOrEqual(AA_NON_TEXT);
@@ -158,8 +158,8 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
   );
 
   it.each([
-    ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((index) => `content-${String(index)}`),
-    ...['series-1', 'series-2', 'series-3', 'series-4', 'warning'],
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((index) => `content-${String(index)}`),
+    ...['series-1', 'series-2', 'series-3', 'series-4', 'warning', 'info'],
   ])('ink reads on a tag tinted with %s (nv-tag--tint, 16 %%)', (name) => {
     const [r, g, b] = token(theme, name);
     for (const bottom of [ground.void, ground.surfaceRaised, ground.glassOverAura]) {
@@ -167,10 +167,35 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     }
   });
 
-  it('the ten categories of content are ten different colours', () => {
-    const all = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((index) => token(theme, `content-${String(index)}`));
-    expect(new Set(all).size).toBe(10);
+  it.each([1, 2, 5, 6])(
+    'a guide in content-%i: its icon reads on its tinted tile, and void on the full tile (nv-guide)',
+    (index) => {
+      const [r, g, b] = token(theme, `content-${String(index)}`);
+      for (const bottom of [ground.void, ground.surfaceRaised]) {
+        expect(contrast([r, g, b, 1], over(bottom, [r, g, b, 0.16]))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+        expect(contrast(token(theme, 'void'), [r, g, b, 1])).toBeGreaterThanOrEqual(AA_NON_TEXT);
+      }
+    },
+  );
+
+  it('the thirteen categories of content are thirteen different colours', () => {
+    const all = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((index) =>
+      token(theme, `content-${String(index)}`),
+    );
+    expect(new Set(all).size).toBe(13);
   });
+
+  it.each(['warning', 'danger'])(
+    'ink reads on a note tinted with %s, and its dot stands out (nv-note, 12 %%)',
+    (name) => {
+      const [r, g, b] = token(theme, name);
+      for (const bottom of [ground.void, ground.surfaceRaised]) {
+        const tinted = over(bottom, [r, g, b, 0.12]);
+        expect(contrast(token(theme, name), tinted)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+        expect(contrast(token(theme, 'ink'), tinted)).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    },
+  );
 
   it('a switch that is on stands out from void, and its thumb from it', () => {
     expect(contrast(token(theme, 'switch-on'), ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
@@ -181,6 +206,11 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     const [r, g, b] = token(theme, 'ink');
     const plate = over(ground.surfaceRaised, token(theme, 'plate-hover'));
     expect(contrast(over(plate, [r, g, b, 0.5]), plate)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
+
+  it('info, a state to know, stands out from void and from the raised plate', () => {
+    expect(contrast(token(theme, 'info'), ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    expect(contrast(token(theme, 'info'), ground.surfaceRaised)).toBeGreaterThanOrEqual(AA_NON_TEXT);
   });
 
   it('the focus ring stands out from void and from neon-solid', () => {

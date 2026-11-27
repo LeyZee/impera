@@ -92,6 +92,11 @@ Branche : task/<id>-<slug>
 | EQ-20 | Inviter un chatteur depuis Reveal : la part d'Équipe de l'ADR 0076 | équipe | in_progress | ADR 0076, la route et la migration de Bilan, l'écran d'Extension |
 | EQ-21 | Rappel du rapport de fin de shift sur le téléphone du chatteur | équipe | in_progress | ADR 0077, CR-01, EQ-03 |
 | EQ-22 | Donner ou partager une vente avec le chatteur qui a été décisif | équipe | in_progress | ADR 0101, CRM-03, CRM-05 |
+| EQ-23 | Retour de fin de shift et suivi de ses incidents | équipe | in_review | ADR 0050 § 10, EQ-03, CR-01 |
+| EQ-24 | « Où te verser » : où un membre reçoit ses virements | équipe | in_review | ADR 0165, EQ-05, EQ-15, CR-01 |
+| EQ-25 | « J'ai été décisif sur une vente » : le chatteur signale son shift, le manager répond | équipe | in_review | ADR 0101 §§ 18 à 22, EQ-22 |
+| EQ-26 | Dispos hebdomadaires, et qui est dispo sur chaque place libre | équipe | in_review | ADR 0171, EQ-02 |
+| EQ-27 | Retour de fin de shift léger | équipe | in_review | ADR 0170, EQ-23 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
@@ -108,7 +113,9 @@ Branche : task/<id>-<slug>
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
 | CR-15 | Qui sont tes fans : les chiffres de sa base, tirés de leurs faits déclarés | espaces | todo | CR-02, ADR 0074 |
 | CR-16 | La semaine de la créatrice : deux jours de tournage, une livraison le dimanche, un agenda que le code remplit | espaces | in_progress (lot 1 en PR) | CR-05, CR-06, SC-02, ADR 0140 |
+| CR-17 | Coffre Impera : ce qu'elle dépose, compté par usage, ouvert en grand et décrit | espaces | in_progress (vue en PR ; « À remplacer » à suivre) | CR-06, ADR 0159, ADR 0161, ADR 0162 |
 | COF-01 | Un média offert n'est jamais revendu, un média de script n'est jamais gratuit | coffre (ADR 0145 § 2) | done | synchro du coffre, scripts natifs et préparés |
+| COF-02 | « À refaire » sur un dépôt : la demande se rouvre avec la phrase de l'agence | coffre (trou 7 du 21/11) | in_progress | CR-06, ADR 0055 |
 | SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
@@ -132,11 +139,12 @@ Branche : task/<id>-<slug>
 | VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
+| ACC-01 | Accueils du chatteur et de la modèle, chacun bâti sur ce qu'il fait | espaces | in progress | ADR 0153, ADR 0124, ADR 0140 |
 | INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | in progress (lot a ; essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lots a et b) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
 | INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
-| INS-05 | « À décider » : les cartes de décision de la créatrice | Instagram (ADR 0164) | in progress (lot a) |
+| INS-05 | « À décider » : les cartes de décision de la créatrice | Instagram (ADR 0164) | in progress (lot a fusionné, lots b1 et b2) |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
@@ -173,6 +181,7 @@ Branche : task/<id>-<slug>
 | OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
 | OPS-18 | Les erreurs de production arrivent dans Sentry, sans rien de personnel | exploitation | done | OPS-01 |
 | OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | in_progress | ADR 0152, OPS-01, OPS-02 |
+| EVAL-01 | Des fans simulés testent l'agent sur des semaines fictives | exploitation | in_progress | OPS-11, ADR 0103 |
 | OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
 | OPS-21 | Le prévisionnel du coût de l'IA | exploitation | review | OPS-08 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |

@@ -26,7 +26,12 @@ import { parse } from 'yaml';
 import { testConfig } from '../../../../__tests__/support/config';
 import { createLogger } from '../../../../logger';
 import { buildServer } from '../../../../server';
-import type { CalibrationRecord, CalibrationStore, VoiceExample } from '../../../agent/index';
+import {
+  FRENCH_ONLY,
+  type CalibrationRecord,
+  type CalibrationStore,
+  type VoiceExample,
+} from '../../../agent/index';
 import { createPlaygroundModule, type HerScriptsSource } from '../../index';
 import type { VoiceBankStore } from '../db/rating-store';
 
@@ -89,6 +94,7 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     instagramComment: () => Promise.reject(new Error('not used')),
+    proposeCaptions: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
@@ -182,6 +188,8 @@ async function server(
       forbiddenEmojis: [],
       kycSlots: [],
       objectionReplies: {},
+      spokenLanguages: FRENCH_ONLY,
+      languageExamples: {},
     },
     // « Tester » reads her active persona; none here: the words are read, the phrase needs no persona to be refused.
     activePersona: () => Promise.resolve(null),

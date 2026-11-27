@@ -139,9 +139,44 @@ export const NOTIFICATION_REASONS = [
    * even in the quiet hours and outside the daily cap: the notice only protects an owner who hears of it.
    */
   'owner_change',
+  /**
+   * A question put to a creator on her « À décider » card (ADR 0164 § 9): once per question, held in the quiet hours,
+   * within the daily cap like a reminder.
+   */
+  'decision',
+  /**
+   * A member's « Où te verser » changed (ADR 0165 § 5), to his own devices: it rings even in the quiet hours and outside
+   * the daily cap, so that a change he did not make is heard before a transfer.
+   */
+  'payout_change',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
+
+/**
+ * The sorts of notification a creator chooses herself in Moi › Notifications (ADR 0150 § 16 ter): an agency request
+ * (a task of her agenda), the week to validate, her earnings (her part of a sale), her lives. Each one is on until she
+ * turns it off; the agency neither reads nor changes these choices, and they touch no alert of the team.
+ */
+export const NOTIFICATION_KINDS = ['agency_request', 'week_to_validate', 'earnings', 'lives'] as const;
+export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
+export type NotificationKind = z.infer<typeof NotificationKindSchema>;
+
+/** `GET` and `PUT /v1/notifications/kinds`: every sort, on or off. */
+export const NotificationKindsSchema = z.strictObject({
+  agency_request: z.boolean(),
+  week_to_validate: z.boolean(),
+  earnings: z.boolean(),
+  lives: z.boolean(),
+});
+export type NotificationKinds = z.infer<typeof NotificationKindsSchema>;
+
+export const DEFAULT_NOTIFICATION_KINDS: NotificationKinds = {
+  agency_request: true,
+  week_to_validate: true,
+  earnings: true,
+  lives: true,
+};
 
 /**
  * A notification asked by another module: once only for an account, its reason and its object (`objectKey`: a sale's
@@ -153,6 +188,8 @@ export const NotificationRequestSchema = z.object({
   objectKey: z.string().min(1).max(200),
   timeZone: z.string().min(1),
   message: PushMessageSchema,
+  /** The sort she may turn off (ADR 0150 § 16 ter); turned off, it is kept silent, never rung. */
+  kind: NotificationKindSchema.optional(),
 });
 export type NotificationRequest = z.infer<typeof NotificationRequestSchema>;
 

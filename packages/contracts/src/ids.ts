@@ -43,6 +43,10 @@ export type MediaDescriptionId = z.infer<typeof MediaDescriptionIdSchema>;
 export const PersonaVersionIdSchema = uuid.brand<'PersonaVersionId'>();
 export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 
+/** A version of the agency's base style (ADR 0173). */
+export const AgencyStyleIdSchema = uuid.brand<'AgencyStyleId'>();
+export type AgencyStyleId = z.infer<typeof AgencyStyleIdSchema>;
+
 export const PersonaCorrectionIdSchema = uuid.brand<'PersonaCorrectionId'>();
 export type PersonaCorrectionId = z.infer<typeof PersonaCorrectionIdSchema>;
 
@@ -111,6 +115,8 @@ export type ShiftTemplateId = z.infer<typeof ShiftTemplateIdSchema>;
 /** A member's request to be away for whole days, decided by the agency (EQ-02, ADR 0031). */
 export const LeaveRequestIdSchema = uuid.brand<'LeaveRequestId'>();
 export type LeaveRequestId = z.infer<typeof LeaveRequestIdSchema>;
+export const AvailabilityWeekIdSchema = uuid.brand<'AvailabilityWeekId'>();
+export type AvailabilityWeekId = z.infer<typeof AvailabilityWeekIdSchema>;
 
 /** A chatter's offer to give or exchange a shift with a colleague, who accepts or declines it (EQ-02, ADR 0031). */
 export const ShiftSwapRequestIdSchema = uuid.brand<'ShiftSwapRequestId'>();
@@ -156,6 +162,10 @@ export type PaySaleDecisionId = z.infer<typeof PaySaleDecisionIdSchema>;
 /** A chatter's signal that a sale on their statement is not theirs, or its withdrawal (CRM-03 lot b4c, ADR 0050 § 5). */
 export const PaySaleSignalIdSchema = uuid.brand<'PaySaleSignalId'>();
 export type PaySaleSignalId = z.infer<typeof PaySaleSignalIdSchema>;
+
+/** A chatter's « J'ai été décisif sur une vente » on one of his shifts (ADR 0101 § 18, trou 15). */
+export const SaleClaimIdSchema = uuid.brand<'SaleClaimId'>();
+export type SaleClaimId = z.infer<typeof SaleClaimIdSchema>;
 
 /** What a validated statement carries to the next pay period instead of paying it (EQ-04). */
 export const CarryOverIdSchema = uuid.brand<'CarryOverId'>();
@@ -272,3 +282,7 @@ export type McpGrantId = z.infer<typeof McpGrantIdSchema>;
 /** His custom order (`custom_orders`, ADR 0159 § A). */
 export const CustomOrderIdSchema = uuid.brand<'CustomOrderId'>();
 export type CustomOrderId = z.infer<typeof CustomOrderIdSchema>;
+
+/** A member's departure (`team_member_departures`, ADR 0166). */
+export const MemberDepartureIdSchema = uuid.brand<'MemberDepartureId'>();
+export type MemberDepartureId = z.infer<typeof MemberDepartureIdSchema>;

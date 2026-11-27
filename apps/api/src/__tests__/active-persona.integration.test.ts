@@ -26,6 +26,7 @@ import {
   createAlertTester,
   createJsonlCalibrationStore,
   guardSettingsOf,
+  languagesOf,
   startDraftComposer,
   voiceExamples,
   type ActivePersonaSource,
@@ -102,6 +103,7 @@ function recordingGateway() {
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     instagramComment: () => Promise.reject(new Error('not used')),
+    proposeCaptions: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
@@ -238,6 +240,7 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
         personaSheet: demo.personaSheet,
         guardSettings: guardSettingsOf(demo),
         voiceExamples: examples,
+        languages: languagesOf(demo),
       }).handleFanMessage('Salut');
       expect(voice[0]?.personaSheet).toContain('Okidoki, réponse corrigée sur la persona fictive');
 

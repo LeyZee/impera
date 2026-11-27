@@ -38,6 +38,8 @@ export const FAMILY_OF: Readonly<Record<NotificationReason, InboxFamily>> = {
   creator_alert: 'alert',
   safety_alert: 'safety',
   owner_change: 'safety',
+  decision: 'day',
+  payout_change: 'safety',
 };
 
 export const FAMILY_WORDS: Readonly<Record<InboxFamily, string>> = {

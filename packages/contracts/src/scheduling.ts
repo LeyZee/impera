@@ -346,7 +346,9 @@ export type Shift = z.infer<typeof ShiftSchema>;
  * shift without moving its hours: pay, the access window and the routing of a sale keep reading the planning. A second
  * check-in answers 200 with the first instant. 404 `shift_not_found` for a shift that is not the reader's, cancelled,
  * or a reader who is not `active`; 409 `shift_check_in_early_conflict` before the window opens; 409
- * `shift_ended_conflict` once it has ended or was stopped.
+ * `shift_ended_conflict` once it has ended or was stopped; 409 `shift_check_in_feedback_due_conflict` while the
+ * feedback of his last shift is due (retour léger, 26/11), `details.shiftId` naming that shift: he sends it first
+ * (`GET /v1/scheduling/shift-feedback/pending`).
  */
 export const ShiftCheckInSchema = z.object({
   shiftId: ShiftIdSchema,
@@ -931,7 +933,8 @@ export type AnswerShiftSwapRequestBody = z.infer<typeof AnswerShiftSwapRequestBo
  * has a member then (both with `details.shiftId`, the shift in the way) ; `shift_ended_conflict` 409, a shift that
  * has ended, or a new one that would end at or before now ; `shift_started_conflict` 409, a change other than an
  * earlier end on a shift under way ; `shift_check_in_early_conflict` 409, « Je prends mon poste » before the shift's
- * access window opens ; `shift_range_invalid` 400, an end at or before the start, a shift longer than
+ * access window opens ; `shift_check_in_feedback_due_conflict` 409, « Je prends mon poste » while the feedback of his
+ * last shift is due (`details.shiftId`) ; `shift_range_invalid` 400, an end at or before the start, a shift longer than
  * `SHIFT_MAX_MINUTES`, or an instant that does not fall on a minute ; `planning_range_invalid` 400,
  * `to` at or before `from`, or more than `PLANNING_MAX_DAYS` (`LEAVE_QUERY_MAX_DAYS` for the leaves) ;
  * `shift_template_date_invalid` 400, a template that starts before today ; `creator_archived_conflict` 409, a shift or
@@ -964,6 +967,7 @@ export const SCHEDULING_ERROR_CODES = [
   'shift_ended_conflict',
   'shift_started_conflict',
   'shift_check_in_early_conflict',
+  'shift_check_in_feedback_due_conflict',
   'shift_range_invalid',
   'planning_range_invalid',
   'shift_template_date_invalid',
@@ -976,6 +980,7 @@ export const SCHEDULING_ERROR_CODES = [
   'leave_shifts_conflict',
   'leave_own_decision_forbidden',
   'leave_date_invalid',
+  'availability_conflict',
   'shift_swap_not_found',
   'shift_swap_conflict',
   'shift_swap_open_conflict',

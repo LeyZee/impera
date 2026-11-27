@@ -5,6 +5,7 @@ import {
   CustomPriceGridSchema,
   emptyCustomPriceGrid,
   quoteCustomOrder,
+  readyVideoPriceMinor,
   type CustomPriceGrid,
 } from './custom-prices';
 
@@ -24,6 +25,10 @@ function grid(): CustomPriceGrid {
       { id: 'sup_0000000b', label: 'Test B', offered: false, percent: null },
       { id: 'sup_0000000c', label: 'Test C', offered: true, percent: 10 },
       { id: 'sup_0000000d', label: 'Test D', offered: true, percent: null },
+    ],
+    readyVideos: [
+      { id: 'rv_0000000a', label: 'Type A', offered: true, minMinor: 2_000, maxMinor: 4_000 },
+      { id: 'rv_0000000b', label: 'Type B', offered: false, minMinor: 1_000, maxMinor: 1_000 },
     ],
   };
 }
@@ -116,5 +121,45 @@ describe('quoteCustomOrder', () => {
       kind: 'off_grid',
       missing: ['photo'],
     });
+  });
+});
+
+describe('the videos already shot (ADR 0159 § C)', () => {
+  it('reads a grid saved before the list existed as having none', () => {
+    const { formats, supplements } = grid();
+    const older = { formats, supplements };
+    expect(CustomPriceGridSchema.parse(older).readyVideos).toEqual([]);
+  });
+
+  it('refuses a range upside down, under 1 €, a malformed id, two lines with one name', () => {
+    const base = grid();
+    const line = { id: 'rv_0000000c', label: 'Type C', offered: true, minMinor: 2_000, maxMinor: 3_000 };
+    const refused = [
+      { ...line, maxMinor: 1_000 },
+      { ...line, minMinor: 50 },
+      { ...line, id: 'rv_C' },
+      { ...line, label: 'type a' },
+    ];
+    for (const bad of refused)
+      expect(
+        CustomPriceGridSchema.safeParse({ ...base, readyVideos: [...base.readyVideos, bad] }).success,
+      ).toBe(false);
+    expect(
+      CustomPriceGridSchema.safeParse({ ...base, readyVideos: [...base.readyVideos, line] }).success,
+    ).toBe(true);
+  });
+
+  it('draws a round price inside the range, the same for the same seed', () => {
+    const range = { minMinor: 2_050, maxMinor: 4_000 };
+    const drawn = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((seed) => readyVideoPriceMinor(range, seed));
+    for (const price of drawn) {
+      expect(price % 100).toBe(0);
+      expect(price).toBeGreaterThanOrEqual(2_100);
+      expect(price).toBeLessThanOrEqual(4_000);
+    }
+    expect(new Set(drawn).size).toBeGreaterThan(1);
+    expect(readyVideoPriceMinor(range, 'a')).toBe(drawn[0]);
+    expect(readyVideoPriceMinor({ minMinor: 1_000, maxMinor: 1_000 }, 'x')).toBe(1_000);
+    expect(readyVideoPriceMinor({ minMinor: 1_020, maxMinor: 1_080 }, 'x')).toBe(1_020);
   });
 });

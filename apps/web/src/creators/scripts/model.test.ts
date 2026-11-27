@@ -38,6 +38,7 @@ describe('Créatrices › Scripts, her sent scripts (SC-03 c2b)', () => {
       {
         requests: [a.request, b.request, gone.request],
         drops: [a.drop, b.drop, gone.drop, dropOf()],
+        redone: [],
       },
       [NIGHT, BOTH],
     );
@@ -50,10 +51,10 @@ describe('Créatrices › Scripts, her sent scripts (SC-03 c2b)', () => {
   it('falls back on its structure’s moment, and never guesses one for « Jour et nuit »', () => {
     const old = scriptOf(1, NIGHT.id, null);
     const unknown = scriptOf(2, BOTH.id, null);
-    const rows = sentScripts({ requests: [old.request, unknown.request], drops: [old.drop, unknown.drop] }, [
-      NIGHT,
-      BOTH,
-    ]);
+    const rows = sentScripts(
+      { requests: [old.request, unknown.request], drops: [old.drop, unknown.drop], redone: [] },
+      [NIGHT, BOTH],
+    );
     expect(rows.map((row) => [row.code, row.moment, row.blocker])).toEqual([
       ['S002', null, 'moment_unknown'],
       ['S001', 'night', null],
@@ -68,7 +69,7 @@ describe('Créatrices › Scripts, her sent scripts (SC-03 c2b)', () => {
       ],
     });
     const rows = sentScripts(
-      { requests: [checking.request, heavy.request], drops: [checking.drop, heavy.drop] },
+      { requests: [checking.request, heavy.request], drops: [checking.drop, heavy.drop], redone: [] },
       [NIGHT],
     );
     expect(rows.map((row) => row.blocker)).toEqual(['too_large', 'not_ready']);
@@ -76,7 +77,7 @@ describe('Créatrices › Scripts, her sent scripts (SC-03 c2b)', () => {
 
   it('says when her originals go once the copy is confirmed: 30 days later', () => {
     const done = scriptOf(5, NIGHT.id, 'night', { exportedAt: '2026-11-06T15:00:00.000Z' });
-    const [row] = sentScripts({ requests: [done.request], drops: [done.drop] }, []);
+    const [row] = sentScripts({ requests: [done.request], drops: [done.drop], redone: [] }, []);
     expect(row?.name).toBeNull();
     expect(row?.originalsUntil).toBe('2026-12-06T15:00:00.000Z');
   });

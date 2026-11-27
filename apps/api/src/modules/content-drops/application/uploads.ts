@@ -15,6 +15,7 @@ import {
   type DropFileUpload,
 } from '@impera/contracts';
 
+import { TAKES_BYTES_STATES } from '../domain/drops';
 import {
   ContentDropFileSettled,
   ContentDropStorageUnavailable,
@@ -44,12 +45,13 @@ const sent = (target: DropFileTarget): DropFileUpload => ({
   stored: [],
 });
 
-/** Only a file still waiting, in a drop still sending or being filled, takes bytes; a file already past that answers « sent ». */
+/** Only a file still waiting, in a drop still sending, being filled or taking a replacement, takes bytes; a file already past that answers « sent ». */
 function takesBytes(target: DropFileTarget): boolean {
   if (target.dropState === 'withdrawn') throw new ContentDropFileSettled();
   if (target.fileState !== 'awaiting') return false;
   // A script she is still filling takes each slot's file as she chooses it (SC-02 lot b).
-  if (target.dropState !== 'uploading' && target.dropState !== 'filling') throw new ContentDropFileSettled();
+  // A medium replaced in a received drop takes its bytes too (trou 7 du 21/11).
+  if (!TAKES_BYTES_STATES.has(target.dropState)) throw new ContentDropFileSettled();
   return true;
 }
 

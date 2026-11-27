@@ -55,6 +55,7 @@ export {
   type BrainScript,
   type BrainInput,
   type CallMeta,
+  type CaptionProposalsInput,
   type ChannelPostInput,
   type ChannelPostResult,
   type InstagramCommentInput,
@@ -85,11 +86,28 @@ export {
   type JudgeInput,
   type JudgeSituation,
   type VoiceInput,
+  type AgencyStyleText,
+  type VoiceLanguage,
   type VoiceScriptStep,
   type VoiceWaitingStep,
 } from './gateway';
+export {
+  createFanSimulationGateway,
+  FAN_BUBBLES_MAX,
+  FAN_STATE_STEP_MAX,
+  FanSimulationOutputSchema,
+  fanRequest,
+  RelationshipJudgmentSchema,
+  type FanSimulationGateway,
+  type FanSimulationGatewayDeps,
+  type FanSimulationInput,
+  type FanSimulationOutput,
+  type FanSimulationTurn,
+  type RelationshipJudgeInput,
+  type RelationshipJudgment,
+} from './fan-simulation';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
-export { loadPrompt } from './prompts';
+export { loadPrompt, parsePrompt } from './prompts';
 export {
   createModelResolver,
   createTranscriberResolver,

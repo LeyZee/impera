@@ -1,4 +1,4 @@
-import { DomainError, type PayRulesSourceRefusal } from '@impera/contracts';
+import { DomainError, type PayRulesSourceRefusal, type ShiftId } from '@impera/contracts';
 
 /** Error codes of the module (`SCHEDULING_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 export class ShiftNotFound extends DomainError {
@@ -85,6 +85,15 @@ export class ShiftEnded extends DomainError {
 export class ShiftCheckInEarly extends DomainError {
   constructor() {
     super('shift_check_in_early_conflict', 'Ton poste n’est pas encore ouvert');
+  }
+}
+
+/** « Je prends mon poste » while the feedback of his last shift is still due (retour léger, 26/11): it comes first. */
+export class ShiftCheckInFeedbackDue extends DomainError {
+  constructor(shiftId: ShiftId) {
+    super('shift_check_in_feedback_due_conflict', 'Fais d’abord le retour de ton shift précédent', {
+      details: { shiftId },
+    });
   }
 }
 
@@ -536,6 +545,44 @@ export class ShiftFeedbackForbidden extends DomainError {
   }
 }
 
+/** A signal linked to a conversation that is not among the fans of his shift (ADR 0170 § 2). */
+export class ShiftFeedbackFanConflict extends DomainError {
+  constructor() {
+    super('shift_feedback_fan_conflict', 'Ce fan n’est pas dans la liste de ton shift');
+  }
+}
+
+/** An answer to the closed question when it was not asked (ADR 0170 § 1). */
+export class ShiftFeedbackReasonConflict extends DomainError {
+  constructor() {
+    super('shift_feedback_reason_conflict', 'La question sur les brouillons n’était pas posée pour ce shift');
+  }
+}
+
+/** A feedback of a shift that is no longer his last one (retour léger, 26/11): it counts as missing, never caught up. */
+export class ShiftFeedbackExpired extends DomainError {
+  constructor() {
+    super('shift_feedback_expired_conflict', 'Ce retour a expiré : un shift plus récent a pris sa place');
+  }
+}
+
+/** A feedback the reader does not see, or one without an incident to follow: the same answer for both. */
+export class ShiftFeedbackNotFound extends DomainError {
+  constructor() {
+    super('shift_feedback_not_found', 'Ce retour de fin de shift est introuvable');
+  }
+}
+
+/** « Vu » and « Réglé » are the owner's and the active managers', never on their own incident. */
+export class ShiftIncidentForbidden extends DomainError {
+  constructor() {
+    super(
+      'shift_incident_forbidden',
+      'Seuls le propriétaire et les managers suivent un incident, jamais le leur',
+    );
+  }
+}
+
 /** A version of the créneaux that does not exist, or that the reader may not see (ADR 0049 § 1). */
 export class SlotVersionNotFound extends DomainError {
   constructor() {
@@ -571,5 +618,12 @@ export class SlotVersionDateInvalid extends DomainError {
 export class SlotVersionInvalid extends DomainError {
   constructor(message: string) {
     super('request_invalid', message);
+  }
+}
+
+/** The same week of availability sent again with other plages, or for another member (ADR 0171). */
+export class AvailabilityConflict extends DomainError {
+  constructor() {
+    super('availability_conflict', 'Ces dispos existent déjà avec d’autres plages');
   }
 }
