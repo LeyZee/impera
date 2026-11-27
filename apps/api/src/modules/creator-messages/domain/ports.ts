@@ -25,7 +25,7 @@ export interface MessageStore {
 }
 
 /** Someone a notification goes to, in their own time zone (their quiet hours and their day). */
-export interface Phone {
+interface Phone {
   readonly userId: string;
   readonly timeZone: string;
 }
