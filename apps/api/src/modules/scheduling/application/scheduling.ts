@@ -218,7 +218,9 @@ export function createSchedulingService(
         platformAccountId: shift.platformAccountId,
         member: toPlanningMember(member),
         shiftId: shift.id,
+        startsAt: shift.startsAt.toISOString(),
         endsAt: shift.endsAt.toISOString(),
+        checkedInAt: shift.checkedInAt?.toISOString() ?? null,
       }));
     },
 

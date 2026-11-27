@@ -497,6 +497,11 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     const handedTo = async () =>
       (await app.modules.scheduling.onShift(anna, new Date())).map((row) => row.memberId);
     expect(await onDuty()).toContain(underWay.id);
+    // Planned is not on post (recette MAN-02): its start, and no check-in yet.
+    const row = OnDutyListSchema.parse((await call('GET', '/scheduling/on-duty', owner)).json()).onDuty.find(
+      (one) => one.shiftId === underWay.id,
+    );
+    expect(row).toMatchObject({ startsAt: underWay.startsAt, checkedInAt: null });
     expect(await handedTo()).toContain(iris.id);
     // Anna taken off her list, as Membres › Modifier does it: Inès stays.
     await test.admin.db

@@ -1,9 +1,10 @@
-import type { ShiftReport } from '@impera/contracts';
+import { LATE_CHECK_IN_MINUTES, type OnDuty, type ShiftReport } from '@impera/contracts';
 
 import type { BackupBanner } from './backups';
 import type { PaperworkLine } from './paperwork';
 
 import { awaitsDecision, gapWaits, hasGap } from '@/reports/model';
+import { lateCheckIn, lateWords } from '@/scheduling/model';
 import { gapCount, type FirstPayoutGaps } from '@/setup/first-payout';
 
 /**
@@ -16,7 +17,8 @@ import { gapCount, type FirstPayoutGaps } from '@/setup/first-payout';
 export type TodoTone = 'danger' | 'warn' | 'neutral';
 
 /** Where a line is settled; a line of documents leads to each member's file instead. */
-export type TodoTarget = '/paie/factures' | '/paie/quinzaine' | '/equipe/rapports' | '/reglages/sauvegardes';
+export type TodoTarget =
+  '/paie/factures' | '/paie/quinzaine' | '/equipe/rapports' | '/equipe/planning' | '/reglages/sauvegardes';
 
 export interface TodoItem {
   readonly key: string;
@@ -102,6 +104,29 @@ export function firstPayoutItem(gaps: FirstPayoutGaps | null): TodoItem | null {
   };
 }
 
+/**
+ * A planned member who has not taken his post (recette MAN-02), once `LATE_CHECK_IN_MINUTES` have passed: one amber
+ * line each, leading to the planning, where it is said from the first minute.
+ */
+export function lateItems(onDuty: readonly OnDuty[], now: Date): TodoItem[] {
+  return onDuty.flatMap((one): TodoItem[] => {
+    const late = lateCheckIn(one, now);
+    if (late === null || late < LATE_CHECK_IN_MINUTES * 60_000) return [];
+    return [
+      {
+        key: `late-${one.shiftId}`,
+        tone: 'warn',
+        title: `${one.member.displayName} : ${lateWords(late)}`,
+        detail: [],
+        to: '/equipe/planning',
+        where: 'Planning',
+        members: [],
+        more: false,
+      },
+    ];
+  });
+}
+
 /** How many lines the card shows before « Et N autres »: the figures stay close under it on a busy day. */
 export const TODO_SHOWN = 4;
 
@@ -111,8 +136,11 @@ export function todoItems(
   paperwork: readonly PaperworkLine[],
   reports: readonly TodoItem[],
   firstPayout: TodoItem | null = null,
+  late: readonly TodoItem[] = [],
 ): TodoItem[] {
   const items: TodoItem[] = [
+    // Someone missing on a shift under way comes first among the warnings: it costs now.
+    ...late,
     ...(firstPayout === null ? [] : [firstPayout]),
     ...paperwork.map((line, index): TodoItem => ({
       key: `paper-${String(index)}`,

@@ -1431,3 +1431,9 @@ button.sc-duty__one:active {
   color: var(--nv-success);
   white-space: nowrap;
 }
+
+/* Planned, not on post (recette MAN-02): an avertissement, amber, in words. */
+.sc-duty__late {
+  color: var(--nv-warning);
+  font-weight: 600;
+}

@@ -82,6 +82,7 @@ const NOTHING = {
   '/v1/dashboard/setup/members': { members: [] },
   '/v1/payroll/payout-destinations': { destinations: [] },
   '/v1/team/members': { members: MEMBERS },
+  '/v1/scheduling/on-duty': { onDuty: [] },
 };
 
 describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
@@ -149,7 +150,7 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(true);
     await screen.findByText('Dashboard');
     await vi.waitFor(() => {
-      expect(reads).toHaveLength(8);
+      expect(reads).toHaveLength(9);
     });
     expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
     cleanup();
@@ -220,10 +221,45 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
         .getByRole('link', { name: /^1 écart à trancher/u })
         .getAttribute('href'),
     ).toBe('/equipe/rapports');
-    // What her creators wrote is read too: the reviewer is an active manager, who reads it without answering.
+    // What her creators wrote is read too: the reviewer is an active manager, who reads it without answering; and who
+    // is on shift now, to say who has not taken his post (recette MAN-02).
     expect(reads.filter((read) => !read.startsWith('/v1/scheduling/shift-reports'))).toEqual([
       '/v1/creator-messages/waiting',
+      '/v1/scheduling/on-duty',
     ]);
+  });
+
+  it('says a planned member not on post after ten minutes, in amber, leading to the planning (recette MAN-02)', async () => {
+    const started = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+    const shift = (id: string, minutes: number, checkedInAt: string | null) => ({
+      creatorId: '0199f2a0-0000-4000-8000-000000000001',
+      platformAccountId: '0199f2a0-0000-4000-8000-000000000011',
+      member: { id: THEO.id, displayName: 'Théo', color: null },
+      shiftId: id,
+      startsAt: started(minutes),
+      endsAt: started(-120),
+      checkedInAt,
+    });
+    serve({
+      ...NOTHING,
+      '/v1/scheduling/on-duty': {
+        onDuty: [
+          shift('0199f2a0-0000-4000-8000-000000000101', 25, null),
+          // Five minutes late is not yet a line; on post is never one.
+          shift('0199f2a0-0000-4000-8000-000000000102', 5, null),
+          shift('0199f2a0-0000-4000-8000-000000000103', 25, started(24)),
+        ],
+      },
+    });
+    renderCard(false, true);
+    const card = (await screen.findByRole('heading', { name: 'À faire' })).closest('section');
+    if (card === null) throw new Error('No card');
+    const line = within(card).getByRole('link', {
+      name: /^Théo : prévu, pas encore en poste depuis 25\smin/u,
+    });
+    expect(line.getAttribute('href')).toBe('/equipe/planning');
+    expect(line.closest('li')?.dataset['tone']).toBe('warn');
+    expect(within(card).getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('puts what a creator wrote to the agency in « À faire », with the owner’s answer box (trous béants n° 13)', async () => {

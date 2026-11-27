@@ -344,6 +344,21 @@ export function phaseOf(shift: Pick<Shift, 'startsAt' | 'endsAt'>, now: Date): P
 export const leftOf = (shift: Pick<Shift, 'endsAt'>, now: Date): string =>
   `reste ${lengthOf(Math.max(60_000, new Date(shift.endsAt).getTime() - now.getTime()))}`;
 
+/**
+ * A shift under way that its member has not taken (recette MAN-02): planned is not on post. How long since it started,
+ * never less than a minute; `null` when it is not under way, or he took his post.
+ */
+export function lateCheckIn(
+  shift: Pick<Shift, 'startsAt' | 'endsAt' | 'checkedInAt'>,
+  now: Date,
+): number | null {
+  if (shift.checkedInAt !== null || phaseOf(shift, now) !== 'live') return null;
+  return Math.max(60_000, now.getTime() - new Date(shift.startsAt).getTime());
+}
+
+/** « prévu, pas encore en poste depuis 12 min », said where « en poste » would be. */
+export const lateWords = (lateMs: number): string => `prévu, pas encore en poste depuis ${lengthOf(lateMs)}`;
+
 /** A shift in one day of the grid. */
 export interface Chip {
   readonly shift: Shift;
