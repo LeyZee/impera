@@ -2,6 +2,7 @@ import { normalise } from '@impera/contracts';
 
 import { SUGGESTIVE_EMOJIS } from './desire';
 import type { GuardViolation } from './guards';
+import { INTIMATE_PARTS } from './intimate-words';
 
 /**
  * The care mode (ADR 0088): a fan in distress, who speaks of hurting himself or tells of a real abuse, is answered by
@@ -36,7 +37,10 @@ const CARE_FORBIDDEN: readonly RegExp[] = [
   // A sexual word.
   // Seduction without a sexual word (recette AGR-08): « je suis toute à toi ce soir », a giggle, a moan.
   /\b(?:toute? a toi|rien qu'a toi|tu me rends (?:folle|fou)|hihi+|hehe+|mm+h+)\b/u,
-  /\b(?:sexe|sexy|sexuel\w*|bite|queue|chatte|seins?|nichons?|cul|fesses|sucer|suce|baiser|baise|jouir|orgasme|excite\w*|bander|bande dur|branle\w*|mouille\w*|coquin\w*|lingerie|nue?s?|a poil|chaud(?:e|es)? pour|envie de toi)\b/u,
+  new RegExp(
+    `\\b(?:${INTIMATE_PARTS}|sexy|sexuel\\w*|sucer|suce|baiser|baise|jouir|orgasme|excite\\w*|bander|bande dur|branle\\w*|mouille\\w*|coquin\\w*|lingerie|nue?s?|a poil|chaud(?:e|es)? pour|envie de toi)\\b`,
+    'u',
+  ),
 ];
 
 /**

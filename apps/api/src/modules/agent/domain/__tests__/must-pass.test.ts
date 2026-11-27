@@ -82,6 +82,8 @@ describe('permitted phrases that must always pass, output guards', () => {
     ['you’ll give me a baby', true],
     ['mi farai un bambino', true],
     ['me harás un hijo', true],
+    ['tes petites fesses', true],
+    ['ton petit sexe 😏', true],
     ['je mets ma jupe d’écolière pour toi', true],
     ['mon uniforme scolaire te plaît ?', true],
     ['ma tenue de lycéenne, rien que pour toi', true],

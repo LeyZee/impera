@@ -441,6 +441,9 @@ describe('voice guards', () => {
       't’as un corps de petit garçon',
       'tes mains de petit garçon',
       't’as des mains d’enfant',
+      'ton sexe de petit garçon',
+      't’as un sexe d’enfant',
+      'tes fesses de petite fille',
     ])
       expect(soft(bubble, { humiliationWanted: true }), bubble).toContainEqual([
         'minor_reference',
@@ -494,6 +497,21 @@ describe('voice guards', () => {
     expect(
       checkVoiceOutput(['*rougit* arrête'], { ...DEFAULT_GUARD_SETTINGS, stageDirections: true }),
     ).toEqual([]);
+  });
+
+  it('blocks an intimate part compared to a child’s, sexual message or not, and lets « petit » alone through (Sécurité, #1054)', () => {
+    for (const bubble of [
+      'ton sexe de petit garçon',
+      't’as un sexe d’enfant',
+      'tes fesses de petite fille',
+    ]) {
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+      expect(isBlocked(checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)), bubble).toBe(true);
+    }
+    for (const bubble of ['tes petites fesses', 'ton petit sexe 😏']) {
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+      expect(checkYouthWords([bubble], true), bubble).toEqual([]);
+    }
   });
 
   it('never lets her say she is under 18, and lets a length of time or her past through (Sécurité, #1054)', () => {

@@ -1,5 +1,7 @@
 import { normalise, normaliseWords, unmask, type GuardCode } from '@impera/contracts';
 
+import { INTIMATE_PARTS } from './intimate-words';
+
 /**
  * Guards on the voice output, before anything can be sent (docs/architecture/ai-engine.md, « Les gardes »).
  * Pure code: a blocking violation forbids sending, a soft one asks for a regeneration. Their codes are a closed list
@@ -201,8 +203,11 @@ const HER_MINOR_AGE = new RegExp(
 
 // His body, or a part of it, compared to a child's (Sécurité, #1054): « t'as un corps de petit garçon », « des mains
 // d'enfant ». Blocking, a `minor_reference`, whatever his desire map.
-const CHILD_BODY =
-  /\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix) (de|d'?) ?(une? |petit |petite )?(petit garcon|petite fille|enfants?|gamine?s?|gosses?|fillettes?|ados?|adolescente?s?)\b/;
+// The intimate parts count too, his or hers, sexual message or not (Sécurité, #1054): the shared lexicon, never a list
+// of its own. « Ta petite queue » or « tes petites fesses » name no child and pass.
+const CHILD_BODY = new RegExp(
+  `\\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix|${INTIMATE_PARTS}) (de|d'?) ?(une? |petit |petite )?(petit garcon|petite fille|enfants?|gamine?s?|gosses?|fillettes?|ados?|adolescente?s?)\\b`,
+);
 const CHILD_ROLE_FOR_HIM =
   /\b(joue|jouer|joues|jouons|sois|seras|serais|deviens|devenir|redeviens|comme si t'? ?etais|fais|faire) (le |mon |un |ton |notre )?(petit|vilain) garcon\b|\b(maman|mommy|mummy|mama|mami)\b[^.!?]{0,40}\b(petit|vilain) garcon\b|\b(petit|vilain) garcon\b[^.!?]{0,40}\b(maman|mommy|mummy|mama|mami)\b/;
 
