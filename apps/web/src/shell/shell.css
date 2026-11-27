@@ -1100,9 +1100,11 @@
   outline: none;
   transform: none;
 }
-/* The stage and a section's title take the focus on arrival: a ring for the keyboard only. */
+/* The stage and a section's title take the focus on arrival: a ring for the keyboard only. A title is not a control:
+ * on a page opened from an address (no click before it), the browser drew its ring as if typed, a white frame around
+ * « Plateformes » (recette 27/11, F1). A screen reader still reads it, and the next Tab goes on from it. */
 .nv-stage:focus:not(:focus-visible),
-.nv-stage h1:focus:not(:focus-visible) {
+.nv-stage h1:focus {
   outline: none;
 }
 /* A title is not a control: on a direct arrival (no click yet) the browser counts the programmatic focus as visible

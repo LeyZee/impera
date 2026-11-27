@@ -23,3 +23,17 @@ export interface MessageStore {
     now: Date,
   ): Promise<ToAgencyMessage>;
 }
+
+/** Someone a notification goes to, in their own time zone (their quiet hours and their day). */
+interface Phone {
+  readonly userId: string;
+  readonly timeZone: string;
+}
+
+/** Who hears of « Écrire à l'agence », read by the service role: never more than the names of the accounts. */
+export interface MessagePhones {
+  /** Her name, her owners and the active managers who work on her. */
+  agency(creatorId: CreatorId): Promise<{ readonly creatorName: string; readonly phones: readonly Phone[] }>;
+  /** Her own accounts, in her time zone. */
+  hers(creatorId: CreatorId): Promise<readonly Phone[]>;
+}

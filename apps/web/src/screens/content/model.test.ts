@@ -21,6 +21,7 @@ import {
   mediaLabel,
   mimeOf,
   moved,
+  movedTo,
   onTheirWay,
   openRequests,
   outLine,
@@ -253,6 +254,11 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(moved(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
     expect(moved(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
     expect(moved(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'b', 'c']);
+    // Dragged: taken out, put back at its new place.
+    expect(movedTo(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd']);
+    expect(movedTo(['a', 'b', 'c', 'd'], 3, 0)).toEqual(['d', 'a', 'b', 'c']);
+    expect(movedTo(['a', 'b', 'c'], 1, 1)).toEqual(['a', 'b', 'c']);
+    expect(movedTo(['a', 'b', 'c'], 1, 5)).toEqual(['a', 'b', 'c']);
   });
 
   it('knows the same file picked twice', () => {

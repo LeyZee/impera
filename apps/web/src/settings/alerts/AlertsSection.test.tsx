@@ -410,7 +410,7 @@ describe('the system’s alerts', () => {
       'Le code les lève lui-même. Sauf les mots-clés, chacune se coupe créatrice par créatrice.',
     );
     expect(lede).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Persona de Léa' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Mots surveillés de Léa' }).getAttribute('href')).toBe(
       `/creatrices?creatrice=${LEA}`,
     );
     expect(screen.getByText('Le fan demande si c’est un bot', { selector: '.al-line__name' })).toBeTruthy();

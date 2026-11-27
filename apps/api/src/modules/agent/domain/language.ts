@@ -1,4 +1,6 @@
-import { isGuardedLanguage, LANGUAGES, type Language } from '@impera/contracts';
+import { isGuardedLanguage, LANGUAGES, normalise, type Language } from '@impera/contracts';
+
+import { BARE_TEEN_NOT_A_DATE } from './teen-number';
 
 /**
  * The fan's language, decided by code (ADR 0168): read on what he wrote, never guessed by a model, then given to the
@@ -60,7 +62,7 @@ const WORDS: Readonly<Record<Exclude<Language, 'arabic'>, readonly string[]>> = 
   german: (
     'ich du er sie wir ihr der die das und ist nicht aber mit fur dich mich mein dein ja nein was ' +
     'wie warum sehr auch noch haben hast habe bin bist kann willst will hallo danke schon heute ' +
-    'morgen wenn weil ein eine einen nur jetzt hier gut liebe schatz geil'
+    'morgen wenn weil ein eine einen nur jetzt hier gut liebe schatz geil jahre jahr'
   ).split(' '),
   portuguese: (
     'eu voce vc ele ela nos os as do da dos das que nao mas com para pra isso isto meu minha teu tua ' +
@@ -165,6 +167,87 @@ export function detectLanguage(text: string): DetectedLanguage {
   return words.length >= UNKNOWN_FROM_WORDS ? 'unknown' : null;
 }
 
+/**
+ * The sentences of a message: cut at a full stop, a question or exclamation mark, a semicolon or an ellipsis followed
+ * by a space or the end, at a line break, or at a colon followed by a space. « 15.30 » or « 15:30 » stay whole.
+ */
+export function sentencesOf(text: string): string[] {
+  return text
+    .split(/[.!?;…]+(?=\s|$)|\n+|:\s/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== '');
+}
+
+/** Whether a word of the sentence belongs to a language the guards read (« rdv le 15 », « à 16h »). */
+function hasCoveredWord(sentence: string): boolean {
+  return wordsOf(sentence).some((word) =>
+    (LANGUAGES_OF.get(word) ?? []).some((language) => {
+      const read = asDetected(language);
+      return read !== 'unknown' && isGuardedLanguage(read);
+    }),
+  );
+}
+
+/** Whether a word of the sentence is written only by languages the guards do not read (« ich », « jahre », « mam »). */
+function hasForeignWord(sentence: string): boolean {
+  return wordsOf(sentence).some((word) => {
+    const languages = LANGUAGES_OF.get(word) ?? [];
+    return (
+      languages.length > 0 &&
+      languages.every((language) => {
+        const read = asDetected(language);
+        return read === 'unknown' || !isGuardedLanguage(read);
+      })
+    );
+  });
+}
+
+/** A sentence that is only the number (« 15 », « 17 ! »). */
+const ONLY_THE_NUMBER =
+  /^[\s\p{P}\p{Extended_Pictographic}\uFE0F]*1[0-7][\s\p{P}\p{Extended_Pictographic}\uFE0F]*$/u;
+
+/**
+ * What a number from 10 to 17 that no age word explains says (ADR 0168 § 4, two levels, 27/11). `'age'`, the age
+ * doubt: the number is alone in its sentence (« salut. 15 »), it answers her question about his age, or its sentence
+ * carries a word only a language outside the coverage writes, or another script (« ich bin 15. salut », « 15 jahre.
+ * salut »). `'human'`: the number stands among words no lexicon knows (« saison 12. tu regardes ? »), a human reads it,
+ * without the doubt. `null`: a date, an hour, a sum, a measure or a rank, or a sentence with a word of a covered
+ * language (« rdv le 15 », « j'habite au 14 »).
+ */
+export type BareTeenReading = 'age' | 'human' | null;
+
+export function bareTeenReading(text: string, askedAge = false): BareTeenReading {
+  let reading: BareTeenReading = null;
+  for (const sentence of sentencesOf(text)) {
+    if (!BARE_TEEN_NOT_A_DATE.test(normalise(sentence))) continue;
+    if (ONLY_THE_NUMBER.test(sentence) || askedAge || !isMostlyLatin(sentence) || hasForeignWord(sentence))
+      return 'age';
+    if (!hasCoveredWord(sentence)) reading = 'human';
+  }
+  return reading;
+}
+
+/**
+ * The sentences of his message that the guards do not read (ADR 0168 § 4 and § 5, read sentence by sentence on 27/11):
+ * a sentence read plainly as `'unknown'`, as a language outside `GUARDED_LANGUAGES`, or in another script. A sentence
+ * too short to be read plainly (« ciao bello », « ok baby », a first name, a brand) is not one of them, unless it
+ * carries a number from 10 to 17 that is no date, hour, sum, measure or rank, with no word of a covered language
+ * (« ich bin 15. salut », « saison 12. tu regardes ? »; not « rdv le 15. bisous »): closed by default. The single
+ * source for `humanOnly`; the translation reads it too. Whether the number is also an age doubt is `bareTeenReading`.
+ */
+export function uncoveredSentences(text: string): string[] {
+  return sentencesOf(text).filter((sentence) => {
+    const read = detectLanguage(sentence);
+    if (read === null) return !hasCoveredWord(sentence) && BARE_TEEN_NOT_A_DATE.test(normalise(sentence));
+    return read === 'unknown' || !isGuardedLanguage(read);
+  });
+}
+
+/** Whether one sentence of his message is enough to treat it as one the guards do not read (ADR 0168 § 5). */
+export function hasUncoveredSentence(text: string): boolean {
+  return uncoveredSentences(text).length > 0;
+}
+
 /** How many words of the text code reads as words (Latin letters): what the output guard measures. */
 export function latinWordCount(text: string): number {
   return wordsOf(text).filter((word) => LATIN.test(word)).length;
@@ -251,7 +334,10 @@ export function decideLanguage(input: LanguageDecisionInput): LanguageDecision {
   const earlier = input.earlierFanText === undefined ? null : detectLanguage(input.earlierFanText);
   const notSpoken = fan === null || speaks(fan) || earlier === fan ? null : fan;
   const humanOnly =
-    fan === 'unknown' || (fan !== null && !isGuardedLanguage(fan)) || !isGuardedLanguage(reply);
+    fan === 'unknown' ||
+    (fan !== null && !isGuardedLanguage(fan)) ||
+    !isGuardedLanguage(reply) ||
+    input.fanTexts.some(hasUncoveredSentence);
   return { reply, fan, notSpoken, keep, humanOnly };
 }
 

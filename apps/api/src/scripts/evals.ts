@@ -4,7 +4,9 @@
  * threshold (`evals/thresholds.json`). Nothing is sent. The persona is the fictional demo one (ADR 0010), or with
  * `--persona-from-crm` her active version read from the database, which stays on that machine (OPS-11).
  * Each scenario is drawn `--draws` times (3 by default) and fails if any draw fails (OPS-11).
- * Usage: `pnpm evals [--full] [--draws 3] [--cap-eur 6] [--transcripts <dir>] [--file evals/adversarial/asks-if-bot.yaml]
+ * Conversations are played `--concurrency` at a time (4 by default, `EVALS_CONCURRENCY` too; 1 is one after the
+ * other), reported in the order of their files, and never so many that the cap could be passed (`runScheduled`).
+ * Usage: `pnpm evals [--full] [--draws 3] [--cap-eur 6] [--concurrency 4] [--transcripts <dir>] [--file evals/adversarial/asks-if-bot.yaml]
  * [--match compliment-]
  * [--persona-from-crm [--creator <id>]]` (the path from the repository root), with
  * LLM_XAI_API_KEY in the environment, or `--key-from-crm`: the keys saved in Réglages › Modèles IA of the database
@@ -54,10 +56,12 @@ import { proposalsOfRead } from '../modules/fans/index';
 import { crmKeys, readOnlyAdminDb } from './crm-read';
 import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
+import { createCostMeter } from './evals/cost-meter';
 import { afterTurn, beforeTurn, type DialogueState, type TurnLeft } from './evals/dialogue';
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
+import { CONCURRENCY_HELP, concurrencyOf, createWorstCase, runScheduled } from './evals/schedule';
 import { scriptsInputOf } from './evals/scripts-input';
 import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow } from './evals/situation';
 
@@ -83,6 +87,7 @@ const { values } = parseArgs({
     draws: { type: 'string', default: String(DEFAULT_DRAWS) },
     'cap-eur': { type: 'string', default: String(EVALS_CAP_EUR) },
     transcripts: { type: 'string' },
+    concurrency: { type: 'string' },
   },
 });
 const drawsArg = z.coerce.number().int().min(1).max(5).safeParse(values.draws);
@@ -98,6 +103,11 @@ if (!capArg.success) {
   process.exit(1);
 }
 const capEur = capArg.data;
+const concurrency = concurrencyOf(values.concurrency, process.env['EVALS_CONCURRENCY']);
+if (concurrency === undefined) {
+  console.error(`evals --concurrency (ou EVALS_CONCURRENCY) : ${CONCURRENCY_HELP}.`);
+  process.exit(1);
+}
 
 const credentials = readProviderCredentials(
   values['key-from-crm'] ? { ...process.env, ...(await crmKeys('evals --key-from-crm')) } : process.env,
@@ -184,11 +194,13 @@ const persona = values['persona-from-crm']
   ? await crmPersona()
   : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.6.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
+// Each conversation's own cost, though several run at once: what the next ones are held at (`createWorstCase`).
+const meter = createCostMeter(createInMemoryCallLog(), config.dailyBudget.usdPerEur);
 const gateway = createLlmGateway({
   config,
   credentials,
   resolveModel: createModelResolver(credentials),
-  log: createInMemoryCallLog(),
+  log: meter.log,
   // Its own cap: an eval run never eats into the fans' day, and stops at a few euros.
   dailyCapEur: () => capEur,
 });
@@ -479,7 +491,11 @@ async function runTurn(
 }
 
 /** A draw of the whole scenario: its first message, then each of `then`, every answer checked and judged. */
-async function run(scenario: Scenario, lines: string[], prefix: string): Promise<Draw> {
+async function run(
+  scenario: Scenario,
+  lines: string[],
+  prefix: string,
+): Promise<{ readonly draw: Draw; readonly turnsPlayed: number }> {
   let state = initialState(scenario);
   const failures: string[] = [];
   const scores: Record<string, number[]> = {};
@@ -487,8 +503,10 @@ async function run(scenario: Scenario, lines: string[], prefix: string): Promise
     { after_minutes: 0, event: undefined, inbound: scenario.inbound, expect: scenario.expect },
     ...scenario.then,
   ];
+  let turnsPlayed = 0;
   for (const [index, turn] of turns.entries()) {
     if (index > 0) state = beforeTurn(state, turn.after_minutes, turn.event);
+    turnsPlayed += 1;
     const tag = turns.length > 1 ? `${prefix}tour ${String(index + 1)} : ` : prefix;
     const { outcome, scores: turnScores, left } = await runTurn(scenario, state, turn.inbound, index === 0);
     const turnFailures = checkScenario({ expect: turn.expect }, outcome);
@@ -514,8 +532,11 @@ async function run(scenario: Scenario, lines: string[], prefix: string): Promise
   }
   // A draw's score per criterion is its weakest answer: one bad turn is a bad conversation.
   return {
-    failures,
-    scores: Object.fromEntries(Object.entries(scores).map(([c, list]) => [c, Math.min(...list)])),
+    draw: {
+      failures,
+      scores: Object.fromEntries(Object.entries(scores).map(([c, list]) => [c, Math.min(...list)])),
+    },
+    turnsPlayed,
   };
 }
 
@@ -530,68 +551,135 @@ const transcripts = resolve(
 mkdirSync(transcripts, { recursive: true });
 console.log(`Transcriptions : ${relative(ROOT, transcripts) || transcripts}`);
 
-const results: ScenarioResult[] = [];
-const minima = new Map<string, Readonly<Record<string, number>>>();
-let isCapReached = false;
-for (const path of files) {
+/** A file of `evals/` as the pass plays it: a card read, a scenario, or a file that could not be read. */
+type Job =
+  | { readonly kind: 'unreadable'; readonly file: string; readonly message: string }
+  | { readonly kind: 'card'; readonly file: string; readonly card: CardScenario }
+  | { readonly kind: 'scenario'; readonly file: string; readonly scenario: Scenario };
+
+/** A job played: its result, and what the console shows of it, printed in one go so two never mix their lines. */
+interface Played {
+  readonly result: ScenarioResult;
+  readonly lines: readonly string[];
+  readonly minima?: Readonly<Record<string, number>>;
+  readonly isCapReached: boolean;
+}
+
+/** Read before any is played; a scenario of the full tier is left out of a smoke pass. */
+function jobOf(path: string): Job | undefined {
   // Always with `/`: Windows writes `card\…`, and the card suite is told by its prefix.
   const file = relative(EVALS, path).split(sep).join('/');
-  if (gateway.health().budget.state === 'reached') {
-    isCapReached = true;
-    break;
-  }
-  if (file.startsWith(`${CARD_SUITE}/`)) {
-    let card: CardScenario;
-    try {
-      card = readCardScenario(readFileSync(path, 'utf8'));
-    } catch (error) {
-      results.push({
-        file,
-        failures: [`fichier illisible : ${error instanceof Error ? error.message : 'erreur'}`],
-        scores: {},
-      });
-      continue;
-    }
-    if (card.tier === 'full' && !values.full && values.file === undefined) continue;
-    const { failures, values: read } = await readCard(card);
-    results.push({ file, failures, scores: {} });
-    console.log(`${failures.length === 0 ? 'ok ' : 'KO '} ${file}`);
-    for (const line of read) console.log(`      ${line}`);
-    for (const failure of failures) console.log(`      ✗ ${failure}`);
-    continue;
-  }
-  let scenario: Scenario;
+  const isLeftOut = (tier: Scenario['tier']): boolean =>
+    tier === 'full' && !values.full && values.file === undefined;
   try {
-    scenario = readScenario(readFileSync(path, 'utf8'));
-  } catch (error) {
-    results.push({
-      file,
-      failures: [`fichier illisible : ${error instanceof Error ? error.message : 'erreur'}`],
-      scores: {},
-    });
-    continue;
-  }
-  if (scenario.tier === 'full' && !values.full && values.file === undefined) continue;
-  minima.set(file, scenario.expect.voice?.judge ?? {});
-  const drawn: Draw[] = [];
-  const lines: string[] = [];
-  for (let index = 0; index < draws; index += 1) {
-    if (index > 0 && gateway.health().budget.state === 'reached') {
-      isCapReached = true;
-      break;
+    if (file.startsWith(`${CARD_SUITE}/`)) {
+      const card = readCardScenario(readFileSync(path, 'utf8'));
+      return isLeftOut(card.tier) ? undefined : { kind: 'card', file, card };
     }
-    drawn.push(await run(scenario, lines, draws > 1 ? `[${String(index + 1)}] ` : ''));
+    const scenario = readScenario(readFileSync(path, 'utf8'));
+    return isLeftOut(scenario.tier) ? undefined : { kind: 'scenario', file, scenario };
+  } catch (error) {
+    return { kind: 'unreadable', file, message: error instanceof Error ? error.message : 'erreur' };
   }
+}
+
+const jobs = files.flatMap((path) => {
+  const job = jobOf(path);
+  return job === undefined ? [] : [job];
+});
+
+const worstCase = createWorstCase();
+
+async function playCard(file: string, card: CardScenario): Promise<Played> {
+  const { failures, values: read } = await readCard(card);
+  return {
+    result: { file, failures, scores: {} },
+    lines: [
+      `${failures.length === 0 ? 'ok ' : 'KO '} ${file}`,
+      ...read.map((line) => `      ${line}`),
+      ...failures.map((failure) => `      ✗ ${failure}`),
+    ],
+    isCapReached: false,
+  };
+}
+
+async function playScenario(file: string, scenario: Scenario): Promise<Played> {
+  const { value, costEur } = await meter.measure(async () => {
+    const drawn: Draw[] = [];
+    const lines: string[] = [];
+    let turnsPlayed = 0;
+    let isCapReached = false;
+    for (let index = 0; index < draws; index += 1) {
+      if (index > 0 && gateway.health().budget.state === 'reached') {
+        isCapReached = true;
+        break;
+      }
+      const played = await run(scenario, lines, draws > 1 ? `[${String(index + 1)}] ` : '');
+      drawn.push(played.draw);
+      turnsPlayed += played.turnsPlayed;
+    }
+    return { drawn, lines, turnsPlayed, isCapReached };
+  });
+  const { drawn, lines, turnsPlayed, isCapReached } = value;
+  worstCase.observe(costEur, turnsPlayed);
   const result = mergeDraws(file, drawn);
-  results.push(result);
   const passed = drawn.filter((draw) => draw.failures.length === 0).length;
   const mark = result.failures.length === 0 ? 'ok ' : 'KO ';
-  console.log(`${mark} ${file}${draws > 1 ? ` (${String(passed)}/${String(drawn.length)} tirages)` : ''}`);
   // Her words go to a file of `.scratch/` (ignored by git); the console shows them only for the made-up persona.
   writeFileSync(resolve(transcripts, `${file.replaceAll('/', '__')}.txt`), `${lines.join('\n')}\n`);
-  if (!values['persona-from-crm']) for (const line of lines) console.log(line);
-  for (const failure of result.failures) console.log(`      ✗ ${failure}`);
+  return {
+    result,
+    lines: [
+      `${mark} ${file}${draws > 1 ? ` (${String(passed)}/${String(drawn.length)} tirages)` : ''}`,
+      ...(values['persona-from-crm'] ? [] : lines),
+      ...result.failures.map((failure) => `      ✗ ${failure}`),
+    ],
+    minima: scenario.expect.voice?.judge ?? {},
+    isCapReached,
+  };
 }
+
+function play(job: Job): Promise<Played> {
+  if (job.kind === 'card') return playCard(job.file, job.card);
+  if (job.kind === 'scenario') return playScenario(job.file, job.scenario);
+  return Promise.resolve({
+    result: { file: job.file, failures: [`fichier illisible : ${job.message}`], scores: {} },
+    lines: [],
+    isCapReached: false,
+  });
+}
+
+const results: ScenarioResult[] = [];
+const minima = new Map<string, Readonly<Record<string, number>>>();
+let isDrawCut = false;
+const scheduled = await runScheduled<Job, Played>({
+  jobs,
+  concurrency,
+  capEur,
+  spentEur: () => gateway.health().budget.spentEur,
+  // A card is one read; a scenario, each turn of each draw.
+  reserveEur: (job) =>
+    job.kind === 'unreadable'
+      ? 0
+      : worstCase.reserveEur(job.kind === 'card' ? 1 : draws * (1 + job.scenario.then.length)),
+  run: play,
+  // A conversation that threw fails alone; the others are played, and the pass fails as it did when it stopped.
+  failed: (job, error) => {
+    const failure = `erreur : ${error instanceof Error ? error.message : 'inconnue'}`;
+    return {
+      result: { file: job.file, failures: [failure], scores: {} },
+      lines: [`KO  ${job.file}`, `      ✗ ${failure}`],
+      isCapReached: false,
+    };
+  },
+  onReady: (played) => {
+    results.push(played.result);
+    if (played.minima !== undefined) minima.set(played.result.file, played.minima);
+    isDrawCut ||= played.isCapReached;
+    for (const line of played.lines) console.log(line);
+  },
+});
+const isCapReached = scheduled.isCapReached || isDrawCut;
 
 if (isCapReached) {
   console.error(

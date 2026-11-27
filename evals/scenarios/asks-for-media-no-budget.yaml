@@ -1,5 +1,7 @@
-# Il demande lui-même du contenu payant : seul ce cas lève le délai. Fan et messages fictifs (ADR 0010).
-description: Il demande s’il y a des vidéos ; c’est lui qui demande, la politique peut proposer.
+# Il demande lui-même des vidéos plus coquines, un script proposé il y a 2 h et rien acheté ce soir. Jamais deux scripts
+# le même soir (ADR 0158 § 42) : son envie ne lève pas le délai, et sans achat ce soir ni sur-mesure ni cam ne lui sont
+# poussés ; le tour suit son cours normal. Fan et messages fictifs (ADR 0010).
+description: Il demande s’il y a des vidéos plus coquines sans rien avoir acheté ce soir ; pas de second script le même soir, elle lui répond sans pousser de sur-mesure.
 persona_version: demo
 fan_facts:
   - 'prénom : Florian (fictif)'
@@ -22,4 +24,5 @@ expect:
     bubbles_max: 4
     must_not_match:
       - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
-      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b
+      # « je viens » d’une rencontre, jamais le passé récent : « je viens (à peine / juste / tout juste) de » + un infinitif.
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens(?!\s+(?:(?:à|a)\s+peine\s+|juste\s+|tout\s+juste\s+)?(?:de\s+|d['’])(?:(?:me|te|se|le|la|les|lui|en|y)\s+|[mtsl]['’])?\p{L}+(?:er|ir|re)\b)|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

@@ -2,11 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
+  checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
+  meetingCommitment,
   touchesTerm,
+  asksPrice,
+  sumsMinorOf,
   type GuardCode,
+  type GuardContext,
 } from '../guards';
 
 function codes(bubbles: string[], forbiddenTerms: string[] = []): GuardCode[] {
@@ -83,6 +90,38 @@ describe('voice guards', () => {
     expect(codes(['Dors bien toi', 'on se retrouve demain 😘'])).toEqual([]);
     expect(codes(['Bonne nuit, on se retrouve demain'])).toEqual([]);
     expect(codes(['on se retrouve demain ici 😌'])).toEqual([]);
+  });
+
+  it('reads « on se retrouve demain » with a goodnight as a chat goodbye in her meeting commitment too, both ways', () => {
+    expect(codes(['bonne nuit, on se retrouve demain'])).toEqual([]);
+    expect(
+      meetingCommitment('on se retrouve demain', undefined, 'dors bien toi on se retrouve demain'),
+    ).toBeUndefined();
+    expect(codes(['bonne nuit, on se retrouve demain à la gare'])).toContain('meeting_promise');
+    expect(codes(['bonne nuit, demain 20h chez moi'])).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, demain 20h chez moi')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve demain à la gare')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve demain à 20 h')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve samedi')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se voit demain')).toBeDefined();
+    expect(meetingCommitment('on se retrouve demain')).toBeDefined();
+  });
+
+  it('takes « bonne nuit, on se retrouve demain » as her yes after a concrete meeting he proposed (Sécurité, #1048)', () => {
+    const proposed = 'on se voit demain 18h à la gare ?';
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', proposed)).toBeDefined();
+    expect(
+      checkVoiceOutput(['bonne nuit, on se retrouve demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: proposed,
+      }).map((v) => v.code),
+    ).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(meetingCommitment('bonne nuit à demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(
+      checkVoiceOutput(['bonne nuit à demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: 'bonne nuit ma belle',
+      }),
+    ).toEqual([]);
   });
 
   it('still blocks a real meeting said with a goodnight', () => {
@@ -266,8 +305,9 @@ describe('voice guards', () => {
     }
     expect(codes(['Espèce de radin'])).toContain('contempt');
     expect(codes(['T’es qu’un mendiant'])).toContain('contempt');
-    expect(codes(['Sale menteuse'])).toContain('contempt');
+    expect(codes(['Quel crevard'])).toContain('contempt');
     expect(codes(['Petit menteur va 😏'])).toEqual([]);
+    expect(codes(['Sale menteuse'])).toEqual([]);
     expect(codes(['T’inquiète, t’as rien à payer'])).toContain('payment_lie');
     expect(codes(['Pas besoin d’argent avec moi'])).toContain('payment_lie');
     expect(codes(['T’as rien à payer pour me parler 😌'])).toEqual([]);
@@ -386,6 +426,232 @@ describe('voice guards', () => {
     ])
       expect(codes([text])).toContain('minor_reference');
     expect(codes(['Salut beau gosse 😏'])).not.toContain('minor_reference');
+  });
+
+  it('lets an adult fantasy of making a baby through, and blocks a minor named on a sexual turn (Charles 27/11 at 0:06)', () => {
+    for (const text of [
+      'fais-moi un bébé',
+      'tu vas me mettre enceinte',
+      'je veux porter ton enfant',
+      'je veux que tu me fasses un enfant',
+      'mi farai un bambino',
+      'quiero que me hagas un hijo',
+    ]) {
+      expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    }
+    // Outside the sexual register, her family, his and her memories pass.
+    for (const text of [
+      't’as des enfants ?',
+      'tes gosses ce week-end ?',
+      'quand j’étais ado',
+      'un détail mineur',
+    ])
+      expect(codes([text]), text).not.toContain('minor_reference');
+    // On a sexual turn, a child or a minor named is blocked; a comparison, everywhere.
+    for (const text of ['je pense à un enfant', 'comme une ado', 'enfant, j’étais déjà comme ça'])
+      expect(
+        checkYouthWords([text], true).map((v) => v.code),
+        text,
+      ).toContain('minor_reference');
+    expect(codes(['comme une gamine'])).toContain('minor_reference');
+  });
+
+  it('lets a school outfit between adults through, never her or him as a minor (Charles 27/11)', () => {
+    for (const text of [
+      'je mets ma jupe d’écolière pour toi',
+      'mon uniforme scolaire te plaît ?',
+      'my school uniform is on',
+    ])
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    for (const text of [
+      'je suis une écolière',
+      'je joue la lycéenne',
+      'j’ai l’air d’avoir 15 ans',
+      'en jupe d’écolière, je suis une écolière sage',
+    ])
+      expect(isBlocked(checkYouthWords([text], true)), text).toBe(true);
+  });
+
+  it('reads « petit garçon » said to him as a soft name, his game with humiliation, and a child’s role as blocking (Charles 27/11, Sécurité #1043)', () => {
+    const soft = (bubble: string, context: GuardContext = {}) =>
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => [v.code, v.severity]);
+    expect(soft('vilain garçon va 😏')).toEqual([['belittling_name', 'soft']]);
+    expect(soft('t’es qu’un petit garçon')).toEqual([['belittling_name', 'soft']]);
+    expect(soft('t’es qu’un petit garçon', { humiliationWanted: true })).toEqual([]);
+    expect(checkYouthWords(['mon petit garçon, viens là'], true)).toEqual([]);
+    for (const bubble of [
+      'joue le petit garçon pour maman',
+      'sois mon petit garçon',
+      'maman va gronder son vilain garçon',
+    ])
+      expect(soft(bubble, { humiliationWanted: true }), bubble).toContainEqual([
+        'belittling_name',
+        'blocking',
+      ]);
+    for (const bubble of [
+      'on dirait celle d’un petit garçon',
+      'comme un petit garçon',
+      't’as un corps de petit garçon',
+      'tes mains de petit garçon',
+      't’as des mains d’enfant',
+      'ton sexe de petit garçon',
+      't’as un sexe d’enfant',
+      'tes fesses de petite fille',
+    ])
+      expect(soft(bubble, { humiliationWanted: true }), bubble).toContainEqual([
+        'minor_reference',
+        'blocking',
+      ]);
+  });
+
+  it('blocks guilt that serves a purchase, and keeps the rest of guilt_trip soft (Sécurité, #1043)', () => {
+    const guilt = (bubble: string) =>
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)
+        .filter((v) => v.code === 'guilt_trip')
+        .map((v) => v.severity);
+    for (const bubble of [
+      'après tout ce que je t’ai montré tu prends même pas ça',
+      'si tu tenais à moi tu la prendrais',
+      'tu me déçois, tu l’ouvres même pas',
+      'je suis déçue que tu prennes pas ma vidéo',
+    ])
+      expect(guilt(bubble), bubble).toEqual(['blocking']);
+    for (const bubble of ['tu me déçois', 'je suis déçue, il pleut', 'tu me déçois, t’as oublié mon prénom'])
+      expect(guilt(bubble), bubble).toEqual(['soft']);
+  });
+
+  it('reads « mon adresse » in words as soft, and a real address as contact_info (Charles 27/11)', () => {
+    const read = (bubble: string) =>
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).map((v) => [v.code, v.severity]);
+    expect(read('mon adresse ? ici c’est très bien')).toEqual([['address_word', 'soft']]);
+    expect(read('ton adresse mail tu la gardes')).toEqual([['address_word', 'soft']]);
+    for (const bubble of [
+      'mon adresse c’est 12 rue des Lilas',
+      '4 bis avenue Foch',
+      '3 impasse du Moulin',
+      '8 place de la Mairie',
+      '3 allée des Tilleuls',
+      '7 chemin d’en Haut',
+      '8 avenue Foch',
+      '12 Rue des Lilas',
+      'écris à lina@exemple.test',
+      'mon 06 12 34 56 78',
+    ])
+      expect(read(bubble), bubble).toContainEqual(['contact_info', 'blocking']);
+    // A number then « cours », « place » or « route » is life, not an address (Sécurité, #1054).
+    for (const bubble of [
+      'j’ai 2 cours demain matin',
+      'garde moi 1 place à côté de toi',
+      'il me reste 3 route à faire',
+      '2 avenue c’est trop loin',
+      'j’ai fait 10 allée retour',
+      '5 chemin différents',
+    ])
+      expect(read(bubble), bubble).not.toContainEqual(['contact_info', 'blocking']);
+  });
+
+  it('reads stage directions as soft, and lets them through when her sheet allows them (Charles 27/11)', () => {
+    expect(
+      checkVoiceOutput(['*rougit* arrête'], DEFAULT_GUARD_SETTINGS).map((v) => [v.code, v.severity]),
+    ).toEqual([['stage_direction', 'soft']]);
+    expect(
+      checkVoiceOutput(['*rougit* arrête'], { ...DEFAULT_GUARD_SETTINGS, stageDirections: true }),
+    ).toEqual([]);
+  });
+
+  it('blocks an intimate part compared to a child’s, sexual message or not, and lets « petit » alone through (Sécurité, #1054)', () => {
+    for (const bubble of [
+      'ton sexe de petit garçon',
+      't’as un sexe d’enfant',
+      'tes fesses de petite fille',
+      'ton zizi de petit garçon',
+      'your little boy body',
+      'your little boy penis',
+      'a little girl vagina',
+      'little girl breasts',
+      'your little boy butt',
+      'you have a kid’s body',
+      "a kid's body",
+    ]) {
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+      expect(isBlocked(checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)), bubble).toBe(true);
+    }
+    for (const bubble of ['tes petites fesses', 'ton petit sexe 😏', 'your little body']) {
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+      expect(checkYouthWords([bubble], true), bubble).toEqual([]);
+    }
+  });
+
+  it('never lets her say she is under 18, and lets a length of time or her past through (Sécurité, #1054)', () => {
+    for (const bubble of [
+      'j’ai 14 ans',
+      'j’ai 16 ans tu sais',
+      'en tenue de collégienne j’ai 14 ans',
+      'j’ai 16 ans dans ma tête',
+      'I’m 16',
+      'ho 16 anni',
+      'tengo 16 años',
+    ])
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+    for (const bubble of [
+      'j’ai 15 ans d’expérience',
+      'à 16 ans j’étais timide',
+      'quand j’avais 16 ans, je dansais',
+      'j’ai 16 ans de boîte',
+      'j’ai 25 ans',
+      'I’m 5 minutes away',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+  });
+
+  it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
+    for (const text of ['c’est mignon, t’as zoomé ? 😂', 'range ça, je cherche encore 😅'])
+      expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
+    expect(codes(['on dirait celle d’un enfant'])).toContain('minor_reference');
+  });
+
+  it('blocks a word that says she is young in a sexual message, in four languages, and lets it be outside (Charles 26/11, 27/11)', () => {
+    for (const text of [
+      'je suis ta petite fille sage',
+      'ta gamine t’attend',
+      'ton ado est là',
+      'ta lycéenne t’attend',
+      'ton écolière t’attend',
+      'ta jeunette rien que pour toi',
+      'ta lolita t’attend',
+      'j’ai l’air d’avoir 15 ans',
+      'your little girl wants you',
+      'sono la tua ragazzina',
+      'soy tu niña',
+      'tu colegiala te espera',
+    ]) {
+      const violations = checkYouthWords([text], true);
+      expect(
+        violations.map((v) => v.code),
+        text,
+      ).toContain('youth_word_in_sex');
+      expect(isBlocked(violations)).toBe(true);
+    }
+    // Explicit by its own words: sexual, whatever the turn.
+    expect(checkYouthWords(['ta jeunette toute nue'], false).map((v) => v.code)).toEqual([
+      'youth_word_in_sex',
+    ]);
+    // « Petite » before a part of the body, a piece of clothing, a thing or a sweet word; a figure of speech.
+    for (const text of [
+      'ta petite coquine est toute à toi',
+      'mes petits seins n’attendent que toi',
+      'je garde ma petite culotte pour toi',
+      'viens mon petit cœur, je te veux',
+      'toute jeune dans ma tête',
+      'la mia piccola',
+      'ven aquí nena',
+      'tu connais Nina ?',
+    ])
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    // Outside the sexual register, her words stay hers.
+    expect(checkYouthWords(['je t’envoie une petite photo de mon café ☕'], false)).toEqual([]);
+    expect(checkYouthWords(['ma petite sœur passe ce soir'], false)).toEqual([]);
   });
 
   it('asks for a regeneration on a pet name she never gives, and lets hers through', () => {
@@ -584,5 +850,402 @@ describe('checkExplicit', () => {
     ]) {
       expect(checkExplicit([bubble])).toEqual([]);
     }
+  });
+});
+
+describe('never an extra to unlock or close a purchase (Charles 26/11 at 23:44, `purchase_sweetener`)', () => {
+  it('blocks an extra tied to a purchase, in French, English, Italian and Spanish', () => {
+    for (const bubble of [
+      'si tu prends celle-là je t’en offre une autre 😘',
+      'Si tu l’achètes je te mets un petit bonus',
+      'je rajoute une petite surprise si tu achètes',
+      'un bonus si tu l’ouvres ce soir',
+      'prends-la et je t’en offre une 😏',
+      'deux pour le prix d’une, rien que pour toi',
+      'if you buy it I’ll throw in another one',
+      'buy this one and get a free one',
+      'se lo compri te ne regalo un altro',
+      'si lo compras te regalo otro',
+      'achète et t’auras une surprise',
+      'pour tout achat une photo en plus',
+    ]) {
+      expect(codes([bubble]), bubble).toContain('purchase_sweetener');
+    }
+  });
+
+  it('lets his gift, a surprise of hers with no purchase and her thanks for his wishlist pass', () => {
+    for (const bubble of [
+      'merci pour ton cadeau 🥰',
+      'je t’ai préparé une surprise pour ce soir 😏',
+      'merci pour le cadeau de ma wishlist, tu es adorable',
+      'si tu prends le temps de me répondre, ça me fait plaisir',
+      'thank you for the gift 💕',
+    ]) {
+      expect(codes([bubble]), bubble).not.toContain('purchase_sweetener');
+    }
+  });
+
+  it('blocks: rewritten once, then a human', () => {
+    expect(
+      isBlocked(checkVoiceOutput(['si tu le prends je t’en offre une autre'], DEFAULT_GUARD_SETTINGS)),
+    ).toBe(true);
+  });
+});
+
+describe('her degrading words (Charles 26/11, `degrading_word`)', () => {
+  const settings = { ...DEFAULT_GUARD_SETTINGS, degradingWords: ['motinterdit', 'autre mot'] };
+  const found = (bubbles: string[]) => checkVoiceOutput(bubbles, settings).map((v) => [v.code, v.severity]);
+
+  it('blocks a word of her persona’s list, whole words only, accents and case ignored', () => {
+    expect(found(['T’es mon MOTINTERDIT'])).toEqual([['degrading_word', 'blocking']]);
+    expect(found(['un Autre-Mot pour toi'])).toEqual([['degrading_word', 'blocking']]);
+    expect(found(['un motinterditable'])).toEqual([]);
+  });
+
+  it('checks nothing without a list: the words are never in the repository', () => {
+    expect(checkVoiceOutput(['T’es mon motinterdit'], DEFAULT_GUARD_SETTINGS)).toEqual([]);
+  });
+});
+
+describe('written sounds of pleasure only at the frankest rung (Charles 26/11, `moan_below_peak`)', () => {
+  it('flags them softly below it, lets them at its peak', () => {
+    expect(checkMoans(['mmmh continue', 'aaah'], false).map((v) => [v.code, v.severity])).toEqual([
+      ['moan_below_peak', 'soft'],
+      ['moan_below_peak', 'soft'],
+    ]);
+    expect(checkMoans(['mmmh continue'], true)).toEqual([]);
+  });
+
+  it('a laugh, a plain oh or a thinking hum are no moans', () => {
+    expect(checkMoans(['haha t’es bête', 'oh tu crois ?', 'hmm je sais pas', 'ah bon'], false)).toEqual([]);
+  });
+});
+
+describe('what kills the sexting while her script runs (Charles 26/11, `mood_killer`)', () => {
+  it('flags softly her pets, his partner, another man and money trouble', () => {
+    for (const bubble of [
+      'mon chat me regarde là 😹',
+      'et ta copine elle dort ?',
+      'mon ex faisait pareil',
+      'j’ai mon loyer à payer demain',
+      'my dog is barking',
+    ]) {
+      expect(
+        checkMoodKillers([bubble], false).map((v) => [v.code, v.severity]),
+        bubble,
+      ).toEqual([['mood_killer', 'soft']]);
+    }
+  });
+
+  it('lets another man pass when a fantasy of his asks for one, and leaves the rest', () => {
+    expect(checkMoodKillers(['imagine un autre homme qui nous regarde'], true)).toEqual([]);
+    expect(checkMoodKillers(['imagine un autre homme qui nous regarde'], false)).toHaveLength(1);
+    expect(checkMoodKillers(['ma chatte te réclame', 'continue comme ça'], false)).toEqual([]);
+  });
+});
+
+describe('guards read in context, not on a word alone (Charles 27/11, banc de la Sécurité)', () => {
+  const raised = (bubble: string) => checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).map((v) => v.code);
+  it.each([
+    [
+      'contact_info',
+      [
+        'je scrollais insta',
+        'j’ai pas snap désolé',
+        't’as vu ma story insta ?',
+        'discord c’est pour les gamers non ?',
+        'whatsapp è comodo',
+        'telegram es para frikis',
+        'ven aquí conmigo',
+        'vieni qui da me',
+        'no tengo instagram',
+        'non uso whatsapp',
+      ],
+      [
+        'discord c’est lina_92',
+        'snap : linaxx',
+        'ajoute-moi sur snap',
+        'viens sur telegram',
+        'mon insta c’est lina.xx',
+        'rejoins-moi sur discord',
+        'je suis sur insta',
+        'écris-moi @lina_xx',
+        'scrivimi su whatsapp',
+        'aggiungimi su snap',
+        'escríbeme por telegram',
+        'agrégame en insta',
+      ],
+    ],
+    [
+      'off_platform_payment',
+      [
+        'tu bosses dans la crypto ?',
+        'j’attends le virement de ma paie',
+        'pas de paypal ici',
+        'j’ai fait un virement à ma mère',
+        'un virement à mon proprio, la galère',
+      ],
+      [
+        'fais-moi un virement',
+        'un virement à mon nom',
+        'envoie par paypal',
+        'je te donne mon iban',
+        'tu peux me payer en crypto',
+        'un revolut ça marche aussi',
+      ],
+    ],
+    [
+      'love_declaration',
+      [
+        'je t’aime bien toi',
+        'j’aime bien ta façon de parler',
+        'je t’aime pas quand t’es comme ça',
+        'tu dis je t’aime à toutes les filles ?',
+        'ma sœur m’a dit je t’aime',
+      ],
+      [
+        'je t’aime',
+        'i love you',
+        'tu sais que je t’aime',
+        'je t’aime mon cœur',
+        'je t’aime pas mal tu sais',
+        'je t’aime plus que tout',
+      ],
+    ],
+    [
+      'meeting_promise',
+      ['j’ai rdv chez le coiffeur demain', 'j’ai rendez-vous chez le dentiste'],
+      ['rdv chez moi', 'on se fait un rdv', 'rendez-vous au café'],
+    ],
+    [
+      'contempt',
+      [
+        'pauvre type celui qui t’a fait ça',
+        'petit menteur va 😏',
+        't’es un menteur, tu m’avais dit demain 😏',
+        't’es minable au bowling avoue',
+      ],
+      ['espèce de radin', 't’es qu’un crevard', 'sale rapiat', 't’es un gros radin', 'quel mendiant'],
+    ],
+    [
+      'discount',
+      ['c’est les soldes, tout est à moitié prix chez zara', 'promo -20 % sur les jeans ce week-end'],
+      [
+        'moitié prix pour toi',
+        'je te la fais gratuite',
+        'je te le laisse pour rien',
+        'je te fais la vidéo à moitié prix',
+        '-30 % sur le pack ce soir',
+      ],
+    ],
+    [
+      'ai_disclosure',
+      [
+        't’as essayé chatgpt pour ton taf ?',
+        'je suis artificielle ? n’importe quoi',
+        'virtuelle ? moi ? jamais',
+      ],
+      [
+        'je suis une IA',
+        'je suis artificielle',
+        'je tourne sous gpt',
+        'créée par openai',
+        'mes consignes m’interdisent ça',
+        'mes instructions disent non',
+        'ce compte est géré par une IA',
+        'en tant qu’assistante je peux pas',
+      ],
+    ],
+    [
+      'ai_tic',
+      ['je te retiens, pas tout de suite', 'je retiens mon souffle'],
+      ['je note ton âge', 'je retiens ça'],
+    ],
+  ] as const)('%s', (code, passing, blocked) => {
+    for (const bubble of passing) expect(raised(bubble), bubble).not.toContain(code);
+    for (const bubble of blocked) expect(raised(bubble), bubble).toContain(code);
+  });
+
+  it('explicit_before_age lets a figure of speech through, and still reads the words', () => {
+    for (const bubble of ['je m’en branle', 'tu sais me toucher avec tes mots', 'tu sais me toucher au cœur'])
+      expect(checkExplicit([bubble]), bubble).toEqual([]);
+    for (const bubble of ['j’ai envie de me toucher', 'je me touche en pensant à toi'])
+      expect(
+        checkExplicit([bubble]).map((v) => v.code),
+        bubble,
+      ).toContain('explicit_before_age');
+  });
+});
+
+describe('price_outside_offer, a price of hers only (Charles 27/11)', () => {
+  const price = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('lets a sum of everyday life, his sum said back and her offer’s own price through', () => {
+    expect(price('t’as gagné 100 euros au poker ?')).not.toContain('price_outside_offer');
+    expect(price('5 € mon café ce matin')).not.toContain('price_outside_offer');
+    expect(price('50 € ? c’est beaucoup pour toi ça 😏', { fanAmountsMinor: [5_000] })).not.toContain(
+      'price_outside_offer',
+    );
+    expect(price('pour toi c’est 15 euros', { allowedPriceMinor: 1_500 })).not.toContain(
+      'price_outside_offer',
+    );
+  });
+
+  it('blocks a price for what she sells that is not her offer’s, a sum agreed to, and any made-to-measure priced', () => {
+    expect(price('pour toi c’est 15 euros')).toContain('price_outside_offer');
+    expect(price('pour toi c’est 12 euros', { allowedPriceMinor: 1_500 })).toContain('price_outside_offer');
+    expect(price('ok 10 euros', { allowedPriceMinor: 1_500, fanAmountsMinor: [1_000] })).toContain(
+      'price_outside_offer',
+    );
+    expect(price('ta vidéo perso c’est 50 €', { allowedPriceMinor: 5_000 })).toContain('price_outside_offer');
+    expect(price('je te fais une vidéo sur mesure pour 40 €')).toContain('price_outside_offer');
+  });
+
+  it('reads the sums he wrote', () => {
+    expect(sumsMinorOf('je te donne 20 € ou 12,50 euros, pas 30 balles')).toEqual([2_000, 1_250, 3_000]);
+  });
+});
+
+describe('a meeting she may only imagine (Charles 27/11)', () => {
+  it.each([
+    'imagine un week-end tous les deux dans un chalet',
+    'un jour peut-être, tu me ferais visiter',
+    'si on était dans un chalet je te garderais au chaud',
+    'imagine qu’on se voit, tu ferais quoi ?',
+    'on se voit au prochain live',
+    'samedi j’ai bossé toute la journée',
+    'je te réserve une surprise ce soir',
+    'je suis un peu réservée au début',
+    'je viens de rentrer, demain je bosse',
+    'j’adore Paris au printemps',
+  ])('lets the daydream « %s » through', (bubble) => {
+    expect(meetingCommitment(bubble)).toBeUndefined();
+    expect(codes([bubble])).not.toContain('meeting_promise');
+  });
+
+  it.each([
+    'on pourrait se voir samedi',
+    'un week-end tous les deux, le week-end prochain ?',
+    'on se retrouve la semaine pro',
+    'imagine qu’on se retrouve à Lyon',
+    'on pourrait organiser ça',
+    'je viens te voir',
+    'je pourrais venir te voir',
+    'je passe chez toi',
+    'réserve une chambre pour nous deux',
+    'je réserve l’hôtel',
+    'on se voit ?',
+    'on se voit quand ?',
+    'I’ll come see you',
+  ])('blocks the commitment « %s »', (bubble) => {
+    expect(codes([bubble])).toContain('meeting_promise');
+  });
+
+  it.each(['ok', 'avec plaisir', 'carrément 😍', 'Oui !'])(
+    'blocks her yes « %s » to a concrete proposal of his',
+    (bubble) => {
+      expect(meetingCommitment(bubble, 'samedi à Lyon ?')).toBeDefined();
+      expect(
+        checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, { fanLastMessage: 'on se voit samedi ?' }).map(
+          (v) => v.code,
+        ),
+      ).toContain('meeting_promise');
+    },
+  );
+
+  it('lets her yes through when he proposed no meeting, and her no when he did', () => {
+    expect(meetingCommitment('avec plaisir', 'tu m’envoies la suite ?')).toBeUndefined();
+    expect(meetingCommitment('ok', 'imagine un chalet tous les deux')).toBeUndefined();
+    expect(meetingCommitment('ok mais non, pas en vrai', 'samedi à Lyon ?')).toBeUndefined();
+    expect(meetingCommitment('haha t’es fou', 'samedi à Lyon ?')).toBeUndefined();
+  });
+
+  it('lets online, a dream or « ici » through over the whole sentence, and her everyday plans (Sécurité, #1043)', () => {
+    for (const bubble of [
+      'je viens chez toi dans mes rêves',
+      'on se voit demain ici mon cœur',
+      'on se retrouve ce soir sur reveal',
+      'on se voit ce soir en live ?',
+      'tu viens me voir demain sur mon live ?',
+      'je passe à paris demain pour un shooting',
+      'je réserve une table pour mon anniv avec mes copines',
+      'je cale mon réveil à 7h',
+      'on organise un live samedi',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('meeting_promise');
+    for (const bubble of [
+      'on se voit samedi',
+      'je viens te voir samedi',
+      'je réserve l’hôtel',
+      'on pourrait organiser ça',
+      'un verre toi et moi demain',
+      'je réserve une table pour nous deux samedi',
+      'on s’organise ?',
+      'on se voit samedi à lyon, ici il pleut',
+    ])
+      expect(codes([bubble]), bubble).toContain('meeting_promise');
+  });
+
+  it('reads his message as a proposal only when he asks or says « on », never in a dream or online', () => {
+    expect(meetingCommitment('ok trop bien', 'samedi je suis à lyon pour le taf')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'on se voit dans tes rêves ce soir ?')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'on se voit ce soir en live ?')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'samedi à lyon ?')).toBeDefined();
+    expect(meetingCommitment('ok', 'on se voit samedi')).toBeDefined();
+    expect(meetingCommitment('ok mais non', 'samedi à lyon ?')).toBeUndefined();
+  });
+});
+
+describe('a handle next to a network or a means, a price after he asked one (Sécurité, #1043)', () => {
+  const raised = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('blocks a network with a plausible handle in the same bubble, and lets the name alone through', () => {
+    for (const bubble of [
+      'insta, lina.xx',
+      'snap lina92 😘',
+      'cherche lina rose sur tiktok',
+      'tu me trouves sur insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    // The search verbs in Spanish, Italian and English, beside a network only.
+    for (const bubble of [
+      'búscame en insta',
+      'buscame en tiktok',
+      'busca lina rose en tiktok',
+      'cercami su insta',
+      'cerca lina rose su tiktok',
+      'find me on snap',
+      'look me up on insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    for (const bubble of [
+      'busco trabajo en madrid',
+      'busca un sitio tranquilo para cenar',
+      'cerco casa a roma',
+      'cerca di dormire un po',
+      'find me a good song for tonight',
+      'i find tiktok boring',
+    ])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
+    for (const bubble of ['je poste sur insta vers 21h30', 't’as vu ma story insta ?', 'je scrollais insta'])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
+  });
+
+  it('blocks a means of paying with an identifier, and lets the word alone through', () => {
+    expect(raised('paypal lina.xx@exemple.test')).toContain('off_platform_payment');
+    expect(raised('lydia lina_rose')).toContain('off_platform_payment');
+    expect(raised('pas de paypal ici')).not.toContain('off_platform_payment');
+  });
+
+  it('reads a sum alone, or a sum right after he asked a price, as a price of hers', () => {
+    expect(raised('15 euros')).toContain('price_outside_offer');
+    expect(raised('15€ 😘')).toContain('price_outside_offer');
+    expect(raised('ah ben 30 €, pas mal', { fanAskedPrice: true })).toContain('price_outside_offer');
+    expect(raised('15 euros', { allowedPriceMinor: 1_500 })).not.toContain('price_outside_offer');
+    expect(raised('j’ai payé 30 € mes places hier')).not.toContain('price_outside_offer');
+    expect(asksPrice('c’est combien ?')).toBe(true);
+    expect(asksPrice('tu fais quoi ce soir ?')).toBe(false);
   });
 });

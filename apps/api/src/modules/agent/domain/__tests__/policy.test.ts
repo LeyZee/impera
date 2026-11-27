@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   asksMoreSameEvening,
   keepsWarm,
+  maySuggestCustom,
   sameEvening,
   maySulk,
   offerableScripts,
   offerDecision,
   offerSignals,
+  saysNoMoneyNow,
   type OfferContext,
 } from '../policy';
 
@@ -266,13 +268,15 @@ describe('the same evening (passe 18, guide 26/11): at least her cooldown, never
   const limits = { cooldownHours: 10, minDesire: 0 };
   const now = new Date('2026-10-17T21:00:00Z'); // 23:00 in Paris
   const at = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
-  it('counts only his own asking within the same evening', () => {
-    const ask = (lastOfferAt: Date | null, fanAsksForPaid: boolean) =>
-      asksMoreSameEvening({ now, lastOfferAt, fanAsksForPaid, limits, timeZone: 'Europe/Paris' });
+  it('counts only his own asking within the evening he bought', () => {
+    const ask = (boughtAt: Date | null, fanAsksForPaid: boolean) =>
+      asksMoreSameEvening({ now, boughtAt, fanAsksForPaid, limits, timeZone: 'Europe/Paris' });
     expect(ask(at(1), true)).toBe(true);
     expect(ask(at(1), false)).toBe(false);
     expect(ask(at(7), true)).toBe(true);
     expect(ask(null, true)).toBe(false);
+    // Bought another evening: the next day where she lives, past her cooldown.
+    expect(ask(at(30), true)).toBe(false);
   });
 
   it('lasts her cooldown, and past it still until her next day', () => {
@@ -281,6 +285,53 @@ describe('the same evening (passe 18, guide 26/11): at least her cooldown, never
     // 11 h ago in Paris was 12:00 the same day: still the same day there.
     expect(sameEvening(now, at(11), 10, 'Europe/Paris')).toBe(true);
     expect(sameEvening(now, at(24), 10, 'Europe/Paris')).toBe(false);
+  });
+});
+
+describe('no money now: nothing paid pushed at him, a custom nor a cam (eval asks-for-media-no-budget)', () => {
+  const adult = { ageConfirmedAt: '2026-10-01T10:00:00Z' };
+
+  it('reads it on his message, or on a freeze for money trouble', () => {
+    expect(saysNoMoneyNow({ risks: ['no_budget'] })).toBe(true);
+    expect(saysNoMoneyNow({ risks: ['money_trouble'] })).toBe(true);
+    expect(
+      saysNoMoneyNow({
+        risks: [],
+        flags: { ...adult, salesFrozen: { reason: 'money_trouble', since: '2026-10-10T10:00:00Z' } },
+      }),
+    ).toBe(true);
+    expect(saysNoMoneyNow({ risks: [] })).toBe(false);
+    expect(saysNoMoneyNow({ risks: ['flirt'], flags: adult })).toBe(false);
+  });
+
+  it('suggests nothing made for him when he says he cannot pay now', () => {
+    expect(maySuggestCustom({ risks: [], flags: adult })).toBe(true);
+    expect(maySuggestCustom({ risks: ['no_budget'], flags: adult })).toBe(false);
+    expect(maySuggestCustom({ risks: ['money_trouble'], flags: adult })).toBe(false);
+  });
+
+  it('suggests nothing to a fan nobody may sell to', () => {
+    expect(maySuggestCustom({ risks: ['distress'], flags: adult })).toBe(false);
+    expect(maySuggestCustom({ risks: [], flags: { ...adult, doNotContact: true } })).toBe(false);
+    expect(
+      maySuggestCustom({
+        risks: [],
+        flags: { ...adult, salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00Z' } },
+      }),
+    ).toBe(false);
+  });
+
+  it('leaves the money-trouble freeze as it was: no script either, even when he asks', () => {
+    const frozen = {
+      ...base,
+      fanAsksForPaid: false,
+      flags: { ...adult, salesFrozen: { reason: 'money_trouble' as const, since: '2026-10-10T10:00:00Z' } },
+    };
+    expect(offerDecision(frozen)).toEqual({ allowed: false, reason: 'no_budget' });
+    expect(offerDecision({ ...base, risks: ['money_trouble'], fanAsksForPaid: true })).toEqual({
+      allowed: false,
+      reason: 'risk',
+    });
   });
 });
 

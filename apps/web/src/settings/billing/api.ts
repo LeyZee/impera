@@ -16,7 +16,6 @@ import {
   type CreateContractTextBody,
   type JournalAccounts,
   type UpdateBillingSettingsBody,
-  type ValidateBillingRegimeBody,
 } from '@impera/contracts';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useCallback } from 'react';
@@ -139,12 +138,6 @@ export const addContractText = (body: CreateContractTextBody): Promise<InvoiceOu
 
 export const addRegime = (body: CreateBillingRegimeBody): Promise<InvoiceOutcome<BillingRegime>> =>
   write('/v1/payroll/billing-regimes', 'POST', { json: body }, BillingRegimeSchema);
-
-export const validateRegime = (
-  regimeId: string,
-  body: ValidateBillingRegimeBody,
-): Promise<InvoiceOutcome<BillingRegime>> =>
-  write(`/v1/payroll/billing-regimes/${regimeId}/validation`, 'POST', { json: body }, BillingRegimeSchema);
 
 /** After a text or a regime is written: the lists read again, the contractors' files too (what they must accept). */
 export function useRefreshPayroll(): () => Promise<void> {

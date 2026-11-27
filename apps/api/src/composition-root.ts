@@ -420,7 +420,15 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const creatorLimits = wireCreatorLimits(shared);
-  const creatorMessages = wireCreatorMessages(shared, { allCreatorIds: persona.allCreatorIds });
+  // The agency's time zone, read by the service role when a job or a notice needs it, long after the planning is
+  // wired below: one door for every reader.
+  const agencyTimeZone = (): Promise<string> =>
+    withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx));
+  const creatorMessages = wireCreatorMessages(shared, {
+    allCreatorIds: persona.allCreatorIds,
+    notify: notifications.module.notify,
+    agencyTimeZone,
+  });
   const creatorDecisions = createCreatorDecisionsModule({
     db: shared.db,
     requireRole: shared.requireRole,
@@ -479,6 +487,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     requeue: invoiceRequeue,
     invoices: invoiceReadsForContractors,
     pay: payReadsForContractors,
+    notify: notifications.module.notify,
     ...(options.invoiceBuckets !== undefined && { invoiceBuckets: options.invoiceBuckets }),
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
@@ -643,7 +652,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         if (notify === null) return;
         await relayOwnerAlertsUnscoped(adminDb.db, {
           notify,
-          agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+          agencyTimeZone,
         });
       },
     ),
@@ -660,7 +669,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         }
         const route = createAlertRouter({
           adminDb: adminDb.db,
-          agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+          agencyTimeZone,
           onShift: (creatorId, at) => scheduling.module.onShift(creatorId, at),
           notify,
           onLinesUnread: (creatorId, error) => {

@@ -168,6 +168,11 @@ export interface BrainCustomOrder {
 export interface BrainScript {
   readonly id: string;
   readonly description: string;
+  /**
+   * What of his desire map the script meets (Charles 26/11, `rankByFantasy`), in his own words; absent or empty, none.
+   * The scripts come closest to his fantasy first: the order is code's.
+   */
+  readonly matches?: readonly string[];
 }
 
 export interface BrainInput extends ConversationInput {
@@ -191,6 +196,23 @@ export interface VoiceScriptStep {
   readonly price: Money | null;
   readonly instruction: string | null;
   readonly mediaSheet: string | null;
+  /**
+   * How he buys, read by code (Charles 26/11): how she presents the step, never its price. Absent or `unknown`, nothing
+   * is said.
+   */
+  readonly buyerType?: BuyerType;
+}
+
+/** How a fan buys (Charles 26/11): a hint for how she presents an offer; the price never moves with it. */
+export type BuyerType = 'impulsive' | 'hesitant' | 'collector' | 'whale' | 'unknown';
+
+/**
+ * His fantasy, for the voice (Charles 26/11): the one the script running with him meets, to play on in the sexting,
+ * and those no script of hers meets, never to promise. Each in his own words, read as data.
+ */
+export interface VoiceFantasy {
+  readonly playOn: readonly string[];
+  readonly noScript: readonly string[];
 }
 
 /** A paid step sent to him and still locked, as the voice reads it to help him open it (ADR 0156 § 4). */
@@ -229,6 +251,19 @@ export interface VoiceInput extends ConversationInput {
   readonly waitingStep?: VoiceWaitingStep;
   /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
   readonly maxBubbles?: number;
+  /** His fantasy to play on, or not to promise (Charles 26/11), each in a typed block after the brief. Absent, none. */
+  readonly fantasy?: VoiceFantasy;
+  /**
+   * What the step of her script he has in front of him shows (Charles 26/11 at 22:47): the media sheet of the last
+   * step he can see (offered, or paid and opened), for the sexting between two steps, said in the present. Never a
+   * paid step he has not bought. Absent, none.
+   */
+  readonly currentStepSheet?: string;
+  /**
+   * What the media he bought and finds disappointing shows, by its description (Charles 26/11): she compares it with
+   * what he says. Absent, none.
+   */
+  readonly boughtMediaSheet?: string;
   /**
    * The agency's base style (ADR 0173), its public then its private part, in typed blocks before her sheet, which
    * wins where they differ. Absent or both empty: no section.

@@ -18,7 +18,6 @@ import {
   regimeAhead,
   regimeInForce,
   regimesFor,
-  validationText,
 } from '@/contractors/model';
 import { countryName } from '@/lib/country';
 import { DayField } from '@/scheduling/DayField';
@@ -30,8 +29,6 @@ import { Panel } from '@/shell/layout';
 
 /** `nv-chip` for a choice among a few, five at most; `Select` past that (docs/design/README.md). */
 const CHIPS_AT_MOST = 5;
-
-const upperFirst = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
  * The owner's checks on a member's identity (EQ-06 lot 8b): « Vérifier » the file as he read it, and the prefix of
@@ -284,12 +281,6 @@ export function RegimePanel({
                 </dd>
               </div>
               <div>
-                <dt>Comptable</dt>
-                <dd className={current.validatedOn === null ? 'cf-amber' : undefined}>
-                  {validationText(current)}
-                </dd>
-              </div>
-              <div>
                 <dt>Pièces</dt>
                 <dd>{askedText(current) ?? 'aucune'}</dd>
               </div>
@@ -416,12 +407,6 @@ function AssignDialog({
                       onChange={choose}
                     />
                   </>
-                )}
-                {chosen === null ? null : (
-                  <p className={chosen.validatedOn === null ? 'tm-hint cf-amber' : 'tm-hint'}>
-                    {/* A sentence of its own under the chips: it starts with a capital. */}
-                    {upperFirst(validationText(chosen))}.
-                  </p>
                 )}
               </div>
               <div className="nv-field tm-field" data-invalid={tried && !fromOk ? 'true' : undefined}>

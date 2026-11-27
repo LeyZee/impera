@@ -1,5 +1,5 @@
 {
-  "id": "d912fa2d-e49a-4b32-9f14-35e4c32cb90e",
+  "id": "aafb5bd5-b38e-4234-ab23-f1ffc1f0699d",
   "prevId": "a3ca4056-22ed-4373-98f0-5eb6425d0b18",
   "version": "7",
   "dialect": "postgresql",
@@ -484,7 +484,7 @@
       "checkConstraints": {
         "creator_alert_routes_alert_code_check": {
           "name": "creator_alert_routes_alert_code_check",
-          "value": "\"creator_alert_routes\".\"alert_code\" in ('safety_handoff', 'identity_doubt', 'sale', 'offer_proposed', 'script_price', 'scripts_exhausted', 'her_alerts', 'ai_budget', 'session_expired', 'uncovered_account', 'shift_not_taken')"
+          "value": "\"creator_alert_routes\".\"alert_code\" in ('safety_handoff', 'identity_doubt', 'sale', 'offer_proposed', 'script_price', 'scripts_exhausted', 'her_alerts', 'ai_budget', 'session_expired', 'uncovered_account')"
         },
         "creator_alert_routes_role_check": {
           "name": "creator_alert_routes_role_check",
@@ -500,7 +500,7 @@
         },
         "creator_alert_routes_chatters_closed_check": {
           "name": "creator_alert_routes_chatters_closed_check",
-          "value": "\"creator_alert_routes\".\"alert_code\" not in ('uncovered_account', 'shift_not_taken') or \"creator_alert_routes\".\"role\" <> 'chatter_on_shift' or \"creator_alert_routes\".\"mode\" = 'off'"
+          "value": "\"creator_alert_routes\".\"alert_code\" not in ('uncovered_account') or \"creator_alert_routes\".\"role\" <> 'chatter_on_shift' or \"creator_alert_routes\".\"mode\" = 'off'"
         }
       },
       "isRLSEnabled": false
@@ -3115,7 +3115,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'account_uncovered', 'shift_not_taken', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'account_uncovered', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -6582,22 +6582,6 @@
           "method": "btree",
           "with": {}
         },
-        "domain_events_shift_not_taken_unique": {
-          "name": "domain_events_shift_not_taken_unique",
-          "columns": [
-            {
-              "expression": "(\"payload\"->>'shiftId')",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"domain_events\".\"type\" = 'shift_not_taken'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "domain_events_connection_state_idx": {
           "name": "domain_events_connection_state_idx",
           "columns": [
@@ -6676,7 +6660,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'account_uncovered', 'shift_not_taken', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'account_uncovered', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -9242,6 +9226,128 @@
       },
       "isRLSEnabled": false
     },
+    "public.payout_destinations": {
+      "name": "payout_destinations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "name": "method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "details_ciphertext": {
+          "name": "details_ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resealed": {
+          "name": "resealed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payout_destinations_member_idx": {
+          "name": "payout_destinations_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payout_destinations_member_id_team_members_id_fk": {
+          "name": "payout_destinations_member_id_team_members_id_fk",
+          "tableFrom": "payout_destinations",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "payout_destinations_created_by_user_id_fk": {
+          "name": "payout_destinations_created_by_user_id_fk",
+          "tableFrom": "payout_destinations",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "owner_or_self_select": {
+          "name": "owner_or_self_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or exists (select 1 from team_members m where m.id = \"payout_destinations\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "self_insert": {
+          "name": "self_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "exists (select 1 from team_members m where m.id = \"payout_destinations\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"payout_destinations\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not \"payout_destinations\".\"resealed\" and \"payout_destinations\".\"created_at\" = now()"
+        }
+      },
+      "checkConstraints": {
+        "payout_destinations_method_check": {
+          "name": "payout_destinations_method_check",
+          "value": "\"payout_destinations\".\"method\" in ('mobile_money', 'bank_account', 'cash_pickup')"
+        },
+        "payout_destinations_size_check": {
+          "name": "payout_destinations_size_check",
+          "value": "octet_length(\"payout_destinations\".\"details_ciphertext\") between 1 and 4096"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.link_service_credentials": {
       "name": "link_service_credentials",
       "schema": "",
@@ -11648,7 +11754,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change')"
         }
       },
       "isRLSEnabled": false
@@ -18694,12 +18800,6 @@
           "notNull": true,
           "default": 500
         },
-        "not_taken_delay_minutes": {
-          "name": "not_taken_delay_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "updated_by": {
           "name": "updated_by",
           "type": "text",
@@ -18764,10 +18864,6 @@
         "scheduling_settings_margin_check": {
           "name": "scheduling_settings_margin_check",
           "value": "\"scheduling_settings\".\"access_margin_minutes\" between 0 and 120"
-        },
-        "scheduling_settings_not_taken_delay_check": {
-          "name": "scheduling_settings_not_taken_delay_check",
-          "value": "\"scheduling_settings\".\"not_taken_delay_minutes\" is null or \"scheduling_settings\".\"not_taken_delay_minutes\" between 5 and 240"
         },
         "scheduling_settings_report_gap_check": {
           "name": "scheduling_settings_report_gap_check",

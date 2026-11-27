@@ -32,7 +32,9 @@ jobs:
   evals:
     name: Evals smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The smoke tier is 37 conversations of 3 draws each, 4 at a time (EVALS_CONCURRENCY), about 4 minutes each on 27/11.
+    # 180 minutes stays the margin if concurrency goes back to 1. The 6 € cap stops the spend, not the clock.
+    timeout-minutes: 180
     env:
       HAS_XAI_KEY: ${{ secrets.LLM_XAI_API_KEY != '' }}
     steps:
@@ -61,5 +63,7 @@ jobs:
       - run: pnpm evals
         if: env.HAS_XAI_KEY == 'true'
         env:
+          # Four conversations at once (`--concurrency`), reported in their files' order; the cap holds (evals/README.md).
+          EVALS_CONCURRENCY: '4'
           LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
           LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}

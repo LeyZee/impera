@@ -233,7 +233,7 @@ describe('Réglages › Facturation, contrat et mandat', () => {
 });
 
 describe('Réglages › Facturation, régimes', () => {
-  it('shows the regimes still to validate first, and notes a validation once, today at the latest', async () => {
+  it('lists the regimes newest first, as written, with no accountant’s validation anywhere (Charles, 27/11)', async () => {
     renderSection();
     const card = await waitFor(() => cardOf('Régimes de facturation'));
     await within(card).findByText('Prestataire Bénin, version 2');
@@ -246,82 +246,16 @@ describe('Réglages › Facturation, régimes', () => {
       'Micro-entrepreneur France',
     ]);
     const draft = items[0] ?? card;
-    // Its chip and its words say it, never a coloured edge (Charles: pastilles only).
-    expect(within(draft).getByText(/^Pas encore notée/u).className).toBe('cf-amber');
-    expect(within(draft).getByText('À valider').className).toBe('rp-chip rp-chip--warn');
     expect(draft.textContent).toContain('Bénin, Madagascar');
     expect(draft.textContent).toContain('Autoliquidée par l’agence, 20');
     expect(draft.textContent).toContain('Écartée par la convention fiscale');
     expect(draft.textContent).toContain('Attestation de résidence fiscale');
-    expect(within(items[1] ?? card).getByText('Validé')).toBeTruthy();
-    expect(items[1]?.textContent).toContain('Par le comptable, le 30 octobre 2026');
-    expect(within(items[1] ?? card).queryByRole('button', { name: 'Noter la validation' })).toBeNull();
-
-    fireEvent.click(within(draft).getByRole('button', { name: 'Noter la validation' }));
-    expect(within(dialog()).getByLabelText<HTMLInputElement>('Validé le').value).toBe('05/11/2026');
-    type('Validé le', '2026-11-06');
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
-    expect(within(dialog()).getByText('Au plus tard aujourd’hui, le 5 novembre 2026.')).toBeTruthy();
-    // Typed in French, never the system's calendar: what is no day is said, and nothing is sent.
-    type('Validé le', '31/10/2026');
-    type('Validé le', '31/02');
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
-    expect(within(dialog()).getByText('Un jour comme 28/10/2026, ou 28/10.')).toBeTruthy();
+    // His agent keeps the books: no chip, no line, no button about a validation, on a regime noted or not.
+    for (const item of items) {
+      expect(item.textContent).not.toMatch(/valid|comptable/iu);
+      expect(within(item).queryByRole('button')).toBeNull();
+    }
     expect(writes).toEqual([]);
-    type('Validé le', '4/11');
-    answer = {
-      status: 409,
-      body: {
-        error: { code: 'billing_regime_validated_conflict', message: 'x', details: {}, requestId: 'r' },
-      },
-    };
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
-    expect((await within(dialog()).findByRole('alert')).textContent).toBe(
-      'La validation du comptable est déjà notée, à un autre jour : elle ne se note qu’une fois.',
-    );
-    expect(writes).toEqual([
-      {
-        method: 'POST',
-        path: `/v1/payroll/billing-regimes/${BENIN_DRAFT.id}/validation`,
-        body: { validatedOn: '2026-11-04' },
-      },
-    ]);
-  });
-
-  it('asks for the password and the code before a validation is noted, then notes the same day (EQ-15)', async () => {
-    confirmIdentity.mockResolvedValue('ok');
-    renderSection();
-    const card = await waitFor(() => cardOf('Régimes de facturation'));
-    await within(card).findByText('Prestataire Bénin, version 2');
-    fireEvent.click(within(card).getByRole('button', { name: 'Noter la validation' }));
-    type('Validé le', '4/11');
-    answer = {
-      status: 403,
-      body: { error: { code: 'reauthentication_forbidden', message: 'x', details: {}, requestId: 'r' } },
-    };
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
-    expect(
-      await within(dialog()).findByText(
-        'Ce geste touche à la facturation : confirme ton mot de passe et ton code.',
-      ),
-    ).toBeTruthy();
-    expect(within(dialog()).queryByRole('alert')).toBeNull();
-    fireEvent.change(within(dialog()).getByLabelText('Mot de passe'), {
-      target: { value: 'mot-de-passe-invente' },
-    });
-    fireEvent.change(within(dialog()).getByLabelText('Code à 6 chiffres ou de secours'), {
-      target: { value: '123456' },
-    });
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Confirmer' }));
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).toBeNull();
-    });
-    const noted = {
-      method: 'POST',
-      path: `/v1/payroll/billing-regimes/${BENIN_DRAFT.id}/validation`,
-      body: { validatedOn: '2026-11-04' },
-    };
-    expect(writes).toEqual([noted, noted]);
   });
 
   it('writes a regime as the accountant wrote it, the treaty asking for the certificate', async () => {
@@ -330,7 +264,7 @@ describe('Réglages › Facturation, régimes', () => {
     const card = await waitFor(() => cardOf('Régimes de facturation'));
     expect(
       await within(card).findByText(
-        'Aucun régime : sans régime validé, aucune facture ne part. Écris celui que ton comptable a rédigé.',
+        'Aucun régime : sans régime, aucune facture ne part. Écris celui que ton comptable a rédigé.',
       ),
     ).toBeTruthy();
     expect(card.textContent).toContain(

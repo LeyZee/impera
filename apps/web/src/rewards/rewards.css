@@ -278,8 +278,8 @@
    more (with « réduire les animations » they are there at once, as the rest of the reveal). */
 .rw-reveal__also {
   /* The reveal is dark in both themes: its inks are its own, mixed from the stage's one. */
-  --rw-also-ink: color-mix(in srgb, var(--rw-ink) 78%, transparent);
-  --rw-also-faint: color-mix(in srgb, var(--rw-ink) 55%, transparent);
+  --rw-also-ink: color-mix(in srgb, var(--rw-ink) 88%, transparent);
+  --rw-also-faint: color-mix(in srgb, var(--rw-ink) 70%, transparent);
   --rw-also-line: color-mix(in srgb, var(--rw-ink) 28%, transparent);
   margin-top: 22px;
   display: flex;
@@ -340,7 +340,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 550;
   color: var(--rw-also-ink);
 }
 .rw-reveal__close {

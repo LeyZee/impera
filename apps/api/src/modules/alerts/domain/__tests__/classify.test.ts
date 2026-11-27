@@ -44,7 +44,22 @@ describe('which alert of her tab an event is (ADR 0150 § B)', () => {
   });
 
   it('tells a sale, the AI budget, and a session that just expired', () => {
-    expect(classifyEvent('sale_detected', {})?.code).toBe('sale');
+    expect(classifyEvent('sale_detected', {})).toEqual({ code: 'sale', conversationId: null });
+    expect(
+      classifyEvent('sale_detected', {
+        saleId: '01900000-0000-7000-8000-000000000050',
+        platform: 'reveal',
+        platformAccountId: '01900000-0000-7000-8000-000000000040',
+        saleType: 'ppv',
+        occurredAt: '2026-11-27T01:00:00.000Z',
+        currency: 'EUR',
+        grossInclVatMinor: 2_500,
+        netMinor: 2_000,
+        agencyMinor: 1_000,
+        creatorMinor: 1_000,
+        seller: { kind: 'agent' },
+      })?.sale,
+    ).toEqual({ grossMinor: 2_500, currency: 'EUR', by: 'agent' });
     expect(classifyEvent('budget_threshold_crossed', {})?.code).toBe('ai_budget');
     expect(classifyEvent('ai_credits_low', {})?.code).toBe('ai_budget');
     const account = '01900000-0000-7000-8000-000000000040';

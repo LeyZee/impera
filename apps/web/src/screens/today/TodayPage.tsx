@@ -20,6 +20,7 @@ import { ReportPanel } from '@/reports/ReportPanel';
 import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { MyReviewCard } from '@/review/MyReviewCard';
 import { MyProgressCard } from '@/rewards/MyProgressCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { ShiftChallengeCard } from '@/rewards/ShiftChallengeCard';
@@ -176,6 +177,8 @@ function Day({
         ) : (
           <MyAwayCard status={away} />
         )}
+        {/* « Mon bilan » of the shift that just ended (ADR 0170 §§ 26 to 31): nothing while it has no remark. */}
+        {away === null && state.kind === 'ended' ? <MyReviewCard shift={state.shift} zone={zone} /> : null}
         {away === null && open !== null ? <ToTalkCard creatorId={open.creatorId} now={now} /> : null}
         {user.team === null ? null : <AnnouncementsCard zone={zone} today={today} />}
         <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
@@ -189,7 +192,7 @@ function Day({
         {/* Where he stands in the game, and the way to Moi › Trophées (ADR 0134, lot 1). */}
         <MyProgressCard user={user} />
         {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
-        <RewardRevealGate user={user} />
+        <RewardRevealGate user={user} held={state.kind === 'soon' || state.kind === 'on'} />
         <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
         {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       </div>

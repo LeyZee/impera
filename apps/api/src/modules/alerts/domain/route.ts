@@ -10,6 +10,7 @@ import {
   type PushMessage,
 } from '@impera/contracts';
 
+import type { SaleSaid } from './classify';
 import { creatorAlertLines } from './creator-alerts';
 
 /** The weight of each mode: an agency alert takes, for each role, the loudest of her creators' choices. */
@@ -84,6 +85,17 @@ const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
   shift_not_taken: 'Un shift a commencé et son chatteur n’a pas pris son poste : à joindre ou à remplacer.',
 };
 
+const AMOUNT: Readonly<Record<SaleSaid['currency'], Intl.NumberFormat>> = {
+  EUR: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }),
+  USD: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }),
+};
+
+const SOLD_BY: Readonly<Record<SaleSaid['by'], string>> = {
+  agent: 'Vendue par l’IA.',
+  member: 'Vendue par le chatteur en poste.',
+  unknown: 'Lue sur la plateforme, sans vendeur relié.',
+};
+
 /** Where the notification opens: the planning for a créneau or a shift nobody holds, the conversation otherwise. */
 function urlOf(code: CreatorAlertCode, conversationId: string | null): string {
   if (code === 'uncovered_account' || code === 'shift_not_taken') return '/equipe/planning';
@@ -95,13 +107,16 @@ export function alertMessage(
   creatorName: string | null,
   conversationId: string | null,
   silent: boolean,
+  sale?: SaleSaid,
 ): PushMessage {
+  // A sale says its amount in its title: fifteen « Vente détectée » alike said nothing (recette 27/11, G19).
+  const what =
+    code === 'sale' && sale !== undefined
+      ? `Vente de ${AMOUNT[sale.currency].format(sale.grossMinor / 100)}`
+      : TITLES[code];
   return {
-    title: (creatorName === null ? TITLES[code] : `${creatorName} · ${TITLES[code]}`).slice(
-      0,
-      PUSH_TITLE_MAX,
-    ),
-    body: BODIES[code],
+    title: (creatorName === null ? what : `${creatorName} · ${what}`).slice(0, PUSH_TITLE_MAX),
+    body: code === 'sale' && sale !== undefined ? SOLD_BY[sale.by] : BODIES[code],
     url: urlOf(code, conversationId),
     ...(silent && { silent: true }),
   };
