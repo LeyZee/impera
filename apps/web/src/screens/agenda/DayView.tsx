@@ -264,6 +264,7 @@ export function Glance({
   nowMinute,
   owes = false,
   children,
+  quietWhenEssentialOnly = false,
 }: {
   plan: DayPlan;
   agenda: CreatorAgenda;
@@ -273,7 +274,12 @@ export function Glance({
   nowMinute: number | null;
   /** What closes the glance, at its foot. */
   children?: ReactNode;
-}): JSX.Element {
+  /**
+   * Aujourd'hui says her essentials twice above it already (the day's hero, Ma journée): with nothing else at the
+   * agenda, the glance would only say them a third time, so it keeps quiet there (audit 27/11).
+   */
+  quietWhenEssentialOnly?: boolean;
+}): JSX.Element | null {
   const { done, total } = progressOf(plan);
   const left = total - done;
   // A day to come: nothing yet to do but what is dated, a routine waits for its day (Design, recette 16/11).
@@ -331,6 +337,7 @@ export function Glance({
   // Her highest streak medal beside the count (ADR 0107 § 9); none before her first, or while her case is not read.
   const medal = highestMedal(useHerTrophyCase(true).data?.items ?? []);
   const tip = useFloatingTip();
+  if (quietWhenEssentialOnly && essentialOnly !== null) return null;
   return (
     <section className="nv-plate ag-glance nv-enter" aria-label="Ta journée">
       <div className="ag-glance__top">

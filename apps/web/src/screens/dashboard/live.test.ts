@@ -45,6 +45,22 @@ describe('fromApi', () => {
     expect(hero.lead).toBe('Aucun modèle IA n’a répondu : 3 fans attendent un chatteur.');
   });
 
+  it('names an outage over « IA de retour », never « IA indisponible » above « L’IA répond de nouveau » (audit 27/11)', () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const back = (n: number): DashboardTodo => ({
+      ...first,
+      tone: 'warn',
+      kind: 'llm_unavailable',
+      voiceBack: true,
+      id: `back-${String(n)}`,
+      waitingMinutes: 10 + n,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000030${String(n)}`),
+    });
+    const { todos } = fromApi(apiDashboard({ todos: [back(1), back(2)] }));
+    expect(todos.map((t) => [t.kind, t.tone])).toEqual([['IA de retour', 'warn']]);
+  });
+
   it('writes the todos in the trade’s words, how long they wait, the hour at her time (DASH-11, DASH-26)', () => {
     const [todo] = fromApi(apiDashboard()).todos;
     expect(todo).toMatchObject({ kind: 'Mineur possible', title: 'Kévin', tone: 'bad' });
