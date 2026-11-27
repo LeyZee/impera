@@ -118,6 +118,15 @@ describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23
     ['it', 'hai 16 anni? mi ecciti'],
     ['es', 'quiero tocar a una niña'],
     ['es', 'disfrázate de colegiala'],
+    // An age he gives her, then the act; her as a minor in his fantasy; the minor first, then his desire.
+    ['fr', 'imagine que t’as 14 ans et que je te prends'],
+    ['fr', 't’as 16 ans dis-moi, et je te prends'],
+    ['fr', 'je fantasme sur toi en écolière'],
+    ['fr', 'tu ressembles à une ado ça m’excite'],
+    ['fr', 'les gamines ça m’excite'],
+    ['en', 'you as a schoolgirl turns me on'],
+    // His own child as the object of his desire: the one case where his children count.
+    ['fr', 'j’ai envie de ma fille'],
   ])('%s: takes « %s »', (_language, text) => {
     expect(safetySigns(text)).toContain('minor_fantasy');
   });
@@ -129,6 +138,12 @@ describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23
     'j’ai envie de toi, je dépose mon fils à l’école et je reviens',
     'j’ai été marié 15 ans, j’ai envie de toi',
     'i was horny as a teen',
+    // A link never crosses a comma nor another complement.
+    'je l’ai prise ce matin, les enfants étaient chez mamie',
+    'j’ai envie de toi, les enfants sont chez mamie',
+    'je l’ai prise pendant que les enfants dormaient',
+    'j’ai envie de voir ma fille ce week-end',
+    'tu as 25 ans et je te prends',
     // Procreation between adults, in the present, the subjunctive and the future.
     'je veux te faire un enfant ce soir au lit',
     'je veux que tu me fasses un enfant',
