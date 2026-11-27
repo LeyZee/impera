@@ -524,12 +524,6 @@ export function earliestRegimeDay(file: Pick<ContractorFile, 'regimes' | 'today'
 export const regimesFor = (country: string, regimes: readonly BillingRegime[]): BillingRegime[] =>
   regimes.filter((regime) => regime.countries.includes(country));
 
-/** « validé par le comptable le 2 novembre 2026 », or that none is noted: a note, never a gate (Charles, 21/11/2026). */
-export const validationText = (regime: Pick<BillingRegime, 'validatedOn'>): string =>
-  regime.validatedOn === null
-    ? 'validation du comptable non notée, facultative'
-    : `validé par le comptable le ${fullDay(regime.validatedOn)}`;
-
 /** The documents a regime asks for, in words; `null` when it asks for none. */
 export function askedText(regime: Pick<BillingRegime, 'documents'>): string | null {
   if (regime.documents.length === 0) return null;

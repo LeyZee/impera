@@ -7,7 +7,7 @@ import {
 } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
-import { AccountsDialog, TextDialog, ValidateDialog } from './LegalDialogs';
+import { AccountsDialog, TextDialog } from './LegalDialogs';
 import { PRINTED_BY_CODE, RegimeDialog } from './RegimeDialog';
 import { givenCount } from './accounts';
 import { dueText, reminderDaysText } from './model';
@@ -29,15 +29,12 @@ import { useBillingRegimes, useContractTexts } from '@/contractors/api';
 import { TEXT_KINDS, TEXT_NAMES, askedText, dayText } from '@/contractors/model';
 import { shortHash } from '@/payroll/model';
 import { useSchedulingSettings } from '@/reports/api';
-import { fullDay } from '@/scheduling/time';
-import { useAgencyToday } from '@/screens/pay/data';
 
-/** What a card opened: the accounts, a new version of a text, a new regime, or a regime's validation. */
+/** What a card opened: the accounts, a new version of a text, or a new regime. */
 type Opened =
   | { readonly kind: 'accounts' }
   | { readonly kind: 'text'; readonly text: ContractTextKind }
-  | { readonly kind: 'regime' }
-  | { readonly kind: 'validate'; readonly regime: BillingRegime };
+  | { readonly kind: 'regime' };
 
 /**
  * The second half of Réglages › Facturation (EQ-06 lot 8c): the journal's accounts, the delays, the versions of the
@@ -53,7 +50,6 @@ export function LegalCards({
 }): JSX.Element {
   const texts = useContractTexts();
   const regimes = useBillingRegimes();
-  const today = useAgencyToday();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const [opened, setOpened] = useState<Opened | null>(null);
   const close = (): void => {
@@ -148,14 +144,7 @@ export function LegalCards({
         ) : (
           <ul className="bf-regimes">
             {regimesToShow(regimes.data.regimes).map((regime) => (
-              <RegimeItem
-                key={regime.id}
-                regime={regime}
-                canValidate={today !== null}
-                onValidate={() => {
-                  setOpened({ kind: 'validate', regime });
-                }}
-              />
+              <RegimeItem key={regime.id} regime={regime} />
             ))}
           </ul>
         )}
@@ -164,10 +153,8 @@ export function LegalCards({
         <AccountsDialog accounts={settings.accounts} onClose={close} />
       ) : opened.kind === 'text' ? (
         <TextDialog kind={opened.text} latest={latestOf(all, opened.text)} onClose={close} />
-      ) : opened.kind === 'regime' ? (
+      ) : (
         <RegimeDialog onClose={close} />
-      ) : today === null ? null : (
-        <ValidateDialog regime={opened.regime} today={today} onClose={close} />
       )}
     </>
   );
@@ -237,22 +224,13 @@ function TextVersions({
   );
 }
 
-function RegimeItem({
-  regime,
-  canValidate,
-  onValidate,
-}: {
-  regime: BillingRegime;
-  canValidate: boolean;
-  onValidate: () => void;
-}): JSX.Element {
+/** A regime as written. No accountant's validation on it any more (Charles, 27/11/2026): his agent keeps the books. */
+function RegimeItem({ regime }: { regime: BillingRegime }): JSX.Element {
   const asked = askedText(regime);
   return (
     <li className="bf-regime">
       <div className="bf-version__head">
         <span className="bf-version__name">{regime.name}</span>
-        {/* The accountant's validation is a note, never a gate (Charles, 21/11/2026): no chip says « à valider ». */}
-        {regime.validatedOn === null ? null : <span className="rp-chip rp-chip--ok">Validé</span>}
       </div>
       <dl className="bf-facts bf-facts--tight">
         <Fact label="Pays">{countriesText(regime.countries)}</Fact>
@@ -262,11 +240,6 @@ function RegimeItem({
           {asked === null ? 'Aucune' : asked.charAt(0).toUpperCase() + asked.slice(1)}
         </Fact>
         <Fact label="Identifiant fiscal">{regime.taxIdRequired ? 'Exigé' : 'Pas exigé'}</Fact>
-        <Fact label="Validation">
-          {regime.validatedOn === null
-            ? 'Pas notée. Facultative : les factures partent sans elle.'
-            : `Par le comptable, le ${fullDay(regime.validatedOn)}`}
-        </Fact>
       </dl>
       {showsResidenceWithoutTreaty(regime) ? (
         <p className="tm-hint cf-amber">{residenceWithoutTreatyText}</p>
@@ -285,11 +258,6 @@ function RegimeItem({
           </ol>
         </details>
       )}
-      {regime.validatedOn === null && canValidate ? (
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm tm-self-start" onClick={onValidate}>
-          Noter la validation
-        </button>
-      ) : null}
     </li>
   );
 }

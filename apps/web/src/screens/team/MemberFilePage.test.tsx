@@ -164,7 +164,8 @@ describe('Équipe › Membres › Dossier', () => {
     await waitFor(() => {
       expect(regime.textContent).toContain('Prestataire Bénin et Madagascar, depuis le 1er novembre 2026');
     });
-    expect(regime.textContent).toContain('validé par le comptable le 30 octobre 2026');
+    // No accountant's validation any more (Charles, 27/11/2026): his agent keeps the books.
+    expect(regime.textContent).not.toMatch(/comptable/iu);
     expect(regime.textContent).toContain('attestation de résidence fiscale');
 
     fireEvent.click(within(regime).getByRole('button', { name: 'Attribuer un régime' }));
@@ -180,10 +181,7 @@ describe('Équipe › Membres › Dossier', () => {
       [BENIN_DRAFT.name, 'true'],
       [BENIN_REGIME.name, 'false'],
     ]);
-    // A note, never a gate (Charles, 21/11/2026): said plainly, never in amber.
-    expect(within(dialog()).getByText('Validation du comptable non notée, facultative.').className).toBe(
-      'tm-hint',
-    );
+    expect(dialog().textContent).not.toMatch(/comptable/iu);
     fireEvent.click(within(choices).getByRole('radio', { name: BENIN_REGIME.name }));
     expect(within(choices).getByRole('radio', { name: BENIN_REGIME.name }).getAttribute('aria-checked')).toBe(
       'true',

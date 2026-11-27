@@ -106,6 +106,8 @@ Lot 0 (cet ADR, le glossaire, les fiches) → 1 Équipe → 2 Planning → 3 Rap
 
 **Amendement du 21/11/2026 (Charles).** La validation d'un régime par le comptable n'est plus une condition d'émission. Charles l'a retirée : « Il n'y a vraiment pas besoin. J'ai peur que ça me bloque. » Le propriétaire peut toujours noter le jour où le comptable a validé un régime, mais aucune facture ne l'attend, ni dans le domaine (`issueDecision`) ni dans la base (migration 0255, fonction `keep_invoice`). Le reste ne change pas : mandat accepté, régime du pays de la fiche affecté au jour d'émission, dossier complet et vérifié. Un régime mal rédigé imprime de mauvaises mentions ; on les corrige par une facture rectificative (ADR 0040).
 
+**Amendement du 27/11/2026 (Charles).** La validation du comptable disparaît aussi de l'écran : « je préfère la retirer vu que mon agent IA va me servir de comptable désormais ». Réglages › Facturation ne montre plus ni pastille « Validé », ni ligne « Validation », ni bouton « Noter la validation » ; le dossier du membre ne dit plus rien du comptable. La colonne et la route restent, sans écran, pour ne rien effacer ; un régime se lit tel qu'il a été écrit.
+
 ## Conséquences
 
 - Les nouveaux chatteurs sont gérés dans le même outil que l'agent, avec la même authentification et le même design.
