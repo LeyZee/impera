@@ -106,7 +106,8 @@ export async function composeTurn(
     inPlay: sexting.inPlay,
     otherManWanted: sexting.otherManWanted,
     care,
-    checksCommitment: customOrder !== undefined || sexting.suggestsCustom || decided.moreTonight,
+    checksCommitment:
+      customOrder !== undefined || sexting.suggestsCustom || sexting.customMidScript || decided.moreTonight,
     // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
     // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
     // Not on his « je t'aime » nor his asking to see her: « c'est tôt, on se connaît à peine » is then the rule's own

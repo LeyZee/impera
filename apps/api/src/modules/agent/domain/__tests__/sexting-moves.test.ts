@@ -8,6 +8,7 @@ import {
   isBareMurmur,
   peakSeen,
   peakStepIndex,
+  wantsMadeForHim,
   wantsOtherMan,
 } from '../sexting-moves';
 
@@ -89,5 +90,20 @@ describe('the moments of the sexting (Charles 26/11)', () => {
     expect(mentionsOtherWoman('my wife is away')).toBe(true);
     expect(mentionsOtherWoman('ma mère m’a appelé')).toBe(false);
     expect(mentionsOtherWoman('t’es la plus belle')).toBe(false);
+  });
+});
+
+describe('wantsMadeForHim (Charles 27/11)', () => {
+  it('reads a cam, a video for him, something else, further', () => {
+    expect(wantsMadeForHim('Je suis trop chaud, j’ai trop envie d’une cam')).toBe(true);
+    expect(wantsMadeForHim('Tu me ferais une vidéo personnalisée ?')).toBe(true);
+    expect(wantsMadeForHim('Je voudrais voir autre chose que tes vidéos')).toBe(true);
+    expect(wantsMadeForHim('On va plus loin ?')).toBe(true);
+  });
+
+  it('leaves the rest of the sexting alone', () => {
+    expect(wantsMadeForHim('Mmh t’es trop bonne')).toBe(false);
+    expect(wantsMadeForHim('On parle d’autre chose ?')).toBe(false);
+    expect(wantsMadeForHim('Je camoufle rien')).toBe(false);
   });
 });
