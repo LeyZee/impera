@@ -146,6 +146,7 @@ const session = createPlaygroundSession({
   personaSheet: persona.personaSheet,
   guardSettings: guardSettingsOf(persona),
   splitMessages: persona.splitMessages,
+  playsJealous: persona.playsJealous,
   voiceExamples: [],
   languages: languagesOf(persona),
   timeZone: 'Europe/Paris',

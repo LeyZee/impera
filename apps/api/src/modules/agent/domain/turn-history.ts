@@ -16,6 +16,12 @@ export interface HistoryTurn {
 
 const HOUR_MS = 3_600_000;
 
+/**
+ * How many of their last messages a turn of hers reads: what `conversations` loads for a real fan, and what the
+ * playground and the simulated fans keep (audit du 27/11), so neither remembers more than she does in production.
+ */
+export const HISTORY_WINDOW = 40;
+
 /** How long they have talked, in hours, on her clock's now. */
 export function knownHoursOf(situation: Pick<Situation, 'now' | 'relationshipStartedAt'>): number {
   return (situation.now.getTime() - situation.relationshipStartedAt.getTime()) / HOUR_MS;

@@ -1,5 +1,6 @@
 import {
   DesireMarkIdSchema,
+  type AgencyStyleContent,
   newId,
   type AnswerVersion,
   type DesireMarkVerdict,
@@ -18,7 +19,7 @@ import {
   bubbleDelays,
   desireSignalPoints,
   checkVoiceOutput,
-  guardSettingsOf,
+  composerFields,
   languagesOf,
   isNight,
   isTimeZone,
@@ -96,10 +97,12 @@ export interface EngineDeps {
    */
   readonly played?: NonNullable<PlaygroundState['persona']['played']>;
   /**
-   * Her bank of the version played, as her drafts read it (ADR 0102 § 2), already chosen by `pickVoiceExamples`.
-   * Absent: chosen from the ratings kept here, as the terminal playground does.
+   * Her bank, as her drafts read it (ADR 0102 § 2): chosen by `composerFields` as for her real fans. Absent: chosen
+   * from the ratings kept here, as the terminal playground does.
    */
-  readonly voiceExamples?: readonly VoiceExample[];
+  readonly bank?: readonly VoiceExample[];
+  /** The agency's active base style (ADR 0173), as her real drafts read it; absent or `null`: none. */
+  readonly baseStyle?: AgencyStyleContent | null;
   readonly timeZone?: string;
   readonly now?: () => Date;
   /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
@@ -224,24 +227,36 @@ function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
 
 /** The P3-05 session behind the API: same brain, voice and guards as production, and nothing is ever sent. */
 export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
+  // Her persona read as her real drafts read it (`composerFields`, audit du 27/11): the base style's texts and form,
+  // her jealousy, her bank's examples, chosen by the same function.
+  const her = composerFields(
+    deps.persona,
+    deps.bank ?? [],
+    deps.profileBio ?? null,
+    deps.baseStyle ?? null,
+  ).persona;
+  const { guardSettings } = her;
   const session = createPlaygroundSession({
     gateway: deps.gateway,
-    creatorName: deps.persona.creatorName,
-    personaSheet: deps.persona.personaSheet,
-    ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
-    guardSettings: guardSettingsOf(deps.persona),
-    splitMessages: deps.persona.splitMessages,
+    creatorName: her.creatorName,
+    personaSheet: her.personaSheet,
+    ...(her.profileBio !== undefined && { profileBio: her.profileBio }),
+    guardSettings,
+    ...(her.splitMessages !== undefined && { splitMessages: her.splitMessages }),
+    ...(her.playsJealous !== undefined && { playsJealous: her.playsJealous }),
+    ...(her.agencyStyle !== undefined && { agencyStyle: her.agencyStyle }),
     languages: languagesOf(deps.persona),
     // Her examples only when her own version is played: never the invented persona's, never another creator's.
     voiceExamples:
       deps.played === undefined
         ? []
-        : (deps.voiceExamples ??
-          voiceExamples(deps.records, {
-            creatorId: deps.played.creatorId,
-            personaVersionId: deps.played.versionId,
-            guardSettings: guardSettingsOf(deps.persona),
-          })),
+        : deps.bank !== undefined
+          ? (her.voiceExamples ?? [])
+          : voiceExamples(deps.records, {
+              creatorId: deps.played.creatorId,
+              personaVersionId: deps.played.versionId,
+              guardSettings,
+            }),
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
@@ -418,9 +433,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         // A correction that trips a hard guard stays a correction, out of her bank, and the screen says why (§ 4).
         const blockedBy =
           verdict.kind === 'corrected' && destination === 'voice_example'
-            ? checkVoiceOutput([verdict.text], guardSettingsOf(deps.persona)).filter(
-                (v) => v.severity === 'blocking',
-              )
+            ? checkVoiceOutput([verdict.text], guardSettings).filter((v) => v.severity === 'blocking')
             : [];
         ratings += 1;
         const record = ratingRecord({

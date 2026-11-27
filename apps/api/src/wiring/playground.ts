@@ -60,6 +60,8 @@ export async function wirePlayground(
         herScripts: createPlaygroundScripts(deps.scripts.reads),
         // Her bank, read as her drafts read it (ADR 0102 § 2).
         voiceExamplesOf: createDbVoiceExampleBank(shared.db),
+        // The agency's base style, as her drafts read it (ADR 0173, audit du 27/11).
+        baseStyleOf: () => deps.persona.agencyStyle.activeUnscoped(),
         bank: createDbVoiceBankStore(shared.db),
         // Her ratings live in the database with its backups (AGE-06); the old JSON lines are imported once, then renamed.
         ratings: createDbCalibrationStore(shared.db, async () =>

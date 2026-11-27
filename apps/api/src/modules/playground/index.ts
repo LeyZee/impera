@@ -16,13 +16,14 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import {
   activePersonaForModels,
+  baseStyleOrNone,
   createAlertTester,
   createJsonlCalibrationStore,
   guardSettingsOf,
-  pickVoiceExamples,
   readPersonaFile,
   type CalibrationRecord,
   type ActivePersonaSource,
+  type BaseStyleSource,
   type CalibrationStore,
   type PersonaForModels,
   type VoiceExample,
@@ -109,6 +110,11 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
    * Absent (no database): chosen from the ratings kept in memory.
    */
   readonly voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
+  /**
+   * The agency's active base style (ADR 0173), read as her drafts read it: when a version of hers is chosen, and kept
+   * for the invented persona's next conversations. Absent or unreadable: none.
+   */
+  readonly baseStyleOf?: BaseStyleSource;
   /** Her bank as Entraîner lists it and « Retirer » (ADR 0102 § 5); absent without a database. */
   readonly bank?: VoiceBankStore;
 }
@@ -134,11 +140,18 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   };
   const now = deps.now ?? (() => new Date());
   const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
+  // The base style last read: the invented persona's engine is built at once, without waiting on a read.
+  let baseStyle: Awaited<ReturnType<typeof baseStyleOrNone>> = null;
+  const readBaseStyle = async () => {
+    baseStyle = await baseStyleOrNone(deps.baseStyleOf);
+    return baseStyle;
+  };
+  void readBaseStyle();
   const engineFor = (
     persona: PersonaForModels,
     played?: PlayedVersion,
     trainer?: Trainer,
-    examples?: readonly VoiceExample[],
+    bank?: readonly VoiceExample[],
     profileBio: string | null = null,
   ) =>
     createPlaygroundEngine({
@@ -159,7 +172,8 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
         deps.herScripts !== undefined && {
           herScripts: herCatalogue(deps.herScripts, played.creatorId, trainer),
         }),
-      ...(examples !== undefined && { voiceExamples: examples }),
+      ...(bank !== undefined && { bank }),
+      baseStyle,
       ...(deps.creatorId !== undefined && { creatorId: deps.creatorId }),
       ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
       ...(deps.now !== undefined && { now: deps.now }),
@@ -175,13 +189,13 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       // Her bio as her real fans' drafts read it; a failed read plays without it, as a draft would.
       const profileBio = await (deps.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
       const bank = await deps.voiceExamplesOf?.(creatorId);
-      const examples =
-        bank === undefined ? undefined : pickVoiceExamples(bank, guardSettingsOf(persona), bank.length);
+      await readBaseStyle();
+      // Her bank's examples are chosen by `composerFields`, under her guards and the base style's form.
       const engine = engineFor(
         persona,
         { creatorId, versionId, version: stored.version },
         trainer,
-        examples,
+        bank,
         profileBio,
       );
       await engine.readScripts();
@@ -204,7 +218,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
             );
             if (stored === undefined || stored === null) return null;
             const persona = await activePersonaForModels(() => Promise.resolve(stored), creatorId, now());
-            return persona === null ? null : guardSettingsOf(persona);
+            return persona === null ? null : guardSettingsOf(persona, (await readBaseStyle())?.form);
           },
           now,
         });
@@ -232,6 +246,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly herScripts?: HerScriptsSource;
   readonly voiceExamplesOf?: NonNullable<PlaygroundDeps['voiceExamplesOf']>;
   readonly bank?: VoiceBankStore;
+  readonly baseStyleOf?: BaseStyleSource;
 }
 
 /** Reads the persona and the ratings kept so far, then builds the module. Throws when the persona is unreadable. */

@@ -15,7 +15,7 @@ import {
   type JobPayload,
 } from '@impera/contracts';
 
-import { declaredAdultAge, safetySigns } from '../../../agent';
+import { declaredAdultAge, HISTORY_WINDOW, safetySigns } from '../../../agent';
 import type {
   Clock,
   ComposeInput,
@@ -53,8 +53,8 @@ export interface RespondDeps {
   readonly replyHours?: ReplyHours;
 }
 
-/** Messages the engine reads. */
-export const HISTORY_LIMIT = 40;
+/** Messages the engine reads: the agent's window, which the playground keeps too (audit du 27/11). */
+export const HISTORY_LIMIT = HISTORY_WINDOW;
 
 /** Holds that give the conversation to the chatters; the others put it back to `idle`. */
 const HANDOFF_REASONS: readonly HoldReason[] = [

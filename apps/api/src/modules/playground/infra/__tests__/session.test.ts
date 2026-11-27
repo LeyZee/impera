@@ -112,6 +112,22 @@ describe('playground session', () => {
     expect(voiceInputs[0]?.language).toEqual({ reply: 'english', notSpoken: null, examples: ['hey you 😘'] });
   });
 
+  it('reads no more of the conversation than her real drafts do (audit du 27/11)', async () => {
+    const brainInputs: ConversationInput[] = [];
+    const session = createPlaygroundSession({
+      gateway: fakeGateway({ bubbles: ['Coucou'] }, [], brainInputs),
+      creatorName: 'Lina',
+      personaSheet: 'fiche',
+      guardSettings: settings,
+      languages: FRENCH,
+    });
+
+    for (let i = 1; i <= 25; i += 1) await session.handleFanMessage(`Message ${String(i)}`);
+
+    expect(session.history.length).toBeGreaterThan(40);
+    expect(brainInputs.at(-1)?.history).toHaveLength(40);
+  });
+
   it('leaves out what goes past her bubble budget: never past her own maximum (Charles 16/11, 21/11)', async () => {
     const session = createPlaygroundSession({
       gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge', 'Moi 23 ans'] }),
@@ -322,7 +338,7 @@ describe('playground session, calibration', () => {
     session.sendCreatorMedia(PHOTO, true);
     session.replaceLastAnswer('Coucou toi ✨');
     expect(session.history.map((t) => [t.from, t.text, t.media !== undefined])).toEqual([
-      ['fan', 'Salut', true],
+      ['fan', 'Salut', false],
       ['creator', 'Coucou toi ✨', false],
       ['creator', '', true],
     ]);
