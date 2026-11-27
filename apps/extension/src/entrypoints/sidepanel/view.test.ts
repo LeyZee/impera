@@ -899,7 +899,9 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
     const before = draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, 'hot') })).root;
     expect(before.querySelector('.cp-move')).toBeNull();
     expect(before.querySelector('.cp-sale')).toBeNull();
-    expect(badgeLabels(before)).toEqual(['Désir chaud']);
+    // His desire is the fire under his name, not a badge (maquette v4, 27/11).
+    expect(badgeLabels(before)).toEqual([]);
+    expect(before.querySelector('.nv-heat')?.getAttribute('aria-label')).toBe('Son envie : chaud');
     expect([...before.children].map((node) => node.className)).toEqual([
       'cp-band',
       'cp-draft',
@@ -1141,30 +1143,29 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
       sale: { ...pending.sale, offerPending: true },
     });
     const calm = with_(lively);
-    expect(badgeLabels(calm)).toEqual(['Désir chaud, en hausse', 'Relance due', 'Offre sans réponse']);
-    // His desire's direction is an arrow by the flame, never a sentence.
-    expect(calm.querySelectorAll('.cp-badge[data-kind="desire"] svg')).toHaveLength(2);
+    // His desire and its direction are the fire under his name (maquette v4, 27/11): the badges keep the signals.
+    expect(badgeLabels(calm)).toEqual(['Relance due', 'Offre sans réponse']);
+    expect(calm.querySelector('.nv-heat')?.getAttribute('aria-label')).toBe('Son envie : chaud, en hausse');
+    expect(calm.querySelector('.cp-badge[data-kind="desire"]')).toBeNull();
     expect(calm.querySelector('.cp-badges__more')).toBeNull();
     const { root, actions } = draw(
       onCard(card({}), [], {
         draft: ready(),
-        standing: standingOf({ fragile: true }, 'hot'),
+        standing: standingOf({ fragile: true, noExplicit: true }, 'hot'),
         assist: lively,
       }),
     );
-    expect(badgeLabels(root)).toEqual(['Fan fragile', 'Désir chaud, en hausse', 'Relance due']);
+    expect(badgeLabels(root)).toEqual(['Fan fragile', 'Rien d’explicite', 'Relance due']);
     const more = root.querySelector<HTMLButtonElement>('.cp-badges__more');
     expect(more?.textContent).toBe('+1');
     expect(more?.getAttribute('aria-label')).toBe('Voir 1 de plus');
     more?.click();
     expect(actions.showSignals).toHaveBeenCalledOnce();
-    const opened = with_(lively, { standing: standingOf({ fragile: true }, 'hot'), signalsOpen: true });
-    expect(badgeLabels(opened)).toEqual([
-      'Fan fragile',
-      'Désir chaud, en hausse',
-      'Relance due',
-      'Offre sans réponse',
-    ]);
+    const opened = with_(lively, {
+      standing: standingOf({ fragile: true, noExplicit: true }, 'hot'),
+      signalsOpen: true,
+    });
+    expect(badgeLabels(opened)).toEqual(['Fan fragile', 'Rien d’explicite', 'Relance due', 'Offre sans réponse']);
     // What forbids or holds back is never folded, even past three.
     const many = with_(lively, {
       standing: standingOf({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, 'hot'),
@@ -1286,13 +1287,24 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
     expect(root.querySelector('.cp-sale .cp-condition__state')?.textContent).toBe('manque');
   });
 
-  it('tints the desire badge by its band, never in red or amber', () => {
-    for (const band of ['neutral', 'playful', 'hot'] as const) {
+  it('says his desire as fire, cold to hot under the line, in the glossary’s words (maquette v4, 27/11)', () => {
+    const widths: number[] = [];
+    for (const [band, word] of [
+      ['neutral', 'neutre'],
+      ['playful', 'joueur'],
+      ['hot', 'chaud'],
+    ] as const) {
       const root = draw(onCard(card({}), [], { draft: ready(), standing: standingOf({}, band) })).root;
-      const badge = root.querySelector<HTMLElement>('.cp-badge[data-kind="desire"]');
-      expect(badge?.dataset['band']).toBe(band);
-      expect(badge?.dataset['tone']).toBe('neutral');
+      const heat = root.querySelector<HTMLElement>('.cp-band .nv-heat');
+      expect(heat?.dataset['lit']).toBe('false');
+      expect(heat?.querySelector('.nv-heat__word')?.textContent).toBe(word);
+      expect(heat?.querySelector('svg.nv-flame')).not.toBeNull();
+      // A place on the track, never a figure on screen.
+      expect(heat?.textContent).not.toMatch(/\d/u);
+      widths.push(Number(/--_wn:(\d+)/u.exec(heat?.getAttribute('style') ?? '')?.[1]));
+      expect(root.querySelector('.cp-badge[data-kind="desire"]')).toBeNull();
     }
+    expect(widths).toEqual([...widths].sort((a, b) => a - b));
   });
 
   it("drops the desire's tint next to a stop, so it never reads as a second alert", () => {

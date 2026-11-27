@@ -14,6 +14,8 @@ export {
   type ChartPoint,
 } from './chart.js';
 
+export { FIRE_STOPS, fireAt } from './heat.js';
+
 export {
   donutArcs,
   funnelSteps,

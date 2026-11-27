@@ -59,6 +59,19 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
     expect(moveLines(move(kind, label), [], bare)).toEqual({ what: label, why: null, tone: 'neutral' });
   });
 
+  it('says the moment to sell as the title, with the step and the price of the code (maquette v4, 27/11)', () => {
+    const { sale } = assist();
+    const offer = move('offer_step', 'Proposer «\u00a0Étape 3\u00a0» à 15 €');
+    const lines = moveLines(offer, [], { band: 'hot', sale, moment: 'good' });
+    expect(lines.tone).toBe('good');
+    expect(lines.what).toMatch(/^C’est le moment\u00a0: «\u00a0.+\u00a0» à \d+/u);
+    expect(lines.why).toBe('Désir chaud, étape 2 sur 4');
+    // Not before the code says the moment is good, nor without a step to offer.
+    expect(moveLines(offer, [], { band: 'hot', sale, moment: 'soon' }).tone).toBe('neutral');
+    expect(moveLines(offer, [], { band: 'hot', sale: null, moment: 'good' }).what).toBe(offer.label);
+    expect(moveLines(move('reply', 'Répondre'), [], { band: 'hot', sale, moment: 'good' }).tone).toBe('neutral');
+  });
+
   // Design 16/11: the why of a proposal is the reason to propose, from what is known, no number invented.
   it('says why a step is proposed: his desire and where the script stands', () => {
     const { sale } = assist();

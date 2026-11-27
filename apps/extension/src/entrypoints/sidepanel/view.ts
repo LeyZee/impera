@@ -28,6 +28,7 @@ import {
   stepDots,
 } from '../../lib/copilot/assist';
 import { bandBadges, type Badge } from '../../lib/copilot/band';
+import { HEAT_MARK, heatOf, type Heat } from '../../lib/copilot/heat';
 import {
   entryOf,
   ESSENTIALS,
@@ -46,7 +47,7 @@ import {
 import { REJECT_WORDS, withheldOf, type Standing, type Withheld } from '../../lib/copilot/standing';
 import type { VerdictSent } from '../../lib/copilot/verdict';
 import { h } from '../../lib/dom';
-import { icon, type IconName } from '../../lib/icons';
+import { flame, icon, type IconName } from '../../lib/icons';
 
 /**
  * One screen of the copilot side panel (ADR 0086). Pure: the same state draws the same nodes; main.ts follows the tab
@@ -561,12 +562,14 @@ function statusBand(
   open: boolean,
   money: FanStanding | null,
   now: Date,
+  heat: Heat | null,
 ): HTMLElement {
   const badges = h('div', { class: 'cp-badges', 'aria-label': 'Où on en est' });
   let calm = false;
   if (standing === null) badges.append(h('span', { class: 'cp-badges__wait', 'aria-busy': 'true' }, '…'));
   else {
-    const { badges: shown, hidden } = bandBadges(standing, assist, cut, open);
+    // His desire is said by the fire under the name when it is drawn, not by a badge as well.
+    const { badges: shown, hidden } = bandBadges(standing, assist, cut, open, heat === null);
     badges.append(...shown.map(badgeNode));
     // The CRM's light above the page, behind the band; gone as soon as something forbids or holds back (Design 16/11).
     calm = cut === null && shown.every(({ kind }) => kind === 'desire' || kind === 'signal');
@@ -604,7 +607,46 @@ function statusBand(
           ),
           money === null ? null : h('span', { class: 'cp-band__money' }, moneyWords(money, now)),
         );
-  return h('header', { class: 'cp-band', 'data-halo': calm ? 'true' : undefined }, who, badges);
+  return h(
+    'header',
+    { class: 'cp-band', 'data-halo': calm ? 'true' : undefined },
+    who,
+    badges,
+    heat === null ? null : heatRow(heat),
+  );
+}
+
+/**
+ * His desire as fire, the whole width under his name (maquette v4, 27/11; design system `nv-heat`): the flame and the
+ * word take the colour of the tip of the fill; the line is the moment to sell. Never a figure.
+ */
+function heatRow(heat: Heat): HTMLElement {
+  return h(
+    'div',
+    {
+      class: 'nv-heat cp-band__heat',
+      role: 'img',
+      'aria-label': heat.label,
+      'data-lit': heat.lit ? 'true' : 'false',
+      'data-rest': heat.rest ? 'true' : undefined,
+      style: [
+        `--_w:${String(heat.level)}%`,
+        `--_wn:${String(heat.level)}`,
+        `--_m:${String(HEAT_MARK)}%`,
+        heat.color === null ? null : `--_c:${heat.color}`,
+      ]
+        .filter((part): part is string => part !== null)
+        .join(';'),
+    },
+    flame(),
+    h(
+      'span',
+      { class: 'nv-heat__track', 'aria-hidden': 'true' },
+      h('span', { class: 'nv-heat__fill' }),
+      h('span', { class: 'nv-heat__mark' }),
+    ),
+    h('span', { class: 'nv-heat__word', 'aria-hidden': 'true' }, heat.word),
+  );
 }
 
 /**
@@ -626,7 +668,11 @@ function moveBand(
     );
   }
   if (assist?.nextMove == null) return null;
-  const { what, why, tone } = moveLines(assist.nextMove, assist.reasons, { band, sale: assist.sale });
+  const { what, why, tone } = moveLines(assist.nextMove, assist.reasons, {
+    band,
+    sale: assist.sale,
+    moment: assist.saleMoment?.verdict ?? null,
+  });
   // The moment to sell takes the place of « pourquoi » when the server says it (§ 4 bis): not one block more.
   const moment = assist.saleMoment == null ? null : momentLine(assist.saleMoment, assist.nextMove);
   return h(
@@ -1510,6 +1556,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       screen.signalsOpen,
       screen.money,
       screen.now,
+      heatOf({ standing: screen.standing, money: screen.money, assist, cut, now: screen.now }),
     );
     const pinned = move === null ? [] : [move];
     const key = draftKey(screen.draft, stops);

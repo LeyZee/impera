@@ -4,7 +4,7 @@
  * text (the core), then the tabs of his card and the sale, one at a time (Charles 21/11, piste C). Colour says something or is not there (Design
  * 16/11, lot 0141-5): red for a limit that forbids the sale, amber for what holds it back, the green of success for a
  * good moment and what is acquired (Design 21/11: red is an emergency to Charles), the neon for the step in progress and
- * the button, a tint of it for his desire. Nothing blinks.
+ * the button, fire for his desire (cold to burning, never red). Nothing blinks: only the lit flame breathes.
  */
 
 html,
@@ -67,6 +67,10 @@ body {
   pointer-events: none;
   background: radial-gradient(70% 120% at 50% -30%, var(--nv-aura-neon), transparent 72%);
   opacity: 0.7;
+}
+/* His desire as fire, the whole width under his name (maquette v4, 27/11; `nv-heat` of the design system). */
+.cp-band__heat {
+  flex: 1 0 100%;
 }
 .cp-band__fan {
   flex: 0 1 auto;
@@ -309,6 +313,33 @@ body {
 .cp-moment[data-verdict='good'] .cp-notch[data-met='true'],
 .cp-condition[data-met='true'] .cp-notch {
   background: var(--nv-trend-up);
+}
+/* The moment to sell (maquette v4, 27/11): the step and its price as the title, on a soft plate of success, rising in. */
+.cp-move[data-tone='good'] {
+  margin: var(--nv-space-1) var(--cp-gutter) 0;
+  padding: var(--nv-space-2) 10px;
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-success) 14%, transparent);
+  animation: cp-rise var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.cp-move[data-tone='good'] .cp-move__what {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-success);
+}
+.cp-move[data-tone='good'] .cp-move__why {
+  color: var(--nv-ink);
+}
+@keyframes cp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-move[data-tone='good'] {
+    animation: none;
+  }
 }
 .cp-move[data-tone='amber'] .cp-move__what,
 .cp-move[data-tone='amber'] .cp-move__cut {
