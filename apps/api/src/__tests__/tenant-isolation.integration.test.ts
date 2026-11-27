@@ -199,6 +199,10 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/team/announcements/:announcementId/read': 'an announcement to the team: announcements tests',
   'GET /v1/team/announcements/:announcementId/readers': 'an announcement to the team: announcements tests',
   'POST /v1/team/announcements/:announcementId/withdraw': 'an announcement to the team: announcements tests',
+  'POST /v1/team/departures/:departureId/cancel':
+    'a member’s departure, the owner’s only: team-departures tests',
+  'POST /v1/team/departures/:departureId/reveal-removed':
+    'a member’s departure, the owner’s only: team-departures tests',
   'DELETE /v1/scheduling/settings/versions/:id': 'an agency planning version',
   'DELETE /v1/scheduling/swap-requests/:shiftSwapRequestId': 'swap requests: leaves-swaps tests',
   'POST /v1/scheduling/swap-requests/:shiftSwapRequestId/answer': 'swap requests: leaves-swaps tests',

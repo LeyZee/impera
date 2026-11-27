@@ -413,6 +413,27 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     (d, c) =>
       `a passé ${c.member(c.entityId)} de « ${STATUS_NAMES[d.from] ?? d.from} » à « ${STATUS_NAMES[d.to] ?? d.to} »`,
   ),
+  'team_member.departure_schedule': action(
+    'team',
+    z.object({ endsAt: instant }),
+    (d, c) => `a prévu le départ de ${c.member(c.entityId)}`,
+  ),
+  'team_member.departure_cancel': action(
+    'team',
+    none,
+    (_d, c) => `a annulé le départ de ${c.member(c.entityId)}`,
+  ),
+  'team_member.departure_apply': action(
+    'team',
+    z.object({ sessionsEnded: count, passkeysRemoved: count, leftOn: day, scheduledBy: id.optional() }),
+    (d, c) =>
+      `a fait partir ${c.member(c.entityId)} (${plural(d.sessionsEnded, 'session fermée', 'sessions fermées')})`,
+  ),
+  'team_member.reveal_removed': action(
+    'team',
+    none,
+    (_d, c) => `a noté l’accès Reveal de ${c.member(c.entityId)} retiré`,
+  ),
   'team_member.time_zone_follow': action(
     'team',
     z.object({ from: zone.nullable().optional(), to: zone }),
