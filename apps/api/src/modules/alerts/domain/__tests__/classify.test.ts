@@ -43,6 +43,24 @@ describe('which alert of her tab an event is (ADR 0150 § B)', () => {
     ).toBe('her_alerts');
   });
 
+  it('marks her persona’s words, paused or not, and never her own alerts (27/11/2026)', () => {
+    const herWord = { alert: { kind: 'system', code: 'keyword' }, matchedBy: 'keyword', keyword: 'Inventé' };
+    expect(
+      classifyEvent('alert_triggered', { conversationId: CONVERSATION, trigger: herWord, notify: true }),
+    ).toEqual({ code: 'her_alerts', conversationId: CONVERSATION, herWords: true });
+    expect(
+      classifyEvent('handoff_requested', {
+        conversationId: CONVERSATION,
+        cause: 'keyword',
+        trigger: herWord,
+      }),
+    ).toEqual({ code: 'her_alerts', conversationId: CONVERSATION, herWords: true });
+    const custom = { alert: { kind: 'custom', id: ALERT }, matchedBy: 'keyword', keyword: 'Inventé' };
+    expect(
+      classifyEvent('handoff_requested', { conversationId: CONVERSATION, cause: 'keyword', trigger: custom }),
+    ).toEqual({ code: 'her_alerts', conversationId: CONVERSATION });
+  });
+
   it('tells a sale, the AI budget, and a session that just expired', () => {
     expect(classifyEvent('sale_detected', {})).toEqual({ code: 'sale', conversationId: null });
     expect(

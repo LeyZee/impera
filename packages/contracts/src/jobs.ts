@@ -47,6 +47,7 @@ export const JOB_NAMES = [
   'conversation.after_sale',
   'conversation.record_facts',
   'conversation.reopen',
+  'conversation.watch_keywords',
   'conversation.release_unavailable',
   'conversation.settle_placed',
   'connector.dispatch',
@@ -135,6 +136,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.after_sale': 'Mot d’après-achat',
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
+  'conversation.watch_keywords': 'Mots d’alerte lus quand l’IA ne répond pas',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
   'conversation.settle_placed': 'Brouillons placés dans Reveal',
   'connector.dispatch': 'Lecture des comptes Reveal',
@@ -268,6 +270,12 @@ export const JOB_PAYLOADS = {
    * wait first. One per creator (`reopenJobKey`): every deferral out of her hours points at it.
    */
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
+  /**
+   * Her alert words read in what he wrote while the agent does not answer him: at once when a human holds him, her
+   * agent is off or her session expired, five minutes later otherwise (what the agent's turn did not reach). The team
+   * and she are told; nothing is paused or sent.
+   */
+  'conversation.watch_keywords': conversationJob,
   /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
   'conversation.release_unavailable': z.object({}),
   /**
@@ -686,6 +694,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.after_sale': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
+  'conversation.watch_keywords': 3,
   // Each minute: the next run is the retry.
   'conversation.release_unavailable': 1,
   'conversation.settle_placed': 3,

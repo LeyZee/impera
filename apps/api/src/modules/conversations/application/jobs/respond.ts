@@ -8,7 +8,6 @@ import {
   queueNameFor,
   replyOpenAt,
   reopenJobKey,
-  type AlertTrigger,
   type ConversationId,
   type EventBody,
   type HandoffCause,
@@ -38,6 +37,7 @@ import { deferredRespondAt } from '../../domain/rules';
 import { closeAutomaticIfLocked } from '../automatic';
 import { readProposedFacts } from '../facts';
 import { appendEvent } from '../journal';
+import { unsounded } from '../sounded';
 import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
 
 export interface RespondDeps {
@@ -159,18 +159,6 @@ export function fanNotesOf(
       cardAgeStated: ages.some((age) => age.stated),
     }),
   };
-}
-
-/** The same alert, however it matched: a custom one by its row, a system one by its code. */
-const alertKey = ({ alert }: AlertTrigger): string => (alert.kind === 'custom' ? alert.id : alert.code);
-
-/** Her alerts not yet sounded since her last answer: the team hears of each once until she answers. */
-function unsounded<T extends { readonly trigger: AlertTrigger }>(
-  alerts: readonly T[],
-  sounded: readonly AlertTrigger[],
-): T[] {
-  const done = new Set(sounded.map(alertKey));
-  return alerts.filter((alert) => !done.has(alertKey(alert.trigger)));
 }
 
 const lastInboundKey = (conversation: Conversation): number => conversation.lastInboundAt?.getTime() ?? 0;

@@ -71,6 +71,8 @@ Le moteur peut aussi ne pas écrire de brouillon (`held`) :
 
 Le job n'envoie jamais rien lui-même.
 
+**Mots-clés d'alerte quand l'agent ne répond pas** (27/11/2026) : chaque message frais du fan met aussi en file `conversation.watch_keywords` (clé par conversation). Tout de suite quand l'agent ne lui répondra pas (conversation tenue par un humain, interrupteur coupé, session expirée) ; sinon cinq minutes plus tard (`preserve_run_at`), pour ce que son propre tour n'a pas atteint (hors de ses heures, attente d'un time waster, panne). Le job lit en code (port `KeywordWatch`, adaptateur de l'agent, aucun modèle) les mots de sa persona et de ses alertes dans ce qu'il a écrit depuis sa dernière réponse, et écrit un `alert_triggered` pour chaque mot dont personne n'a encore entendu parler depuis cette réponse (ni ce job, ni une pause de l'agent : `alertsSince` lit aussi le `trigger` des `handoff_requested`). Rien n'est mis en pause, rien n'est envoyé. Jamais pour une créatrice archivée. Un mot de sa persona sonne `safety_alert` (même la nuit) chez l'équipe et chez elle, sans le fan ni le mot (`alerts.route`).
+
 ## 3. Approbation et envoi
 
 ```

@@ -215,5 +215,26 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
       );
       return rows.map((row) => ({ userId: row.userId, timeZone: row.timeZone }));
     },
+
+    async creatorAccounts(creatorId) {
+      return admin(async (tx) => {
+        const [creator] = await tx
+          .select({ timeZone: schema.creators.timezone })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        // Strictly hers: an account given several creators, or none, is never told (relecture Sécurité).
+        const accounts = await tx
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(
+            and(
+              eq(schema.user.role, 'creator'),
+              sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`,
+            ),
+          )
+          .orderBy(schema.user.id);
+        return accounts.map((one) => ({ userId: one.id, timeZone: creator?.timeZone ?? 'Europe/Paris' }));
+      });
+    },
   };
 }

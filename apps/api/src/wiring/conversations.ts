@@ -52,6 +52,7 @@ export function wireConversations(
     guard: agent.guard,
     composer: agent.composer,
     cardReader: agent.cardReader,
+    keywordWatch: agent.keywordWatch,
     ...(agent.followUps !== undefined && { followUps: agent.followUps }),
     typing: {
       delaysMs: bubbleDelays,
@@ -114,6 +115,12 @@ export function wireConversations(
         JOB_PAYLOADS['fans.read_card'],
         logger,
         (payload, context) => module.jobs.readCard(payload, context.logger),
+      ),
+      'conversation.watch_keywords': defineTask(
+        'conversation.watch_keywords',
+        JOB_PAYLOADS['conversation.watch_keywords'],
+        logger,
+        (payload, context) => module.jobs.watchKeywords(payload, context.logger),
       ),
       'conversation.reopen': defineTask(
         'conversation.reopen',
