@@ -208,8 +208,10 @@ export function failureOf(
       };
     case 'other-member':
       return {
-        cause: 'Cet onglet est connecté avec un autre membre que le « bot » de ce compte.',
-        gesture: 'Connecte-toi à Reveal avec le « bot », puis resynchronise.',
+        cause:
+          'Cet onglet est connecté avec un autre membre que celui retenu pour l’IA à la première synchro.',
+        gesture:
+          'Connecte-toi à Reveal avec le « bot », puis resynchronise. Si la première synchro s’était faite avec un autre compte, l’agence libère le compte de l’IA sur le serveur, puis tu refais la première synchro avec le « bot ».',
       };
     case 'refused':
       return {
@@ -420,7 +422,7 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
       : text(
           confirm.seen === 'same'
             ? `Cet onglet montre le même modèle qu’à la dernière synchro de ${named(account)}.`
-            : `Première synchro de ce compte : vérifie que cet onglet montre bien ${named(account)} avant d’envoyer.`,
+            : `Première synchro de ce compte : vérifie que cet onglet montre bien ${named(account)}, et qu’il est connecté avec le compte Reveal créé pour l’IA (le «\u00a0bot\u00a0»), jamais le tien ni celui d’un chatteur. Ce compte deviendra celui de l’IA : ses messages et ses ventes seront à son nom.`,
         );
   return [
     h(

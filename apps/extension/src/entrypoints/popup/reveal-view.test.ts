@@ -368,6 +368,9 @@ describe('before a session leaves (demande de Sécurité)', () => {
     const { card, actions } = confirm('unknown');
     const text = card?.textContent ?? '';
     expect(text).toContain('Première synchro de ce compte');
+    // The first « Sync » pins the platform member the AI speaks and sells as (audit de robustesse, 27/11).
+    expect(text).toContain('compte Reveal créé pour l’IA');
+    expect(text).toContain('Ce compte deviendra celui de l’IA');
     expect(text).toContain('Soleil (@soleil.noir)');
     expect(text).not.toContain('Lune');
     expect(text).not.toContain('Garde la messagerie Reveal ouverte');

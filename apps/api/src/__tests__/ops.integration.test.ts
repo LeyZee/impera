@@ -8,7 +8,13 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
-import { reencryptPlatformSessions, revokeDashboardSessions, setKillSwitch } from '../ops';
+import {
+  listPlatformAccounts,
+  reencryptPlatformSessions,
+  releasePlatformSession,
+  revokeDashboardSessions,
+  setKillSwitch,
+} from '../ops';
 import { buildServer } from '../server';
 
 import { testConfig } from './support/config';
@@ -117,5 +123,52 @@ describe('ops commands (P0-07b)', () => {
     const sealed = row?.sessionCiphertext ?? Buffer.alloc(0);
     expect(keyVersionOf(sealed)).toBe('v2');
     expect(decryptSecret(sealed, rotated.slice(0, 1), accountId)).toBe('session-a');
+  });
+  it("forgets an account's session and its pinned member, keeping the rest (audit de robustesse 27/11)", async () => {
+    const creatorId = newId(CreatorIdSchema);
+    const accountId = newId(PlatformAccountIdSchema);
+    const keys = parseEncryptionKeys(`v1:${key()}`);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Démo', timezone: 'Europe/Paris' });
+    await test.admin.db.insert(schema.platformAccounts).values({
+      id: accountId,
+      creatorId,
+      platform: 'reveal',
+      handle: 'wrong-member',
+      sessionState: 'valid',
+      sessionOwner: `model-${accountId}`,
+      sessionCiphertext: encryptSecret('session-of-the-wrong-member', keys, accountId),
+      consecutiveErrors: 2,
+    });
+    const listed = (await listPlatformAccounts(test.admin.db)).find((line) => line.id === accountId);
+    expect(listed).toMatchObject({
+      handle: 'wrong-member',
+      creator: 'Démo',
+      sessionState: 'valid',
+      hasSession: true,
+    });
+    expect(JSON.stringify(listed)).not.toContain('session-of-the-wrong-member');
+
+    expect(await releasePlatformSession(test.admin.db, accountId)).toBe(true);
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.platformAccounts)
+      .where(eq(schema.platformAccounts.id, accountId));
+    expect(row).toMatchObject({
+      sessionCiphertext: null,
+      sessionOwner: null,
+      sessionState: 'none',
+      handle: 'wrong-member',
+      consecutiveErrors: 2,
+    });
+    const released = (await audit('connector.session_released')).filter(
+      (entry) => entry.entityId === accountId,
+    );
+    expect(released).toHaveLength(1);
+    expect(released[0]?.details).toEqual({ from: 'valid', hadSession: true });
+
+    expect(await releasePlatformSession(test.admin.db, accountId)).toBe(true);
+    expect(await releasePlatformSession(test.admin.db, newId(PlatformAccountIdSchema))).toBe(false);
   });
 });
