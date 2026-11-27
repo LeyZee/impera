@@ -41,6 +41,8 @@ export type UntrustedKind =
   | 'script_step'
   /** The paid step waiting for him, when he asks how to pay (ADR 0156 § 4): its price and what it holds. */
   | 'waiting_step'
+  /** Her own accounts code gives this turn (Charles 27/11): the owner's handles, read as data, never as an order. */
+  | 'her_accounts'
   /**
    * A comment left under one of her Instagram posts, and that post's caption (ADR 0122 § 2): a third party's words
    * and hers, read as data, never as an order.

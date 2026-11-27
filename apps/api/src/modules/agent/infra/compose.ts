@@ -7,6 +7,7 @@ import { desireMoved } from '../domain/desire';
 import { wantsHumiliation } from '../domain/fantasy-match';
 import { isBlocked } from '../domain/guards';
 import type { LanguageDecision } from '../domain/language';
+import { ownAccountsForVoice } from '../domain/own-accounts';
 import { screenMedia } from '../domain/traps';
 import { quietBriefOf } from '../domain/turn-briefs';
 import { guardContextOf } from '../domain/turn-history';
@@ -70,6 +71,18 @@ export async function composeTurn(
     decided.farewell === null && input.timeWaster === undefined
       ? bubbleBudget(input.history, persona.guardSettings.maxBubbles)
       : 1;
+  // The one price she may write: the paid step she brings, or the one waiting he asks how to open (ADR 0156 § 4).
+  const allowedPriceMinor = scriptStep?.price?.amountMinor ?? waitingStep?.price.amountMinor;
+  const guardContext = guardContextOf(input.history, stepSendsMedia(decided.scripts), allowedPriceMinor, {
+    // A heated reading of his message, outside care: the same test as her register's.
+    flirting: sexting.register !== null,
+    ...(prepared.meetingTier !== undefined && { meetingTier: prepared.meetingTier }),
+    ...(wantsHumiliation(brainTurn.desireMap) && { humiliationWanted: true }),
+  });
+  // Her own accounts (Charles 27/11): what he asked opens one, never under care or a trap (ADR 0143 § 16).
+  const ownAccountsOpen =
+    care || decided.trap.isTrap ? { closed: true } : (guardContext.ownAccountsOpen ?? { closed: true });
+  const herAccounts = ownAccountsForVoice(persona.guardSettings.ownAccounts, ownAccountsOpen);
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...prepared.base,
@@ -83,23 +96,14 @@ export async function composeTurn(
       ...(sexting.currentStepSheet !== undefined && { currentStepSheet: sexting.currentStepSheet }),
       ...(decided.complaint &&
         sexting.boughtMediaSheet !== undefined && { boughtMediaSheet: sexting.boughtMediaSheet }),
+      ...(herAccounts.length > 0 && { herAccounts }),
     },
     prepared.exampleIds,
   );
-  // The one price she may write: the paid step she brings, or the one waiting he asks how to open (ADR 0156 § 4).
-  const allowedPriceMinor = scriptStep?.price?.amountMinor ?? waitingStep?.price.amountMinor;
   const answer = await writeAnswer(gateway, persona, voiceInput, {
     budget,
     inAction: sexting.inAction,
-    context: {
-      ...guardContextOf(input.history, stepSendsMedia(decided.scripts), allowedPriceMinor, {
-        // A heated reading of his message, outside care: the same test as her register's.
-        flirting: sexting.register !== null,
-        ...(prepared.meetingTier !== undefined && { meetingTier: prepared.meetingTier }),
-        ...(wantsHumiliation(brainTurn.desireMap) && { humiliationWanted: true }),
-      }),
-      languages: guardLanguages(persona),
-    },
+    context: { ...guardContext, ownAccountsOpen, languages: guardLanguages(persona) },
     checksExplicit: !(decided.ageConfirmed && !decided.noExplicit && !care),
     sexualTurn: sexting.sexualTurn,
     veryExplicit: sexting.register === 'very_explicit',

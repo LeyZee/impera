@@ -20,7 +20,18 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
-import { CodeTag, Entries, Field, Fold, NumberInput, Picker, Segment, SwitchRow, TextArea } from './fields';
+import {
+  CodeTag,
+  Entries,
+  Field,
+  Fold,
+  NumberInput,
+  Picker,
+  Segment,
+  SwitchRow,
+  TextArea,
+  TextInput,
+} from './fields';
 import {
   collectOrAll,
   desireHint,
@@ -746,7 +757,7 @@ export function NotificationsTab({
 }
 
 const RULES: readonly {
-  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden' | 'close_only_words'>;
+  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden' | 'close_only_words' | 'own_accounts'>;
   readonly label: string;
   readonly placeholder: string;
   readonly hint?: string;
@@ -779,6 +790,27 @@ const RULES: readonly {
     placeholder: 'Ajouter une insulte',
     hint: 'Même dans le feu de l’action. Si le fan en emploie une envers elle, elle le recadre gentiment.',
     max: 120,
+  },
+];
+
+/**
+ * Her own accounts (Charles 27/11): the only ones the guard lets out, exactly as typed here, each in its context. The
+ * rest of « sortie de Reveal » stays blocked.
+ */
+const OWN_ACCOUNTS: readonly {
+  readonly platform: 'instagram' | 'tiktok';
+  readonly label: string;
+  readonly hint: string;
+}[] = [
+  {
+    platform: 'instagram',
+    label: 'Son Instagram',
+    hint: 'Donné seulement si le fan le demande : pour voir sa wishlist en story à la une, ou pour une cam. Jamais de lui-même.',
+  },
+  {
+    platform: 'tiktok',
+    label: 'Son TikTok',
+    hint: 'Donné seulement pour ses lives. Tout autre pseudo, lien, Snap, Telegram, WhatsApp ou numéro reste bloqué.',
   },
 ];
 
@@ -829,6 +861,26 @@ export function RulesTab({ value: r, onChange }: TabProps<PersonaAgentRules>): J
           }}
         />
       </Field>
+      {OWN_ACCOUNTS.map((item) => (
+        <Field
+          key={item.platform}
+          label={item.label}
+          hint={item.hint}
+          id={`${id}-own-${item.platform}`}
+          path={`rules.own_accounts.${item.platform}`}
+        >
+          <TextInput
+            id={`${id}-own-${item.platform}`}
+            value={r.own_accounts?.[item.platform] ?? ''}
+            maxLength={31}
+            placeholder="Son pseudo, sans lien"
+            onChange={(typed) => {
+              const handle = typed.trim() === '' ? null : typed.trim();
+              onChange({ ...r, own_accounts: { ...r.own_accounts, [item.platform]: handle } });
+            }}
+          />
+        </Field>
+      ))}
     </Block>
   );
 }

@@ -47,6 +47,7 @@ Ce qui existe au 16/11 (main `08ecb4d`) :
    - **Le code décide quand** : il ne donne à la voix un bloc typé `<her_socials>` (un seul compte, celui des lives quand il y en a) que si le fan n'en a jamais reçu dans les 30 derniers jours, n'est pas dans une session chaude ni une course de script (ADR 0098, 0103), n'est pas en mode soin, et seulement après un fait de live dit ou une question du fan sur ses lives ou ses réseaux. La voix le dit en passant, comme un « suis-moi », jamais comme un départ de Reveal.
    - Jamais une messagerie privée ni une autre plateforme payante, jamais d'annonce d'un live à venir.
    - Les deux seuils (30 jours, un compte) sont des constantes du domaine ; à mesurer : fans qui écrivent encore sur Reveal 7 jours après l'avoir reçu.
+   - *Avenant du 27/11/2026 (décision de Charles, 15 h 47, méthode § 10.27 Q3) : le compte des lives est son TikTok, saisi dans sa fiche du CRM (`agent.rules.own_accounts.tiktok`, avenant de l'ADR 0143 § 9). La garde de sortie laisse passer exactement ce pseudo dans un contexte de live (le fan parle de ses lives, ou sa réponse dit « j'étais en live ») ; hors de ce contexte, ou tout autre pseudo, il reste bloqué. Le bloc `<her_socials>` prévu ici s'appelle `<her_accounts>` dans le code ; le seuil de 30 jours n'est pas encore codé.*
 12. **Le playground** passe par le même chemin (ADR 0102) ; une session peut recevoir un agenda fictif, et l'horloge simulée ouvre et ferme la fenêtre de live.
 
 ### D. Les shifts de l'agent, en relais avec les chatteurs

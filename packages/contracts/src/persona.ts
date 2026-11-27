@@ -558,10 +558,36 @@ export const CloseOnlyWordsSchema = z.strictObject({
 });
 export type CloseOnlyWords = z.infer<typeof CloseOnlyWordsSchema>;
 
+/** An Instagram user name as the platform allows it: letters, digits, dots and underscores, 30 at most, no « @ ». */
+export const OWN_INSTAGRAM_HANDLE = /^[a-z0-9._]{1,30}$/u;
+/** A TikTok user name as the platform allows it: letters, digits, dots and underscores, 2 to 24, no « @ ». */
+export const OWN_TIKTOK_HANDLE = /^[a-z0-9._]{2,24}$/u;
+
+/** A handle typed by the owner: trimmed, its leading « @ » dropped, in lower case, as the guard compares it. */
+const ownHandle = (pattern: RegExp) =>
+  z
+    .string()
+    .trim()
+    .transform((typed) => typed.replace(/^@/u, '').toLowerCase())
+    .pipe(z.string().regex(pattern, { message: 'Un pseudo seul : lettres, chiffres, points, tirets bas' }));
+
+/**
+ * Her own accounts the agent may give (Charles 27/11, ADR 0143 avenant du 27/11): her Instagram, only when the fan asks
+ * for it (her wishlist in a story highlight, a cam), and her TikTok, for her lives. Real data typed by the owner in the
+ * CRM: never in the repository, a test or a versioned prompt. Each absent or null: none is ever given.
+ */
+export const OwnAccountsSchema = z.strictObject({
+  instagram: ownHandle(OWN_INSTAGRAM_HANDLE).nullable().optional(),
+  tiktok: ownHandle(OWN_TIKTOK_HANDLE).nullable().optional(),
+});
+export type OwnAccounts = z.infer<typeof OwnAccountsSchema>;
+
 export const PersonaAgentRulesSchema = PersonaLimitsSchema.extend({
   emojis_forbidden: emojiList,
   /** Absent or empty: no word of hers is kept for close fans. */
   close_only_words: z.array(CloseOnlyWordsSchema).max(CLOSE_ONLY_WORD_GROUPS_MAX).optional(),
+  /** Absent: she gives no account of hers. */
+  own_accounts: OwnAccountsSchema.optional(),
 });
 export type PersonaAgentRules = z.infer<typeof PersonaAgentRulesSchema>;
 

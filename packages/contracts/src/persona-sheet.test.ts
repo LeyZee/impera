@@ -277,6 +277,35 @@ describe('corrections', () => {
   });
 });
 
+describe('her own accounts (Charles 27/11)', () => {
+  const withAccounts = (own_accounts: unknown) => {
+    const raw = demo();
+    return PersonaV2Schema.safeParse({
+      ...raw,
+      agent: { ...raw.agent, rules: { ...raw.agent.rules, own_accounts } },
+    });
+  };
+
+  it('is optional: a persona without them gives none', () => {
+    expect(demo().agent.rules.own_accounts).toBeUndefined();
+  });
+
+  it('keeps a handle as the guard compares it: no « @ », lower case; invented handles only', () => {
+    const parsed = withAccounts({ instagram: ' @Exemple.Fictif ', tiktok: null });
+    expect(parsed.success && parsed.data.agent.rules.own_accounts).toEqual({
+      instagram: 'exemple.fictif',
+      tiktok: null,
+    });
+  });
+
+  it('refuses a link, a space, an empty handle or a too long one', () => {
+    for (const instagram of ['instagram.com/exemple', 'https://x.fr', 'exemple fictif', '', 'a'.repeat(31)])
+      expect(withAccounts({ instagram }).success, instagram).toBe(false);
+    expect(withAccounts({ tiktok: 'a' }).success).toBe(false);
+    expect(withAccounts({ snapchat: 'exemple' }).success).toBe(false);
+  });
+});
+
 describe('her close-only words and her emoji streak (Charles 26/11)', () => {
   it('reads the demo example, invented words only', () => {
     const persona = PersonaV2Schema.parse(personaFile('demo/v0.7.0.yaml'));

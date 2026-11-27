@@ -4,6 +4,7 @@ import { gapNotes, timingLines } from './elapsed';
 import { asksPrice, previousTurnsOf, sumsMinorOf, type GuardContext } from './guards';
 import type { Relationship } from './meeting';
 import { isOpener } from './origin';
+import { ownAccountsOpenedBy } from './own-accounts';
 import { askedRefundLately } from './refund';
 import { describeSituation, type Situation } from './situation';
 
@@ -63,6 +64,8 @@ export function guardContextOf(
     fanAmountsMinor: hisSinceHer.flatMap((turn) => sumsMinorOf(turn.text)),
     // He just asked a price: a sum she writes now is a price of hers (Sécurité, #1043).
     fanAskedPrice: hisSinceHer.some((turn) => asksPrice(turn.text)),
+    // What he asks of her own accounts: her Instagram, her lives (Charles 27/11).
+    ownAccountsOpen: ownAccountsOpenedBy(hisSinceHer.map((turn) => turn.text)),
     // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
     ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
     // He asked for a refund lately: she may say it is done on Reveal (ADR 0158 § 48, avenant du 27/11).
