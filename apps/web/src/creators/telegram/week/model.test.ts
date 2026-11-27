@@ -72,6 +72,7 @@ describe('her channel’s week, as the review reads it', () => {
       ],
       reviewed: 1,
       total: 3,
+      thumbnails: {},
     });
     const view = weekView(week, new Date('2026-11-30T08:00:00Z'), PARIS);
     expect(view.answer).toBe('2 posts à relire');
@@ -83,14 +84,14 @@ describe('her channel’s week, as the review reads it', () => {
   });
 
   it('says who read a post, that it left, or why it did not', () => {
-    expect(stateLine(post(1), PARIS)).toEqual({ text: 'Pas encore relu', tone: 'idle' });
+    expect(stateLine(post(1), PARIS)).toEqual({ text: 'À relire', tone: 'todo' });
     expect(
       stateLine(post(1, { review: { action: 'edited', byName: 'Lou', at: '2026-11-29T10:00:00Z' } }), PARIS)
         .text,
     ).toBe('Modifié par Lou');
     expect(stateLine(post(1, { state: 'sent', sentAt: '2026-11-30T09:12:30Z' }), PARIS)).toEqual({
       text: 'Parti à 10:12',
-      tone: 'ok',
+      tone: 'done',
     });
     expect(stateLine(post(1, { state: 'skipped', reason: 'Heure dépassée.' }), PARIS)).toEqual({
       text: 'Heure dépassée.',
@@ -100,7 +101,7 @@ describe('her channel’s week, as the review reads it', () => {
 
   it('says a week not planned yet', () => {
     const view = weekView(
-      ChannelWeekSchema.parse({ week: '2026-11-30', posts: [], reviewed: 0, total: 0 }),
+      ChannelWeekSchema.parse({ week: '2026-11-30', posts: [], reviewed: 0, total: 0, thumbnails: {} }),
       new Date('2026-11-30T08:00:00Z'),
       PARIS,
     );

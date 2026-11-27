@@ -95,4 +95,9 @@ export interface ChannelVisualsSource {
   telegramStock(creatorId: CreatorId): Promise<readonly ChannelVisual[]>;
   /** Its file; `gone` when it is no longer there, `too_big` above what a bot may send (50 MB). */
   file(creatorId: CreatorId, mediaId: string): Promise<ChannelFile | 'gone' | 'too_big'>;
+  /** Where these media sit among her drops, for their reduced picture in the review; one gone is left out. */
+  places(
+    creatorId: CreatorId,
+    mediaIds: readonly string[],
+  ): Promise<Readonly<Record<string, { dropId: string; fileId: string }>>>;
 }

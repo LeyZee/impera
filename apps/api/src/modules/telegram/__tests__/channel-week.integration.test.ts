@@ -67,11 +67,16 @@ describe('her channel’s week on Postgres', () => {
     kind: 'video' as const,
     description: 'Une nouvelle lingerie noire',
   };
+  const place = { dropId: newId(CreatorIdSchema), fileId: newId(CreatorIdSchema) };
   const visuals: ChannelVisualsSource = {
     eveningCandidates: (creatorId) => Promise.resolve(creatorId === nora ? [visual] : []),
     telegramStock: () => Promise.resolve([]),
     file: () =>
       Promise.resolve({ bytes: new Uint8Array([1, 2, 3]), filename: 'video.mp4', mime: 'video/mp4' }),
+    places: (_creatorId, mediaIds) =>
+      Promise.resolve(
+        Object.fromEntries(mediaIds.map((id) => [id, { dropId: place.dropId, fileId: place.fileId }])),
+      ),
   };
   const config = testConfig();
   const headers = { 'x-test-role': 'owner', origin: config.WEB_ORIGIN };
@@ -270,6 +275,7 @@ describe('her channel’s week on Postgres', () => {
       (post) => post.kind === 'main' && post.day === '2026-11-23' && post.state === 'planned',
     );
     if (main === undefined) throw new Error('no main post');
+    expect(main.mediaId === null ? undefined : week.thumbnails[main.mediaId]).toEqual(place);
     now = new Date(new Date(main.at).getTime() + 30_000);
     await module.jobs.channelSend();
     await module.jobs.channelSend();

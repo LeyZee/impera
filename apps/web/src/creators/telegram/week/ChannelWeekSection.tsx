@@ -4,7 +4,7 @@ import { useId, useState, type JSX } from 'react';
 
 import { ChannelRefused, CHANNEL_ERRORS, channelErrorKind } from '../api';
 
-import { channelGesture, useChannelWeek, validateChannelWeek, weekQueryKey } from './api';
+import { channelGesture, thumbnailUrl, useChannelWeek, validateChannelWeek, weekQueryKey } from './api';
 import {
   addDays,
   draftWords,
@@ -18,6 +18,7 @@ import {
   weekToOpen,
   weekView,
   windowWords,
+  waitsForRead,
   type WeekDay,
 } from './model';
 import './channel-week.css';
@@ -44,6 +45,7 @@ export function ChannelWeekSection({
   const [dayIndex, setDayIndex] = useState<number | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [said, setSaid] = useState<{ text: string; tone: 'ok' | 'warn' } | null>(null);
   const { lit, setLit, row } = useLit();
 
@@ -71,6 +73,7 @@ export function ChannelWeekSection({
   const litKind = lit === null ? undefined : view.byKind[lit];
 
   const validateAll = async (): Promise<void> => {
+    setConfirming(false);
     setBusy(true);
     setSaid(null);
     try {
@@ -89,6 +92,7 @@ export function ChannelWeekSection({
     setDayIndex(null);
     setOpened(null);
     setSaid(null);
+    setConfirming(false);
   };
 
   return (
@@ -147,17 +151,38 @@ export function ChannelWeekSection({
             </p>
           )}
         </div>
-        {view.waiting > 0 ? (
+        {view.waiting === 0 ? null : confirming ? (
+          <div className="cw-answer__go cw-confirm" role="group" aria-label="Confirmer">
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              onClick={() => {
+                setConfirming(false);
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              onClick={() => void validateAll()}
+            >
+              {`Oui, valider les ${String(view.waiting)}`}
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            className="nv-btn nv-btn--neon nv-btn--lg cw-answer__go"
+            className="nv-btn nv-btn--soft cw-answer__go"
             disabled={busy}
             aria-busy={busy}
-            onClick={() => void validateAll()}
+            onClick={() => {
+              setConfirming(true);
+            }}
           >
             {busy ? 'Validation…' : 'Tout valider'}
           </button>
-        ) : null}
+        )}
       </div>
 
       {view.total === 0 ? null : (
@@ -218,20 +243,34 @@ export function ChannelWeekSection({
           >
             <span className="cw-day__name">{day.short}</span>
             <span className="cw-day__number nv-num">{day.number}</span>
-            <span className="cw-day__dots" aria-hidden="true">
-              {day.posts
-                .filter((post) => post.state !== 'removed')
-                .map((post) => (
-                  <i
-                    key={post.id}
-                    style={{ '--_c': KIND_COLOUR[post.kind] }}
-                    data-read={post.locked || post.state !== 'planned' || undefined}
-                  />
-                ))}
-            </span>
+            {day.waiting === 0 && day.posts.length > 0 ? (
+              <span className="cw-day__done" aria-hidden="true">
+                <Check />
+              </span>
+            ) : (
+              <span className="cw-day__dots" aria-hidden="true">
+                {day.posts
+                  .filter((post) => post.state !== 'removed' && waitsForRead(post, at))
+                  .map((post) => (
+                    <i key={post.id} style={{ '--_c': KIND_COLOUR[post.kind] }} />
+                  ))}
+              </span>
+            )}
           </button>
         ))}
       </nav>
+      <p className="cw-key">
+        <span>
+          <i className="cw-key__dot" aria-hidden="true" />
+          Un post à relire, dans la couleur de son type
+        </span>
+        <span>
+          <span className="cw-key__check" aria-hidden="true">
+            <Check />
+          </span>
+          Jour relu
+        </span>
+      </p>
 
       {shown === undefined ? null : (
         <Day
@@ -243,6 +282,10 @@ export function ChannelWeekSection({
           onOpen={setOpened}
           onChanged={refresh}
           failure={failure}
+          thumbnailOf={(mediaId) => {
+            const place = mediaId === null ? undefined : query.data.thumbnails[mediaId];
+            return place === undefined ? null : thumbnailUrl(creatorId, place);
+          }}
         />
       )}
     </section>
@@ -258,6 +301,7 @@ function Day({
   onOpen,
   onChanged,
   failure,
+  thumbnailOf,
 }: {
   day: WeekDay;
   creatorId: CreatorId;
@@ -267,6 +311,7 @@ function Day({
   onOpen: (id: string | null) => void;
   onChanged: () => Promise<void>;
   failure: (error: unknown) => string;
+  thumbnailOf: (mediaId: string | null) => string | null;
 }): JSX.Element {
   return (
     <section className="cw-list" aria-label={`${day.weekday} ${String(day.number)}`}>
@@ -281,6 +326,7 @@ function Day({
             creatorId={creatorId}
             timeZone={timeZone}
             now={now}
+            thumbnail={thumbnailOf(post.mediaId)}
             open={opened === post.id}
             onToggle={() => {
               onOpen(opened === post.id ? null : post.id);
@@ -300,6 +346,7 @@ function Post({
   creatorId,
   timeZone,
   now,
+  thumbnail,
   open,
   onToggle,
   onChanged,
@@ -310,6 +357,7 @@ function Post({
   creatorId: CreatorId;
   timeZone: string;
   now: Date;
+  thumbnail: string | null;
   open: boolean;
   onToggle: () => void;
   onChanged: () => Promise<void>;
@@ -326,6 +374,7 @@ function Post({
       className="cw-post"
       data-state={post.state}
       data-open={open || undefined}
+      data-read={(!removed && line.tone !== 'todo') || undefined}
       style={{ '--_c': colour, '--nv-i': index }}
     >
       <button
@@ -350,12 +399,21 @@ function Post({
             )}
           </span>
           {removed ? null : (
-            <span className="cw-post__text">{words === null ? 'Le texte s’écrit…' : words.text}</span>
+            <span className="cw-post__content">
+              {thumbnail === null ? null : (
+                <img className="cw-post__thumb" src={thumbnail} alt="Son visuel" loading="lazy" />
+              )}
+              <span className="cw-post__text">{words === null ? 'Le texte s’écrit…' : words.text}</span>
+            </span>
           )}
-          <span className="cw-post__state" data-tone={line.tone}>
-            {line.tone === 'ok' ? <Check /> : null}
-            {line.text}
-          </span>
+          {line.tone === 'todo' ? (
+            <span className="nv-tag cw-post__todo">{line.text}</span>
+          ) : (
+            <span className="cw-post__state" data-tone={line.tone}>
+              {line.tone === 'done' ? <Check /> : null}
+              {line.text}
+            </span>
+          )}
         </span>
         {removed ? null : <span className="cw-post__chev" aria-hidden="true" />}
       </button>
@@ -535,7 +593,7 @@ function PostOpen({
           </div>
           <button
             type="button"
-            className="nv-btn nv-btn--plain nv-btn--destructive cw-open__remove"
+            className="nv-btn nv-btn--plain nv-btn--sm cw-open__remove"
             disabled={busy !== null}
             aria-busy={busy === 'remove'}
             onClick={() => void act({ gesture: 'remove' })}

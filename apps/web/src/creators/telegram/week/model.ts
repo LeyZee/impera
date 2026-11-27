@@ -131,7 +131,8 @@ export function waitsForRead(post: ChannelPlannedPost, now: Date): boolean {
   return isOpen(post, now) && !post.locked;
 }
 
-export type PostTone = 'ok' | 'warn' | 'quiet' | 'idle';
+/** `todo`: waits for a read, said strong; `done`: read or left, set back; `warn`: not sent; `quiet`: removed. */
+export type PostTone = 'todo' | 'done' | 'warn' | 'quiet';
 
 const REVIEW_WORDS = {
   validated: 'Validé',
@@ -144,7 +145,7 @@ const REVIEW_WORDS = {
 /** The line under a post: who read it, or that it left, or why it did not, in its tone. */
 export function stateLine(post: ChannelPlannedPost, timeZone: string): { text: string; tone: PostTone } {
   if (post.state === 'sent') {
-    return { text: `Parti à ${hourOf(post.sentAt ?? post.at, timeZone)}`, tone: 'ok' };
+    return { text: `Parti à ${hourOf(post.sentAt ?? post.at, timeZone)}`, tone: 'done' };
   }
   if (post.state === 'skipped' || post.state === 'failed') {
     return { text: post.reason ?? 'Il n’est pas parti.', tone: 'warn' };
@@ -154,9 +155,9 @@ export function stateLine(post: ChannelPlannedPost, timeZone: string): { text: s
     return { text: `Retiré${by} : un autre post prend sa place.`, tone: 'quiet' };
   }
   if (post.review !== null) {
-    return { text: `${REVIEW_WORDS[post.review.action]} par ${post.review.byName}`, tone: 'ok' };
+    return { text: `${REVIEW_WORDS[post.review.action]} par ${post.review.byName}`, tone: 'done' };
   }
-  return { text: 'Pas encore relu', tone: 'idle' };
+  return { text: 'À relire', tone: 'todo' };
 }
 
 /** What the card shows of its text: the post's words without the markup, or the poll's question and options. */

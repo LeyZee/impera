@@ -214,6 +214,12 @@ describe('her channel’s visuals on Postgres', () => {
     }
   });
 
+  it('says where her visual sits among her drops, for its reduced picture, and nothing of hers to another', async () => {
+    const places = await reader().places(nora, [assets.stock, assets.withdrawn]);
+    expect(Object.keys(places)).toEqual([assets.stock]);
+    expect(await reader().places(ines, [assets.stock])).toEqual({});
+  });
+
   it('reads nothing of hers under another creator', async () => {
     expect(await reader().telegramStock(ines)).toEqual([]);
     expect(await reader().file(ines, assets.stock)).toBe('gone');

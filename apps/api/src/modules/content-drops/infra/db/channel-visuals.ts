@@ -25,7 +25,13 @@ export interface ChannelVisualsReader {
   eveningCandidates(creatorId: string, day: string): Promise<readonly ChannelVisualRead[]>;
   telegramStock(creatorId: string): Promise<readonly ChannelVisualRead[]>;
   file(creatorId: string, mediaId: string): Promise<ChannelVisualFile | 'gone' | 'too_big'>;
+  places(
+    creatorId: string,
+    mediaIds: readonly string[],
+  ): Promise<Readonly<Record<string, { dropId: string; fileId: string }>>>;
 }
+
+const PlaceRowSchema = z.object({ media_asset_id: z.string(), drop_id: z.string(), file_id: z.string() });
 
 const CandidateRowSchema = z.object({
   media_asset_id: z.string(),
@@ -149,6 +155,24 @@ export function createChannelVisualsReader(
       read(creatorId, {
         categories: EVENING,
         keptUntil: new Date(Date.parse(`${day}T00:00:00Z`) + 2 * DAY_MS),
+      }),
+    // Its newest live file among her drops, for its reduced picture in the review; read in her creator only.
+    places: (creatorId, mediaIds) =>
+      withTenantJob(db, creatorId, 'telegram_channel', async (tx) => {
+        const result = await tx.execute(sql`
+          select distinct on (f.media_asset_id) f.media_asset_id, f.drop_id, f.id as file_id
+            from content_drop_files f join content_drops d on d.id = f.drop_id and d.creator_id = f.creator_id
+           where f.creator_id = ${creatorId} and f.media_asset_id in ${list(mediaIds)}
+             and d.withdrawn_at is null and f.replaced_at is null
+           order by f.media_asset_id, d.created_at desc, f.position`);
+        return Object.fromEntries(
+          result.rows.flatMap((raw) => {
+            const row = PlaceRowSchema.safeParse(raw);
+            return row.success
+              ? [[row.data.media_asset_id, { dropId: row.data.drop_id, fileId: row.data.file_id }] as const]
+              : [];
+          }),
+        );
       }),
     telegramStock: (creatorId) =>
       read(creatorId, { categories: STOCK, keptUntil: new Date(Date.now() + STOCK_HORIZON_MS) }),

@@ -38,6 +38,7 @@ const week = (posts: readonly ChannelPlannedPost[], reviewed = 0) => ({
   posts,
   reviewed,
   total: posts.filter((one) => one.state !== 'removed').length,
+  thumbnails: {},
 });
 
 function serve(answers: Record<string, () => { status: number; body: unknown }>) {
@@ -99,6 +100,7 @@ describe('La semaine du canal', () => {
     mount();
     expect(await screen.findByText('1 post à relire')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Tout valider' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Oui, valider les 1' }));
     expect(await screen.findByText('1 post validé.')).toBeTruthy();
     expect(await screen.findByText('Tout est relu')).toBeTruthy();
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ week: '2026-11-30' });

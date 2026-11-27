@@ -80,6 +80,10 @@ export const ChannelPlannedPostSchema = z.object({
 });
 export type ChannelPlannedPost = z.infer<typeof ChannelPlannedPostSchema>;
 
+/** A visual's place among her drops, to show its reduced picture. */
+export const ChannelVisualPlaceSchema = z.object({ dropId: z.uuid(), fileId: z.uuid() });
+export type ChannelVisualPlace = z.infer<typeof ChannelVisualPlaceSchema>;
+
 export const ChannelWeekSchema = z.object({
   week: ChannelDaySchema,
   /** Every post of the week, removed ones included, by hour. */
@@ -87,6 +91,11 @@ export const ChannelWeekSchema = z.object({
   /** Read by someone: validated, edited, rewritten or visual changed; out of the posts that count (not removed). */
   reviewed: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
+  /**
+   * Where each visual of the week is shown in the review, by its medium: its drop and its file, whose reduced picture
+   * the agency's route serves (`/v1/creators/:creatorId/drops/:id/files/:fileId/thumbnail`). A visual gone is absent.
+   */
+  thumbnails: z.record(z.uuid(), ChannelVisualPlaceSchema),
 });
 export type ChannelWeek = z.infer<typeof ChannelWeekSchema>;
 

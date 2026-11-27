@@ -5,6 +5,7 @@ import {
   refusalOf,
   type ChannelPlannedPost,
   type ChannelPostGesture,
+  type ChannelVisualPlace,
   type ChannelWeek,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -96,3 +97,7 @@ export const validateChannelWeek = async (creatorId: string, week: string): Prom
       json({ week }),
     )
   ).validated;
+
+/** Its visual's reduced picture, served by the agency's route of her drops. */
+export const thumbnailUrl = (creatorId: string, place: ChannelVisualPlace): string =>
+  `/v1/creators/${encodeURIComponent(creatorId)}/drops/${encodeURIComponent(place.dropId)}/files/${encodeURIComponent(place.fileId)}/thumbnail`;

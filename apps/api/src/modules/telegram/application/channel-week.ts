@@ -359,11 +359,13 @@ export async function channelWeek(
   if (!(await deps.channels.creatorActive(creatorId))) return null;
   const posts = await deps.week.week(creatorId, week);
   const counted = posts.filter((post) => post.state !== 'removed');
+  const media = [...new Set(counted.flatMap((post) => (post.mediaId === null ? [] : [post.mediaId])))];
   return {
     week,
     posts: [...posts],
     reviewed: counted.filter((post) => post.locked).length,
     total: counted.length,
+    thumbnails: media.length === 0 ? {} : { ...(await deps.visuals.places(creatorId, media)) },
   };
 }
 
