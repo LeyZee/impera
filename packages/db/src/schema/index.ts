@@ -26,6 +26,7 @@ export * from './persona';
 export * from './rewards';
 export * from './playground';
 export * from './sales-feed';
+export * from './chatter-review';
 export * from './scheduling';
 export * from './redirect-links';
 export * from './custom-orders';

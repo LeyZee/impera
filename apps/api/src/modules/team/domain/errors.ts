@@ -165,6 +165,30 @@ export class AnnouncementWithdrawForbidden extends DomainError {
   }
 }
 
+/** « Mon bilan » is a team member's: the owner and a creator have none (ADR 0170 § 12). */
+export class ReviewMemberForbidden extends DomainError {
+  constructor() {
+    super('review_member_forbidden', 'Le bilan est celui d’un membre de l’équipe');
+  }
+}
+
+/** A remark that is not his, or that does not exist: the same answer (ADR 0170 § 14). */
+export class ReviewRemarkNotFound extends DomainError {
+  constructor() {
+    super('review_remark_not_found', 'Remarque introuvable');
+  }
+}
+
+/** Only the owner or a manager of the creator settles a contest, never his own (ADR 0170 § 14). */
+export class ReviewRulingForbidden extends DomainError {
+  constructor() {
+    super(
+      'review_ruling_forbidden',
+      'Seul le propriétaire ou un manager tranche, jamais sa propre contestation',
+    );
+  }
+}
+
 /** ADR 0166 § 1: one departure waiting per member, and only a waiting one is cancelled. */
 export class MemberDepartureConflict extends DomainError {
   constructor(message = 'Ce membre a déjà un départ prévu') {
@@ -178,6 +202,13 @@ export class MemberDepartureDateInvalid extends DomainError {
       'member_departure_date_invalid',
       `L’heure de fin est maintenant ou plus tard, dans les ${String(maxDays)} jours`,
     );
+  }
+}
+
+/** « Mon bilan » of a shift that is not his, or that does not exist: the same answer (ADR 0170 § 12). */
+export class ReviewShiftNotFound extends DomainError {
+  constructor() {
+    super('review_shift_not_found', 'Shift introuvable');
   }
 }
 
