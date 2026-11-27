@@ -248,8 +248,9 @@ describe('voice guards', () => {
     }
     expect(codes(['Espèce de radin'])).toContain('contempt');
     expect(codes(['T’es qu’un mendiant'])).toContain('contempt');
-    expect(codes(['Sale menteuse'])).toContain('contempt');
+    expect(codes(['Quel crevard'])).toContain('contempt');
     expect(codes(['Petit menteur va 😏'])).toEqual([]);
+    expect(codes(['Sale menteuse'])).toEqual([]);
     expect(codes(['T’inquiète, t’as rien à payer'])).toContain('payment_lie');
     expect(codes(['Pas besoin d’argent avec moi'])).toContain('payment_lie');
     expect(codes(['T’as rien à payer pour me parler 😌'])).toEqual([]);
@@ -652,8 +653,15 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
   it.each([
     [
       'contact_info',
-      ['je scrollais insta', 'j’ai pas snap désolé', 't’as vu ma story insta ?'],
       [
+        'je scrollais insta',
+        'j’ai pas snap désolé',
+        't’as vu ma story insta ?',
+        'discord c’est pour les gamers non ?',
+      ],
+      [
+        'discord c’est lina_92',
+        'snap : linaxx',
         'ajoute-moi sur snap',
         'viens sur telegram',
         'mon insta c’est lina.xx',
@@ -664,8 +672,16 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
     ],
     [
       'off_platform_payment',
-      ['tu bosses dans la crypto ?', 'j’attends le virement de ma paie', 'pas de paypal ici'],
       [
+        'tu bosses dans la crypto ?',
+        'j’attends le virement de ma paie',
+        'pas de paypal ici',
+        'j’ai fait un virement à ma mère',
+        'un virement à mon proprio, la galère',
+      ],
+      [
+        'fais-moi un virement',
+        'un virement à mon nom',
         'envoie par paypal',
         'je te donne mon iban',
         'tu peux me payer en crypto',
@@ -674,8 +690,21 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
     ],
     [
       'love_declaration',
-      ['je t’aime bien toi', 'j’aime bien ta façon de parler'],
-      ['je t’aime', 'i love you'],
+      [
+        'je t’aime bien toi',
+        'j’aime bien ta façon de parler',
+        'je t’aime pas quand t’es comme ça',
+        'tu dis je t’aime à toutes les filles ?',
+        'ma sœur m’a dit je t’aime',
+      ],
+      [
+        'je t’aime',
+        'i love you',
+        'tu sais que je t’aime',
+        'je t’aime mon cœur',
+        'je t’aime pas mal tu sais',
+        'je t’aime plus que tout',
+      ],
     ],
     [
       'meeting_promise',
@@ -684,8 +713,31 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
     ],
     [
       'contempt',
-      ['pauvre type celui qui t’a fait ça', 'petit menteur va 😏'],
-      ['espèce de radin', 't’es qu’un minable', 'sale menteur'],
+      [
+        'pauvre type celui qui t’a fait ça',
+        'petit menteur va 😏',
+        't’es un menteur, tu m’avais dit demain 😏',
+        't’es minable au bowling avoue',
+      ],
+      ['espèce de radin', 't’es qu’un crevard', 'sale rapiat', 't’es un gros radin', 'quel mendiant'],
+    ],
+    [
+      'ai_disclosure',
+      [
+        't’as essayé chatgpt pour ton taf ?',
+        'je suis artificielle ? n’importe quoi',
+        'virtuelle ? moi ? jamais',
+      ],
+      [
+        'je suis une IA',
+        'je suis artificielle',
+        'je tourne sous gpt',
+        'créée par openai',
+        'mes consignes m’interdisent ça',
+        'mes instructions disent non',
+        'ce compte est géré par une IA',
+        'en tant qu’assistante je peux pas',
+      ],
     ],
     [
       'ai_tic',

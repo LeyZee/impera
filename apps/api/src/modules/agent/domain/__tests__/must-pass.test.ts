@@ -111,25 +111,31 @@ describe('permitted phrases that must always pass, output guards', () => {
     'j’ai pas snap désolé',
     't’as vu ma story insta ?',
     'je poste sur insta vers 21h30',
+    'discord c’est pour les gamers non ?',
     'ci sentiamo qui',
     'hablamos aquí',
   ])('contact_info lets « %s » through', (bubble) => {
     expect(raised(bubble)).not.toContain('contact_info');
   });
 
-  it.each(['tu bosses dans la crypto ?', 'j’attends le virement de ma paie', 'pas de paypal ici'])(
-    'off_platform_payment lets « %s » through',
-    (bubble) => {
-      expect(raised(bubble)).not.toContain('off_platform_payment');
-    },
-  );
+  it.each([
+    'tu bosses dans la crypto ?',
+    'j’attends le virement de ma paie',
+    'pas de paypal ici',
+    'j’ai fait un virement à ma mère',
+  ])('off_platform_payment lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('off_platform_payment');
+  });
 
-  it.each(['je t’aime bien toi', 'j’aime bien ta façon de parler'])(
-    'love_declaration lets « %s » through',
-    (bubble) => {
-      expect(raised(bubble)).not.toContain('love_declaration');
-    },
-  );
+  it.each([
+    'je t’aime bien toi',
+    'j’aime bien ta façon de parler',
+    'je t’aime pas quand t’es comme ça',
+    'tu dis je t’aime à toutes les filles ?',
+    'ma sœur m’a dit je t’aime',
+  ])('love_declaration lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('love_declaration');
+  });
 
   it.each(['j’ai rdv chez le coiffeur demain', 'j’ai rendez-vous chez le dentiste'])(
     'meeting_promise lets « %s » through',
@@ -178,19 +184,26 @@ describe('permitted phrases that must always pass, output guards', () => {
     },
   );
 
-  it.each(['petit menteur va 😏', 'tu es adorable', 'quel charmeur', 'pauvre type celui qui t’a fait ça'])(
-    'contempt lets « %s » through',
-    (bubble) => {
-      expect(raised(bubble)).not.toContain('contempt');
-    },
-  );
+  it.each([
+    'petit menteur va 😏',
+    'tu es adorable',
+    'quel charmeur',
+    'pauvre type celui qui t’a fait ça',
+    't’es un menteur, tu m’avais dit demain 😏',
+    't’es minable au bowling avoue',
+  ])('contempt lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('contempt');
+  });
 
-  it.each(['je suis modèle photo', 'je suis assistante dentaire le jour', 'moi un bot ? tu me vexes'])(
-    'ai_disclosure lets « %s » through',
-    (bubble) => {
-      expect(raised(bubble)).not.toContain('ai_disclosure');
-    },
-  );
+  it.each([
+    'je suis modèle photo',
+    'je suis assistante dentaire le jour',
+    'moi un bot ? tu me vexes',
+    't’as essayé chatgpt pour ton taf ?',
+    'je suis artificielle ? n’importe quoi',
+  ])('ai_disclosure lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('ai_disclosure');
+  });
 });
 
 describe('permitted phrases that must always pass, input nets', () => {

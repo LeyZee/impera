@@ -130,7 +130,7 @@ function minorNamed(bubble: string): string | undefined {
 
 // A means of paying outside Reveal (recette MOT-04). « Wise » counts only as a means: « that's wise » is innocent.
 const PAYMENT_MEANS =
-  '(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)';
+  '(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)(?! (a|au|pour) ((ma|mon|sa|son) (mere|pere|soeur|frere|proprio|proprietaire|banque|pote|copine|copain|ex|coloc|daronne|daron|famille|mamie|papy)|(mes|ses) (parents|potes)))';
 // A plausible handle or identifier: a dot or an underscore inside a word, letters then digits, an « @ ».
 const HANDLE = '(?<![\\w@])[a-z][a-z0-9]*([._][a-z0-9]+)+|(?<![\\w@])[a-z]{3,}\\d{2,}\\b|@[a-z0-9_.]{2,}';
 // Two words after « cherche », « tape »: a name to type in a search (« cherche lina rose »).
@@ -153,8 +153,10 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   },
   {
     code: 'ai_disclosure',
+    // Her instructions always; a product only said of herself (« je tourne sous gpt », « créée par openai »): « t'as
+    // essayé chatgpt pour ton taf ? » is a topic (Sécurité, #1043).
     pattern:
-      /\b(prompt|language model|modele de langage|mes instructions|grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|deepseek|perplexity)\b/,
+      /\b(prompt|language model|modele de langage|mes instructions|mes consignes)\b|\b(je suis|j'?suis|jsuis|chui|moi c'est|i am|i'?m|je tourne sous|je tourne avec|propulsee? par|powered by|basee? sur|developpee? par|creee? par|concue? par|made by|built on) (une? |un simple )?(grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|deepseek|perplexity)\b/,
   },
   // Naming herself after a model: « je suis claude », « moi c'est mistral ».
   {
@@ -169,7 +171,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     pattern: new RegExp(
       [
         `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | rien qu'| rien d'autre qu')?\\s?(une? |un simple |une simple )(modele|programme|logiciel|application|appli|simulation)(?! (photo|pour|nue?|lingerie|charme|glamour|insta|instagram|en |de |d'))(?![a-z])`,
-        `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | )(une? |ta |ton )?((fille|femme|meuf|personne|copine|creature|amie) )?(artificielle?|virtuelle?|simulee?|generee? par)(?![a-z])`,
+        `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | )(une? |ta |ton )?((fille|femme|meuf|personne|copine|creature|amie) )?(artificielle?|virtuelle?|simulee?|generee? par)(?![a-z])(?!\\s*\\?)`,
       ].join('|'),
     ),
   },
@@ -218,9 +220,10 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   },
   {
     code: 'love_declaration',
-    // « Je t'aime bien » is no declaration (Charles 27/11).
+    // « Je t'aime bien » is no declaration (Charles 27/11), nor « je t'aime pas quand… », nor a « je t'aime » she
+    // quotes (« tu dis je t'aime à toutes ? », « elle m'a dit je t'aime »), Sécurité #1043.
     pattern:
-      /\b(je t'?\s?aime|j'?t'?aime|jtm|je suis amoureuse de toi|i love you|te (quiero|amo))\b(?! bien)/,
+      /(?<!\b(dis|dit|dire|dites|disent|disais|ecris|ecrit|says?|said|tell|told) (que )?)\b(je t'?\s?aime|j'?t'?aime|jtm|je suis amoureuse de toi|i love you|te (quiero|amo))\b(?! bien| pas(?! mal)| plus(?! que| qu'| fort)| point)/,
   },
   // A concrete meeting (a day, a place, a visit) is blocked; the playful « un jour, peut-être » stays allowed, and
   // so do the live, the DMs and the bed: « on se voit au prochain live », « viens me voir en privé ».
@@ -275,7 +278,9 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
         `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
         `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
         `\\b(mon|ma|mes|my|mi|il mio|la mia) (compte |account |cuenta )?${NETWORK}\\b`,
-        `\\b${NETWORK} ?(:|=|c'?est|est|is|es|e) ?@?[a-z0-9_.]{3,}`,
+        // « discord c'est pour les gamers » is a topic: after « c'est », only a handle (Sécurité, #1043).
+        `\\b${NETWORK} ?(:|=) ?@?[a-z0-9_.]{3,}`,
+        `\\b${NETWORK} ?(c'?est|est|is|es|e) ?(${HANDLE})`,
         `(^|\\s)@[a-z0-9_.]{3,}`,
       ].join('|'),
     ),
@@ -315,7 +320,9 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     code: 'contempt',
     pattern:
       // Only said to him (Charles 27/11): « pauvre type celui qui t'a fait ça » passes.
-      /\b(sale|espece de|t'?es (qu'?)?une?|tu es (qu'?)?une?|t'?es (qu'?)?|tu es (qu'?)?|toi,? ) ?(radin|radine|rapiat|rapiate|menteur|menteuse|mendiant|mendiante|crevard|crevarde|minable|pauvre type)s?\b/,
+      // Only the words of money, said to him (Sécurité, #1043): « t'es un menteur 😏 » or « minable au bowling » are
+      // teasing, the rest is for the judge in context.
+      /\b(sale|espece de|t'?es (qu'?)?(une? )?|tu es (qu'?)?(une? )?|toi,? |quel |quelle ) ?(gros |grosse |petit |petite |vrai |vraie )?(radin|radine|rapiat|rapiate|mendiant|mendiante|crevard|crevarde)s?\b/,
   },
   // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat.
   { code: 'forbidden_term', pattern: /\bmdr+\b/ },
