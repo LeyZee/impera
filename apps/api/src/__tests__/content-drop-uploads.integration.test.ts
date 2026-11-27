@@ -775,6 +775,33 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     expect(hers.drops.find((mine) => mine.id === one.dropId)?.exportedAt).toBe(drop.exportedAt);
   });
 
+  it('numbers her drop among her own of the day: another creator’s drop the same day shifts nothing (Sécurité, 27/11)', async () => {
+    // Another creator drops a feed session first, the same day.
+    const theirs = { id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes: MB };
+    const other = await call('POST', '/v1/creator-space/drops', 'ines', {
+      id: newId(ContentDropIdSchema),
+      category: 'feed_shoot',
+      files: [theirs],
+    });
+    expect(other.statusCode, other.body).toBe(200);
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x6e));
+    await sendWhole(one);
+    await receive();
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(new Date());
+    const hers = await test.admin.db
+      .select({ createdAt: schema.contentDrops.createdAt })
+      .from(schema.contentDrops)
+      .where(and(eq(schema.contentDrops.creatorId, nora), eq(schema.contentDrops.category, 'feed_shoot')));
+    const today = hers.filter(
+      (drop) => new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(drop.createdAt) === day,
+    ).length;
+    const archive = await call('GET', `/v1/creators/${nora}/drops/${one.dropId}/export`, 'manager');
+    expect(archive.statusCode, archive.body).toBe(200);
+    expect(String(archive.headers['content-disposition'])).toBe(
+      `attachment; filename="feed-seance-${day}-${String(today)}.zip"`,
+    );
+  });
+
   it('takes no more bytes once her drop is withdrawn, and the job erases what had arrived', async () => {
     const { dropId, fileId, base, bytes } = await dropOne('nora', jpegOf(MB, 30, 40, 0x22));
     const plan = await upload(base, 'nora');

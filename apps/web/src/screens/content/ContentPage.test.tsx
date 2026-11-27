@@ -490,7 +490,7 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
   });
 
-  it('lets her drag a file by its grip to its place, and says the order she sees is the one published (Charles, 26/11)', async () => {
+  it('lets her drag a file by its grip to its place, under « Ordre de publication » (Charles, 26/11)', async () => {
     serve({ requests: [], drops: [] });
     show();
     fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
@@ -502,7 +502,9 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
       fileWithHead('IMG_2.HEIC', 'heic', 1),
       fileWithHead('IMG_3.HEIC', 'heic', 2),
     ]);
-    expect(within(dialog).getByText(/Vérifie l’ordre : c’est celui-ci qui sera publié/u)).toBeDefined();
+    // « Ordre de publication » names the list, the 1, 2, 3 on its thumbnails.
+    expect(within(dialog).getByRole('list', { name: 'Ordre de publication' })).toBeDefined();
+    expect(within(dialog).getByText('Glisse une vignette par sa poignée pour la déplacer.')).toBeDefined();
     // jsdom lays nothing out: each row 50 px high, one under the other.
     const rows = [...dialog.querySelectorAll<HTMLElement>('.ct-chosen__item')];
     rows.forEach((row, index) => {

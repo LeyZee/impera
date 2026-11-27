@@ -818,13 +818,16 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
   if (await redoPendingIn(tx, dropId)) throw new ContentDropExportUnprocessable('redo_pending');
   const timezone = creator?.timezone ?? 'UTC';
   // Its rank among her drops of that category on that day of hers, withdrawn ones counted: a name never changes.
+  // Compared to its own row in the base, never to a JS Date: the base keeps microseconds, a Date only milliseconds,
+  // and the drop would then fall out of its own count.
   const [rank] = await tx
     .execute<{ rank: number }>(
       sql`
     select count(*)::int as rank from content_drops d
-     where d.creator_id = ${row.creatorId} and d.category = ${row.category}
-       and (d.created_at at time zone ${timezone})::date = (${row.createdAt}::timestamptz at time zone ${timezone})::date
-       and (d.created_at, d.id) <= (${row.createdAt}::timestamptz, ${row.id}::uuid)
+      join content_drops me on me.id = ${row.id}::uuid
+     where d.creator_id = me.creator_id and d.category = me.category
+       and (d.created_at at time zone ${timezone})::date = (me.created_at at time zone ${timezone})::date
+       and (d.created_at, d.id) <= (me.created_at, me.id)
   `,
     )
     .then((result) => result.rows);
