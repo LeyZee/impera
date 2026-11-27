@@ -57,7 +57,17 @@ export function wireSupervision(
       }),
     requireRole,
     budget: () => llm.gateway.health().budget,
-    voiceHealth: () => voiceHealthOf(llm.gateway.health().roles.find((r) => r.role === 'voice')),
+    voiceHealth: () => {
+      const { roles } = llm.gateway.health();
+      const voice = roles.find((r) => r.role === 'voice');
+      return {
+        ...voiceHealthOf(voice),
+        ...liveAnswerOf(
+          voice,
+          roles.find((r) => r.role === 'brain'),
+        ),
+      };
+    },
     voice: deps.activeVoice,
     stuckJobs: (creatorId) => readStuckJobs(adminDb, creatorId, deps.jobNames()),
     allCreatorIds: deps.allCreatorIds,
@@ -90,5 +100,30 @@ export function voiceHealthOf(voice: RoleHealth | undefined): { ok: boolean; key
   return {
     ok: voice !== undefined && voice.state !== 'down',
     keyMissing: voice === undefined || (!voice.hasKey && voice.fallback?.hasKey !== true),
+  };
+}
+
+/**
+ * Whether the agent's models answer, from what they did (recette 27/11, A9): the latest real call either answered
+ * (an owner's « Essai réel » is not one, health.ts), and, while one of them is down, since when. The brain fails
+ * first in an outage and the voice is then never called: both are read, never the voice alone.
+ */
+export function liveAnswerOf(
+  voice: RoleHealth | undefined,
+  brain: RoleHealth | undefined,
+): { lastAnsweredAt?: Date; down?: { since: Date | null } } {
+  const live = [voice, brain].filter((role): role is RoleHealth => role !== undefined);
+  const answered = live
+    .map((role) => role.lastSuccessAt)
+    .filter((at): at is Date => at !== undefined)
+    .toSorted((a, b) => b.getTime() - a.getTime())[0];
+  const down = live.filter((role) => role.state === 'down');
+  const since = down
+    .map((role) => role.downSince)
+    .filter((at): at is Date => at !== undefined)
+    .toSorted((a, b) => a.getTime() - b.getTime())[0];
+  return {
+    ...(answered !== undefined && { lastAnsweredAt: answered }),
+    ...((down.length > 0 || voice === undefined) && { down: { since: since ?? null } }),
   };
 }

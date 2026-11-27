@@ -1,4 +1,10 @@
-import { AGENT_PAUSE_MAX_MS, type AgentHoursNow, type AgentMode, type ResumeMode } from '@impera/contracts';
+import {
+  AGENT_PAUSE_MAX_MS,
+  type AgentHoursNow,
+  type AgentMode,
+  type AgentStatus,
+  type ResumeMode,
+} from '@impera/contracts';
 
 import { MODE_LABEL } from './mode';
 
@@ -28,9 +34,20 @@ export interface AgentStateInput {
    * the extension, so « IA active » would be false. Empty from a server that does not say it yet.
    */
   readonly expiredSessions?: readonly string[] | undefined;
+  /**
+   * What runs, as the server decided it from her persona, her scripts, her drafts and her mode (recette 27/11, G18):
+   * it wins over the fields above. Absent or `null` (the Dashboard, an older server): the state is read from them.
+   */
+  readonly agentStatus?: AgentStatus | null | undefined;
+  /**
+   * No model answers the agent now (recette 27/11, A9): `GET /v1/dashboard/todos`'s `aiOutage`, with the clock its hour
+   * is said at (`outageZone`, as Suivi's banner and the menu's pill). Every state but an Arrêt says it then.
+   */
+  readonly aiOutage?: { readonly since: string | null; readonly zone: string } | null | undefined;
 }
 
-export type AgentStateKind = 'on' | 'out' | 'idle' | 'expired' | 'paused' | 'off' | 'global';
+export type AgentStateKind =
+  'on' | 'out' | 'idle' | 'expired' | 'paused' | 'off' | 'global' | 'no_scripts' | 'drafts_off' | 'outage';
 
 export interface AgentState {
   readonly kind: AgentStateKind;
@@ -38,7 +55,8 @@ export interface AgentState {
   readonly label: string;
   /** When it changes, or what holds, in her clock; `null` when nothing more is to be said. */
   readonly detail: string | null;
-  readonly tone: 'ok' | 'calm' | 'warn';
+  /** `bad` for an outage alone: fans wait for a human now, the red of the urgencies. */
+  readonly tone: 'ok' | 'calm' | 'warn' | 'bad';
 }
 
 /** « demain », « jeudi », or nothing for her today: the day of an instant, in her clock. */
@@ -67,60 +85,123 @@ export function withPersona(input: AgentStateInput, hasActivePersona: boolean | 
   return hasActivePersona === undefined ? input : { ...input, hasActivePersona };
 }
 
+/** Her state from the fields alone, when the server did not decide it: the same order as `agentStatusOf` (api). */
+function statusOf(input: AgentStateInput): AgentStatus {
+  if (input.globalStop) return 'global_stop';
+  if (input.mode === 'stop') return input.pausedUntil === null ? 'stopped' : 'paused';
+  if ((input.expiredSessions?.length ?? 0) > 0) return 'session_expired';
+  if (input.hasActivePersona === false) return 'no_persona';
+  if (input.hoursNow !== null && !input.hoursNow.open) return 'off_hours';
+  return input.mode;
+}
+
 export function agentStateOf(input: AgentStateInput, zone: string, now: Date): AgentState {
-  if (input.globalStop) {
+  const status = input.agentStatus ?? statusOf(input);
+  // An outage says itself over what runs, as Suivi's banner and the menu's pill do (A9); an Arrêt someone chose stays.
+  const chosenStop = status === 'global_stop' || status === 'paused' || status === 'stopped';
+  if (input.aiOutage != null && !chosenStop) {
+    const { since, zone: outageZone } = input.aiOutage;
     return {
-      kind: 'global',
-      label: 'IA coupée pour toute l’agence',
-      detail: 'Un arrêt général est posé : il se lève dans Réglages, pas ici.',
-      tone: 'warn',
+      kind: 'outage',
+      label: 'IA indisponible',
+      detail: since === null ? 'un humain répond' : `depuis ${clockAt(since, outageZone)}, un humain répond`,
+      tone: 'bad',
     };
   }
-  if (input.mode === 'stop') {
-    if (input.pausedUntil !== null) {
+  switch (status) {
+    case 'global_stop':
+      return {
+        kind: 'global',
+        label: 'IA coupée pour toute l’agence',
+        detail: 'Un arrêt général est posé : il se lève dans Réglages, pas ici.',
+        tone: 'warn',
+      };
+    case 'paused':
       return {
         kind: 'paused',
         label: 'IA en pause',
-        detail: `reprend seule ${whenOf(input.pausedUntil, zone, now)}, en ${MODE_LABEL[input.resumesAs]}`,
+        detail:
+          input.pausedUntil === null
+            ? `reprend seule, en ${MODE_LABEL[input.resumesAs]}`
+            : `reprend seule ${whenOf(input.pausedUntil, zone, now)}, en ${MODE_LABEL[input.resumesAs]}`,
         tone: 'warn',
       };
-    }
-    return { kind: 'off', label: 'IA coupée', detail: 'jusqu’à ce qu’on la rallume', tone: 'warn' };
+    case 'stopped':
+      return { kind: 'off', label: 'IA coupée', detail: 'jusqu’à ce qu’on la rallume', tone: 'warn' };
+    case 'session_expired':
+      return {
+        kind: 'expired',
+        label: 'Session Reveal expirée',
+        detail: 'reconnecte-la depuis l’extension : rien n’est lu ni envoyé d’ici là',
+        tone: 'warn',
+      };
+    case 'no_persona':
+      return {
+        kind: 'idle',
+        label: 'IA en attente de sa persona',
+        detail: 'aucun brouillon tant qu’aucune persona n’est active',
+        tone: 'warn',
+      };
+    case 'no_scripts':
+      return {
+        kind: 'no_scripts',
+        label: 'IA en attente de scripts',
+        detail: 'aucun script prêt dans Reveal : l’agent n’a rien à proposer',
+        tone: 'warn',
+      };
+    case 'off_hours':
+      return {
+        kind: 'out',
+        label: 'IA hors de ses heures',
+        detail:
+          input.hoursNow?.changesAt == null
+            ? 'aucune heure ouverte cette semaine'
+            : `reprend ${whenOf(input.hoursNow.changesAt, zone, now)}, en ${MODE_LABEL[input.mode]}`,
+        tone: 'calm',
+      };
+    case 'drafts_off':
+      return {
+        kind: 'drafts_off',
+        label: 'IA prête · brouillons éteints',
+        detail: 'les chatteurs écrivent seuls dans Reveal',
+        tone: 'calm',
+      };
+    case 'copilot':
+    case 'auto':
+      return {
+        kind: 'on',
+        label: `IA active · ${MODE_LABEL[status]}`,
+        detail: input.hoursNow?.changesAt == null ? null : untilWords(input.hoursNow.changesAt, zone, now),
+        tone: 'ok',
+      };
   }
-  if ((input.expiredSessions?.length ?? 0) > 0) {
-    return {
-      kind: 'expired',
-      label: 'Session Reveal expirée',
-      detail: 'reconnecte-la depuis l’extension : rien n’est lu ni envoyé d’ici là',
-      tone: 'warn',
-    };
+}
+
+/**
+ * The menu's pill in a word or two (recette 27/11, PRO-15): what runs, never a mode the agent does not follow. `null`
+ * while it runs in its mode or for an Arrêt, which the pill says by its mode.
+ */
+export function pillStatusLabel(status: AgentStatus | null | undefined): string | null {
+  switch (status) {
+    case 'session_expired':
+      return 'Session expirée';
+    case 'no_persona':
+      return 'en attente de persona';
+    case 'no_scripts':
+      return 'en attente de scripts';
+    case 'off_hours':
+      return 'hors de ses heures';
+    case 'drafts_off':
+      return 'brouillons éteints';
+    case 'global_stop':
+    case 'paused':
+    case 'stopped':
+    case 'copilot':
+    case 'auto':
+    case null:
+    case undefined:
+      return null;
   }
-  if (input.hasActivePersona === false) {
-    return {
-      kind: 'idle',
-      label: 'IA en attente de sa persona',
-      detail: 'aucun brouillon tant qu’aucune persona n’est active',
-      tone: 'warn',
-    };
-  }
-  const mode = MODE_LABEL[input.mode];
-  if (input.hoursNow !== null && !input.hoursNow.open) {
-    return {
-      kind: 'out',
-      label: 'IA hors de ses heures',
-      detail:
-        input.hoursNow.changesAt === null
-          ? 'aucune heure ouverte cette semaine'
-          : `reprend ${whenOf(input.hoursNow.changesAt, zone, now)}, en ${mode}`,
-      tone: 'calm',
-    };
-  }
-  return {
-    kind: 'on',
-    label: `IA active · ${mode}`,
-    detail: input.hoursNow?.changesAt == null ? null : untilWords(input.hoursNow.changesAt, zone, now),
-    tone: 'ok',
-  };
 }
 
 /** A pause the switch offers (ADR 0148 § 1): its words, and its end. An Arrêt without an end is « Couper ». */

@@ -24,7 +24,10 @@ import {
   LIST_ORDERS,
   MODE_MEANINGS,
   mergeConversations,
+  onlyConversations,
   orderLines,
+  outageWords,
+  outageZone,
   readListOrder,
   searchLines,
   sharedMode,
@@ -139,6 +142,8 @@ export function TrackingPage({
   const [order, setOrder] = useState<ListOrder>(readListOrder);
   const [search, setSearch] = useState('');
   const [allTodos, setAllTodos] = useState(false);
+  /** The group of « À traiter » the list is narrowed to (recette 27/11, G14, PRO-10), by its key. */
+  const [groupFilter, setGroupFilter] = useState<string | null>(null);
   /**
    * Said once above the list, for a member whose scope is `self`: a hand he just gave back, the conversation gone from
    * his list, or a conversation that closed to him while he read it, his shift over (EQ-13).
@@ -184,6 +189,20 @@ export function TrackingPage({
       ? entries
       : entries.slice(0, QUEUE_SHOWN);
   const hiddenTodos = entries.length - shownTodos.length;
+  // The list narrowed to a group's fans while that group is still there: given back, the list is whole again.
+  const filterGroup = entries.find(
+    (entry): entry is Extract<QueueEntry<CreatorTodo>, { kind: 'group' }> =>
+      entry.kind === 'group' && entry.key === groupFilter,
+  );
+  const narrowedLines =
+    filterGroup === undefined
+      ? shown
+      : onlyConversations(
+          shown,
+          filterGroup.todos.map((todo) => todo.conversationId),
+        );
+  // No model answers (recette 27/11, A9): said once above everything, at her clock when her creators share one.
+  const aiOutage = queue.data?.aiOutage ?? null;
   const open =
     selected === null
       ? null
@@ -202,7 +221,8 @@ export function TrackingPage({
         title={nav === undefined ? 'Suivi' : screenLabel('/suivi')}
         // Only what the mode means: the panels say the rest themselves (D-03).
         // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
-        lead={mode === null || offShift !== undefined ? undefined : MODE_MEANINGS[mode]}
+        // During an outage no draft comes: the mode's promise would be false, and the banner below says it (A9).
+        lead={offShift !== undefined || aiOutage !== null || mode === null ? undefined : MODE_MEANINGS[mode]}
         tabs={nav}
       />
       {offShift?.(lines.length > 0)}
@@ -214,6 +234,14 @@ export function TrackingPage({
           liftsStop={liftsStop}
           creatorId={stoppedCreators.length === 1 ? stoppedCreators[0]?.id : undefined}
         />
+      )}
+      {aiOutage === null ? null : (
+        <Panel className="tr-stop">
+          <p className="tr-stop__in" role="status">
+            <span className="nv-orb nv-tone--bad" aria-hidden="true" />
+            <strong>{outageWords(aiOutage, outageZone(creators.map((creator) => creator.timezone)))}</strong>
+          </p>
+        </Panel>
       )}
       {stopUnread && stoppedNames.length === 0 ? (
         <Panel className="tr-stop">
@@ -293,9 +321,12 @@ export function TrackingPage({
                         group={entry}
                         canGiveBack={canDecide && !selfScope}
                         withCreator={showsCreator}
-                        isOpen={isOpenEntry(entry)}
-                        onOpen={() => {
-                          onSelect(entry.latest.conversationId);
+                        isFiltering={filterGroup?.key === entry.key}
+                        onFilter={() => {
+                          setGroupFilter((current) => (current === entry.key ? null : entry.key));
+                        }}
+                        onShowAll={() => {
+                          setGroupFilter(null);
                         }}
                       />
                     ),
@@ -348,12 +379,12 @@ export function TrackingPage({
                   />
                 </label>
                 <div className="nv-scroll">
-                  {isSearching && shown.length === 0 ? (
+                  {isSearching && narrowedLines.length === 0 ? (
                     <p className="tr-more">Aucun fan ne porte ce pseudo dans la liste.</p>
                   ) : null}
                   {/* Grouped by who acts (CHAT-22): the state is said by the group, not on every line. */}
                   <div role="group" aria-label="Conversations" className="tr-groups">
-                    {groupByHand(shown, selfScope, canDecide).map((group) => {
+                    {groupByHand(narrowedLines, selfScope, canDecide).map((group) => {
                       // In « À toi », a state all its lines share is said once, by the title (PIL-10).
                       const shared =
                         group.hand === 'yours'
@@ -564,30 +595,38 @@ function QueueRow({
 
 /**
  * One failure of the agent behind several fans (recette AGT-05): the cause first, how many fans wait, the sentence and
- * the longest wait of them; it opens the latest. A missing persona names its creator; the others are everyone's.
+ * the longest wait of them. A click narrows the list to these fans, a second one gives it back whole (recette 27/11,
+ * G14, PRO-10). A missing persona names its creator; the others are everyone's.
  */
 function QueueGroupRow({
   group,
   canGiveBack,
   withCreator,
-  isOpen,
-  onOpen,
+  isFiltering,
+  onFilter,
+  onShowAll,
 }: {
   group: Extract<QueueEntry<CreatorTodo>, { kind: 'group' }>;
   /** The owner or a manager: the agent's hand given back to every fan behind an outage at once (recette 27/11, G14). */
   canGiveBack: boolean;
   withCreator: boolean;
-  isOpen: boolean;
-  onOpen: () => void;
+  /** The list shows these fans only. */
+  isFiltering: boolean;
+  onFilter: () => void;
+  onShowAll: () => void;
 }): JSX.Element {
   const { oldest } = group;
+  // Only once a model answers again (A9, PARC-04): during the outage the hand given back would come straight back.
+  const givesBack =
+    group.cause === 'budget' || (group.cause === 'llm_unavailable' && oldest.voiceBack === true);
   return (
     <li className="tr-group">
       <button
         type="button"
         className="nv-convo tr-row tr-row--open"
-        aria-current={isOpen ? 'true' : undefined}
-        onClick={onOpen}
+        aria-pressed={isFiltering}
+        title={isFiltering ? 'Revoir toute la liste' : 'Voir seulement ces fans dans la liste'}
+        onClick={onFilter}
       >
         <span className={`nv-dot nv-tone--${toneOf(oldest)}`} aria-hidden="true" />
         <span className="nv-convo__main">
@@ -602,13 +641,19 @@ function QueueGroupRow({
         </span>
         <span className="nv-convo__side tr-wait">{duration(oldest.waitingMinutes)}</span>
       </button>
-      {canGiveBack && GIVEN_BACK_AT_ONCE.has(group.cause) ? <GiveBackAll todos={group.todos} /> : null}
+      {/* Said under the group just pressed, where the eye is: on a phone the list below is out of sight (PRO-10). */}
+      {isFiltering ? (
+        <p className="tr-group__filter" role="status">
+          <span>{`Seulement les ${fansWaiting(group.todos.length)} de « ${todoLabel(oldest)} » dans la liste.`}</span>
+          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onShowAll}>
+            Tout afficher
+          </button>
+        </p>
+      ) : null}
+      {canGiveBack && givesBack ? <GiveBackAll todos={group.todos} /> : null}
     </li>
   );
 }
-
-/** The outages whose fans wait for nothing but the agent: once it answers again, its hand goes back to all of them. */
-const GIVEN_BACK_AT_ONCE: ReadonlySet<CreatorTodo['kind']> = new Set(['llm_unavailable', 'budget']);
 
 /**
  * « Rendre la main à l'agent » for every fan an outage gave the chatters (recette 27/11, G14): one by one, as the

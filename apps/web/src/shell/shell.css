@@ -197,7 +197,28 @@
 }
 .nv-rail__agent-mode {
   flex: none;
-  margin-left: -4px;
+}
+/* Her name above, what runs under it (recette 27/11): a long state (« en attente de persona ») never cuts her name to
+   one letter. Each line is cut with « … » only past the pill's width, the title keeping both whole. */
+.nv-rail__agent--named {
+  height: auto;
+  min-height: 32px;
+  padding-block: 5px;
+}
+.nv-rail__agent-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 15px;
+}
+.nv-rail__agent-text > .nv-rail__agent-label {
+  color: var(--nv-ink);
+}
+.nv-rail__agent-text > .nv-rail__agent-mode {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
 }
 .nv-rail__agent:hover {
   color: var(--nv-ink);
@@ -212,6 +233,10 @@
 }
 .nv-rail__agent[data-tone='warn'] {
   color: var(--nv-warning);
+}
+/* No model answers (recette 27/11, A9): red as Suivi's banner, fans wait for a human now. */
+.nv-rail__agent[data-tone='bad'] {
+  color: var(--nv-danger);
 }
 
 /* « Flou des médias » (SC-04 lot c4): a switch over the settings, an eye crossed out while her media are blurred. */
@@ -1580,6 +1605,10 @@
     padding: 0;
     font-size: 0;
     margin-inline: 0;
+  }
+  /* Icons only: the dot says it, her name and the state are in the title. */
+  .nv-rail__agent-text {
+    display: none;
   }
   .nv-rail__blur {
     justify-content: center;

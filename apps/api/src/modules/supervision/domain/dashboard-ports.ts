@@ -182,6 +182,13 @@ export interface CreatorOverviewFacts {
   readonly hasActivePersona: boolean;
   /** The platforms where a session of one of her accounts expired (recette REV-05). */
   readonly expiredSessions: readonly Platform[];
+  /**
+   * Her scripts the agent may offer (ADR 0161), by when they play, as « Mise en route » counts them; `null` for a scope
+   * of one's own, which does not read them (RLS).
+   */
+  readonly scripts: { readonly day: number; readonly night: number } | null;
+  /** « Brouillons de l'IA » in the extension (ADR 0086 § 6), from her settings. */
+  readonly draftsOn: boolean;
   /** Her open requests with nothing dropped, the first due first; empty for a scope of one's own (RLS). */
   readonly requests: readonly { readonly category: DropCategory; readonly dueOn: string }[];
   /** Member id to display name (the team's, read by the owner and an active manager). */

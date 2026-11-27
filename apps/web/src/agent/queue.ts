@@ -35,6 +35,8 @@ export type QueueEntry<T extends DashboardTodo> =
   | {
       readonly kind: 'group';
       readonly cause: DashboardTodo['kind'];
+      /** Which group it is, the same from one reading to the next: the list keeps its filter on it (PRO-10). */
+      readonly key: string;
       /** Every line behind it, the longest waiting first. */
       readonly todos: readonly T[];
       /** The longest waiting: its wait and its sentence are the group's. */
@@ -43,10 +45,14 @@ export type QueueEntry<T extends DashboardTodo> =
       readonly latest: T;
     };
 
-/** A persona is missing for one creator: her lines group apart from another's. The other failures are everyone's. */
+/**
+ * A persona is missing for one creator: her lines group apart from another's. The other failures are everyone's, but
+ * the fans an outage still holds never share a line with those it is over for (recette 27/11, A9).
+ */
 function keyOf(todo: DashboardTodo): string {
   const creator = 'creatorId' in todo && typeof todo.creatorId === 'string' ? todo.creatorId : '';
-  return todo.kind === 'persona_inactive' ? `${todo.kind}:${creator}` : todo.kind;
+  if (todo.kind === 'persona_inactive') return `${todo.kind}:${creator}`;
+  return todo.kind === 'llm_unavailable' && todo.voiceBack === true ? `${todo.kind}:back` : todo.kind;
 }
 
 const rankOf = (todo: DashboardTodo): number =>
@@ -79,7 +85,10 @@ export function queueEntries<T extends DashboardTodo>(todos: readonly T[]): Queu
     const sorted = members.toSorted(byWait);
     const oldest = sorted[0] ?? todo;
     const latest = sorted[sorted.length - 1] ?? todo;
-    entries.push({ entry: { kind: 'group', cause: todo.kind, todos: sorted, oldest, latest }, lead: oldest });
+    entries.push({
+      entry: { kind: 'group', cause: todo.kind, key, todos: sorted, oldest, latest },
+      lead: oldest,
+    });
   }
   return entries
     .toSorted((a, b) => rankOf(a.lead) - rankOf(b.lead) || byWait(a.lead, b.lead))

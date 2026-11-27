@@ -165,8 +165,10 @@ describe('AgentPill', () => {
       );
       const pill = await renderPill();
       await waitFor(() => {
-        expect(pill.textContent).toBe('Léa · Copilote');
+        expect(pill.querySelector('.nv-rail__agent-mode')?.textContent).toBe('Copilote');
       });
+      expect(pill.querySelector('.nv-rail__agent-label')?.textContent).toBe('Léa');
+      expect(pill.getAttribute('aria-label')).toBe('Agent : Léa · Copilote. Le changer sur le Dashboard.');
     } finally {
       localStorage.clear();
     }
@@ -188,6 +190,98 @@ describe('AgentPill', () => {
     } finally {
       localStorage.clear();
     }
+  });
+
+  it('says what runs for her, never « Copilote » for a creator without a persona (recette 27/11, PRO-15)', async () => {
+    serveDashboard((url) =>
+      url.pathname === '/v1/dashboard/creators'
+        ? {
+            status: 200,
+            body: {
+              creators: [
+                {
+                  creatorId: CREATOR.id,
+                  mode: 'copilot',
+                  hasActivePersona: false,
+                  agentStatus: 'no_persona',
+                  sales: null,
+                  onShift: null,
+                  requests: null,
+                },
+              ],
+            },
+          }
+        : live('copilot'),
+    );
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.textContent).toBe('en attente de persona');
+    });
+    expect(pill.getAttribute('data-tone')).toBe('warn');
+  });
+
+  it('keeps her name whole above a long state, never cut to one letter (recette 27/11)', async () => {
+    const ana = { id: '0192f3a0-0000-7000-8000-0000000000c2', displayName: 'Ana', timezone: 'Europe/Paris' };
+    serveDashboard(
+      (url) =>
+        url.pathname === '/v1/dashboard/creators'
+          ? {
+              status: 200,
+              body: {
+                creators: [
+                  {
+                    creatorId: CREATOR.id,
+                    mode: 'copilot',
+                    agentStatus: 'no_persona',
+                    sales: null,
+                    onShift: null,
+                    requests: null,
+                  },
+                ],
+              },
+            }
+          : live('copilot'),
+      [CREATOR, ana],
+    );
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.querySelector('.nv-rail__agent-mode')?.textContent).toBe('en attente de persona');
+    });
+    // Two lines: her name, then the state under it.
+    const words = pill.querySelector('.nv-rail__agent-text');
+    expect(words?.children[0]?.textContent).toBe('Léa');
+    expect(words?.children[1]?.textContent).toBe('en attente de persona');
+    expect(pill.classList.contains('nv-rail__agent--named')).toBe(true);
+  });
+
+  it('says the AI outage as Suivi does, red, never « Copilote » (recette 27/11, A9)', async () => {
+    serveDashboard((url) =>
+      url.pathname === '/v1/dashboard/todos'
+        ? { status: 200, body: { items: [], creators: [], aiOutage: { since: '2026-11-27T13:05:00.000Z' } } }
+        : live('copilot'),
+    );
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.textContent).toBe('IA indisponible');
+    });
+    expect(pill.dataset['tone']).toBe('bad');
+    expect(pill.querySelector('.nv-dot')?.classList.contains('nv-tone--bad')).toBe(true);
+    expect(pill.getAttribute('aria-label')).toMatch(
+      /^Agent : IA indisponible depuis 14\sh\s05, un humain répond\. Voir le Dashboard\.$/u,
+    );
+  });
+
+  it('keeps an Arrêt said by its mode during an outage', async () => {
+    serveDashboard((url) =>
+      url.pathname === '/v1/dashboard/todos'
+        ? { status: 200, body: { items: [], creators: [], aiOutage: { since: null } } }
+        : live('stop'),
+    );
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.textContent).toBe('Arrêt');
+    });
+    expect(pill.dataset['tone']).toBe('warn');
   });
 
   it('cuts a long name inside the pill, the title keeping it whole (recette 05/11, PRO-12)', async () => {

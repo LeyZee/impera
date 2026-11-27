@@ -232,6 +232,95 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(screen.getByRole('link', { name: 'Anna' })).toBeDefined();
   });
 
+  it('says what her agent actually does, not « IA active · Copilote » without a script (recette 27/11, G18, PRO-03)', async () => {
+    await serve([ANNA]);
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {
+      const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      if (url === '/v1/creators') return json({ creators: [ANNA] });
+      if (url === '/v1/dashboard/creators') {
+        return json({
+          creators: [
+            {
+              creatorId: ANNA.id,
+              mode: 'copilot',
+              agentStatus: 'no_scripts',
+              sales: null,
+              onShift: null,
+              requests: null,
+            },
+          ],
+        });
+      }
+      if (url === '/v1/dashboard/todos') return json({ items: [], creators: [] });
+      return json({});
+    });
+    renderAt(operator, '/creatrices');
+    const anna = await cardOf('Anna');
+    await waitFor(() => {
+      expect(within(anna).getByText('IA en attente de scripts')).toBeDefined();
+    });
+    expect(within(anna).queryByText('IA active · Copilote')).toBeNull();
+  });
+
+  it('says the AI outage on her card and her header, red, an Arrêt staying an Arrêt (recette 27/11, A9)', async () => {
+    await serve([ANNA, BEA]);
+    const served = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      if (url === '/v1/dashboard/creators') {
+        return json({
+          creators: [
+            {
+              creatorId: ANNA.id,
+              mode: 'copilot',
+              agentStatus: 'copilot',
+              sales: null,
+              onShift: null,
+              requests: null,
+            },
+            {
+              creatorId: BEA.id,
+              mode: 'stop',
+              agentStatus: 'stopped',
+              sales: null,
+              onShift: null,
+              requests: null,
+            },
+          ],
+        });
+      }
+      // 13:05 UTC is 14 h 05 in Paris, where both live.
+      if (url === '/v1/dashboard/todos') {
+        return json({ items: [], creators: [], aiOutage: { since: '2026-11-27T13:05:00.000Z' } });
+      }
+      if (served === undefined) throw new Error('serve() stubs fetch');
+      return served(url, init);
+    });
+    const router = renderAt(owner, '/creatrices');
+    const anna = await cardOf('Anna');
+    await waitFor(() => {
+      expect(within(anna).getByText('IA indisponible')).toBeDefined();
+    });
+    expect(within(anna).getByText(/^depuis 14\sh\s05, un humain répond$/u)).toBeDefined();
+    expect(within(anna).queryByText('IA active · Copilote')).toBeNull();
+    expect(anna.querySelector('.ai-switch__dot--outage')).not.toBeNull();
+    // Its label is red by its state (switch.css), as the pill's.
+    expect(anna.querySelector(".ai-switch[data-state='outage'] .ai-switch__label")?.textContent).toBe(
+      'IA indisponible',
+    );
+    // Cut by someone: still said as such during the outage.
+    const bea = await cardOf('Bea');
+    expect(within(bea).getByText('IA coupée')).toBeDefined();
+    expect(within(bea).queryByText('IA indisponible')).toBeNull();
+    // Her sheet's header says it as her card does.
+    router.history.push(`/creatrices?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      const header = document.querySelector('.ai-switch--header');
+      expect(header?.textContent).toContain('IA indisponible');
+      expect(header?.querySelector('.ai-switch__dot--outage')).not.toBeNull();
+    });
+  });
+
   it('says on a card only what the server gives: no figures for a reader whose scope is his own', async () => {
     await serve([ANNA]);
     vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {

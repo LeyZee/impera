@@ -47,6 +47,7 @@ import './sheet.css';
 
 import { AgentSwitch } from '@/agent/AgentSwitch';
 import { canSwitch, withPersona } from '@/agent/state';
+import { useAiOutage } from '@/screens/tracking/outage';
 import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { useCreatorSetups } from '@/setup/api';
@@ -629,6 +630,8 @@ function CreatorAgentSwitch({
   const overview = useCreatorsOverview();
   // Her card says whether a persona is active for her, to every reader; the owner's « Mise en route » too (PRO1-03).
   const setups = useCreatorSetups(user.role === 'owner');
+  // No model answers (recette 27/11, A9): her header says it as her card, the pill and Suivi do.
+  const aiOutage = useAiOutage();
   const card = overview.data?.find((one) => one.creatorId === creator.id);
   if (card === undefined) return null;
   const setup = setups.data?.find((one) => one.creatorId === creator.id);
@@ -637,7 +640,7 @@ function CreatorAgentSwitch({
       creatorId={creator.id}
       creatorName={creator.displayName}
       zone={creator.timezone}
-      state={withPersona(card, hasActivePersonaOf(setup))}
+      state={{ ...withPersona(card, hasActivePersonaOf(setup)), aiOutage }}
       read={overview.dataUpdatedAt}
       variant="header"
       readOnly={!canSwitch(user)}

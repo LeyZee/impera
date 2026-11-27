@@ -289,7 +289,8 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
         // One tenant transaction per creator (RLS): nothing of a creator outside the list is ever read. One after the
         // other, so a refresh holds one connection of the pool, not one per creator.
         const queues: CreatorQueue[] = [];
-        // Read once for all: an outage line says it is over once a voice model answers again (IA-07).
+        // Read once for all: an outage line says it is over once a model answered after it (IA-07, A9), and the outage
+        // itself is said above the queue while it lasts.
         const voice = deps.voiceHealth();
         for (const creatorId of followed) {
           const found = await deps.reader.read(
@@ -303,7 +304,7 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           );
           if (found !== undefined) queues.push(creatorQueue(creatorId, found.facts, now, voice));
         }
-        return queueAcross(queues);
+        return queueAcross(queues, voice);
       },
     );
     app.get(

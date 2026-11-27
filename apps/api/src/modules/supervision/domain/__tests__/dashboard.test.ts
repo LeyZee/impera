@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  aiOutageOf,
   assembleDashboard,
   creatorQueue,
   queueAcross,
@@ -304,28 +305,53 @@ describe('an AI outage over (IA-07)', () => {
     since: minutesAgo(36),
   });
 
-  it('says the AI answers again and to give these fans back, once a voice model answers', () => {
+  // Held 36 minutes ago: a model answered 10 minutes ago (after him), or 50 minutes ago (before him).
+  const answered = (minutes: number): VoiceHealth => ({
+    ok: true,
+    keyMissing: false,
+    lastAnsweredAt: minutesAgo(minutes),
+  });
+
+  it('says the AI answers again and to give these fans back, once a model answered after him', () => {
     const [down] = todos([held('A')], NOW);
     expect(down?.why).toBe('Aucun modèle IA n’a répondu. Un chatteur prend le relais.');
     expect(down).not.toHaveProperty('voiceBack');
-    const [back] = todos([held('A')], NOW, { stopped: false, voiceAnswers: true });
+    const [back] = todos([held('A')], NOW, { stopped: false, voice: answered(10) });
     expect(back).toMatchObject({
       kind: 'llm_unavailable',
       why: 'L’IA répond de nouveau : rends la main à ces fans.',
       voiceBack: true,
     });
     // Another cause is left as it was.
-    const [other] = todos([held('B', 'meeting')], NOW, { stopped: false, voiceAnswers: true });
+    const [other] = todos([held('B', 'meeting')], NOW, { stopped: false, voice: answered(10) });
     expect(other).not.toHaveProperty('voiceBack');
+  });
+
+  it('never says « IA de retour » during the outage (recette 27/11, A9, PARC-04)', () => {
+    // The brain fails first and the voice is never called: its health looks fine, no call answered since.
+    expect(
+      todos([held('A')], NOW, { stopped: false, voice: { ok: true, keyMissing: false } })[0],
+    ).not.toHaveProperty('voiceBack');
+    // A success before he was handed over is the time before the outage, not its end.
+    expect(todos([held('A')], NOW, { stopped: false, voice: answered(50) })[0]).not.toHaveProperty(
+      'voiceBack',
+    );
+    // A model still down, whatever answered before.
+    expect(
+      todos([held('A')], NOW, {
+        stopped: false,
+        voice: { ...answered(10), down: { since: minutesAgo(5) } },
+      })[0],
+    ).not.toHaveProperty('voiceBack');
   });
 
   it('reads the voice’s health on the Dashboard and in « À traiter », a missing key never « back »', () => {
     const facts = { waiting: [held('A')] };
+    expect(assemble(facts, undefined, undefined, { voice: answered(10) }).todos[0]).toMatchObject({
+      voiceBack: true,
+    });
     expect(
-      assemble(facts, undefined, undefined, { voice: { ok: true, keyMissing: false } }).todos[0],
-    ).toMatchObject({ voiceBack: true });
-    expect(
-      assemble(facts, undefined, undefined, { voice: { ok: false, keyMissing: false } }).todos[0],
+      assemble(facts, undefined, undefined, { voice: { ...answered(10), ok: false } }).todos[0],
     ).not.toHaveProperty('voiceBack');
     const queue = (voice?: VoiceHealth) =>
       creatorQueue(
@@ -334,9 +360,26 @@ describe('an AI outage over (IA-07)', () => {
         NOW,
         voice,
       ).todos[0];
-    expect(queue({ ok: true, keyMissing: false })).toMatchObject({ voiceBack: true });
-    expect(queue({ ok: true, keyMissing: true })).not.toHaveProperty('voiceBack');
+    expect(queue(answered(10))).toMatchObject({ voiceBack: true });
+    expect(queue({ ...answered(10), keyMissing: true })).not.toHaveProperty('voiceBack');
     expect(queue()).not.toHaveProperty('voiceBack');
+  });
+
+  it('says the outage above the queue, since its first failed call, and nothing once it is over', () => {
+    const creatorId = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-00000000c002');
+    const outage = { ok: false, keyMissing: false, down: { since: minutesAgo(40) } };
+    const across = (voice: VoiceHealth) =>
+      queueAcross([creatorQueue(creatorId, { ...FACTS, waiting: [held('A')] }, NOW, voice)], voice);
+    expect(across(outage).aiOutage).toEqual({ since: minutesAgo(40).toISOString() });
+    expect(across(answered(10)).aiOutage).toBeNull();
+    expect(queueAcross([]).aiOutage).toBeNull();
+  });
+
+  it('says a keyless outage only when a fan waits for it: the Dashboard says the key', () => {
+    const keyless: VoiceHealth = { ok: false, keyMissing: true, down: { since: null } };
+    expect(aiOutageOf(keyless, [])).toBeNull();
+    const [line] = todos([held('A')], NOW, { stopped: false, voice: keyless });
+    expect(aiOutageOf(keyless, line === undefined ? [] : [line])).toEqual({ since: null });
   });
 });
 

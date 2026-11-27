@@ -14,6 +14,8 @@ export type AgentModeView =
       readonly stalled: string | null;
       /** Whose agent: the pill names her when the account follows several (DASH-03). */
       readonly creatorName: string;
+      /** Her id: the pill reads what runs for her on her card (recette 27/11, PRO-15). */
+      readonly creatorId: string;
     }
   | { readonly source: 'loading' | 'unavailable' | 'empty' };
 
@@ -43,6 +45,7 @@ export function useAgentMode(shown: string | null = null): AgentModeView {
       automatic: live.data.automatic,
       stalled,
       creatorName: live.data.creator.name,
+      creatorId: live.data.creator.id,
     };
   }
   // The pill never asks for one creator and no other (`exact`): `missing` cannot come back here.

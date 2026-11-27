@@ -14,6 +14,11 @@ export interface RoleHealth {
   /** True when the last call of the last 15 minutes was served by the fallback. */
   readonly isOnFallback: boolean;
   readonly lastSuccessAt?: Date;
+  /**
+   * While its last call failed (and no fallback answered): the first failure after its last success today, when the
+   * outage began (recette 27/11, A9). Absent while it answers, or when it is down for want of a key.
+   */
+  readonly downSince?: Date;
   readonly lastError?: { readonly at: Date; readonly outcome: CallOutcome; readonly message?: string };
   readonly latencyP50Ms?: number;
   readonly latencyP95Ms?: number;
@@ -95,6 +100,7 @@ function roleHealth(
   const fallbackHasKey =
     roleConfig.fallback !== undefined && apiKeyFor(credentials, roleConfig.fallback.provider) !== undefined;
   const lastCallFailed = records.at(-1) !== undefined && records.at(-1)?.outcome !== 'ok';
+  const failingSince = records.slice(records.findLastIndex((r) => r.outcome === 'ok') + 1).at(0)?.at;
 
   const p50 = percentile(latencies, 50);
   const p95 = percentile(latencies, 95);
@@ -125,6 +131,7 @@ function roleHealth(
     hasKey,
     isOnFallback,
     ...(lastSuccess && { lastSuccessAt: lastSuccess.at }),
+    ...(state === 'down' && lastCallFailed && failingSince !== undefined && { downSince: failingSince }),
     ...(lastFailure && {
       lastError: {
         at: lastFailure.at,
