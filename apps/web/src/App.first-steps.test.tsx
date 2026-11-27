@@ -105,7 +105,11 @@ describe('App at an account’s first steps (recette 27/11, A8)', () => {
     const list = await screen.findByLabelText('Codes de secours');
     expect(list.querySelectorAll('li')).toHaveLength(10);
     // Why they are back, and until when (in amber, a warning).
-    expect(screen.getByRole('status').textContent).toMatch(/Ils restent affichés jusqu’à \d\d:\d\d/u);
+    const note = screen.getByRole('status');
+    expect(note.textContent).toMatch(/Ils restent affichés jusqu’à \d\d:\d\d/u);
+    expect(note.className).toContain('nv-note--warn');
+    // Never « ils ne seront plus affichés » beside « ils restent affichés » (Design, 27/11).
+    expect(screen.queryByText(/Ils ne seront plus affichés/u)).toBeNull();
     expect(screen.queryByText('Bienvenue, Théo')).toBeNull();
     const enter = screen.getByRole('button', { name: 'Ouvrir Impera' });
     expect(enter).toHaveProperty('disabled', true);

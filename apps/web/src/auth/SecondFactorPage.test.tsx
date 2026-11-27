@@ -68,7 +68,9 @@ describe('SecondFactorPage', () => {
     const open = screen.getByRole('link', { name: 'Ouvrir dans l’application' });
     expect(open.getAttribute('href')).toBe(URI);
     // A phone's button only, and no button named that does not exist (recette 27/11, CH-12).
-    expect(open.className).toContain('sm:hidden');
+    // Hidden by its wrapper: the button's own display would win over the utility (Design, 27/11).
+    expect(open.className).not.toContain('hidden');
+    expect(open.parentElement?.className).toContain('sm:hidden');
     expect(screen.queryByText(/Saisir une clé/u)).toBeNull();
     const key = screen.getByLabelText('Clé à recopier dans l’application');
     expect(key.textContent).toBe(keyOf(URI));

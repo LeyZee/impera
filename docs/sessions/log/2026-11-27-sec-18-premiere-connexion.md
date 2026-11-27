@@ -7,3 +7,5 @@ Candidats à suppression : aucun.
 Vérifié : tests web des écrans touchés ✓ ; intégration du deuxième facteur et des premiers pas ✓ ; pnpm check au pre-push.
 
 Ajout après la demande de Design : les codes réaffichés disent pourquoi ils sont encore là et jusqu'à quelle heure (phrase en ambre ; le serveur rend `shownUntil`).
+
+Découverte (relecture Design) : une fois les dix minutes passées, rien ne le dit à l'arrivée, seule la page Sécurité ; un rappel ailleurs (« À faire ») serait un ajout, pas fait.

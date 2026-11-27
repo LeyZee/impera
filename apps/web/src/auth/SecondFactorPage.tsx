@@ -249,9 +249,12 @@ export function SecondFactorPage({
               <QrCode text={setup.totpURI} label="Code à scanner avec l’application" />
             </div>
             {/* A phone's screen only: on a computer the address opens nothing (recette 27/11, CH-12). */}
-            <a className="nv-btn nv-btn--soft sm:hidden" href={setup.totpURI}>
-              Ouvrir dans l’application
-            </a>
+            {/* The wrapper hides, not the button: `.nv-btn` sets its own display and wins over the utility (Design, 27/11). */}
+            <div className="flex flex-col sm:hidden">
+              <a className="nv-btn nv-btn--soft" href={setup.totpURI}>
+                Ouvrir dans l’application
+              </a>
+            </div>
             <div className="flex flex-col gap-2">
               <span className="nv-field__label">Clé</span>
               <code
@@ -329,15 +332,20 @@ export function BackupCodes({
           C’est actif. Note tes codes de secours
         </h1>
         <p className="text-sm text-[var(--nv-ink-muted)]">
-          Sans ton téléphone, chacun de ces codes remplace une fois le code de l’application. Ils ne seront
-          plus affichés : garde-les dans ton gestionnaire de mots de passe ou sur papier, jamais en photo.
+          Sans ton téléphone, chacun de ces codes remplace une fois le code de l’application.{' '}
+          {shownUntil === undefined ? 'Ils ne seront plus affichés : garde-les' : 'Garde-les'} dans ton
+          gestionnaire de mots de passe ou sur papier, jamais en photo.
         </p>
       </div>
       {shownUntil === undefined ? null : (
-        <p className="text-sm text-[var(--nv-warning)]" role="status">
-          Tu avais quitté cette page avant de dire que tu les avais notés. Ils restent affichés jusqu’à{' '}
-          {HOUR.format(shownUntil)}&nbsp;; ensuite, il faudra en créer de nouveaux dans Sécurité.
-        </p>
+        <div className="nv-note nv-note--warn" role="status">
+          {/* One paragraph inside: the brick lays its children out in a column. */}
+          <p>
+            Tu avais quitté cette page avant de dire que tu les avais notés. Ils restent affichés{' '}
+            <strong>jusqu’à {HOUR.format(shownUntil)}</strong>&nbsp;; ensuite, il faudra en créer de nouveaux
+            dans Sécurité.
+          </p>
+        </div>
       )}
       <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
