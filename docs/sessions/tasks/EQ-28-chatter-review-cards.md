@@ -14,8 +14,10 @@ Le chatteur lit, après chaque shift pendant son accompagnement puis chaque sema
 - [x] Port `ShiftRemarkSource` (type figé avec le fil Agent, 27/11) ; sans lui, chaque bilan est vide. Branchement à faire quand le module `agent` le livre.
 - [x] Migration 0281 (numéro donné par Bilan le 27/11) : niveaux par code de faute (saisis hors dépôt), explications, contestations, dossiers ; FORCE RLS, `REVOKE ALL`, `GRANT` explicites.
 - [x] Routes `/v1/team/review` : « Mon bilan » d'un shift, « vu », contestation, décision ; balayage d'isolation.
-- [ ] Écran « Mon bilan » selon la maquette validée (v3) ; vérifier le vert du gain de « Bien fait ».
-- [ ] Tests : domaine, contrat, intégration, écran.
+- [x] Écran « Mon bilan » dans Aujourd'hui selon la maquette validée (v3), captures du 27/11 ; le gain de « Bien fait » prend `--nv-success`, à confirmer par Design.
+- [x] Tests : domaine, contrat, intégration (RLS, store, isolation), écran.
+- [ ] OK Design et Sécurité, « ok captures » de Charles.
+- [ ] Brancher la source des remarques du module `agent` quand il la livre.
 
 ## Ensuite
 EQ-29 « À trancher » pour le propriétaire et les alertes dès la première fois ; EQ-30 les primes proposées.
