@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OffRailBack } from './OffRailBack';
@@ -62,7 +62,7 @@ describe('OffRailBack', () => {
   it.each([
     ['a chatter', chatter],
     ['a creator', creator],
-  ])('sends %s back from the extension’s guide to Moi › Sécurité (CHAT-08)', async (_, user) => {
+  ])('sends %s opening the extension’s guide first back to Moi › Sécurité (CHAT-08)', async (_, user) => {
     vi.stubGlobal('scrollTo', vi.fn());
     renderAs(user, '/aide/extension');
     const back = await screen.findByRole('link', { name: '← Moi › Sécurité' });
@@ -83,5 +83,32 @@ describe('OffRailBack', () => {
     renderAs(owner, '/aide/installer');
     const back = await screen.findByRole('link', { name: '← Réglages' });
     expect(back.getAttribute('href')).toBe('/reglages');
+  });
+
+  // Recette navigation du 27/11, CH-05: reached from Aujourd'hui or the welcome, the guide led to Moi › Sécurité.
+  it('sends whoever came from another page of the app back to it from the extension’s guide', async () => {
+    vi.stubGlobal('scrollTo', vi.fn());
+    const root = createRootRouteWithContext<{ user: Me }>()();
+    const today = createRoute({
+      getParentRoute: () => root,
+      path: '/aujourdhui',
+      component: () => <h1>Aujourd’hui</h1>,
+    });
+    const guide = createRoute({
+      getParentRoute: () => root,
+      path: '/aide/extension',
+      component: OffRailBack,
+    });
+    const router = createRouter({
+      routeTree: root.addChildren([today, guide]),
+      context: { user: chatter },
+      history: createMemoryHistory({ initialEntries: ['/aujourdhui'] }),
+    });
+    render(<RouterProvider router={router} />);
+    await screen.findByRole('heading', { name: 'Aujourd’hui' });
+    await router.navigate({ to: '/aide/extension' });
+    fireEvent.click(await screen.findByRole('button', { name: '← Retour' }));
+    expect(await screen.findByRole('heading', { name: 'Aujourd’hui' })).toBeDefined();
+    expect(screen.queryByRole('link', { name: '← Moi › Sécurité' })).toBeNull();
   });
 });

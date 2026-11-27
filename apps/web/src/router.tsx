@@ -1310,7 +1310,7 @@ const extensionHelp = createRoute({
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
     // The trend watch is the owner's alone (ADR 0024, amendement du 16/11): the team is shown the copilot instead.
-    return <ExtensionPage watches={user.role === 'owner'} />;
+    return <ExtensionPage watches={user.role === 'owner'} security={securityPathOf(user)} />;
   },
 });
 /**
