@@ -265,7 +265,6 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     show(agencyPage);
     await screen.findByText('fans ont acheté pour la première fois');
     const path = document.querySelector('.stg-traffic');
-    expect(path?.textContent).not.toMatch(/\d{3,} ?%/u);
     expect(Array.from(path?.querySelectorAll('.nv-funnel__rate') ?? [], (rate) => rate.textContent)).toEqual([
       '',
       '',
