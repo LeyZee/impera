@@ -25,6 +25,17 @@ export function duration(minutes: number): string {
 const daysSince = (iso: string, now: Date): number =>
   Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000));
 
+/**
+ * When he arrived, never after what he already did: a fan known to Impera today whose message waits since yesterday
+ * arrived yesterday at the latest (recette 27/11, G9: « arrivé aujourd’hui · attend depuis 1 j »).
+ */
+function arrivalOf(fan: ToTalkFan, now: Date): string {
+  const seen = [Date.parse(fan.fanSince)];
+  if (fan.waitingMinutes !== null) seen.push(now.getTime() - fan.waitingMinutes * 60_000);
+  if (fan.lastMessageAt !== null) seen.push(Date.parse(fan.lastMessageAt));
+  return new Date(Math.min(...seen.filter((at) => Number.isFinite(at)))).toISOString();
+}
+
 /** What the line says after his name: what he spent and when he last bought, or how new he is. */
 export function standingOf(fan: ToTalkFan, now: Date): string {
   if (fan.spentMinor > 0) {
@@ -36,7 +47,7 @@ export function standingOf(fan: ToTalkFan, now: Date): string {
           : ` · dernier achat il y a ${plural(daysSince(fan.lastPurchaseAt, now), 'jour', 'jours')}`;
     return `${euros(fan.spentMinor)} dépensés${bought}`;
   }
-  const days = daysSince(fan.fanSince, now);
+  const days = daysSince(arrivalOf(fan, now), now);
   return days === 0 ? 'arrivé aujourd’hui' : `arrivé il y a ${plural(days, 'jour', 'jours')}`;
 }
 

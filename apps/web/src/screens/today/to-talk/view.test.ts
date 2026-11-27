@@ -36,6 +36,14 @@ describe('« À qui parler », in words', () => {
     expect(standingOf(fan({ fanSince: '2026-11-19T10:00:00Z' }), NOW)).toBe('arrivé il y a 2 jours');
   });
 
+  it('never says he arrived after his message: waiting a day means here a day at least (recette 27/11, G9)', () => {
+    const waiting = fan({ waitingMinutes: 1_500 });
+    expect([standingOf(waiting, NOW), whenOf(waiting, NOW).text]).toEqual([
+      'arrivé il y a 1 jour',
+      'attend depuis 1 j',
+    ]);
+  });
+
   it('says a long wait in amber, and how long a quiet fan has been quiet', () => {
     expect(whenOf(fan({ waitingMinutes: 31 }), NOW)).toEqual({ text: 'attend depuis 31 min', long: true });
     expect(whenOf(fan({ waitingMinutes: 4 }), NOW).long).toBe(false);
