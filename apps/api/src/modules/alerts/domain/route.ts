@@ -97,13 +97,13 @@ const SOLD_BY: Readonly<Record<SaleSaid['by'], string>> = {
 };
 
 /**
- * What her phone says when a fan wrote one of her persona's words: that the team knows and the agent stopped for him,
+ * What her phone says when a fan wrote one of her persona’s words: that the team knows and takes care of it,
  * never who nor which word (they stay in the team's Suivi). Opens Aujourd'hui, her space.
  */
 export function herWordsNotice(): PushMessage {
   return {
     title: 'Un de tes mots d’alerte',
-    body: 'Un fan a écrit un de tes mots d’alerte. L’IA ne lui répond plus et l’équipe s’en occupe.',
+    body: 'Un fan a écrit un de tes mots d’alerte. L’équipe est prévenue et s’en occupe.',
     url: '/aujourdhui',
   };
 }
