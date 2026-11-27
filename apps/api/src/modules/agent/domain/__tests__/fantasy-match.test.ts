@@ -7,6 +7,7 @@ import {
   fantasyMatchOf,
   mentions,
   rankByFantasy,
+  wantsHumiliation,
   withoutHerLimits,
   type DesireMap,
   type ScriptTextView,
@@ -149,5 +150,16 @@ describe('his message speaks of a fantasy of his card', () => {
   it('reads his words like a script’s: half the item at least, accents and plurals aside', () => {
     expect(mentions('jeu de rôle au bureau', 'tu as une vidéo de jeux de role au bureau ?')).toBe(true);
     expect(mentions('jeu de rôle au bureau', 'tu as une vidéo ?')).toBe(false);
+  });
+});
+
+describe('wantsHumiliation (Charles 27/11)', () => {
+  it('reads a fantasy of humiliation of his, unless one of his limits refuses it', () => {
+    expect(wantsHumiliation({ ...EMPTY_DESIRE_MAP, desires: ['être humilié'] })).toBe(true);
+    expect(wantsHumiliation({ ...EMPTY_DESIRE_MAP, wordsThatWork: ['vilain garçon'] })).toBe(true);
+    expect(wantsHumiliation({ ...EMPTY_DESIRE_MAP, desires: ['lingerie noire'] })).toBe(false);
+    expect(
+      wantsHumiliation({ ...EMPTY_DESIRE_MAP, desires: ['être humilié'], limits: ['pas d’humiliation'] }),
+    ).toBe(false);
   });
 });

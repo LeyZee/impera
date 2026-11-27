@@ -42,5 +42,7 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   moan_below_peak: 'des bruits écrits de plaisir avant le plus fort de l’action',
   mood_killer: 'un sujet qui casse le sexto (ses animaux, la compagne du fan, un autre homme, l’argent)',
   purchase_sweetener: 'un cadeau, un bonus ou un extra promis pour décrocher un achat',
+  address_word: 'le mot « adresse » (« mon adresse », « mon adresse mail »), sans l’adresse elle-même',
+  belittling_name: 'un nom qui le rabaisse (« petit garçon », « vilain garçon »)',
   unwarranted_brake: 'un frein (« tu y vas un peu fort », « tu vises direct ») sur un simple compliment',
 };

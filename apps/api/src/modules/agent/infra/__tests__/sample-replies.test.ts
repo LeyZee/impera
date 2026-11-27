@@ -33,14 +33,14 @@ describe('sampleReplyFaults (P5-01)', () => {
       sampleReplyFaults(
         withReplies(
           'Coucou toi 😏',
-          '*sourit* tu me manques',
+          'ajoute-moi sur snap',
           'On se voit en vrai samedi ? on se fait un rdv',
           'Je suis malade et j’ai des dettes, achète mon pack',
           'Je suis une IA tu sais',
         ),
       ),
     ).toEqual([
-      { index: 1, code: 'stage_direction' },
+      { index: 1, code: 'contact_info' },
       { index: 2, code: 'meeting_promise' },
       { index: 3, code: 'fake_emergency' },
       { index: 4, code: 'ai_disclosure' },
@@ -82,12 +82,12 @@ describe('sampleReplyFaults, « Réponses typiques » (ADR 0079 § 6)', () => {
         withLines(
           'Il propose de se voir en vrai : Haha on verra 😏',
           '',
-          'Coucou : *sourit* tu me manques',
+          'Coucou : ajoute-moi sur snap',
           'Je suis une IA tu sais',
         ),
       ),
     ).toEqual([
-      { index: 2, code: 'stage_direction' },
+      { index: 2, code: 'contact_info' },
       { index: 3, code: 'ai_disclosure' },
     ]);
   });
@@ -103,11 +103,11 @@ describe('sampleReplyFaults, « Réponses typiques » (ADR 0079 § 6)', () => {
         { id: 'testaaaaaaaa', text: 'Réplique de test A' },
         { id: 'testbbbbbbbb', text: 'Je te fais un petit prix' },
       ],
-      asks_discount: [{ id: 'testcccccccc', text: '*sourit* non' }],
+      asks_discount: [{ id: 'testcccccccc', text: 'ajoute-moi sur snap, non' }],
     };
     expect(sampleReplyFaults(p)).toEqual([
       { index: 1, code: 'discount', objection: 'too_expensive' },
-      { index: 0, code: 'stage_direction', objection: 'asks_discount' },
+      { index: 0, code: 'contact_info', objection: 'asks_discount' },
     ]);
   });
 });

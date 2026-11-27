@@ -267,6 +267,40 @@ describe('permitted phrases that must always pass, output guards', () => {
   });
 
   it.each([
+    'après tout ce que je t’ai montré, tu me fais rire',
+    'tu me déçois, t’as oublié mon prénom 😏',
+    'je suis déçue, il pleut',
+  ])('guilt_trip never blocks « %s »', (bubble) => {
+    expect(
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter(
+        (v) => v.code === 'guilt_trip' && v.severity === 'blocking',
+      ),
+    ).toEqual([]);
+  });
+
+  it.each(['vilain garçon va 😏', 't’es qu’un petit garçon', 'mon petit garçon, viens là'])(
+    'belittling_name never blocks « %s »',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('minor_reference');
+      expect(
+        checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter((v) => v.severity === 'blocking'),
+      ).toEqual([]);
+    },
+  );
+
+  it.each([
+    '*rougit*',
+    '(rires) t’es bête',
+    'mon adresse ? ici c’est très bien',
+    'ton adresse mail tu la gardes 😌',
+    'tu y vas un peu fort toi 😏',
+  ])('a style fault never blocks « %s »', (bubble) => {
+    expect(
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter((v) => v.severity === 'blocking'),
+    ).toEqual([]);
+  });
+
+  it.each([
     'je suis modèle photo',
     'je suis assistante dentaire le jour',
     'moi un bot ? tu me vexes',
@@ -304,6 +338,9 @@ describe('permitted phrases that must always pass, input nets', () => {
     'en seconde main',
     'première fois que je fais ça',
     'je passe le bac',
+    'je passe en seconde équipe',
+    'mets ta jupe d’écolière ce soir, j’ai envie de toi',
+    'joue une lycéenne pour moi',
   ])('safetySigns finds no minor in « %s »', (text) => {
     expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).not.toContain('minor_suspected');
   });
@@ -346,6 +383,10 @@ describe('permitted phrases that must always pass, input nets', () => {
     'sei sexy, piccola mia',
     'quiero hacerte un bebé en la cama',
     'estás sexy, cariño',
+    'mets ta jupe d’écolière ce soir, j’ai envie de toi',
+    'je fantasme sur toi en écolière',
+    'joue une lycéenne pour moi',
+    'you as a schoolgirl turns me on',
   ])('minor_fantasy leaves « %s »', (text) => {
     expect(safetySigns(text)).not.toContain('minor_fantasy');
   });

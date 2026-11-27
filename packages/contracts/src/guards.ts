@@ -56,6 +56,10 @@ export const GUARD_CODES = [
   'mood_killer',
   // Charles 26/11 at 23:44: never an extra (a gift, a bonus, a media offered) promised to unlock or close a purchase.
   'purchase_sweetener',
+  // Charles 27/11: « petit garçon », « vilain garçon » said to him, soft; allowed when his desire map holds humiliation.
+  'belittling_name',
+  // Charles 27/11: « mon adresse » in words, soft; a real address, an e-mail or a number stays `contact_info`.
+  'address_word',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

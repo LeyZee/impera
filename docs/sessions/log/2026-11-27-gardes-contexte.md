@@ -1,0 +1,7 @@
+# 2026-11-27 — Gardes en contexte : une ligne dure se bloque, le reste se dit (ADR 0098 § 19) — done
+Fait : tenue d'écolière ou uniforme scolaire entre adultes permis en sortie, sur la carte du désir et à l'entrée (`withoutSchoolOutfit`, `minor_fantasy` ne lève que sur un mineur réel : âge, enfant, ado, « une vraie lycéenne », son enfant) ; rôle d'élève sans âge : aucune alerte, indice à la voix pour revenir à la tenue (`asksSchoolRole`) ; « petit garçon » et « vilain garçon » dits à lui en `belittling_name` doux, permis avec une humiliation sur sa carte (`wantsHumiliation`), bloquant en rôle d'enfant ; didascalies en doux, réglage `behavior.stage_directions` dans la fiche (faux par défaut) ; « mon adresse » en `address_word` doux, adresse postale chiffrée bloquée en `contact_info` ; `unwarranted_brake` doux ; `guilt_trip` bloquant quand il sert un achat ; « équipe » annule une classe ; voix 1.21.0.
+Pas fait : « mdr » laissé dans les gardes globales (attend son ajout aux termes interdits de la fiche réelle, lot de Bilan).
+Décisions : ADR 0098 § 19 ; classement des codes bloquants rendu au coordinateur et arbitré par la Sécurité.
+Découvertes : aucune garde ne couvrait la culpabilité liée à un achat (`fake_emergency` vise une urgence, `payment_lie` un faux « rien à payer ») ; d'où la variante bloquante de `guilt_trip`.
+Candidats à suppression : aucun.
+Vérifié : tests unitaires agent et playground de l'api, contrats ; `pnpm check`.

@@ -254,14 +254,15 @@ const BRAKE = new RegExp(
 
 /**
  * She never slows down a fan who does not go there (Charles, 20/11): a compliment, even an insistent one, is welcomed,
- * with a thank-you and a tease. Read when the cursor did not steer him back; blocking, so the voice writes it again.
+ * with a thank-you and a tease. Read when the cursor did not steer him back; soft since 27/11 (Sécurité, #1043): a
+ * style fault the calibration reads, never a hard line.
  */
 export function checkWelcome(bubbles: readonly string[]): GuardViolation[] {
   const violations: GuardViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
     const match = BRAKE.exec(normalise(bubble))?.[0];
     if (match !== undefined)
-      violations.push({ code: 'unwarranted_brake', severity: 'blocking', bubbleIndex, match });
+      violations.push({ code: 'unwarranted_brake', severity: 'soft', bubbleIndex, match });
   });
   return violations;
 }

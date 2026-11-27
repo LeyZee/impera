@@ -1154,7 +1154,11 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     const held = await draftComposer.compose({
       ...INPUT,
       history: [
-        { direction: 'inbound', text: 'je fantasme sur une écolière', at: new Date('2026-10-17T09:59:00Z') },
+        {
+          direction: 'inbound',
+          text: 'je fantasme sur une vraie écolière',
+          at: new Date('2026-10-17T09:59:00Z'),
+        },
       ],
     });
     expect(held).toEqual({
@@ -1778,7 +1782,7 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(limits.confirmed).toEqual([]);
   });
 
-  it('takes an insistent compliment as one, and writes a brake on it again (Charles, 20/11)', async () => {
+  it('takes an insistent compliment as one, and lets a brake on it through as a soft fault (Sécurité, #1043)', async () => {
     // « tu es trop belle !!! » read as a flirt in a good mood (her « Pourquoi », 20/11): welcomed.
     const INSISTENT: Brief = {
       ...BRIEF,
@@ -1796,12 +1800,13 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       limitsOf({}).limits,
       cursor,
     );
+    // A brake on a compliment is a style fault since 27/11 (Sécurité, #1043): soft, read by the calibration, not rewritten.
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'draft',
-      bubbles: ['Je sais 😏 merci, c’est mignon'],
+      bubbles: ['Coucou toi ! Tu y vas un peu fort, non 😏'],
     });
     expect(written(seen)?.replyBrief).not.toContain('ralentit');
-    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
+    expect(seen.voiceInputs).toHaveLength(1);
   });
 
   it('writes what she does on a compliment itself, never in the brain’s words (Charles, 20/11)', async () => {
@@ -1826,14 +1831,14 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     );
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'draft',
-      bubbles: ['Merci 😏 ça me fait plaisir, tu fais quoi de beau ?'],
+      bubbles: ['Merci 😏 tu vises direct toi'],
     });
     const brief = seen.voiceInputs?.[0]?.brief;
     expect(brief?.replyBrief).toContain('avec assurance et jeu');
     expect(brief?.replyBrief).toContain('question ouverte');
     expect(brief?.replyBrief).not.toMatch(/réserve|direct/u);
     expect(brief?.toneHints).not.toContain('réservée');
-    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
+    expect(seen.voiceInputs).toHaveLength(1);
   });
 
   it('welcomes a compliment the brain adds a desire to, never slowed down nor asked his age (Charles, 20/11)', async () => {

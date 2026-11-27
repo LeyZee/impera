@@ -120,6 +120,15 @@ export function AgentBehaviorTab({ value: b, onChange }: TabProps<AgentBehavior>
           set('plays_jealous', v);
         }}
       />
+      <SwitchRow
+        label="Elle écrit des didascalies"
+        path="behavior.stage_directions"
+        detail="« *rougit* », « (rires) ». Désactivé : elle n’en écrit pas."
+        checked={b.stage_directions ?? false}
+        onChange={(v) => {
+          set('stage_directions', v);
+        }}
+      />
       <Field
         label="Surnoms"
         id={`${id}-pet`}

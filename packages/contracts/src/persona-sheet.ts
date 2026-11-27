@@ -336,6 +336,11 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
    * and the voice is told so; never a prompt's choice.
    */
   plays_jealous: z.boolean().optional(),
+  /**
+   * She may write stage directions (« *rougit* », « (rires) »), a style of hers (Charles 27/11). Absent or false: the
+   * guards read one as a soft `stage_direction`.
+   */
+  stage_directions: z.boolean().optional(),
 });
 
 /** « Réglages de l'agent » (ADR 0079 § 4): versioned with the sheet, applied by the code, never a question of hers. */

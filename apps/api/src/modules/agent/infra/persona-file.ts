@@ -48,6 +48,8 @@ export interface PersonaForModels {
   readonly splitMessages: boolean;
   /** She may play the jealous one when he speaks of another woman (`behavior.plays_jealous`); absent, she is not. */
   readonly playsJealous: boolean;
+  /** She may write stage directions (`behavior.stage_directions`, Charles 27/11); absent, she does not. */
+  readonly stageDirections: boolean;
   /** The only pet names she gives fans (`behavior.pet_names`); a guard flags any other. */
   readonly petNames: readonly string[];
   /** Her alert keywords (`notifications.alert_keywords`): one written by a fan pauses the agent for him (P4-01). */
@@ -190,6 +192,7 @@ export function personaForModels(
     },
     splitMessages: agent.behavior.split_messages,
     playsJealous: agent.behavior.plays_jealous ?? false,
+    stageDirections: agent.behavior.stage_directions ?? false,
     petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,
@@ -208,5 +211,6 @@ export function guardSettingsOf(persona: PersonaForModels): GuardSettings {
     ...(persona.petNames.length > 0 && { petNames: persona.petNames }),
     ...(persona.degradingWords !== undefined &&
       persona.degradingWords.length > 0 && { degradingWords: persona.degradingWords }),
+    ...(persona.stageDirections && { stageDirections: true }),
   };
 }
