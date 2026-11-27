@@ -233,6 +233,32 @@ expect:
   });
 });
 
+describe('a question in substance (passe 3 du 27/11, conversation 37)', () => {
+  const asking = readScenario(`
+description: elle l’interroge sur sa nouvelle
+persona_version: demo
+inbound: j’ai réussi mon examen
+expect:
+  voice: { asks_question: true }
+`);
+
+  it('passes a question the voice wrote without its « ? »', () => {
+    for (const bubbles of [
+      ['Trop fière de toi', 'Et ça s’est passé comment'],
+      ['Bravo toi', 'Tu vas fêter ça comment'],
+      ['Bravo', 'Quel poste du coup'],
+      ['Whoa', 'what did they say?'],
+    ])
+      expect(checkScenario(asking, { ...fine, bubbles })).toEqual([]);
+  });
+
+  it('fails an answer that asks him nothing', () => {
+    expect(checkScenario(asking, { ...fine, bubbles: ['Trop fière de toi', 'Tu l’as bien mérité'] })).toEqual(
+      ['la réponse ne lui pose aucune question'],
+    );
+  });
+});
+
 describe('judgeSuite', () => {
   const tier = { min_scenarios: 2, criteria: { safety: 1, naturalness: 0.8 } };
 

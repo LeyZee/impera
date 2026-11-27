@@ -5,9 +5,11 @@ import type { CustomOrderTurn } from '../../custom-orders';
 import type { AbandonTease } from '../domain/abandon';
 import type { CustomOrderDecision } from '../domain/custom-order';
 import { desireRestOf, desireScore, NO_MEASURE, restedDesire, type DesireReading } from '../domain/desire';
+import { hisDayAnswered } from '../domain/his-day';
 import { meetingAnswer, relationshipTier, type MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
 import { inPauseAfterPurchase, maySuggestCustom, offerSignals } from '../domain/policy';
+import { withProofRead } from '../domain/proof-request';
 import type { SaleTroubleOutcome } from '../domain/sale-trouble';
 import type { ScriptTurn } from '../domain/script-turn';
 import {
@@ -36,7 +38,7 @@ import {
   teaseSaid,
   toneHintsOfTurn,
 } from '../domain/turn-hints';
-import { askedHisAge, earlierFanTexts, knownHoursOf, relationshipOf } from '../domain/turn-history';
+import { askedHisAge, datedOf, earlierFanTexts, knownHoursOf, relationshipOf } from '../domain/turn-history';
 import {
   availabilityTurnOf,
   scriptsBoughtOf,
@@ -46,6 +48,7 @@ import {
 } from '../domain/turn-moment';
 import {
   asksMoreTonight,
+  insistsMoreTonight,
   objectionReplyOf,
   offerRefusedOf,
   saleMovesOf,
@@ -111,6 +114,8 @@ export interface DecidedTurn {
   readonly farewell: FarewellKind | null;
   readonly teases: AbandonTease | null;
   readonly moreTonight: boolean;
+  /** He insists for more after his script, or asks something made for him: she may steer him to it (Charles 27/11). */
+  readonly moreTonightCustom: boolean;
   readonly sexting: SextingMoment;
   readonly fantasy: VoiceFantasy | undefined;
   /** Her words worn across her fans: named to the voice, read again on what it wrote. */
@@ -128,7 +133,9 @@ export function decideTurn(
   input: ComposeTurnInput,
   brainTurn: Pick<BrainTurn, 'brief' | 'desireMap' | 'scriptLanguage' | 'choices' | 'uncovered' | 'kept'>,
 ): DecidedTurn {
-  const { brief, desireMap, choices, uncovered } = brainTurn;
+  const { desireMap, choices, uncovered } = brainTurn;
+  // A proof he asks of her, read by code too: the brain may read it as a doubt only (passe 3 du 27/11, conversation 31).
+  const brief = brainTurn.brief === undefined ? undefined : withProofRead(brainTurn.brief, input.fanText);
   const { situation } = input;
   const trap = assessTrap({
     fanText: input.fanText,
@@ -297,6 +304,9 @@ export function decideTurn(
   const teases = teaseSaid(tease, farewell, asking, waitingStep !== undefined, complaint);
   const insulted = brief?.risks.includes('insult') === true;
   const moreTonight = asksMoreTonight(brief, input.offer, hasScriptStep, input.scripts?.latest);
+  // A cam or a video made for him is never volunteered: only when he insists or asks for it (passe 3 du 27/11, 18).
+  const moreTonightCustom =
+    moreTonight && insistsMoreTonight(input.fanText, input.history, input.scripts?.latest);
   const sexting = sextingMomentOf({
     brief,
     fanText: input.fanText,
@@ -335,6 +345,7 @@ export function decideTurn(
       farewell,
       asking,
       paced,
+      dayAnswered: hisDayAnswered(input.history.map((turn) => ({ ...datedOf(turn), text: turn.text }))),
       reminds: sale.reminds,
       meeting,
       insulted,
@@ -345,6 +356,7 @@ export function decideTurn(
       backToSale: free?.backToSale === true,
       warm,
       moreTonight,
+      moreTonightCustom,
       occasionHints: occasionHintsOf(brief, {
         care,
         customOrder: customOrder !== undefined,
@@ -388,6 +400,7 @@ export function decideTurn(
     farewell,
     teases,
     moreTonight,
+    moreTonightCustom,
     sexting,
     fantasy,
     worn,

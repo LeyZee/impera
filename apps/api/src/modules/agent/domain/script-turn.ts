@@ -1,3 +1,5 @@
+import { sameEvening } from './policy';
+import type { ScriptReply } from './script-reply';
 import {
   applyScriptRunEvent,
   nextScriptStep,
@@ -16,9 +18,6 @@ import {
  * brain read in his message, then one closed decision, applied to the run. Pure: the caller writes the runs and the
  * journal, and the voice says the step decided. Nothing is sent from here: a step decided is draft content (P2-03 sends).
  */
-
-/** What his last message does with the step waiting for him, as the brain read it (`Brief.scriptReply`). */
-type ScriptReply = 'refused' | 'answers_step' | 'claims_bought';
 
 /** An event the turn journals for a run, in order (§ 2); the run's id is the caller's. */
 export type ScriptJournalEvent =
@@ -123,10 +122,13 @@ function afterHisMessage(
   reply: ScriptReply | null,
   hotSession: boolean,
   at: Date,
+  answersItTonight: boolean,
 ): ScriptRun {
   // He comes back once the session cooled (asleep, gone, the next day) with the paid step still waiting: the run
-  // pauses there, never a refusal of his « salut » (ADR 0156 § 1). A clear no is still one.
-  if (!hotSession && reply !== 'refused' && paidWaiting(run) !== undefined) {
+  // pauses there, never a refusal of his « salut » (ADR 0156 § 1). A clear no is still one. A message about the step
+  // the evening it was sent (« c'est cher quand même ») is his answer to it, not a session that cooled: the step keeps
+  // waiting for his yes or his no (passe 3 du 27/11, conversation 42).
+  if (!hotSession && reply !== 'refused' && !answersItTonight && paidWaiting(run) !== undefined) {
     const cooled = applyScriptRunEvent(run, script, { type: 'session_cooled', at });
     if (cooled.ok) return cooled.run;
   }
@@ -137,6 +139,16 @@ function afterHisMessage(
   // « Je l'ai pris » is an answer to the step, never a purchase: only Reveal says what he bought (ADR 0018 § 5).
   const moved = applyScriptRunEvent(run, script, { type: 'fan_message', aboutTheStep: reply !== null, at });
   return moved.ok ? moved.run : run;
+}
+
+/** His message is about the paid step waiting, the evening it was sent to him (`sameEvening`, ADR 0128 § 1). */
+function answersTonight(run: ScriptRun, input: ScriptTurnInput): boolean {
+  const waiting = paidWaiting(run);
+  return (
+    (input.reply === 'answers_step' || input.reply === 'claims_bought') &&
+    waiting !== undefined &&
+    sameEvening(input.now, waiting.sentAt, input.offer.limits.cooldownHours, input.offer.timeZone)
+  );
 }
 
 const noStep = (decision: ScriptStepDecision): boolean =>
@@ -158,7 +170,14 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
     // Paused while he is not free (ADR 0103 § 12) or right after he came (ADR 0156 § 6): his message is neither an
     // answer to the step nor a refusal.
     if (input.countsHisMessage && input.availability !== 'no' && input.heCame !== true)
-      run = afterHisMessage(run, storedScript, input.reply, input.hotSession, now);
+      run = afterHisMessage(
+        run,
+        storedScript,
+        input.reply,
+        input.hotSession,
+        now,
+        answersTonight(run, input),
+      );
     // Whether a step waits or he just bought one, the evening's script ends when he came (ADR 0156 § 6).
     if (input.heCame === true) {
       const over = applyScriptRunEvent(run, storedScript, { type: 'session_cooled', at: now });

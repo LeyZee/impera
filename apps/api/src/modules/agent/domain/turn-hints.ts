@@ -3,6 +3,7 @@ import type { FanAvailabilityRecord } from '@impera/contracts';
 import type { AbandonTease } from './abandon';
 import type { TimeWasterLevel } from './attention';
 import { asksAvailability, type ScriptStart } from './availability';
+import { HIS_DAY_ANSWERED_HINT } from './his-day';
 import type { MeetingAnswer } from './meeting';
 import { paceHints } from './pace';
 import { asksForRefund } from './refund';
@@ -45,6 +46,7 @@ import {
   meetingHint,
   MOOD_KILLER_HINT,
   MOOD_KILLER_OTHER_MAN_HINT,
+  MORE_TONIGHT_CUSTOM_HINT,
   MORE_TONIGHT_HINT,
   MURMUR_HINT,
   NO_MOANS_HINT,
@@ -171,6 +173,8 @@ export interface TurnHintFacts {
   readonly farewell: FarewellKind | null;
   readonly asking: boolean;
   readonly paced: readonly string[];
+  /** She asked about his evening or his day and he answered, or he told it (`hisDayAnswered`, passe 3 du 27/11). */
+  readonly dayAnswered: boolean;
   readonly reminds: boolean;
   readonly meeting: MeetingAnswer | undefined;
   /** He insults or belittles her, or comes back after: her stance, whatever else she answers (Charles 21/11). */
@@ -182,6 +186,8 @@ export interface TurnHintFacts {
   readonly backToSale: boolean;
   readonly warm: boolean;
   readonly moreTonight: boolean;
+  /** He insists for more after his script, or asks something made for him (`insistsMoreTonight`, Charles 27/11). */
+  readonly moreTonightCustom: boolean;
   readonly occasionHints: readonly string[];
   readonly sexting: SextingMoment;
   readonly timeWaster: TimeWasterLevel | undefined;
@@ -213,6 +219,7 @@ export function toneHintsOfTurn(facts: TurnHintFacts): string[] {
       : WORK_TEASE_HINTS[facts.workPhase];
   return [
     ...facts.paced,
+    ...(facts.dayAnswered && !care ? [HIS_DAY_ANSWERED_HINT] : []),
     ...(facts.reminds ? [UNOPENED_STEP_HINT] : []),
     ...(facts.meeting === undefined ? [] : [meetingHint(facts.meeting)]),
     ...(facts.insulted ? [INSULT_HINT] : facts.afterInsult ? [AFTER_INSULT_HINT] : []),
@@ -231,7 +238,7 @@ export function toneHintsOfTurn(facts: TurnHintFacts): string[] {
       : []),
     ...(sexting.sexualTurn && register !== 'very_explicit' ? [NO_MOANS_HINT] : []),
     ...(facts.warm ? [KEEP_WARM_HINT] : []),
-    ...(facts.moreTonight ? [MORE_TONIGHT_HINT] : []),
+    ...(facts.moreTonight ? [facts.moreTonightCustom ? MORE_TONIGHT_CUSTOM_HINT : MORE_TONIGHT_HINT] : []),
     ...facts.occasionHints,
     ...(sexting.inTension ? [IN_TENSION_HINT] : []),
     ...(sexting.justBought ? [AFTER_PURCHASE_HINT] : []),

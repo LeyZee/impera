@@ -166,6 +166,42 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(no.decision.kind).toBe('after_refusal');
   });
 
+  it('keeps the step waiting when he answers it cold the same evening, then reads his no (passe 3 du 27/11, conversation 42)', () => {
+    // « C'est cher quand même » cools his score under her opening one: still his answer to the step, never a pause.
+    const objection = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      hotSession: false,
+      reply: 'answers_step',
+    });
+    expect(objection.decision).toMatchObject({ kind: 'wait', step: { stepIndex: 1 } });
+    const waiting = objection.moved?.run ?? offered;
+    expect(waiting.status).toBe('open');
+    // His no a few minutes later: the step is refused and the after-refusal path follows.
+    const no = scriptTurn({
+      ...input,
+      now: new Date(NOW.getTime() + 180_000),
+      latest: waiting,
+      history: history([0, 1]),
+      hotSession: false,
+      reply: 'refused',
+    });
+    expect(no.decision.kind).toBe('after_refusal');
+    expect(no.moved?.run.steps.at(-1)?.outcome).toBe('refused');
+    // The next day, an answer about it no longer holds the run: the session cooled (ADR 0156 § 1).
+    const nextDay = new Date(NOW.getTime() + 20 * 3_600_000);
+    const later = scriptTurn({
+      ...input,
+      now: nextDay,
+      latest: offered,
+      history: history([0, 1]),
+      hotSession: false,
+      reply: 'answers_step',
+    });
+    expect(later.moved?.run.status).toBe('stalled');
+  });
+
   it('never teases him about the step the same evening, when his heat fell because he came (eval passe-13)', () => {
     // « Merci pour ce soir » a few minutes after « j'ai fini »: the run pauses, nothing is recalled to him.
     const thanks = scriptTurn({ ...input, latest: offered, history: history([0, 1]), hotSession: false });

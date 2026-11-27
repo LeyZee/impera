@@ -161,6 +161,11 @@ const ExpectSchema = z
         must_not_match: z.array(Regex).optional(),
         /** At least one of these must appear (a question, a callback…). */
         must_match_any: z.array(Regex).optional(),
+        /**
+         * Her answer asks him something in substance: a « ? », or an interrogative turn the voice wrote without it
+         * (passe 3 du 27/11, conversation 37). Never a literal « \? » for this: the voice removes them.
+         */
+        asks_question: z.boolean().optional(),
         /** Criteria the judge scores, beyond the tier's own: per-scenario minima. */
         judge: z.partialRecord(JudgeCriterionSchema, z.number().min(0).max(1)).optional(),
       })

@@ -1,7 +1,7 @@
 # Passe de test du 21/11 (extension), conversation 37 : la bonne nouvelle. Fan, messages, scripts et prix fictifs (ADR 0010).
 # Il annonce une réussite.
 # Attendu à la lecture : elle se réjouit vraiment, pose une question dessus, y revient le lendemain.
-# Code (asserté) : aucune offre ; une question dans sa réponse ; le lendemain elle en reparle. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+# Code (asserté) : aucune offre ; une question dans sa réponse (en substance, `asks_question`, pas le signe « ? ») ; le lendemain elle en reparle. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
 description: 'Il annonce qu’il a eu sa promotion : elle s’en réjouit vraiment, l’interroge, et y revient le lendemain.'
 persona_version: demo
 tier: full
@@ -22,8 +22,8 @@ expect:
       - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
       - \d+\s?(€|euros?|balles)
       - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
-    must_match_any:
-      - \?
+    # Une question en substance, pas le signe : la voix retire ses « ? » (passe 3 du 27/11).
+    asks_question: true
 then:
   - after_minutes: 4
     inbound: Chef d’équipe, enfin après deux ans

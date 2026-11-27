@@ -7,6 +7,7 @@ import { holdsBackNow } from './gauge';
 import { touchesTerm, type GuardSettings } from './guards';
 import type { LanguageDecision } from './language';
 import { offerSignals, sameEvening, type OfferContext } from './policy';
+import { scriptReplyOf } from './script-reply';
 import {
   mayOpenScript,
   permittedScripts,
@@ -260,7 +261,8 @@ export function scriptsTurnOf(facts: {
     careMode: facts.care,
     ...(facts.scriptStart !== undefined && { startGate: facts.scriptStart }),
     ...(facts.gateRecord !== undefined && { availability: facts.gateRecord.state }),
-    reply: brief?.scriptReply ?? null,
+    // The brain's reading, completed by code where it left it empty (passe 3 du 27/11, conversation 42).
+    reply: scriptReplyOf(brief, facts.fanText),
     countsHisMessage: scripts.countsHisMessage && brief !== undefined,
     heCame: facts.heCame,
     hisMessagesAt: facts.hisMessagesAt,

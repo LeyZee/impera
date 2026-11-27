@@ -10,6 +10,7 @@ import type { LanguageDecision } from '../domain/language';
 import { screenMedia } from '../domain/traps';
 import { quietBriefOf } from '../domain/turn-briefs';
 import { guardContextOf } from '../domain/turn-history';
+import { customUnaskedNow } from '../domain/turn-sale';
 import { stepSendsMedia } from '../domain/turn-scripts';
 
 import { askBrain, type BrainTurn } from './compose-brain';
@@ -98,6 +99,18 @@ export async function composeTurn(
         ...(prepared.meetingTier !== undefined && { meetingTier: prepared.meetingTier }),
         ...(wantsHumiliation(brainTurn.desireMap) && { humiliationWanted: true }),
       }),
+      // A cam or a video made for him is never volunteered (Charles 27/11, passe 3 du 27/11, conversation 18).
+      ...(customUnaskedNow({
+        customLed:
+          customOrder !== undefined ||
+          sexting.suggestsCustom ||
+          sexting.customMidScript ||
+          decided.moreTonightCustom,
+        hasStep: scriptStep !== undefined || waitingStep !== undefined,
+        intent: brief?.intent,
+        fanText: input.fanText,
+        history: input.history,
+      }) && { customUnasked: true }),
       languages: guardLanguages(persona),
     },
     checksExplicit: !(decided.ageConfirmed && !decided.noExplicit && !care),

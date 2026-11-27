@@ -1,4 +1,4 @@
-import type { ObjectionReplies } from '@impera/contracts';
+import { normalise, type ObjectionReplies } from '@impera/contracts';
 
 import type { ScriptStart, ScriptStartBlock } from './availability';
 import type { CustomOrderDecision } from './custom-order';
@@ -20,6 +20,7 @@ import {
 } from './sale-trouble';
 import { scriptStepsHeld, type ScriptRun } from './script-run';
 import type { ScriptTurn } from './script-turn';
+import { wantsMadeForHim } from './sexting-moves';
 import type { Situation } from './situation';
 import type { TurnReading } from './turn-briefs';
 import { herAnswersSince, type HistoryTurn } from './turn-history';
@@ -194,6 +195,39 @@ function lastBoughtStepAt(run: ScriptRun | null | undefined): Date | null {
   return run?.steps.findLast((step) => step.kind === 'paid' && step.outcome === 'bought')?.at ?? null;
 }
 
+// He asks for more of what she sends (passe 18): « t'as encore quelque chose », « montre-moi autre chose », « another
+// one », « algo más », « un'altra ». Read on his messages since his purchase this evening.
+const ASKS_MORE_TONIGHT =
+  /\b(encore (une?|des|du|de la|quelque chose|autre chose|plus)|t'?as encore|tu as encore|autre chose|une autre|un autre|la suite|montre[- ]moi|envoie[- ]moi|j'?en veux (encore|plus)|(some|any) ?more|another (one|video|pic|photo)|something else|show me|send me|otra|otro|algo mas|ensename|mandame|un'?altra|un altro|qualcos'?altro|ancora|fammi vedere|mandami)\b/;
+
+/**
+ * After his script, he asks for more again, or asks something made for him (Charles 27/11): only then may she steer
+ * him to a cam or a video made for him. His first « t'as encore quelque chose ? » gets tenderness and nothing proposed
+ * (passe 3 du 27/11, conversation 18): a cam or a custom video is never volunteered. An earlier ask counts only when
+ * written after his last purchase in the run (dated messages; undated ones do not count, closed by default).
+ */
+export function insistsMoreTonight(
+  fanText: string,
+  history: readonly HistoryTurn[],
+  latestRun: ScriptRun | null | undefined,
+): boolean {
+  if (wantsMadeForHim(fanText)) return true;
+  const boughtAt = lastBoughtStepAt(latestRun);
+  if (boughtAt === null) return false;
+  // His messages she already answered: the ones after her last answer are those she answers now.
+  const earlier = history.slice(
+    0,
+    history.findLastIndex((turn) => turn.from === 'creator'),
+  );
+  return earlier.some(
+    (turn) =>
+      turn.from === 'fan' &&
+      turn.at !== undefined &&
+      turn.at >= boughtAt &&
+      ASKS_MORE_TONIGHT.test(normalise(turn.text)),
+  );
+}
+
 /**
  * He asks for more the evening he bought a step of his script: nothing more tonight, a custom request instead (passe
  * 18). Only after a real purchase this evening, read on his latest run; an offer made or refused is not one. Never to a
@@ -216,4 +250,24 @@ export function asksMoreTonight(
       boughtAt: lastBoughtStepAt(latestRun),
     })
   );
+}
+
+/** His last messages read for a cam or a video he asked for himself. */
+const ASKED_CUSTOM_MESSAGES = 3;
+
+/**
+ * Whether her answer may not propose a cam or a video made for him (Charles 27/11, guard `custom_unasked`): nothing in
+ * code steers him to it now (a custom order, his insisting after his script, his wish mid-script, a fantasy no script
+ * serves), no step of her script is in the answer, and he asked for none in his last messages nor the brain read one.
+ */
+export function customUnaskedNow(facts: {
+  readonly customLed: boolean;
+  readonly hasStep: boolean;
+  readonly intent: string | undefined;
+  readonly fanText: string;
+  readonly history: readonly HistoryTurn[];
+}): boolean {
+  if (facts.customLed || facts.hasStep || facts.intent === 'asks_for_service') return false;
+  const his = facts.history.filter((turn) => turn.from === 'fan').slice(-ASKED_CUSTOM_MESSAGES);
+  return ![facts.fanText, ...his.map((turn) => turn.text)].some(wantsMadeForHim);
 }

@@ -44,7 +44,7 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 7. **`creator_no`.** L'IA décline avec douceur, sans reproche, et reprend la conversation.
 8. **Délais** (défauts dans le code) : sans réponse de la créatrice en 24 h, la demande revient au propriétaire ; livraison attendue 72 h après l'acompte, rappel à la créatrice à 48 h, alerte au propriétaire au-delà. L'IA ne donne jamais de délai au fan.
 9. **Annulation.** L'acompte est gardé si le fan annule après le oui. Si la créatrice ne livre pas, un humain décide. L'IA ne promet jamais de remboursement.
-10. **Quand le proposer.** L'IA n'ouvre pas d'elle-même une commande, sauf à un fan qui a acheté toutes les étapes d'un script le même soir et en redemande : elle peut alors évoquer une vidéo pour lui ou une cam, au lieu d'un deuxième script (jamais deux scripts le même soir).
+10. **Quand le proposer.** L'IA n'ouvre pas d'elle-même une commande, sauf à un fan qui a acheté toutes les étapes d'un script le même soir et en redemande : elle peut alors évoquer une vidéo pour lui ou une cam, au lieu d'un deuxième script (jamais deux scripts le même soir). *Avenant du 27/11/2026 (Charles) : seulement s'il insiste ou demande lui-même une cam ou une vidéo pour lui, jamais à sa première demande de plus ; détail à l'ADR 0098 § 15, avenant du même jour.*
 11. **Ce qui prime.** Doute d'âge ouvert, fan fragile, ventes gelées, « Ne plus lui écrire », risque de `NO_SALE_RISKS`, `never_do` : aucune commande, aucun pourboire demandé (règle actuelle de `customOrderDecision`, inchangée). Un chatteur en poste peut toujours prendre la conversation.
 
 ### B. Le dossier « Perso » du coffre
