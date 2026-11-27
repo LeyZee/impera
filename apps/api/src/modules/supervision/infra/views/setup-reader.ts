@@ -12,8 +12,8 @@ import { z } from 'zod';
 import { modeOf } from '../../domain/dashboard';
 import type { CreatorSetupFacts, Invitation, MemberSetupFacts } from '../../domain/setup';
 
-/** Whether an urgent alert reaches a group for each creator (`telegram`'s coverage); `null` when Telegram is off. */
-export type TelegramReach = () => Promise<ReadonlyMap<CreatorId, boolean> | null>;
+/** Whether this server sends notifications (a push key is set): without it, nobody is woken at night. */
+export type PushOn = () => boolean;
 
 /**
  * What stops the first invoice of each member on `day` (invoicing's `invoiceGaps`), every gap, none when it could go out.
@@ -85,13 +85,13 @@ const invitationOf = (
  */
 export function createSetupReader(
   adminDb: Database,
-  telegramReach: TelegramReach,
+  pushOn: PushOn,
   billing: BillingReadiness,
   agencyTimeZone: string,
 ): SetupReader {
   return {
     creators: async () => {
-      const reach = await telegramReach();
+      const push = pushOn();
       return withAdmin(adminDb, async (tx) => {
         const read = async <T extends z.ZodType>(
           schema: T,
@@ -152,6 +152,13 @@ export function createSetupReader(
               group by ps.creator_id`,
         );
         const grids = await read(IdRow, sql`select distinct creator_id from custom_price_grids`);
+        // An owner's device that accepted the notifications: her urgent alerts ring someone at night (27/11/2026).
+        const [device] = await read(
+          z.object({ reached: z.boolean() }),
+          sql`select exists (select 1 from push_subscriptions s join "user" u on u.id = s.user_id
+                where u.role = 'owner') as reached`,
+        );
+        const ownerDevice = device?.reached ?? false;
         const checks = await read(
           CheckRow,
           sql`select distinct on (platform) platform, clean, to_day from sales_feed_checks
@@ -180,7 +187,7 @@ export function createSetupReader(
             hasAgencyRate: withRate.has(id),
             hasLinkedReveal: hers.some((a) => a.platform === 'reveal' && a.linked),
             access: account?.invitation ?? 'none',
-            telegramReachable: reach === null ? null : (reach.get(id) ?? false),
+            nightAlertsReach: push ? ownerDevice : null,
             hasOwnHours: own_hours,
             hasShifts: withShifts.has(id),
             mode: modeOf({

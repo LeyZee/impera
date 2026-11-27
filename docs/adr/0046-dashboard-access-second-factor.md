@@ -10,6 +10,7 @@
 
 Statut : accepted (Charles, 2026-11-02 17h08, « ok 0046 »)
 Date : 2026-11-02
+Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.
 
 ## Contexte
 
@@ -52,3 +53,7 @@ Livraison en trois lots, dans cet ordre : (a) deuxième facteur, codes de secour
 - **Code par e-mail ou SMS** : un e-mail se pirate avec le même mot de passe, un SMS se détourne ; aucun envoi d'e-mail n'existe dans Nirvana.
 - **Passkeys seules** (Face ID, empreinte) : la meilleure protection, mais l'appareil du chatteur n'en a pas toujours, et le plugin demande une dépendance de plus. Elles viendront en option dans un second temps (l'ADR 0042 prévoit Face ID pour la créatrice).
 - **Garder le verrouillage par compte toutes adresses confondues** : il protège le mot de passe au prix de la disponibilité du compte ; le deuxième facteur rend ce prix inutile.
+
+## Amendement du 27/11/2026 : les alertes de sécurité par notification (ADR 0176)
+
+Le § 8 n'envoie plus rien dans le groupe Telegram urgent : chaque alerte de sécurité sonne en notification Impera chez chaque propriétaire, motif `agency_urgent` (passe les heures calmes et le plafond du jour), avec les mêmes mots et les mêmes limites (ni nom, ni contenu, ni adresse IP complète). La sortie vers Telegram des Conséquences disparaît.

@@ -46,7 +46,6 @@ function chat(title: string, patch: Partial<ChatRecord> = {}): ChatRecord {
 const context = (chats: readonly ChatRecord[], more: Partial<ChannelContext> = {}): ChannelContext => ({
   chats,
   takenByOthers: new Set<TelegramChatId>(),
-  routed: new Set<TelegramChatId>(),
   ...more,
 });
 
@@ -162,17 +161,12 @@ describe('the channel chosen (ADR 0057 § 2, ADR 0080 § 6.1)', () => {
     expect(channelRefusal(config({ chatId: mine.id }), context([mine]))).toBeNull();
   });
 
-  it('refuses a group, another creator’s channel and a channel that receives alerts', () => {
+  it('refuses a group and another creator’s channel', () => {
     const group = chat('Équipe', { kind: 'supergroup' });
     const taken = chat('Canal B');
-    const routed = chat('Canal C');
-    const all = context([group, taken, routed], {
-      takenByOthers: new Set([taken.id]),
-      routed: new Set([routed.id]),
-    });
+    const all = context([group, taken], { takenByOthers: new Set([taken.id]) });
     expect(channelRefusal(config({ chatId: group.id }), all)?.kind).toBe('chat_not_channel');
     expect(channelRefusal(config({ chatId: taken.id }), all)?.kind).toBe('chat_taken');
-    expect(channelRefusal(config({ chatId: routed.id }), all)?.kind).toBe('chat_routed');
     expect(channelRefusal(config({ chatId: newId(TelegramChatIdSchema) }), all)?.kind).toBe('chat_unknown');
   });
 

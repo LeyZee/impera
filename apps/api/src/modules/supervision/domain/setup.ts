@@ -49,8 +49,11 @@ export interface CreatorSetupFacts {
   readonly hasLinkedReveal: boolean;
   /** Her own account. */
   readonly access: Invitation;
-  /** An urgent alert reaches a group for her now; `null` when Telegram is off (no key). */
-  readonly telegramReachable: boolean | null;
+  /**
+   * An owner has a device that accepted the notifications, so her urgent alerts ring someone at night (27/11/2026,
+   * Telegram back to the channels only); `null` when this server sends no notification.
+   */
+  readonly nightAlertsReach: boolean | null;
   /** Her agent hours stored; `false` follows the defaults. */
   readonly hasOwnHours: boolean;
   /** A shift not cancelled on one of her accounts, ending in the last 14 days or later. */
@@ -98,9 +101,9 @@ export function creatorSetup(facts: CreatorSetupFacts): CreatorSetupStep[] {
         : null,
     ),
     step(
-      'telegram',
-      doneIf(facts.telegramReachable === true),
-      facts.telegramReachable === null ? { kind: 'telegram_off' } : null,
+      'night_alerts',
+      doneIf(facts.nightAlertsReach === true),
+      facts.nightAlertsReach === null ? { kind: 'push_off' } : null,
     ),
     // The defaults are a choice the agency may keep: done, and said so, never a step that cannot be ticked.
     step('agent_hours', 'done', facts.hasOwnHours ? null : { kind: 'default_hours' }),

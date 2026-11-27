@@ -15,7 +15,7 @@ import { createAgencySteeringReader } from './infra/views/agency-steering-reader
 import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
-import { createSetupReader, type BillingReadiness, type TelegramReach } from './infra/views/setup-reader';
+import { createSetupReader, type BillingReadiness, type PushOn } from './infra/views/setup-reader';
 
 export interface SupervisionModule {
   readonly name: 'supervision';
@@ -44,8 +44,8 @@ export interface SupervisionDeps extends Omit<
   readonly db: Database;
   /** Admin role: « Mise en route » reads her account, passwords, passkeys and extension links (owner's routes only). */
   readonly adminDb: Database;
-  /** Whether an urgent alert reaches a group for each creator; `null` when Telegram is off. */
-  readonly telegramReach: TelegramReach;
+  /** Whether this server sends notifications (a push key is set), for her « Alertes la nuit » step. */
+  readonly pushOn: PushOn;
   /** What stops each member's first invoice (invoicing's `invoiceGaps`), for his « Facturation » step. */
   readonly billingReadiness: BillingReadiness;
   /** The connectors' `salesFeedTotals.totalsOf` (CRM-04), for the sales panel. */
@@ -77,7 +77,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       agencyTimeZone,
       steering: createAgencySteeringReader(deps.db, deps.salesTimeZone, deps.dailyStatsOf),
       objectives: createObjectivesStore(deps.db),
-      setup: createSetupReader(deps.adminDb, deps.telegramReach, deps.billingReadiness, agencyTimeZone),
+      setup: createSetupReader(deps.adminDb, deps.pushOn, deps.billingReadiness, agencyTimeZone),
       overview: createCreatorsOverviewReader(deps.db),
     }),
     reads: {

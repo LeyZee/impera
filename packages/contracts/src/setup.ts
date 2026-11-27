@@ -24,7 +24,7 @@ export const CREATOR_SETUP_STEPS = [
   'agency_rate',
   'access',
   'pay_rules',
-  'telegram',
+  'night_alerts',
   'agent_hours',
   'shifts',
   'agent_mode',
@@ -51,7 +51,7 @@ export type MemberSetupStepKey = z.infer<typeof MemberSetupStepKeySchema>;
 
 /**
  * What a step adds when its state alone says too little: hours left on the defaults, the agent's mode in force, how
- * many of her accounts have pay rules, Telegram off, a latest reliability check that is not clean, the agency's share
+ * many of her accounts have pay rules, the notifications off on this server, a latest reliability check that is not clean, the agency's share
  * read at the platform.
  */
 export const SetupNoteSchema = z.discriminatedUnion('kind', [
@@ -62,7 +62,8 @@ export const SetupNoteSchema = z.discriminatedUnion('kind', [
     done: z.number().int().nonnegative(),
     total: z.number().int().nonnegative(),
   }),
-  z.object({ kind: z.literal('telegram_off') }),
+  /** The server sends no notification (no push key): nobody can be woken at night. */
+  z.object({ kind: z.literal('push_off') }),
   /**
    * Her scripts the agent may offer (ADR 0161): ours, recognised in Reveal and active there, by when they play; one
    * « jour et nuit » counts on both sides.

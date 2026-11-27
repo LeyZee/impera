@@ -2,7 +2,7 @@ import type {
   ChannelFailure,
   ChannelResult,
   ChannelUpdate,
-  NotificationChannel,
+  BotChannel,
   OutgoingMessage,
 } from '../../domain/ports';
 
@@ -24,9 +24,8 @@ export interface SentMessage extends OutgoingMessage {
  * Plays Telegram for the tests: knows the tokens it was given, records every message, and answers the next call
  * of a method with a scripted failure when one is queued. Nothing leaves the process.
  */
-export class FakeTelegram implements NotificationChannel {
+export class FakeTelegram implements BotChannel {
   readonly sent: SentMessage[] = [];
-  readonly edits: { chatId: string; messageId: number; text: string }[] = [];
   readonly updates: ChannelUpdate[] = [];
   private readonly failures = new Map<string, ChannelFailure[]>();
   private readonly known = new Map<
@@ -43,7 +42,7 @@ export class FakeTelegram implements NotificationChannel {
     this.known.delete(token);
   }
 
-  failNext(method: 'getMe' | 'getUpdates' | 'send' | 'edit', failure: ChannelFailure): void {
+  failNext(method: 'getMe' | 'getUpdates' | 'send', failure: ChannelFailure): void {
     const queue = this.failures.get(method) ?? [];
     queue.push(failure);
     this.failures.set(method, queue);
@@ -56,7 +55,7 @@ export class FakeTelegram implements NotificationChannel {
     return { ok: true, value: value() };
   }
 
-  getMe(token: string): ReturnType<NotificationChannel['getMe']> {
+  getMe(token: string): ReturnType<BotChannel['getMe']> {
     return Promise.resolve(
       this.check('getMe', token, () => {
         const bot = this.known.get(token);
@@ -66,36 +65,22 @@ export class FakeTelegram implements NotificationChannel {
     );
   }
 
-  deleteWebhook(token: string): ReturnType<NotificationChannel['deleteWebhook']> {
+  deleteWebhook(token: string): ReturnType<BotChannel['deleteWebhook']> {
     return Promise.resolve(this.check('deleteWebhook', token, () => null));
   }
 
-  getUpdates(token: string, offset: number): ReturnType<NotificationChannel['getUpdates']> {
+  getUpdates(token: string, offset: number): ReturnType<BotChannel['getUpdates']> {
     return Promise.resolve(
       this.check('getUpdates', token, () => this.updates.filter((update) => update.updateId >= offset)),
     );
   }
 
-  send(token: string, chatId: string, message: OutgoingMessage): ReturnType<NotificationChannel['send']> {
+  send(token: string, chatId: string, message: OutgoingMessage): ReturnType<BotChannel['send']> {
     return Promise.resolve(
       this.check('send', token, () => {
         const messageId = (this.nextMessageId += 1);
         this.sent.push({ ...message, chatId, messageId });
         return { messageId };
-      }),
-    );
-  }
-
-  edit(
-    token: string,
-    chatId: string,
-    messageId: number,
-    text: string,
-  ): ReturnType<NotificationChannel['edit']> {
-    return Promise.resolve(
-      this.check('edit', token, () => {
-        this.edits.push({ chatId, messageId, text });
-        return null;
       }),
     );
   }

@@ -19,6 +19,14 @@ export interface RoutedEventRow {
   readonly payload: unknown;
 }
 
+/** A safety relay nobody took yet: the event, her, the conversation and when it was raised. */
+export interface WaitingSafetyRelay {
+  readonly id: string;
+  readonly creatorId: CreatorId;
+  readonly conversationId: string | null;
+  readonly createdAt: Date;
+}
+
 /** An account a notification goes to, in its own time zone (its quiet hours, its day). */
 interface Recipient {
   readonly userId: string;
@@ -39,6 +47,10 @@ export interface RouterReads {
   safetyEvents(since: Date): Promise<readonly RoutedEventRow[]>;
   /** Every routed event written after `since`, oldest first, read page by page to the window's newest. */
   events(since: Date): Promise<readonly RoutedEventRow[]>;
+  /** The agency's alerts written after `since` (`AGENCY_EVENT_TYPES`), oldest first, page by page. */
+  agencyEvents(since: Date): Promise<readonly RoutedEventRow[]>;
+  /** The safety relays written after `since` that no takeover followed yet (no `takeover_started` nor `_ended`). */
+  waitingSafety(since: Date): Promise<readonly WaitingSafetyRelay[]>;
   /** Her stored choices, through `creatorAlertLines`: a locked alert reads « reçoit » whatever a row says. */
   lines(creatorId: CreatorId): Promise<readonly CreatorAlertLine[]>;
   /** The creators not archived, with the name a notification shows. */
@@ -130,7 +142,8 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
         : modesFor(alert.code, await linesOf(event.creatorId));
 
     const byRole = async (role: CreatorAlertRole): Promise<readonly Recipient[]> => {
-      if (role === 'owner') return owners;
+      // The owners hear of the AI budget by the agency's alerts, with the figures (`alerts.agency`): never twice.
+      if (role === 'owner') return alert.code === 'ai_budget' ? [] : owners;
       // A creator's alert to her managers only; the agency's (budget, no creator) to every active manager.
       if (role === 'manager') {
         const creatorId = event.creatorId;
