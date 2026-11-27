@@ -484,6 +484,19 @@
 .ct-thumb__play path {
   fill: var(--nv-ink);
 }
+/* A video's length on its corner, as in her phone's gallery (Charles, 27/11). */
+.ct-thumb__length {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 0 3px;
+  border-radius: var(--nv-radius-xs);
+  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
+  color: var(--nv-ink);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 13px;
+}
 .ct-thumb img,
 .ct-thumb video {
   width: 100%;
