@@ -294,6 +294,7 @@ export const EVENT_TYPES = [
   'sales_feed_mismatch',
   'agency_share_mismatch',
   'agency_share_changed',
+  'account_uncovered',
   'connection_state_changed',
   'security_alert',
   'content_drop_received',
@@ -707,6 +708,20 @@ export const EVENT_PAYLOADS = {
       .max(SALES_FEED_MISMATCH_DAYS_MAX),
   }),
   /**
+   * ADR 0094 § 1 (lot a), « compte sans personne »: a créneau of the planning began on this account with no chatter in
+   * post and the agent not answering in Automatique, while a fan wrote to the account in the 24 hours before. Published
+   * once per account and créneau (unique index); the zone is the planning's, to say the créneau's hours. For the
+   * owner and the managers only: never a chatter, never her.
+   */
+  account_uncovered: z.strictObject({
+    creatorId: CreatorIdSchema,
+    platform: PlatformSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    slotStartsAt: z.iso.datetime(),
+    slotEndsAt: z.iso.datetime(),
+    timeZone: z.string().min(1),
+  }),
+  /**
    * CRM-04 lot d3 (ADR 0054 § 2, question 5): on the fortnight just over, a creator's part as the platform reads it
    * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale and per refund, on
    * one account and in one currency. Only the days a percentage covers are compared, each with its own; `sales` and
@@ -839,6 +854,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('sales_feed_mismatch'),
   typedEvent('agency_share_mismatch'),
   typedEvent('agency_share_changed'),
+  typedEvent('account_uncovered'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('content_drop_received'),

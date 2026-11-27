@@ -5,3 +5,5 @@ Décisions : aucune nouvelle ; l'écran suit l'ADR 0150 et l'avis de Design (une
 Découvertes : aucune.
 Candidats à suppression : aucun.
 Vérifié : tests unitaires de `apps/web/src/creators` ✓, typecheck ✓, lint ✓ ; captures Nuit/Jour, PC/téléphone avec des données inventées.
+
+Fait le 19/11 (lot 4b, PR suivante) : les sortes de notification de la créatrice (`NOTIFICATION_KINDS` : demandes de l'agence, semaine à valider, gains, lives), table `notification_kind_preferences` (RLS `own_rows` forcée, aucune ligne = allumée, numéro de migration pris au tour), routes `GET` et `PUT /v1/notifications/kinds` (créatrice seule), `kind` facultatif sur la demande de notification : une sorte coupée est gardée en silence, jamais sonnée ni récapitulée. Les gains (vente) et les rappels de son agenda portent déjà leur sorte ; la semaine à valider et les lives la porteront avec leurs envois. Carte « Ce que tu reçois » dans Notifications, pour elle seule.

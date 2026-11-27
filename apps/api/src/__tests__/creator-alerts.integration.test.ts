@@ -179,6 +179,22 @@ describe('the Alertes tab of her sheet (ADR 0150, /v1/creators/:creatorId/alerts
     ).rejects.toThrow();
   });
 
+  it('never opens « Compte sans personne » to the chatters, and lets the owner quiet it for herself (ADR 0094 § 3)', async () => {
+    const opened = await put('owner', nora, 'uncovered_account', {
+      owner: 'deliver',
+      manager: 'deliver',
+      chatter_on_shift: 'muted',
+    });
+    expect(opened.statusCode).toBe(422);
+    expect(ErrorBodySchema.parse(opened.json()).error.code).toBe('creator_alert_locked_unprocessable');
+    const quietForAll = { owner: 'muted', manager: 'off', chatter_on_shift: 'off' } as const;
+    expect((await put('owner', nora, 'uncovered_account', quietForAll)).statusCode).toBe(200);
+    const line = CreatorAlertsViewSchema.parse((await view('owner', nora)).json()).alerts.find(
+      (l) => l.code === 'uncovered_account',
+    );
+    expect(line).toMatchObject({ family: 'steering', chattersClosed: true, routes: quietForAll });
+  });
+
   it('answers 404 for a creator that does not exist', async () => {
     const missing = '00000000-0000-4000-8000-000000000000';
     expect(ErrorBodySchema.parse((await view('owner', missing)).json()).error.code).toBe(

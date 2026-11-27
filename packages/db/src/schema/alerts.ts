@@ -6,6 +6,7 @@ import {
   CREATOR_ALERT_CODES,
   CREATOR_ALERT_MODES,
   CREATOR_ALERT_ROLES,
+  CHATTER_CLOSED_CREATOR_ALERTS,
   LOCKED_CREATOR_ALERTS,
   SYSTEM_ALERT_CODES,
 } from '@impera/contracts';
@@ -158,6 +159,11 @@ export const creatorAlertRoutes = pgTable(
     check(
       'creator_alert_routes_locked_check',
       sql`${t.alertCode} not in (${sql.raw(LOCKED_CREATOR_ALERTS.map((code) => `'${code}'`).join(', '))}) or ${t.mode} = 'deliver'`,
+    ),
+    // Never to a chatter (ADR 0094 § 3): the steering alerts keep « chatteur en shift » on `off`.
+    check(
+      'creator_alert_routes_chatters_closed_check',
+      sql`${t.alertCode} not in (${sql.raw(CHATTER_CLOSED_CREATOR_ALERTS.map((code) => `'${code}'`).join(', '))}) or ${t.role} <> 'chatter_on_shift' or ${t.mode} = 'off'`,
     ),
     tenantPolicy(t.creatorId),
     closedToCreator(),
