@@ -78,6 +78,9 @@ export const GUARD_CODES = [
   'refund_unasked',
   // ADR 0158 § 48, avenant du 27/11: she refunds him or decides he will be (« je te rembourse »): money outside policy.
   'refund_promise',
+  // Charles 27/11 (passe 3 du 27/11, conversation 18): she proposes a cam or a video made for him when he did not ask
+  // for one. Soft: rewritten once; still there after the rewrite, blocked.
+  'custom_unasked',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

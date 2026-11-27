@@ -9,6 +9,7 @@ import {
 
 import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
 import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
+import { asksHisDay } from './his-day';
 import { INTIMATE_PARTS } from './intimate-words';
 import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
 import { refundInDraft } from './refund';
@@ -118,6 +119,17 @@ export interface GuardContext {
    * she may then send him to Reveal. Absent, he did not ask (closed by default, Sécurité on #1073).
    */
   readonly fanAskedRefund?: boolean;
+  /**
+   * No cam nor video made for him may be proposed at this message (Charles 27/11): he did not ask for one, and no rule
+   * of code steers him to it (a custom order, his insisting after his script, his wish mid-script). Set by the composer
+   * only; absent, not read (a chatter's draft, a follow-up).
+   */
+  readonly customUnasked?: boolean;
+  /**
+   * She already asked about his evening or his day and he answered, or he told it himself (`hisDayAnswered`, passe 3
+   * du 27/11): asking it again is a `repetition`, soft. Absent, not read.
+   */
+  readonly hisDayAnswered?: boolean;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -1455,8 +1467,23 @@ export function checkVoiceOutput(
     );
   violations.push(...closeOnlyWords(bubbles, settings, context.meetingTier));
   violations.push(...refundViolations(bubbles, context.fanAskedRefund));
+  if (context.hisDayAnswered === true) {
+    const again = bubbles.findIndex(asksHisDay);
+    if (again !== -1 && !violations.some((v) => v.code === 'repetition' && v.bubbleIndex === again))
+      violations.push({ code: 'repetition', severity: 'soft', bubbleIndex: again, match: 'his_day_again' });
+  }
+  if (context.customUnasked === true) {
+    const offered = CUSTOM_OFFER.exec(normalise(bubbles.join('\n')))?.[0];
+    if (offered !== undefined) violations.push({ code: 'custom_unasked', severity: 'soft', match: offered });
+  }
   return violations;
 }
+
+// A cam or a video made for him, in her words (Charles 27/11): « une cam », « en visio », « une vidéo rien que pour toi »,
+// « une vidéo perso », « a custom video », « una videollamada », « un video solo per te ». French, English, Spanish,
+// Italian.
+const CUSTOM_OFFER =
+  /\b(cams?|webcam|visio|facetime|appel video|video ?call|videollamada|videochiamata|videos? (rien que |juste |seulement |faite? |tournee |speciale(ment)? )*pour toi|videos? (perso|personnalisee|sur mesure)|sur mesure|faite? (rien que |juste |specialement )?pour toi|custom (video|vid|content)|(video|vid) (made )?(just )?for you|made (just )?for you|personali[sz]ed video|video (personalizado|solo para ti|hecho para ti)|hecho para ti|video (personalizzato|solo per te|fatto per te)|fatto apposta per te)\b/;
 
 /**
  * A refund in her answer (ADR 0158 § 48, avenant du 27/11; `refundInDraft`): any sentence of it but one that sends him to
@@ -1539,13 +1566,19 @@ export function isBlocked(violations: readonly GuardViolation[]): boolean {
 }
 
 /** The soft guards that ask for one more writing of her answer (passe 1, 21/11; emojis, 26/11). */
-export const REWRITTEN_SOFT: readonly GuardCode[] = ['repetition', 'emoji_misuse', 'refund_unasked'];
+export const REWRITTEN_SOFT: readonly GuardCode[] = [
+  'repetition',
+  'emoji_misuse',
+  'refund_unasked',
+  'custom_unasked',
+];
 
 /**
  * The soft guards that block once her answer was written again and still holds one (ADR 0158 § 48, avenant du 27/11):
- * a refund he did not ask for is read in context first, never sent.
+ * a refund he did not ask for is read in context first, never sent; so is a cam or a video made for him he did not ask
+ * for (Charles 27/11).
  */
-const BLOCKED_AFTER_REWRITE: readonly GuardCode[] = ['refund_unasked'];
+const BLOCKED_AFTER_REWRITE: readonly GuardCode[] = ['refund_unasked', 'custom_unasked'];
 
 /** Her last writing: what `BLOCKED_AFTER_REWRITE` still finds blocks it (no rewrite comes after it). */
 export function asLastWriting(violations: readonly GuardViolation[]): GuardViolation[] {

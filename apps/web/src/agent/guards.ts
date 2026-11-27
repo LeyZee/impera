@@ -54,4 +54,5 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   help_number_from_model: 'un numéro ou une ligne d’aide écrit par l’IA, que seul le code pose',
   refund_unasked: 'un remboursement évoqué alors que le fan n’en demande pas',
   refund_promise: 'un remboursement promis ou décidé par elle (« je te rembourse »), qui se demande à Reveal',
+  custom_unasked: 'une cam ou une vidéo faite pour lui proposée alors qu’il n’a rien demandé',
 };

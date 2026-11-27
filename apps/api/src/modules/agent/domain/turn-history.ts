@@ -2,6 +2,7 @@ import { normalise } from '@impera/contracts';
 
 import { gapNotes, timingLines } from './elapsed';
 import { asksPrice, previousTurnsOf, sumsMinorOf, type GuardContext } from './guards';
+import { hisDayAnswered } from './his-day';
 import type { Relationship } from './meeting';
 import { isOpener } from './origin';
 import { askedRefundLately } from './refund';
@@ -71,6 +72,10 @@ export function guardContextOf(
     ),
     // His desire map holds humiliation: « petit garçon » said to him is his game (Charles 27/11).
     ...(about.humiliationWanted === true && { humiliationWanted: true }),
+    // She asked about his evening or his day and he answered: not again (passe 3 du 27/11).
+    ...(hisDayAnswered(history.map((turn) => ({ ...datedOf(turn), text: turn.text }))) && {
+      hisDayAnswered: true,
+    }),
   };
 }
 

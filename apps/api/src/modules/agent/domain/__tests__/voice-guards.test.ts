@@ -217,6 +217,7 @@ describe('voice guards (P3-13)', () => {
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
       ...read(['Tu peux demander un remboursement à Reveal'], { fanAskedRefund: false }),
       ...read(['Je te rembourse']),
+      ...read(['Une cam rien que pour toi ?'], { customUnasked: true }),
       ...read(['hallo schatz, was machst du heute abend?']),
       ...read(['Tu fais quoi de beau ce soir ?'], {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],

@@ -94,6 +94,8 @@ const PLAIN: TurnHintFacts = {
   backToSale: false,
   warm: false,
   moreTonight: false,
+  moreTonightCustom: false,
+  dayAnswered: false,
   occasionHints: [],
   sexting: CALM,
   timeWaster: undefined,

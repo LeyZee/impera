@@ -40,6 +40,7 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
   help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
   refund_unasked: 'elle parlait de remboursement alors qu’il n’en demande pas',
   refund_promise: 'elle promettait de le rembourser elle-même : un remboursement se demande à Reveal',
+  custom_unasked: 'elle lui proposait une cam ou une vidéo faite pour lui alors qu’il n’a rien demandé',
 };
 
 /** The codes of the blocking guards an answer broke, each once. */
@@ -173,9 +174,18 @@ export const AFTER_INSULT_HINT =
 /** Broke until his pay, a fan who already paid (passe 11a, Charles 21/11): kept warm, words only (`keepsWarm`). */
 export const KEEP_WARM_HINT =
   'il est à sec pour l’instant mais il a déjà payé : elle le garde au chaud, gratuitement, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
-/** He asks for more the evening he bought a step of his script (passe 18, Charles 21/11): nothing more tonight (`asksMoreTonight`). */
+/**
+ * He asks for more the evening he bought a step of his script (passe 18, Charles 21/11): nothing more tonight
+ * (`asksMoreTonight`). She proposes nothing herself, no cam nor video (Charles 27/11, passe 3 du 27/11, conversation 18).
+ */
 export const MORE_TONIGHT_HINT =
-  'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle l’oriente vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
+  'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus ; tendre et complice, elle ne lui propose rien d’elle-même, ni cam, ni vidéo, ni autre contenu';
+/**
+ * He insists, or asks something made for him, after his script (`insistsMoreTonight`, Charles 27/11): only then may she
+ * steer him to a cam or a video made for him, never a yes nor a price before the creator agrees.
+ */
+export const MORE_TONIGHT_CUSTOM_HINT =
+  'il en redemande encore alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle peut l’orienter vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
 
 /**
  * How frank her words may be (`registerOf`, Charles 21/11 and 26/11): each rung in intention only; her words for it are

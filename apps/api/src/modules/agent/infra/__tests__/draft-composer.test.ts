@@ -605,6 +605,24 @@ describe('createDraftComposer', () => {
     expect(photo.some((hint) => hint.includes('se calmer'))).toBe(true);
   });
 
+  it('tells the voice not to ask about his evening again once he answered it (passe 3 du 27/11)', async () => {
+    const { draftComposer, seen } = composer({ brief: BRIEF });
+    await draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'outbound', text: 'et ta soirée elle donne quoi', at: new Date('2026-10-17T09:50:00Z') },
+        { direction: 'inbound', text: 'Calme, je lis un peu', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('elle ne le lui redemande pas'))).toBe(true);
+    const fresh = composer({ brief: BRIEF });
+    await fresh.draftComposer.compose(INPUT);
+    expect(
+      (fresh.seen.voiceInputs?.[0]?.brief.toneHints ?? []).some((hint) => hint.includes('redemande pas')),
+    ).toBe(false);
+  });
+
   it('never brings up a refund to a fan who complains of a purchase, only when he asks (ADR 0158 § 48, avenant du 27/11)', async () => {
     const complaint: Brief = { ...BRIEF, intent: 'complaint', risks: [] };
     const { draftComposer, seen } = composer({ brief: complaint });
@@ -1752,17 +1770,50 @@ describe('createDraftComposer, the offer policy', () => {
     expect(written(second.seen)?.replyBrief).not.toContain('mystère');
   });
 
-  it('offers nothing more the evening he had his script, and steers him to a cam or a custom video (passe 18, Charles 21/11)', async () => {
+  it('offers nothing more the evening he had his script, and steers him to a cam or a custom video only when he insists (passe 18, Charles 27/11)', async () => {
     const asks: Brief = { ...OFFER, intent: 'asks_for_media', sentiment: 'positive' };
     const threeHoursAgo = new Date(INPUT.now.getTime() - 3 * 3_600_000);
     const tonight = composer({ brief: asks }, undefined, limitsOf(ADULT).limits, policy(threeHoursAgo));
     await tonight.draftComposer.compose({ ...INPUT, scriptRun: runWith('bought', threeHoursAgo) });
     expect(written(tonight.seen)?.action).toBe('reply');
+    // His first ask after his script: tenderness, nothing proposed by her (passe 3 du 27/11, conversation 18).
     expect(
       written(tonight.seen)?.toneHints.some(
-        (hint) => hint.includes('le faire jouir lui') && hint.includes('sans dire oui ni donner de prix'),
+        (hint) => hint.startsWith('il en redemande') && hint.includes('ni cam, ni vidéo'),
       ),
     ).toBe(true);
+    expect(written(tonight.seen)?.toneHints.some((hint) => hint.includes('le faire jouir lui'))).toBe(false);
+
+    // He asks again after her answer, or asks for a cam himself: she may steer him to something made for him.
+    const anHourAgo = new Date(INPUT.now.getTime() - 3_600_000);
+    for (const history of [
+      [
+        { direction: 'inbound' as const, text: 'Tu as encore quelque chose ce soir', at: anHourAgo },
+        { direction: 'outbound' as const, text: 'Moi je suis comblée là', at: anHourAgo },
+        { direction: 'inbound' as const, text: 'Allez montre-moi', at: INPUT.now },
+      ],
+      [{ direction: 'inbound' as const, text: 'On se fait une cam ?', at: INPUT.now }],
+    ]) {
+      const insists = composer({ brief: asks }, undefined, limitsOf(ADULT).limits, policy(threeHoursAgo));
+      await insists.draftComposer.compose({ ...INPUT, history, scriptRun: runWith('bought', threeHoursAgo) });
+      expect(
+        written(insists.seen)?.toneHints.some(
+          (hint) => hint.includes('le faire jouir lui') && hint.includes('sans dire oui ni donner de prix'),
+        ),
+      ).toBe(true);
+    }
+
+    // Unasked, a cam or a video made for him she writes anyway is written again, then held for a human.
+    const volunteers = composer(
+      { brief: asks, voice: { bubbles: ['Je suis comblée', 'une cam rien que nous deux, je regarde'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      policy(threeHoursAgo),
+    );
+    expect(
+      await volunteers.draftComposer.compose({ ...INPUT, scriptRun: runWith('bought', threeHoursAgo) }),
+    ).toMatchObject({ kind: 'held', reason: 'guard_blocked', detail: ['custom_unasked'] });
+    expect(volunteers.seen.voiceCalls).toBe(2);
 
     // Her script only offered or refused tonight: nothing bought, the turn follows its normal flow.
     for (const outcome of ['sent', 'refused'] as const) {
@@ -3009,6 +3060,21 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       cause: 'custom_order',
       customOrderOpened: true,
     });
+    expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('hands a proof the brain read as a doubt only to the chatter on shift (passe 3 du 27/11, conversation 31)', async () => {
+    // After two messages of doubt, the brain reads his proof as « is she real », even as a manipulation: code reads it.
+    const doubt: Brief = { ...BRIEF, intent: 'asks_if_bot', risks: ['manipulation_attempt'] };
+    const { draftComposer, seen } = ordering({ chatter: true, brief: doubt });
+    expect(
+      await draftComposer.compose({
+        ...INPUT,
+        history: [
+          { direction: 'inbound', text: 'Vas-y prouve-le, une photo avec le pouce levé', at: INPUT.now },
+        ],
+      }),
+    ).toMatchObject({ kind: 'held', reason: 'handoff', cause: 'custom_order' });
     expect(seen.voiceCalls).toBe(0);
   });
 

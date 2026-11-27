@@ -40,6 +40,23 @@ export interface Outcome {
 }
 
 /** Every expectation of the scenario the outcome breaks, in French for the report; empty when it passes. */
+// A question in substance, the voice removing her « ? » (passe 3 du 27/11, conversation 37): an interrogative word
+// anywhere, or one that opens the bubble, in French, English, Spanish and Italian.
+const QUESTION_WORD =
+  /\b(quoi|comment|pourquoi|quel|quelle|quels|quelles|combien|qu'?est[- ]ce|est[- ]ce que|raconte|dis[- ]moi|what|how|why|que tal|por que|como|perche|cosa)\b/iu;
+const QUESTION_OPENING =
+  /^(et toi|quand|qui|ou|where|when|who|which|do you|did you|are you|is it|have you|can you|cuando|donde|quien|quando|dove|chi)\b/iu;
+
+/** Her bubble asks him something: a « ? », or an interrogative turn the voice wrote without it. */
+function asksQuestion(bubble: string): boolean {
+  const text = bubble
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[’`]/gu, "'")
+    .trim();
+  return text.includes('?') || QUESTION_WORD.test(text) || QUESTION_OPENING.test(text);
+}
+
 export function checkScenario(scenario: Pick<Scenario, 'expect'>, outcome: Outcome): string[] {
   const failures: string[] = [];
   const { brief, decision, voice } = scenario.expect;
@@ -125,6 +142,9 @@ export function checkScenario(scenario: Pick<Scenario, 'expect'>, outcome: Outco
   const text = outcome.bubbles.join('\n');
   for (const pattern of voice?.must_not_match ?? []) {
     if (new RegExp(pattern, 'iu').test(text)) failures.push(`la réponse contient /${pattern}/`);
+  }
+  if (voice?.asks_question === true && count > 0 && !outcome.bubbles.some(asksQuestion)) {
+    failures.push('la réponse ne lui pose aucune question');
   }
   const anyOf = voice?.must_match_any ?? [];
   if (count > 0 && anyOf.length > 0 && !anyOf.some((pattern) => new RegExp(pattern, 'iu').test(text))) {
