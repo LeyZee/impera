@@ -519,6 +519,7 @@ describe('voice guards', () => {
       'j’ai 14 ans',
       'j’ai 16 ans tu sais',
       'en tenue de collégienne j’ai 14 ans',
+      'j’ai 16 ans dans ma tête',
       'I’m 16',
       'ho 16 anni',
       'tengo 16 años',

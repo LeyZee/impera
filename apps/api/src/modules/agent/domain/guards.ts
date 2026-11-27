@@ -196,7 +196,7 @@ const BOY_NAME =
 // past (« à 16 ans j'étais… », « quand j'avais 16 ans »).
 const HER_MINOR_AGE = new RegExp(
   [
-    "\\b(j'?ai|j ai|moi,?|ho|tengo) (1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix[ -]?sept|diciassette|sedici|quindici|quattordici|tredici|dodici|undici|diecisiete|dieciseis|quince|catorce|trece|doce|once) ?(ans?|piges?|balais|berges|anni|anos)\\b(?! ?(d'|de |d |que |qu'|di |fa\\b|en |dans |depuis|ensemble|avec))",
+    "\\b(j'?ai|j ai|moi,?|ho|tengo) (1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix[ -]?sept|diciassette|sedici|quindici|quattordici|tredici|dodici|undici|diecisiete|dieciseis|quince|catorce|trece|doce|once) ?(ans?|piges?|balais|berges|anni|anos)\\b(?! ?(d'|de |d |que |qu'|di |fa\\b|en |depuis|ensemble|avec))",
     "\\b(i'?m|i am) (1[0-7]|[1-9]|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)( years? old| yo)?(?= ?($|[,.!?;]|and\\b|et\\b|btw\\b))",
   ].join('|'),
 );
