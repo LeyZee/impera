@@ -1137,6 +1137,26 @@ describe('a handle next to a network or a means, a price after he asked one (Sé
       'tu me trouves sur insta',
     ])
       expect(raised(bubble), bubble).toContain('contact_info');
+    // The search verbs in Spanish, Italian and English, beside a network only.
+    for (const bubble of [
+      'búscame en insta',
+      'buscame en tiktok',
+      'busca lina rose en tiktok',
+      'cercami su insta',
+      'cerca lina rose su tiktok',
+      'find me on snap',
+      'look me up on insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    for (const bubble of [
+      'busco trabajo en madrid',
+      'busca un sitio tranquilo para cenar',
+      'cerco casa a roma',
+      'cerca di dormire un po',
+      'find me a good song for tonight',
+      'i find tiktok boring',
+    ])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
     for (const bubble of ['je poste sur insta vers 21h30', 't’as vu ma story insta ?', 'je scrollais insta'])
       expect(raised(bubble), bubble).not.toContain('contact_info');
   });

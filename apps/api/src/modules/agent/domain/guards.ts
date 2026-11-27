@@ -405,12 +405,14 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
   // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there
   // never does (« ajoute-moi sur snap », « viens sur telegram », « mon insta c'est… », « rejoins-moi sur discord »).
+  // The search verbs count in Spanish, Italian and English too (« búscame en insta », « cercami su tiktok », « find me on
+  // snap », « look me up on insta »), only beside a network's name.
   {
     code: 'contact_info',
     pattern: new RegExp(
       [
-        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
-        `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
+        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|busca|cerca|passons|passe[sz]?|continue[sz]?)([ -]?(moi|me|toi|nous|mi))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
+        `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|look me up|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
         `\\b(mon|ma|mes|my|mi|il mio|la mia) (compte |account |cuenta )?${NETWORK}\\b`,
         // « discord c'est pour les gamers » is a topic: after « c'est », only a handle (Sécurité, #1043).
         `\\b${NETWORK} ?(:|=) ?@?[a-z0-9_.]{3,}`,

@@ -282,6 +282,13 @@ describe('permitted phrases that must always pass, output guards', () => {
     expect(raised(bubble)).not.toContain('contact_info');
   });
 
+  it.each(['busco trabajo en madrid', 'cerco casa a roma', 'find me a good song for tonight'])(
+    'contact_info lets a search without a network « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('contact_info');
+    },
+  );
+
   it.each([
     'après tout ce que je t’ai montré, tu me fais rire',
     'tu me déçois, t’as oublié mon prénom 😏',
