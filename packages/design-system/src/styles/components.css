@@ -2966,6 +2966,17 @@
   fill: color-mix(in srgb, var(--_c) 30%, #fff3c4);
   animation: nv-flame-core 1.2s ease-in-out infinite;
 }
+/* The fire stays still for who asked for no motion: no flicker, no sparks, the fill at once. */
+@media (prefers-reduced-motion: reduce) {
+  .nv-flame,
+  .nv-flame__core,
+  .nv-spark-dot {
+    animation: none;
+  }
+  .nv-heat__fill {
+    transition: none;
+  }
+}
 @keyframes nv-flicker {
   0%,
   100% {
@@ -3031,17 +3042,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nv-spark,
-  .nv-flame,
-  .nv-flame__core,
-  .nv-spark-dot,
   .nv-donut__arc,
   .nv-col__part,
   .nv-meter > span {
     animation: none;
   }
   /* Without motion the lit column still stands out, at once, without growing. */
-  .nv-col__stack,
-  .nv-heat__fill {
+  .nv-col__stack {
     transition: none;
   }
   .nv-col:hover .nv-col__stack,
