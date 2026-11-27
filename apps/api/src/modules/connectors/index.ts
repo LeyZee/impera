@@ -80,7 +80,7 @@ import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
 
 export type { AvatarPorts } from './domain/avatar';
-export { createAvatarFetch } from './infra/avatar/fetch-avatar';
+export { confinePinnedGets, createAvatarFetch } from './infra/avatar/fetch-avatar';
 export { LinkServiceError, type LinkServiceReader } from './domain/link-service';
 export { createLinkServiceReader } from './infra/link-service/rest-link-service';
 export { createS3AvatarStore } from './infra/avatar/s3-avatar-store';

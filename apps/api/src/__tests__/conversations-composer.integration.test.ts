@@ -254,6 +254,20 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     expect(await state(id)).toBe('awaiting_approval');
   });
 
+  it('keeps in the draft’s guard trace the guards of an answer set aside and written again (IA-08)', async () => {
+    const id = await fanWrites('c-retried', 'Tu fais quoi ce soir ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Je me pose chez moi'],
+      softViolations: [],
+      retried: ['ai_disclosure'],
+      costUsd: 0.002,
+    };
+    await respond(id);
+    const [draft] = await drafts(id);
+    expect(draft?.guardTrace).toEqual({ softViolations: [], retried: ['ai_disclosure'] });
+  });
+
   it('hands the conversation to the chatters when a guard blocks, and tells the outbox', async () => {
     const id = await fanWrites('c-guard', 'On se voit quand ?');
     composer.next = { kind: 'held', reason: 'guard_blocked', detail: ['meeting_promise'], costUsd: 0.001 };

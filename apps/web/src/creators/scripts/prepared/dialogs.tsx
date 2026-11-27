@@ -11,7 +11,7 @@ import {
 import { useId, useState, type JSX } from 'react';
 
 import { createPrepared } from './api';
-import { sellable, type EditorMedia } from './media';
+import { sellable, startFolder, type EditorMedia, type PickerFolder } from './media';
 import { newContent, parsePrice, previousBranches, priceText } from './model';
 import { MediaTile, MomentChoice } from './parts';
 
@@ -123,6 +123,7 @@ export function MediaPicker({
   place,
   folders,
   media,
+  moment,
   taken,
   onAdd,
   onClose,
@@ -130,14 +131,16 @@ export function MediaPicker({
   creatorId: CreatorId;
   /** Where the media go, said above the title: « Étape 2, branche 1 ». */
   place: string;
-  folders: readonly { readonly key: string; readonly name: string }[];
+  folders: readonly PickerFolder[];
   media: ReadonlyMap<string, EditorMedia>;
+  /** The script's moment: the picker opens on a folder of it. */
+  moment: PreparedScriptMoment;
   /** Already in the branch: shown ticked, never added twice. */
   taken: readonly string[];
   onAdd: (refs: readonly string[]) => void;
   onClose: () => void;
 }): JSX.Element {
-  const [folder, setFolder] = useState(folders[0]?.key ?? '');
+  const [folder, setFolder] = useState(() => startFolder(folders, media, moment));
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const shown = [...media.entries()].filter(([, item]) => item.folderKey === folder && !item.media.removed);
 

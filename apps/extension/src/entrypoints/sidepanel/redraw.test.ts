@@ -18,6 +18,7 @@ const screen = (now: string, text = ''): PanelScreen => ({
     kind: 'ready',
     bubbles: ['coucou'],
     placed: false,
+    pending: true,
     mode: 'editing',
     text,
     reason: null,

@@ -46,9 +46,9 @@ function fanName(notes: readonly string[]): string {
 const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
   llm_unavailable: 'Grok ne répond pas : ajoute ou vérifie sa clé dans Réglages › Modèles IA.',
   unreachable: 'Le serveur ne répond pas. Réessaie dans un instant.',
-  not_deployed: 'Le playground n’est pas encore en ligne sur ce serveur.',
+  not_deployed: 'L’entraînement au chatting n’est pas encore en ligne sur ce serveur.',
   still_writing: 'L’agent rédige encore la réponse précédente.',
-  forbidden: 'Le Playground est réservé au propriétaire pour l’instant.',
+  forbidden: 'L’entraînement au chatting est réservé au propriétaire pour l’instant.',
   failed: 'Le serveur n’a pas répondu. Réessaie dans un instant.',
 };
 
@@ -69,7 +69,7 @@ const LOADING_ACTIONS: Readonly<Record<PlaygroundErrorCode, string>> = {
 const LOADING_TITLES: Readonly<Record<PlaygroundErrorCode, string>> = {
   llm_unavailable: 'Grok ne répond pas',
   unreachable: 'Le serveur ne répond pas',
-  not_deployed: 'Le playground n’est pas en ligne',
+  not_deployed: 'L’entraînement n’est pas en ligne',
   still_writing: 'L’agent rédige encore',
   forbidden: '',
   failed: 'Le serveur ne répond pas',

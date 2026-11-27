@@ -1,5 +1,5 @@
 # VEI-07 Veille : les relevés deviennent des signaux, sur la médiane du compte, et l'agence voit l'écart
-Statut : todo
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo
 Phase : veille (ADR 0060, ADR 0082 § 1)
 Dépend de : VEI-01 (lots a à d, faits), VEI-02 (fait), ADR 0082 (acceptée le 08/11/2026)
 Branche : task/vei-07-standout-median

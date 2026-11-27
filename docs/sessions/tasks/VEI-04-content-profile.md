@@ -1,5 +1,5 @@
 # VEI-04 Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire
-Statut : blocked (clé de vision)
+Statut : todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : blocked (clé de vision)
 Phase : veille (ADR 0060)
 Dépend de : VEI-01, CR-06
 Branche : task/vei-04-content-profile

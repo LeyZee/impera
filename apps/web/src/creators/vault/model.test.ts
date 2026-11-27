@@ -12,8 +12,8 @@ import {
   durationLine,
   findFolder,
   folderLine,
-  folderTiles,
-  tileLine,
+  folderName,
+  momentTag,
   mediaKindLine,
   mediaLine,
   phaseAfterRead,
@@ -82,44 +82,15 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
     expect(mediaLine([mediaOf({ kind: 'audio' }), mediaOf({ kind: 'audio' })])).toBe('2 vocaux');
   });
 
-  it('lists her folders in Reveal’s order, the root and an unnamed one said in words, those à classer marked', () => {
-    const tiles = folderTiles(
-      viewOf([
-        folderOf({ folderRef: null, folderName: null, moment: null }),
-        folderOf({
-          folderRef: 'f2',
-          folderName: 'Nuit 🌙',
-          moment: 'night',
-          media: [mediaOf(), mediaOf({ removed: true })],
-        }),
-        folderOf({ folderRef: 'f3', folderName: null, moment: null, media: [] }),
-      ]),
-    );
-    // Her names as Reveal gives them, never an emoji added; the root, which has no name to change, is never à classer.
-    expect(tiles.map((tile) => [tile.id, tile.name, tile.unmarked, tile.line, tile.removed])).toEqual([
-      ['racine', 'Racine du coffre', false, '1 photo', 0],
-      ['f2', 'Nuit 🌙', false, '1 photo', 1],
-      ['f3', 'Dossier sans nom', true, 'Vide', 0],
-    ]);
-    expect(new Set(tiles.map((tile) => tile.key)).size).toBe(3);
-  });
-
-  it('covers a folder with the previews of its first four media still listed', () => {
-    const [tile] = folderTiles(
-      viewOf([
-        folderOf({
-          media: [
-            mediaOf({ blurhash: 'LA' }),
-            mediaOf({ blurhash: 'LB', removed: true }),
-            mediaOf({ blurhash: null }),
-            mediaOf({ blurhash: 'LC' }),
-            mediaOf({ blurhash: 'LD' }),
-            mediaOf({ blurhash: 'LE' }),
-          ],
-        }),
-      ]),
-    );
-    expect(tile?.cover.map((item) => item.hash)).toEqual(['LA', null, 'LC', 'LD']);
+  it('names the root « Hors dossier », an unnamed one in words, and pills each folder’s moment (PRO1-04, PRO1-11)', () => {
+    expect(folderName({ folderRef: null, folderName: null })).toBe('Hors dossier');
+    expect(folderName({ folderRef: 'f3', folderName: null })).toBe('Dossier sans nom');
+    expect(folderName({ folderRef: 'f2', folderName: 'Nuit 🌙' })).toBe('Nuit 🌙');
+    expect(momentTag({ folderRef: 'f1', moment: 'day' })).toEqual({ label: '☀️ Jour', tone: 'declared' });
+    expect(momentTag({ folderRef: 'f2', moment: 'night' })).toEqual({ label: '🌙 Nuit', tone: 'declared' });
+    expect(momentTag({ folderRef: 'f3', moment: null })).toEqual({ label: 'À classer', tone: 'inferred' });
+    // The root has no name to change: it is never à classer.
+    expect(momentTag({ folderRef: null, moment: null })).toBeNull();
   });
 
   it('opens the folder the address names, and none when the last sync no longer lists it', () => {
@@ -205,17 +176,5 @@ describe('« Son coffre Reveal »: the rules of the card', () => {
       expect(bar).toBeGreaterThanOrEqual(0.2);
       expect(bar).toBeLessThanOrEqual(1);
     }
-  });
-
-  it('writes a tile’s line in full for two kinds, as a total beyond', () => {
-    expect(tileLine([mediaOf({ kind: 'image' }), mediaOf({ kind: 'video' })])).toBe('1 photo · 1 vidéo');
-    expect(
-      tileLine([
-        mediaOf({ kind: 'image' }),
-        mediaOf({ kind: 'video' }),
-        mediaOf({ kind: 'audio' }),
-        mediaOf({ kind: 'audio', removed: true }),
-      ]),
-    ).toBe('3 médias');
   });
 });

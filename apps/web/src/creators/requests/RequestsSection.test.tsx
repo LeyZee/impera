@@ -6,10 +6,18 @@ import {
   SetScriptCadenceBodySchema,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RequestsSection } from './RequestsSection';
+
+// The one router link of the section (to Structures) as a plain anchor: the section is rendered without a router.
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, search, children }: { to: string; search?: Record<string, string>; children: ReactNode }) => (
+    <a href={`${to}?${new URLSearchParams(search).toString()}`}>{children}</a>
+  ),
+}));
 
 import { structureOf } from '@/creators/scripts/fixtures';
 import { requestOf } from '@/screens/content/fixtures';
@@ -202,6 +210,23 @@ describe('Créatrices › Demandes (MED-09)', () => {
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Demander' }));
     expect(within(dialog).getByText('Choisis la structure du script.')).toBeDefined();
+  });
+
+  it('greys « Script » without a structure and leads to Structures, never a dead end (PRO1-13)', async () => {
+    serve({ ...base(), [STRUCTURES]: () => ({ status: 200, body: { structures: [] } }) });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Demander un contenu' }));
+    const dialog = screen.getByRole('dialog', { name: 'Demander un contenu' });
+    await waitFor(() => {
+      expect(
+        within(dialog)
+          .getByRole('radio', { name: /Script/u })
+          .hasAttribute('disabled'),
+      ).toBe(true);
+    });
+    const link = within(dialog).getByRole('link', { name: 'crée-la dans Scripts › Structures' });
+    expect(link.getAttribute('href')).toContain('vue=structures');
+    expect(within(dialog).queryByLabelText('Structure')).toBeNull();
   });
 
   it('puts the server’s refusal of a past day under the day (MED-10)', async () => {

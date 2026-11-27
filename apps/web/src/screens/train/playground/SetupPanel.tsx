@@ -52,7 +52,7 @@ export function SetupPanel({
         </button>
       </div>
       <div className="nv-scroll">
-        <PersonaPicker state={state} pg={pg} />
+        <PersonaPicker state={state} pg={pg} asOwner={asOwner} />
         <FanPicker state={state} pg={pg} onPicked={onCloseSheet} />
 
         <details className="nv-disclosure pg-fold">

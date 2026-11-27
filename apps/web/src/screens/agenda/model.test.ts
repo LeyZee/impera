@@ -80,6 +80,14 @@ describe('her day (CR-05)', () => {
     expect(momentOf(plan, 23 * 60)).toEqual({ kind: 'none' });
   });
 
+  it('never gives a task already ticked as the next one (MOD-06)', () => {
+    const plan = planOf(
+      agendaOf({ ticks: [{ taskId: live.id, day: WEDNESDAY, doneAt: '2026-11-04T08:00:00.000Z' }] }),
+      WEDNESDAY,
+    );
+    expect(momentOf(plan, 17 * 60)).toEqual({ kind: 'none' });
+  });
+
   it('gives her program with the free times between, open to the agency or not, and now', () => {
     const rows = programOf(planOf(agendaOf(), WEDNESDAY), 12 * 60 + 5);
     expect(

@@ -1,5 +1,15 @@
 # 0112. Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0132 · Paliers de dépense : l'IA est plus proche et plus attentive avec ceux qui ont beaucoup dépensé, jamais plus pressante ; un prix plus haut par une branche de palier](0132-spender-tiers-per-creator.md) : **Amende l'ADR 0112 § 2** (« jamais les mêmes médias à deux prix ») pour la seule branche de palier du § 12 bis, sur décision de Charles du 16/11/2026 à 15 h 10.
+>
+> - [0161 · Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse](0161-only-our-scripts-impera-to-reveal.md) : Amende : l'ADR 0099 § 1 (deuxième temps, « importer les scripts existants ») et § 5 (ordre des descriptions), l'ADR 0098 § 6 (le cerveau choisit un script sur son identité validée) et l'ADR 0112 §§ 20 et 23 (la liste de l'onglet Scripts, la reconnaissance d'une copie).
+>
+> Toutes les décisions du même sujet : [`docs/regles/vente-et-scripts.md`](../regles/vente-et-scripts.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (« ok 0112 » de Charles le 16/11/2026, 0 h 37, après ses choix du 16/11 à 0 h 00, 0 h 01, 0 h 02, 0 h 05 et 0 h 07, fil « Concevoir les scripts de vente à branches » ; relu par Agent et Médias). Amendement du 19/11/2026 (§ 20 à 26, créer un script à l'écran et le recopier dans Reveal) : accepted (Charles, 19/11/2026, 17 h 26 heure de Paris, « Oui, comme la maquette » sur la carte du fil)
 Date : 2026-11-16
 Précise : l'ADR 0098 (déroulé d'un script par fan), l'ADR 0099 (coffre et scripts de Reveal), l'ADR 0100 (rôle `script_writer`), l'ADR 0090 (objections), l'ADR 0103 (porte, ventes fictives au playground). Ne remplace rien : un script sans branche reste celui de l'ADR 0098.

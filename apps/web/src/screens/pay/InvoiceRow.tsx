@@ -35,6 +35,7 @@ import {
   pdfRefusalText,
   periodText,
   readsAgain,
+  settleAmountMax,
   settlementText,
   type InvoiceChip,
 } from '@/invoices/model';
@@ -439,7 +440,8 @@ export function SettleDialog({
   const [checking, setChecking] = useState(false);
 
   const reissue = item.kind === 'invoice' && correction === 'reissue';
-  const typed = parseAmount(amount, false, PAY_AMOUNT_MAX_MINOR);
+  const amountMax = settleAmountMax(item, side);
+  const typed = parseAmount(amount, false, amountMax);
   const amountValid = typed !== null && typed > 0;
   const reasonValid = InvoiceReasonSchema.safeParse(reason).success;
   const ready =
@@ -654,7 +656,9 @@ export function SettleDialog({
                     className={touched && !amountValid ? 'tm-hint tm-hint--error' : 'tm-hint'}
                   >
                     {touched && !amountValid
-                      ? `Un montant en euros, plus de 0 et jusqu’à ${amountText(PAY_AMOUNT_MAX_MINOR, 'EUR')}, deux décimales au plus.`
+                      ? amountMax < PAY_AMOUNT_MAX_MINOR
+                        ? `Un montant en euros, plus de 0 et jusqu’à ${amountText(amountMax, 'EUR')}, le hors taxes de la facture, deux décimales au plus.`
+                        : `Un montant en euros, plus de 0 et jusqu’à ${amountText(PAY_AMOUNT_MAX_MINOR, 'EUR')}, deux décimales au plus.`
                       : 'Il va dans sa prochaine quinzaine ouverte.'}
                   </p>
                 </div>

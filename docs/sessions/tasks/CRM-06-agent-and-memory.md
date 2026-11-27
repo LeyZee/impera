@@ -1,6 +1,6 @@
 # CRM-06 CA de l'agent et achats dans la mémoire du fan
 
-Statut : todo (ADR 0050, fiches acceptées par Charles le 02/11/2026)
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo (ADR 0050, fiches acceptées par Charles le 02/11/2026)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire
 Branche : task/crm-06-agent-and-memory

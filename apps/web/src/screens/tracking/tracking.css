@@ -329,6 +329,12 @@
   color: var(--nv-warning);
   font-weight: 600;
 }
+/* Red: a fan one no longer writes to, a disputed age (IA-06). */
+.tr-bad {
+  margin: 0;
+  color: var(--nv-danger);
+  font-weight: 600;
+}
 /* « À traiter » unread: its one line keeps the panel's inset. */
 .tr-queue-error {
   padding: var(--nv-space-2) var(--nv-plate-pad) var(--nv-space-3);
@@ -516,6 +522,9 @@
 .tr-limits__sum.tr-warn {
   color: var(--nv-warning);
 }
+.tr-limits__sum.tr-bad {
+  color: var(--nv-danger);
+}
 .tr-limits__body {
   display: flex;
   flex-direction: column;
@@ -545,6 +554,9 @@
 }
 .tr-limit__hint.tr-warn {
   color: var(--nv-warning);
+}
+.tr-limit__hint.tr-bad {
+  color: var(--nv-danger);
 }
 .tr-limit__actions {
   display: flex;

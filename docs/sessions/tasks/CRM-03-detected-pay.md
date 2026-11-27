@@ -1,6 +1,6 @@
 # CRM-03 Paie sur les ventes lues, téléphone du chatteur et mini feedback
 
-Statut : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone)
 Branche : task/crm-03-detected-pay

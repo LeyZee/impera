@@ -1,5 +1,5 @@
 # OPS-11 Les évaluations tirent trois fois et passent sur la persona en vigueur
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : exploitation
 Dépend de : OPS-07
 Branche : task/ops-11-evals-draws

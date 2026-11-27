@@ -42,6 +42,7 @@ import { createDraftCorrectionsRoutes } from './infra/http/draft-corrections-rou
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
+export { MAX_SEND_ATTEMPTS } from './domain/state-machine';
 export { scriptRunsForTeam } from './infra/db/script-runs';
 export { conversationReadsForShifts } from './infra/db/shift-activity-reads';
 export type {

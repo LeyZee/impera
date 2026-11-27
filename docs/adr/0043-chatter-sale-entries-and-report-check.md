@@ -1,5 +1,15 @@
 # 0043. Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0050 · Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste](0050-reveal-two-paths-crm-api-and-captured-session.md) : Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur » ; dans l'ADR 0043 § 5, la phrase « le rapport reste dû pour le commentaire, l'incident, les remontées et le contrôle ».
+>
+> - [0073 · Rapport déclaré sur Reveal : l'écart avec les ventes lues se voit, s'explique et se tranche par un humain](0073-declared-reports-checked-against-reveal-sales.md) : Remplace : dans l'ADR 0043 § 4, pour le rapport d'un compte Reveal en source « déclarée », le paragraphe « Dès que le connecteur lit les ventes de Reveal » (seuils de 5 % et 10 €, rapprochement ligne par ligne, ambre « écart »).
+>
+> Toutes les décisions du même sujet : [`docs/regles/chatteurs.md`](../regles/chatteurs.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 02/11/2026 16h17, « ok 0043 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Précise : l'ADR 0023 § Une seule source de revenus par compte et § Rôles (validation des rapports), et la fiche EQ-03 (le rapport porte un montant déclaré). Ne change ni le calcul de la paie, ni ses états, ni son immuabilité (ADR 0023 § Paie, 0032, 0035).
