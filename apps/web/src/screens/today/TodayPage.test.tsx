@@ -35,11 +35,18 @@ const mine = (n: number, startsAt: string, endsAt: string): unknown => ({
   endsAt,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
   creatorName: 'Nora Vidal',
   platform: 'reveal',
   handle: 'nora',
   accessStartsAt: new Date(new Date(startsAt).getTime() - 15 * 60_000).toISOString(),
   accessEndsAt: new Date(new Date(endsAt).getTime() + 15 * 60_000).toISOString(),
+});
+
+/** The same shift, taken by its member at 22:58Z (23 h 58 in Paris): « Je prends mon poste » (EQ-12). */
+const taken = (shift: unknown): object => ({
+  ...(typeof shift === 'object' && shift !== null ? shift : {}),
+  checkedInAt: '2026-10-27T21:58:00Z',
 });
 
 function serve(body: unknown): void {
@@ -93,7 +100,7 @@ afterEach(() => {
 describe('Aujourd’hui', () => {
   it('puts the shift under way first: where, until when, and what arrives in Suivi', async () => {
     serve({
-      current: mine(1, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z'),
+      current: { ...taken(mine(1, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z')) },
       next: mine(2, '2026-10-29T22:00:00Z', '2026-10-30T04:00:00Z'),
       ended: null,
     });
@@ -327,5 +334,134 @@ describe('Aujourd’hui', () => {
     });
     expect(screen.queryByText('TEST-2026-0001')).toBeNull();
     expect(screen.queryByText('À faire', { selector: '.nv-eyebrow' })).toBeNull();
+  });
+});
+
+describe('Aujourd’hui, « Je prends mon poste » (EQ-12)', () => {
+  /** The member's shifts and the check-in's answer; each POST is kept to be read. */
+  function serveCheckIn(
+    shifts: () => unknown,
+    answer: { readonly status: number; readonly body: unknown },
+  ): { readonly posts: string[] } {
+    const posts: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string, init?: RequestInit) => {
+        const path = new URL(input, 'http://localhost').pathname;
+        if (init?.method === 'POST') {
+          posts.push(path);
+          return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status }));
+        }
+        return Promise.resolve(
+          path === '/v1/scheduling/my-shifts'
+            ? new Response(JSON.stringify(shifts()), { status: 200 })
+            : new Response('null', { status: 404 }),
+        );
+      }),
+    );
+    return { posts };
+  }
+
+  it('asks a shift under way to be taken, in amber, then says « En poste » and when it was taken', async () => {
+    let checkedIn = false;
+    const shift = mine(1, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z');
+    const { posts } = serveCheckIn(
+      () => ({ current: checkedIn ? taken(shift) : shift, next: null, ended: null }),
+      { status: 200, body: { shiftId: id(101), checkedInAt: '2026-10-27T21:58:00Z' } },
+    );
+    renderPage();
+    const hero = (await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 })).closest('section');
+    expect(hero?.textContent).toContain('Poste à prendre');
+    expect(hero?.querySelector('.sc-state .nv-dot')?.className).toContain('nv-tone--warn');
+    const button = screen.getByRole('button', { name: 'Je prends mon poste' });
+    // The check-in takes the light; Suivi steps back until it is done.
+    expect(button.className).toContain('nv-btn--neon');
+    expect(screen.getByRole('link', { name: 'Ouvrir Suivi' }).className).toContain('nv-btn--soft');
+    checkedIn = true;
+    button.click();
+    await waitFor(() => {
+      expect(hero?.textContent).toContain('En poste');
+    });
+    expect(posts).toEqual([`/v1/scheduling/shifts/${id(101)}/check-in`]);
+    expect(hero?.textContent).toMatch(/Poste pris à 22\s?h\s?58/u);
+    expect(screen.queryByRole('button', { name: 'Je prends mon poste' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Ouvrir Suivi' }).className).toContain('nv-btn--neon');
+  });
+
+  it('offers the shift about to start, and says a refusal under the button, never in silence', async () => {
+    serveCheckIn(
+      () => ({ current: null, next: mine(2, '2026-10-28T00:10:00Z', '2026-10-28T06:00:00Z'), ended: null }),
+      {
+        status: 409,
+        body: {
+          error: {
+            code: 'shift_check_in_early_conflict',
+            message: 'Pas encore',
+            details: {},
+            requestId: 'r-1',
+          },
+        },
+      },
+    );
+    renderPage();
+    const hero = (await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 })).closest('section');
+    expect(hero?.textContent).toContain('Bientôt en poste');
+    screen.getByRole('button', { name: 'Je prends mon poste' }).click();
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Ton poste n’est pas encore ouvert : il s’ouvre un peu avant le début du shift.',
+    );
+  });
+
+  it('opens the feedback of his last shift first when the check-in waits for it (retour léger, 26/11)', async () => {
+    serveCheckIn(
+      () => ({ current: null, next: mine(2, '2026-10-28T00:10:00Z', '2026-10-28T06:00:00Z'), ended: null }),
+      {
+        status: 409,
+        body: {
+          error: {
+            code: 'shift_check_in_feedback_due_conflict',
+            message: 'Retour d’abord',
+            details: { shiftId: id(150) },
+            requestId: 'r-2',
+          },
+        },
+      },
+    );
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 });
+    screen.getByRole('button', { name: 'Je prends mon poste' }).click();
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Fais d’abord le retour de ton shift précédent : 30 secondes, puis ton poste s’ouvre.',
+    );
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('holds the gesture on a shift of today not open yet, and says the minute it opens, in grey', async () => {
+    // 00:00Z is 1 h in Paris: a shift at 10 h opens at 9 h 45, the same day.
+    serveCheckIn(
+      () => ({ current: null, next: mine(5, '2026-10-28T09:00:00Z', '2026-10-28T15:00:00Z'), ended: null }),
+      { status: 200, body: null },
+    );
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 });
+    const held = screen.getByRole('button', { name: 'Je prends mon poste' });
+    expect(held.hasAttribute('disabled')).toBe(true);
+    expect(held.className).toContain('nv-btn--soft');
+    expect(screen.getByText(/Tu pourras prendre ton poste à 9\s?h\s?45\./u)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('offers nothing to take on a shift ahead, nor once it has ended', async () => {
+    serveCheckIn(
+      () => ({
+        current: null,
+        next: mine(3, '2026-10-29T22:00:00Z', '2026-10-30T04:00:00Z'),
+        ended: mine(4, '2026-10-27T18:00:00Z', '2026-10-27T23:55:00Z'),
+      }),
+      { status: 200, body: null },
+    );
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 });
+    expect(screen.queryByRole('button', { name: 'Je prends mon poste' })).toBeNull();
   });
 });

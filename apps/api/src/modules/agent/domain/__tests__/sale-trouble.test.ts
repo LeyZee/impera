@@ -35,4 +35,12 @@ describe('a sale gone wrong: she answers once, the same trouble again goes to a 
     expect(complainsOfPurchase({ intent: 'complaint', risks: [], hasBought: false })).toBe(false);
     expect(complainsOfPurchase({ intent: 'flirt', risks: [], hasBought: true })).toBe(false);
   });
+
+  it('never reads his contempt as a complaint about what he bought: no refund talk (eval passe-16)', () => {
+    // A payer who belittles her (« t'es comme les autres ») is answered by her retort, not by Reveal's refund.
+    expect(complainsOfPurchase({ intent: 'complaint', risks: ['insult'], hasBought: true })).toBe(false);
+    expect(complainsOfPurchase({ intent: 'complaint', risks: ['insult', 'dispute'], hasBought: true })).toBe(
+      true,
+    );
+  });
 });

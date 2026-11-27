@@ -1,5 +1,11 @@
 import {
+  AnswerSaleClaimBodySchema,
   BonusIdSchema,
+  CreateSaleClaimBodySchema,
+  MySaleClaimsSchema,
+  PendingSaleClaimsSchema,
+  SaleClaimParamsSchema,
+  SaleClaimSchema,
   BonusSchema,
   BonusTierSetSchema,
   CollectiveGoalSchema,
@@ -52,7 +58,12 @@ import type { Actor } from '../../contractors/pure';
 import type { PayrollEntries } from '../application/entries';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
-import type { PayrollRuleStore, PayrollSaleDecisionStore, PayrollSaleSignalStore } from '../domain/ports';
+import type {
+  PayrollRuleStore,
+  PayrollSaleClaimStore,
+  PayrollSaleDecisionStore,
+  PayrollSaleSignalStore,
+} from '../domain/ports';
 
 import type { ReportEstimate } from './report-estimate';
 
@@ -75,8 +86,8 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
 /**
  * `/v1/payroll` (EQ-04): the owner and the team's accounts reach it, a creator never. What each one reads and writes
  * is the database's call (`withMember`): every statement for the owner and an active manager, one's own for anyone
- * else; a validation, a bonus, a penalty or an adjustment by the owner or an active manager, never for oneself; a
- * payment and the team's rules (tiers, goals, minimum payout) by the owner only; the held sales and a decision on one
+ * else; a validation or a penalty by the owner or an active manager, never for oneself; a bonus, its cancelling, an
+ * adjustment, a payment and the team's rules (tiers, goals, minimum payout) by the owner only (SEC-15); the held sales and a decision on one
  * by the owner or an active manager, never on a sale of their own (CRM-03); one's own sales on the platform's net and a
  * signal on one of them by any member, on their own statement only (CRM-03 lot b4c). A create sent again with the same `id`
  * and values gives back what was recorded (200). The contractors' file (`/payroll/billing-settings`,
@@ -91,6 +102,7 @@ export function createPayrollRoutes(
   rules: PayrollRuleStore,
   decisions: PayrollSaleDecisionStore,
   signals: PayrollSaleSignalStore,
+  claims: PayrollSaleClaimStore,
   estimate: ReportEstimate,
   requireRole: RequireRole,
   recentLogin: preValidationAsyncHookHandler,
@@ -211,6 +223,45 @@ export function createPayrollRoutes(
         const { value, created } = await signals.signal(actorOf(request), request.body);
         return reply.code(created ? 201 : 200).send(value);
       },
+    );
+
+    // ADR 0101 §§ 18 to 22: « J'ai été décisif sur une vente ». A member writes and withdraws his own; the owner and an
+    // active manager read those waiting and answer, never their own. No step-up: a claim gives no sale.
+    app.get(
+      '/payroll/sale-claims/mine',
+      { preValidation: ownerOrMember, schema: { response: { 200: MySaleClaimsSchema } } },
+      (request) => claims.mine(userOf(request)),
+    );
+
+    app.get(
+      '/payroll/sale-claims',
+      { preValidation: ownerOrMember, schema: { response: { 200: PendingSaleClaimsSchema } } },
+      (request) => claims.pending(userOf(request)),
+    );
+
+    app.post(
+      '/payroll/sale-claims',
+      {
+        preValidation: ownerOrMember,
+        schema: { body: CreateSaleClaimBodySchema, response: { 200: SaleClaimSchema, 201: SaleClaimSchema } },
+      },
+      async (request, reply) => {
+        const { value, created } = await claims.create(actorOf(request), request.body);
+        return reply.code(created ? 201 : 200).send(value);
+      },
+    );
+
+    app.post(
+      '/payroll/sale-claims/:saleClaimId/answer',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: SaleClaimParamsSchema,
+          body: AnswerSaleClaimBodySchema,
+          response: { 200: SaleClaimSchema },
+        },
+      },
+      (request) => claims.answer(actorOf(request), request.params.saleClaimId, request.body),
     );
 
     app.get(

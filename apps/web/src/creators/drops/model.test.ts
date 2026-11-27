@@ -5,7 +5,7 @@ import { herDrops, holdsLine, summaryLine } from './model';
 import { dropOf, fileOf, requestOf } from '@/screens/content/fixtures';
 
 /* Invented drops (ADR 0010). */
-const content = (drops: ReturnType<typeof dropOf>[]) => ({ requests: [requestOf()], drops });
+const content = (drops: ReturnType<typeof dropOf>[]) => ({ requests: [requestOf()], drops, redone: [] });
 
 describe('Créatrices › Contenu (recette créatrice 1)', () => {
   it('lists her drops but her scripts and the withdrawn ones, the latest first, each where it stands', () => {

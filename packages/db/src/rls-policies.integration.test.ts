@@ -18,10 +18,18 @@ import { createTestDb, type TestDb } from './test/test-db';
 
 /** Policies that delegate their tenant to another table under RLS, or open on purpose: `table.policy` → why. */
 const POLICY_EXCEPTIONS: Readonly<Record<string, string>> = {
+  'announcements.team_insert':
+    'agency-level, the owner or an active manager in his own name (app.team_scope, app.user_id): creator_id is whom an announcement is addressed to, a manager only to a creator of his own list, not a tenant (EQ-12)',
+  'announcements.team_read':
+    'agency-level (app.team_scope), a member those addressed to him through his own list (app.user_id): creator_id is an addressee, not a tenant (EQ-12)',
+  'announcements.team_withdraw':
+    'agency-level, the owner or its author in his own name (app.team_scope, app.user_id): creator_id is an addressee, not a tenant (EQ-12)',
   'invoice_events.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_lines.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_pdf_copies.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_pdfs.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
+  'pay_sale_claim_answers.member_read':
+    'EXISTS on pay_sale_claims, itself under RLS by creator, member and team scope (trou 15, Sécurité #1026)',
   'mcp_grants.owner_insert':
     'agency-level, the owner alone in his own name (app.team_scope, app.user_id): creator_id is the creator an agent access is bound to, not a tenant (migration 0193)',
   'mcp_grants.owner_read':

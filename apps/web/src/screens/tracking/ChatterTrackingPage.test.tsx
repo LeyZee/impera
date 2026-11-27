@@ -31,6 +31,7 @@ const tomorrow = {
   endsAt: '2026-10-29T04:00:00Z',
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
   creatorName: 'Nora Vidal',
   platform: 'reveal',
   handle: 'nora',

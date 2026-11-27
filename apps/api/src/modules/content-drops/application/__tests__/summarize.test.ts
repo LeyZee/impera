@@ -81,7 +81,7 @@ function fakes(
   const asks: string[] = [];
   const store: ScriptSummaryStore = {
     target: () => Promise.resolve(target),
-    summarized: (_dropId, mediaHash, promptHash) => {
+    summarized: (_creatorId, _dropId, mediaHash, promptHash) => {
       asks.push(`${mediaHash}@${promptHash}`);
       return Promise.resolve(options.summarized ?? false);
     },
@@ -136,7 +136,7 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
   it('tells each step from its card and its media’s descriptions, then keeps the synthesis', async () => {
     const { deps, saved, asked } = fakes();
 
-    expect(await summarizeScript(deps, 'drop', NOW, 'corr')).toBe('summarized');
+    expect(await summarizeScript(deps, 'creator', 'drop', NOW, 'corr')).toBe('summarized');
 
     expect(asked).toEqual([
       {
@@ -189,8 +189,8 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
         ],
       },
     });
-    await summarizeScript(first.deps, 'drop', NOW, 'corr');
-    await summarizeScript(second.deps, 'drop', NOW, 'corr');
+    await summarizeScript(first.deps, 'creator', 'drop', NOW, 'corr');
+    await summarizeScript(second.deps, 'creator', 'drop', NOW, 'corr');
 
     expect(second.saved[0]?.mediaHash).toBe(first.saved[0]?.mediaHash);
     // `both` and no moment fixed by her request: none is said.
@@ -200,8 +200,8 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
   it('tells the script again once a description is corrected, with the prompt of now', async () => {
     const first = fakes();
     const corrected = fakes({ rows: { m3: 'd-m3-human' } });
-    await summarizeScript(first.deps, 'drop', NOW, 'corr');
-    await summarizeScript(corrected.deps, 'drop', NOW, 'corr');
+    await summarizeScript(first.deps, 'creator', 'drop', NOW, 'corr');
+    await summarizeScript(corrected.deps, 'creator', 'drop', NOW, 'corr');
 
     expect(corrected.saved[0]?.mediaHash).not.toBe(first.saved[0]?.mediaHash);
     expect(first.asks[0]).toMatch(/@summary-v1$/u);
@@ -214,25 +214,25 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
         files: [{ slotKey: 'salon::0', mediaAssetId: null, kind: 'image', durationS: null }],
       },
     });
-    expect(await summarizeScript(cleaning.deps, 'drop', NOW, 'corr')).toBe('waiting');
+    expect(await summarizeScript(cleaning.deps, 'creator', 'drop', NOW, 'corr')).toBe('waiting');
 
     const undescribed = fakes({ described: ['m1'] });
-    expect(await summarizeScript(undescribed.deps, 'drop', NOW, 'corr')).toBe('waiting');
+    expect(await summarizeScript(undescribed.deps, 'creator', 'drop', NOW, 'corr')).toBe('waiting');
     expect(undescribed.asked).toEqual([]);
   });
 
   it('does nothing for a set already told, or a drop gone', async () => {
     const already = fakes({ summarized: true });
-    expect(await summarizeScript(already.deps, 'drop', NOW, 'corr')).toBe('already');
+    expect(await summarizeScript(already.deps, 'creator', 'drop', NOW, 'corr')).toBe('already');
     const gone = fakes({ target: null });
-    expect(await summarizeScript(gone.deps, 'drop', NOW, 'corr')).toBe('gone');
+    expect(await summarizeScript(gone.deps, 'creator', 'drop', NOW, 'corr')).toBe('gone');
     expect([...already.asked, ...gone.asked]).toEqual([]);
   });
 
   it('asks again an hour later when the day’s budget is spent', async () => {
     const { deps, saved, later } = fakes({ answers: [{ kind: 'budget' }] });
 
-    expect(await summarizeScript(deps, 'drop', NOW, 'corr')).toBe('later');
+    expect(await summarizeScript(deps, 'creator', 'drop', NOW, 'corr')).toBe('later');
 
     expect(later).toEqual([new Date('2026-11-08T19:00:00.000Z')]);
     expect(saved).toEqual([]);
@@ -240,11 +240,13 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
 
   it('fails, to be retried, when every model fails or the steps told are not the script’s', async () => {
     await expect(
-      summarizeScript(fakes({ answers: [{ kind: 'failed' }] }).deps, 'drop', NOW, 'corr'),
+      summarizeScript(fakes({ answers: [{ kind: 'failed' }] }).deps, 'creator', 'drop', NOW, 'corr'),
     ).rejects.toThrow(ScriptSummaryFailed);
     const other = { ...SUMMARY, steps: [told('salon:'), told('cuisine:')] };
     const wrong = fakes({ answers: [{ kind: 'summarized', summary: other, model: 'm', promptHash: 'h' }] });
-    await expect(summarizeScript(wrong.deps, 'drop', NOW, 'corr')).rejects.toThrow(ScriptSummaryFailed);
+    await expect(summarizeScript(wrong.deps, 'creator', 'drop', NOW, 'corr')).rejects.toThrow(
+      ScriptSummaryFailed,
+    );
     expect(wrong.saved).toEqual([]);
   });
 
@@ -256,20 +258,20 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
         { kind: 'summarized', summary: SUMMARY, model: 'm', promptHash: 'h' },
       ],
     });
-    expect(await summarizeScript(fixed.deps, 'drop', NOW, 'corr')).toBe('summarized');
+    expect(await summarizeScript(fixed.deps, 'creator', 'drop', NOW, 'corr')).toBe('summarized');
     expect(fixed.saved.map((one) => one.reviewReasons)).toEqual([[]]);
 
     const stubborn = fakes({
       answers: [{ kind: 'summarized', summary: priced, model: 'm', promptHash: 'h' }],
     });
-    await summarizeScript(stubborn.deps, 'drop', NOW, 'corr');
+    await summarizeScript(stubborn.deps, 'creator', 'drop', NOW, 'corr');
     expect(stubborn.asked).toHaveLength(2);
     expect(stubborn.saved.map((one) => one.reviewReasons)).toEqual([['price']]);
 
     const spent = fakes({
       answers: [{ kind: 'summarized', summary: priced, model: 'm', promptHash: 'h' }, { kind: 'budget' }],
     });
-    await summarizeScript(spent.deps, 'drop', NOW, 'corr');
+    await summarizeScript(spent.deps, 'creator', 'drop', NOW, 'corr');
     expect(spent.saved.map((one) => one.reviewReasons)).toEqual([['price']]);
   });
 });

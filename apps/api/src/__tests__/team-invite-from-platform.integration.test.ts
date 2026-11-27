@@ -95,6 +95,7 @@ describe('a member invited from a link proposal (ADR 0076 § 3)', () => {
       db: app.db.db,
       adminDb: app.adminDb.db,
       creators: { existing: (ids) => Promise.resolve(new Set(ids)) },
+      creatorNames: () => Promise.resolve(new Map()),
       invitationLinks: { live: () => Promise.resolve(new Map()) },
       enqueuePayRecalculation,
       platformRemovals: () => Promise.resolve([]),

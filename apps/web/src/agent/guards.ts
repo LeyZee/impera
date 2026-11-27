@@ -35,5 +35,9 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   repetition: 'une phrase déjà dite',
   closed_question_streak: 'trop de questions fermées d’affilée',
   care_breach: 'une vente, une rencontre ou un mot sexuel dans une réponse de soin',
+  place_named: 'le nom d’un lieu où elle vit (sa ville, son quartier)',
+  minor_reference: 'un enfant ou un mineur nommé, pour rire ou dans un contexte sexuel',
   unwarranted_brake: 'un frein (« tu y vas un peu fort », « tu vises direct ») sur un simple compliment',
+  language_not_covered: 'une langue que les gardes ne lisent pas, ou qu’elle ne parle pas',
+  help_number_from_model: 'un numéro ou une ligne d’aide écrit par l’IA, que seul le code pose',
 };

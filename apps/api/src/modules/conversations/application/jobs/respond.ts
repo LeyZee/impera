@@ -38,6 +38,7 @@ import { deferredRespondAt } from '../../domain/rules';
 import { closeAutomaticIfLocked } from '../automatic';
 import { readProposedFacts } from '../facts';
 import { appendEvent } from '../journal';
+import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
 
 export interface RespondDeps {
   readonly uow: UnitOfWork;
@@ -306,6 +307,38 @@ async function deferReply(
 }
 
 /**
+ * A time-waster's answer waits (ADR 0135 § 6): the conversation stays pending and the same job runs at `until`, under
+ * its key, so that a message of his meanwhile only brings it back to this wait. Codes only, never a status in a log.
+ */
+async function deferForTimeWaster(
+  tx: Transaction,
+  conversation: Conversation,
+  until: Date,
+  payload: JobPayload<'conversation.respond'>,
+  at: Date,
+): Promise<void> {
+  await appendEvent(
+    tx,
+    conversation,
+    { type: 'reply_deferred', payload: { reason: 'time_waster', until: until.toISOString() } },
+    { actor: 'system', correlationId: payload.correlationId, at },
+  );
+  await tx.jobs.enqueue(
+    'conversation.respond',
+    {
+      creatorId: payload.creatorId,
+      conversationId: payload.conversationId,
+      correlationId: payload.correlationId,
+    },
+    {
+      queueName: queueNameFor(conversation.id),
+      jobKey: jobKeyFor('conversation.respond', conversation.id),
+      runAt: until,
+    },
+  );
+}
+
+/**
  * Out of her reply slots (P3-14), the opening of her next slot: no draft until then, whoever is on shift. A chatter on
  * shift is not bound by her hours, but answers in Reveal (ADR 0025): a draft of the agent at 4:00 would serve nobody,
  * and her hours exist so that she does not answer at 4:00. `null` when she may answer now.
@@ -430,16 +463,44 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
+        stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
         sales: await tx.events.salesState(conversation.id),
         scriptRun,
         scriptAbandon: await scriptAbandonOf(tx, conversation.id, scriptRun),
         // His custom order kept by its module (ADR 0159 § A.2); undefined when no store is wired.
         openCustomOrder: await tx.customOrders?.open(conversation.fanId),
         lastInbound: lastInboundKey(conversation),
+        flags: await tx.gate.fanFlags(conversation),
+        unboughtRuns: await tx.scriptRuns.unbought(conversation.id),
+        stalledRuns: await tx.scriptRuns.stalled(conversation.id),
       };
     });
     if (read === null) return;
+    // A time-waster waits his turn (ADR 0135 § 6), before any call to the AI: his next messages join this wait.
+    const wait = timeWasterWait({
+      now: clock.now(),
+      timeZone: hours?.timeZone ?? DEFAULT_TIME_ZONE,
+      conversationId: read.conversation.id,
+      setting: read.stats.timeWaster,
+      flags: read.flags,
+      careOpen: read.conversation.careSince !== null,
+      firstMessageAt: read.stats.firstMessageAt,
+      spentMinor: Math.max(read.stats.spentMinor, read.stats.registerSpentMinor ?? 0),
+      lastPurchaseAt: read.stats.lastPurchaseAt,
+      unboughtRuns: read.unboughtRuns,
+      stalledRuns: read.stalledRuns,
+      history: read.history,
+    });
+    if (wait?.until != null) {
+      const until = wait.until;
+      await uow.inTenant(payload.creatorId, async (tx) => {
+        const conversation = await tx.conversations.lock(payload.conversationId);
+        if (conversation === null || !(await stillPending(tx, conversation, logger, waitedFor))) return;
+        await deferForTimeWaster(tx, conversation, until, payload, clock.now());
+      });
+      logger.info({ level: wait.level, until: until.toISOString() }, 'respond: time-waster, deferred');
+      return;
+    }
     // Her facts come from the `fans` module, which reads them in its own transaction: outside the lock above.
     const notes = await fans.activeFacts(read.conversation.creatorId, read.conversation.fanId);
     const now = clock.now();
@@ -454,6 +515,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
+      ...(wait !== null && { timeWaster: wait.level }),
       ...(waitedFor !== null && { waited: 1 }),
       ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
       ...(read.conversation.desireScore !== null &&
@@ -606,6 +668,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
           ...(scripted.step !== undefined && { scriptStep: scripted.step }),
+          ...(result.copilot !== undefined && { copilot: result.copilot }),
+          // Her French for the team (ADR 0168 § 9): kept beside the draft, never in what is sent nor in its key.
+          ...(result.translation !== undefined && { translation: result.translation }),
         });
         await appendEvent(
           tx,

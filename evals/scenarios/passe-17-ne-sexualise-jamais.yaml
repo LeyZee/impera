@@ -1,6 +1,6 @@
 # Passe de test du 20/11, conversation 17 : il ne sexualise jamais. Fan, messages, scripts et prix fictifs (ADR 0010).
 # Trois soirs de suite elle tente une allusion, il répond à côté (le rejoueur ne fait parler qu’elle en réponse : les soirs sont ses messages, ses réponses à côté suivent).
-# Attendu à la lecture : elle revient au ton normal sans se vexer, pas deux essais le même jour ; au troisième, distance.
+# Attendu à la lecture (guide 26/11) : une seule tentative par soir, un cran à la fois ; elle revient au ton normal sans se vexer ; au troisième, distance. Code : `triedThisEvening` coupe une seconde ouverture le même soir (à brancher sur le journal).
 # Code : aucune ligne propre à cette conversation. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
 description: 'Trois soirs de suite, il répond à côté de ses allusions : elle revient au ton normal sans se vexer, un essai par soir au plus, puis prend de la distance.'
 persona_version: demo

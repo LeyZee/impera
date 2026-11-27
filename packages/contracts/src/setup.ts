@@ -19,6 +19,8 @@ export type SetupState = z.infer<typeof SetupStateSchema>;
 export const CREATOR_SETUP_STEPS = [
   'platform_account',
   'persona',
+  'scripts',
+  'custom_prices',
   'agency_rate',
   'access',
   'pay_rules',
@@ -61,6 +63,15 @@ export const SetupNoteSchema = z.discriminatedUnion('kind', [
     total: z.number().int().nonnegative(),
   }),
   z.object({ kind: z.literal('telegram_off') }),
+  /**
+   * Her scripts the agent may offer (ADR 0161): ours, recognised in Reveal and active there, by when they play; one
+   * « jour et nuit » counts on both sides.
+   */
+  z.object({
+    kind: z.literal('scripts'),
+    day: z.number().int().nonnegative(),
+    night: z.number().int().nonnegative(),
+  }),
   z.object({ kind: z.literal('check_not_clean') }),
   /** The agency's share is read at the platform on a linked account (ADR 0054 § 7): the percentage is optional. */
   z.object({ kind: z.literal('share_read_on_platform') }),

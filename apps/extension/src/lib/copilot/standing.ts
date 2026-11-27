@@ -18,6 +18,8 @@ export interface Standing {
    * The other stops forbid an offer, not a word: their draft stays his to read and to send.
    */
   readonly noContact: boolean;
+  /** « Âge contesté »: the panel cuts the sale and masks what is intimate by itself, closed by default (ADR 0141 § 9). */
+  readonly ageDisputed: boolean;
 }
 
 /**
@@ -41,7 +43,8 @@ const euros = (minor: number): string =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.floor(minor / 100));
 
 export function standingOf(flags: FanFlags | 'unread', band: DesireBand | null): Standing {
-  if (flags === 'unread') return { stops: [], cares: [], band, unread: true, noContact: false };
+  if (flags === 'unread')
+    return { stops: [], cares: [], band, unread: true, noContact: false, ageDisputed: false };
   const stops: string[] = [];
   const cares: string[] = [];
   if (flags.doNotContact !== undefined) stops.push('Ne plus lui écrire');
@@ -50,7 +53,14 @@ export function standingOf(flags: FanFlags | 'unread', band: DesireBand | null):
   if (flags.fragile !== undefined) cares.push('Fan fragile');
   if (flags.noExplicit !== undefined) cares.push('Rien d’explicite');
   if (flags.spendingLimitMinor !== undefined) cares.push(`Plafond ${euros(flags.spendingLimitMinor)}\u00a0€`);
-  return { stops, cares, band, unread: false, noContact: flags.doNotContact !== undefined };
+  return {
+    stops,
+    cares,
+    band,
+    unread: false,
+    noContact: flags.doNotContact !== undefined,
+    ageDisputed: flags.ageDisputed !== undefined,
+  };
 }
 
 /** The playground's closed list (ADR 0086 § 4), in the server's words (calibration.ts). */

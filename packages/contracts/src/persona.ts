@@ -56,6 +56,7 @@ export const PERSONA_BOUNDS = {
   sexualizationMinDesireToOpen: [20, 70],
   scriptMinDesire: [50, 90],
   scriptCooldownHours: [0, 24],
+  scriptAfterPurchaseHours: [24, 72],
   postOfferDelayDays: [1, 60],
   followUpDelayHours: [1, 168],
   nudgeDelayMinutes: [1, 120],
@@ -67,6 +68,21 @@ export const ADDITIONAL_INFO_MAX = 6000;
 export const MIN_CREATOR_AGE = 18;
 /** Past this age on the date of the version, a date of birth is a typo (1890), never a creator (recette, reco 22). */
 export const MAX_CREATOR_AGE = 100;
+
+/**
+ * The French name of each language (ADR 0168): the persona's choice list, his language on his card and the copilot say
+ * these, never their own copy. Typed by `LANGUAGES`: a language added there needs its name here.
+ */
+export const LANGUAGE_LABELS_FR: Readonly<Record<(typeof LANGUAGES)[number], string>> = {
+  french: 'Français',
+  english: 'Anglais',
+  italian: 'Italien',
+  spanish: 'Espagnol',
+  german: 'Allemand',
+  portuguese: 'Portugais',
+  dutch: 'Néerlandais',
+  arabic: 'Arabe',
+};
 
 /** French labels of every choice list: the dashboard renders these, never its own copy. */
 export const PERSONA_OPTIONS = {
@@ -80,16 +96,7 @@ export const PERSONA_OPTIONS = {
     arab: 'Moyen-orientale',
     other: 'Autre',
   }),
-  languages: labelled(LANGUAGES, {
-    french: 'Français',
-    english: 'Anglais',
-    italian: 'Italien',
-    spanish: 'Espagnol',
-    german: 'Allemand',
-    portuguese: 'Portugais',
-    dutch: 'Néerlandais',
-    arabic: 'Arabe',
-  }),
+  languages: labelled(LANGUAGES, LANGUAGE_LABELS_FR),
   hair: labelled(HAIR_COLORS, {
     brown: 'Bruns',
     black: 'Noirs',
@@ -242,6 +249,11 @@ export const PersonaStrategiesSchema = z.strictObject({
       cooldown_hours: intIn(PERSONA_BOUNDS.scriptCooldownHours),
       /** His desire score (P3-12) before a script may go out; absent, 70 (`DEFAULT_SCRIPT_MIN_DESIRE`). */
       min_desire: intIn(PERSONA_BOUNDS.scriptMinDesire).optional(),
+      /**
+       * The pause after a purchase (ADR 0128 § 1): hours after his last purchase before she opens a script herself;
+       * absent, 48 (`DEFAULT_AFTER_PURCHASE_HOURS`).
+       */
+      after_purchase_hours: intIn(PERSONA_BOUNDS.scriptAfterPurchaseHours).optional(),
     })
     .refine(...instructionsWhenCustom('custom')),
   post_offer: z

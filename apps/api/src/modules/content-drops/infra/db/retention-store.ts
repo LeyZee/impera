@@ -1,5 +1,5 @@
 import { AuditEntryIdSchema, EventIdSchema, newId, type EventType } from '@impera/contracts';
-import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import { and, eq, schema, sql, withAdmin, withTenantJob, type Database, type Transaction } from '@impera/db';
 
 import type { DueOriginal, DueThumbnail, RetentionStore } from '../../domain/ports';
 
@@ -42,8 +42,17 @@ async function sayOnce(
   return inserted.length > 0;
 }
 
-/** `content_drops.erase_originals`'s reads and writes, as the admin role: no policy lets anyone else move a state. */
-export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
+/**
+ * `content_drops.erase_originals`'s reads and writes (SEC-16). What is due is found across the creators, as the admin
+ * role, and only read; each thing is then moved in its own creator, under the app role (`withTenantJob`, `drop_media`):
+ * a medium named with another creator's id is not found there, and nothing of hers is erased nor said.
+ */
+export function createDrizzleRetentionStore(adminDb: Database, db: Database): RetentionStore {
+  const inCreator = <T>(creatorId: string, fn: (tx: Transaction) => Promise<T>): Promise<T> =>
+    withTenantJob(db, creatorId, 'drop_media', fn);
+  /** Hers, said outright besides the policy. */
+  const herMedium = (creatorId: string, mediaAssetId: string) =>
+    and(eq(mediaAssets.id, mediaAssetId), eq(mediaAssets.creatorId, creatorId));
   return {
     abandonedFiles: (before) =>
       withAdmin(adminDb, async (tx) => {
@@ -54,17 +63,18 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           .where(
             and(
               eq(contentDropFiles.state, 'awaiting'),
-              // A drop sending since before the limit; in a script being filled, a file chosen before it (SC-02 lot b).
+              // A drop sending since before the limit; in a script being filled, or a medium replaced in a drop received
+              // (trou 7 du 21/11), a file chosen before it (SC-02 lot b).
               sql`((${contentDrops.state} = 'uploading' and ${contentDrops.createdAt} < ${before})
-                or (${contentDrops.state} = 'filling' and ${contentDropFiles.createdAt} < ${before}))`,
+                or (${contentDrops.state} in ('filling', 'received') and ${contentDropFiles.createdAt} < ${before}))`,
             ),
           );
         return rows.map((row) => row.id);
       }),
 
-    announce: (now, until, correlationId) =>
-      withAdmin(adminDb, async (tx) => {
-        const coming = await tx
+    announce: async (now, until, correlationId) => {
+      const coming = await withAdmin(adminDb, (tx) =>
+        tx
           .select({ id: mediaAssets.id, creatorId: mediaAssets.creatorId, expiresAt: mediaAssets.expiresAt })
           .from(mediaAssets)
           .where(
@@ -74,25 +84,33 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
               keptByDrop,
               sql`not (${allWithdrawn})`,
             ),
-          );
-        let said = 0;
-        for (const medium of coming) {
-          if (medium.expiresAt === null) continue;
-          const erasedOn = medium.expiresAt.toISOString().slice(0, 10);
-          if (
-            await sayOnce(
-              tx,
-              'content_media_expiring',
-              medium.creatorId,
-              { mediaAssetId: medium.id, erasedOn },
-              now,
-              correlationId,
+          ),
+      );
+      const byCreator = new Map<string, typeof coming>();
+      for (const one of coming) byCreator.set(one.creatorId, [...(byCreator.get(one.creatorId) ?? []), one]);
+      let said = 0;
+      for (const [creatorId, hers] of byCreator)
+        said += await inCreator(creatorId, async (tx) => {
+          let count = 0;
+          for (const one of hers) {
+            if (one.expiresAt === null) continue;
+            const erasedOn = one.expiresAt.toISOString().slice(0, 10);
+            if (
+              await sayOnce(
+                tx,
+                'content_media_expiring',
+                creatorId,
+                { mediaAssetId: one.id, erasedOn },
+                now,
+                correlationId,
+              )
             )
-          )
-            said += 1;
-        }
-        return said;
-      }),
+              count += 1;
+          }
+          return count;
+        });
+      return said;
+    },
 
     dueOriginals: (now) =>
       withAdmin(adminDb, async (tx) => {
@@ -121,12 +139,12 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
       }),
 
     erase: (original, now, correlationId, remove) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(original.creatorId, async (tx) => {
         // The receipt's settle locks this row too: a medium given again waits for the erasure, or keeps it away.
         await tx
           .select({ id: mediaAssets.id })
           .from(mediaAssets)
-          .where(eq(mediaAssets.id, original.mediaAssetId))
+          .where(herMedium(original.creatorId, original.mediaAssetId))
           .for('update');
         // Checked again once locked, in a statement of its own that sees what committed while it waited: given again
         // meanwhile (a new date, a drop not withdrawn), it stays held.
@@ -135,7 +153,7 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           .from(mediaAssets)
           .where(
             and(
-              eq(mediaAssets.id, original.mediaAssetId),
+              herMedium(original.creatorId, original.mediaAssetId),
               sql`${mediaAssets.erasedAt} is null`,
               sql`(${mediaAssets.expiresAt} <= ${now} or ${allWithdrawn})`,
             ),
@@ -143,7 +161,10 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
         if (due === undefined) return false;
         // The storage's call under the lock: an hourly job, and the client's time limit bounds it.
         await remove(original.storageKey);
-        await tx.update(mediaAssets).set({ erasedAt: now }).where(eq(mediaAssets.id, original.mediaAssetId));
+        await tx
+          .update(mediaAssets)
+          .set({ erasedAt: now })
+          .where(herMedium(original.creatorId, original.mediaAssetId));
         await tx.insert(domainEvents).values({
           id: newId(EventIdSchema),
           creatorId: original.creatorId,
@@ -178,11 +199,11 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
       }),
 
     eraseThumbnail: (thumbnail, archivedBefore, remove) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(thumbnail.creatorId, async (tx) => {
         await tx
           .select({ id: mediaAssets.id })
           .from(mediaAssets)
-          .where(eq(mediaAssets.id, thumbnail.mediaAssetId))
+          .where(herMedium(thumbnail.creatorId, thumbnail.mediaAssetId))
           .for('update');
         // Checked again once locked: reopened meanwhile, she keeps it; emptied meanwhile, nothing to do.
         const [due] = await tx
@@ -191,7 +212,7 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           .innerJoin(creators, eq(creators.id, mediaAssets.creatorId))
           .where(
             and(
-              eq(mediaAssets.id, thumbnail.mediaAssetId),
+              herMedium(thumbnail.creatorId, thumbnail.mediaAssetId),
               eq(mediaAssets.thumbnailKey, thumbnail.thumbnailKey),
               sql`${creators.archivedAt} < ${archivedBefore}`,
             ),
@@ -202,12 +223,12 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
         await tx
           .update(mediaAssets)
           .set({ thumbnailKey: null })
-          .where(eq(mediaAssets.id, thumbnail.mediaAssetId));
+          .where(herMedium(thumbnail.creatorId, thumbnail.mediaAssetId));
         return true;
       }),
 
     thumbnailsErased: (creatorId, count) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(creatorId, async (tx) => {
         await tx.insert(auditLog).values({
           id: newId(AuditEntryIdSchema),
           userId: null,
@@ -219,7 +240,13 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
       }),
 
     eraseFailed: (original, now, correlationId) =>
-      withAdmin(adminDb, async (tx) => {
+      inCreator(original.creatorId, async (tx) => {
+        // Said only of a medium of hers: one named with another creator's id is not found here.
+        const [held] = await tx
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .where(herMedium(original.creatorId, original.mediaAssetId));
+        if (held === undefined) return;
         await sayOnce(
           tx,
           'content_media_erase_failed',

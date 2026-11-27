@@ -50,6 +50,8 @@ const NBSP = '\u00a0';
 const REASON_MAX = 500;
 
 const KINDS: readonly EntryKind[] = ['bonus', 'fixed', 'percent', 'adjustment'];
+/** What a manager adds: a penalty. A bonus and an adjustment are the owner's alone (the server refuses them too). */
+export const PENALTY_KINDS: readonly EntryKind[] = ['fixed', 'percent'];
 const STEPS = ['Remplir', 'Relire'] as const;
 
 /** What the neon of the second step says. */
@@ -158,6 +160,7 @@ export interface EntryAdded {
 export function EntryForm({
   kind,
   onKind,
+  kinds = KINDS,
   members,
   corrects,
   pagePeriod,
@@ -169,6 +172,8 @@ export function EntryForm({
   kind: EntryKind;
   /** Absent when the kind is fixed (« Ajuster »). */
   onKind?: (kind: EntryKind) => void;
+  /** The kinds offered: all of them for the owner, the penalties alone for a manager. */
+  kinds?: readonly EntryKind[];
   /** Who it may be for: active members, never the reader. */
   members: readonly TeamMember[];
   /** « Ajuster »: the statement corrected, its member fixed. */
@@ -346,7 +351,7 @@ export function EntryForm({
                 Quoi
               </span>
               <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-kind`}>
-                {KINDS.map((one) => (
+                {kinds.map((one) => (
                   <button
                     key={one}
                     type="button"

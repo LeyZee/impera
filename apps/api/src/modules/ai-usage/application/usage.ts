@@ -6,6 +6,7 @@ import {
   type AiUsage,
 } from '@impera/contracts';
 
+import { aiForecast } from '../domain/forecast';
 import type { Clock, CreditActor, CreditAlerts, CreditLedger, UsageReader } from '../domain/ports';
 import { aiUsage, countFrom, type CapReading, type VoiceQuotaReading } from '../domain/usage';
 
@@ -47,11 +48,12 @@ function wallClock(now: Date, timeZone: string): { readonly day: string; readonl
 export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
   const now = deps.clock.now();
   const from = new Date(now.getTime() - READ_BACK_MS);
-  const [rows, lastCallAt, entries, voice] = await Promise.all([
+  const [rows, lastCallAt, entries, voice, forecastRead] = await Promise.all([
     deps.reader.rows(from, deps.timeZone),
     deps.reader.lastCallAt(from),
     deps.ledger.list(),
     deps.voice?.() ?? null,
+    deps.reader.forecast(from, deps.timeZone),
   ]);
   const providers = AiCreditProviderSchema.options;
   const spent = await Promise.all(
@@ -71,9 +73,10 @@ export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
     (first, r) => (first === null || r.day < first ? r.day : first),
     null,
   );
-  return aiUsage({
+  const cap = deps.cap();
+  const usage = aiUsage({
     rows,
-    cap: deps.cap(),
+    cap,
     today: day,
     hour,
     firstDay,
@@ -86,6 +89,17 @@ export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
     quotaRefusedAt: Object.fromEntries(refused),
     voice,
   });
+  return {
+    ...usage,
+    forecast: aiForecast({
+      rows: forecastRead.rows,
+      sales: forecastRead.sales,
+      creatorNames: forecastRead.creatorNames,
+      today: day,
+      usdPerEur: deps.usdPerEur,
+      capEur: cap.capEur,
+    }),
+  };
 }
 
 /**

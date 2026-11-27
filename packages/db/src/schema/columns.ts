@@ -59,7 +59,7 @@ export function tenantOrGlobalPolicy(creatorId: PgColumn) {
  * True unless the transaction runs as a creator's own account (`withCreatorAccount`, CR-02): another role for the
  * agency (`withMember`), unset for the jobs and the tests, so the restrictive policies below change nothing for them.
  */
-const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
+export const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
 
 /**
  * A creator reads these rows of her own creator, never writes them (ADR 0042 § 2). Restrictive policies are ANDed

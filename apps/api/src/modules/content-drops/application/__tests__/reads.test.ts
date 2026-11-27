@@ -28,6 +28,8 @@ function storeOf(drops: readonly ContentDrop[], asked: number[]): AgencyContentS
     drop: none,
     correct: none,
     withdraw: none,
+    redo: none,
+    redoFile: none,
     ask: none,
     cancel: none,
     fileTarget: none,

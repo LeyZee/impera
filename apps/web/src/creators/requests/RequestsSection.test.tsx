@@ -68,7 +68,7 @@ const PUT_CADENCE = `PUT /creators/${CREATOR}/script-cadence`;
 const ASK = `POST /creators/${CREATOR}/content-requests`;
 
 const base = (): Record<string, (body: unknown) => Reply> => ({
-  [CONTENT]: () => ({ status: 200, body: { requests: [OPEN, REFUSED], drops: [] } }),
+  [CONTENT]: () => ({ status: 200, body: { requests: [OPEN, REFUSED], drops: [], redone: [] } }),
   [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
   [GET_CADENCE]: () => ({ status: 200, body: CADENCE }),
 });

@@ -22,6 +22,8 @@ import {
 export interface SeenRequest {
   readonly url: string;
   readonly requestHeaders?: readonly RequestHeader[];
+  /** 0 for the tab's main frame; absent where the browser does not say. */
+  readonly frameId?: number;
 }
 
 /** The browser's `webRequest.onBeforeSendHeaders`, for one tab, as the service worker wires it. */
@@ -34,9 +36,9 @@ export interface RequestTap {
 
 /** Reveal asks every few seconds; a tab that asked nothing is reloaded once, then the « Sync » gives up. */
 const NUDGE_AFTER_MS = 4_000;
-const GIVE_UP_AFTER_MS = 30_000;
+export const GIVE_UP_AFTER_MS = 30_000;
 /** Once a session can be made and the account's model is not seen yet, how long the tab may still name it. */
-const SETTLE_MS = 2_500;
+export const SETTLE_MS = 2_500;
 
 /**
  * Listens to the tab until the account's model shows (`expected`), then reads at once. Without it, or while the tab
@@ -52,8 +54,14 @@ export function captureSession(
     waitMs: GIVE_UP_AFTER_MS,
     settleMs: SETTLE_MS,
   },
+  /** Ends the listening at once, with nothing: the tab closed or another one came to the front (ADR 0147 § 3). */
+  signal?: AbortSignal,
 ): Promise<Captured | null> {
   return new Promise((resolve) => {
+    if (signal?.aborted === true) {
+      resolve(null);
+      return;
+    }
     let parts = NO_PARTS;
     let settle: ReturnType<typeof setTimeout> | undefined;
     const now = (): Captured | null => sessionOf(parts, expected, frame.userAgent, frame.now());
@@ -79,9 +87,14 @@ export function captureSession(
       clearTimeout(nudge);
       clearTimeout(giveUp);
       clearTimeout(settle);
+      signal?.removeEventListener('abort', abort);
       tap.stop(listener);
       resolve(captured);
     }
+    function abort(): void {
+      finish(null);
+    }
+    signal?.addEventListener('abort', abort);
     tap.listen(tabId, listener);
   });
 }

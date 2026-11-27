@@ -3,6 +3,7 @@ import {
   ArchivedCreatorListSchema,
   ArchivedCreatorSchema,
   CopilotSwitchesSchema,
+  FanTiersSettingSchema,
   CreatorIdSchema,
   CreatorListSchema,
   CreatorSummarySchema,
@@ -176,6 +177,40 @@ export function createCreatorRoutes(
         const switches = await directory.setCopilotSwitches(request.params.id, request.body, user.id);
         if (switches === null) throw new CreatorNotFound();
         return switches;
+      },
+    );
+
+    // Créatrices › (elle) › Compte: from how much her fans are good, very good payers and whales (Charles, 21/11). Money:
+    // the owner's alone.
+    app.get(
+      '/creators/:id/fan-tiers',
+      {
+        preValidation: requireRole('owner'),
+        schema: { params: CreatorParamsSchema, response: { 200: FanTiersSettingSchema } },
+      },
+      async (request) => {
+        const tiers = await directory.fanTiers(request.params.id);
+        if (tiers === null) throw new CreatorNotFound();
+        return tiers;
+      },
+    );
+
+    app.put(
+      '/creators/:id/fan-tiers',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: CreatorParamsSchema,
+          body: FanTiersSettingSchema,
+          response: { 200: FanTiersSettingSchema },
+        },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const tiers = await directory.setFanTiers(request.params.id, request.body, user.id);
+        if (tiers === null) throw new CreatorNotFound();
+        return tiers;
       },
     );
     return Promise.resolve();

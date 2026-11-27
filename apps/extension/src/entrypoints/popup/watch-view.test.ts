@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { WatchStatus } from '../../lib/watch/protocol';
 
-import { hourOf, minutesSince, watchCard, type WatchActions, type WatchView } from './watch-view';
+import { minutesSince, watchCard, type WatchActions, type WatchView } from './watch-view';
 
 const CREATOR_A = CreatorIdSchema.parse('0d4c7f5e-3b1a-4c8e-9a2d-6e5f4b3a2c10');
 const CREATOR_B = CreatorIdSchema.parse('1e5d8a6f-4c2b-4d9f-8b3e-7f6a5c4b3d21');
@@ -135,8 +135,7 @@ describe('the watch card', () => {
     expect([...card.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
   });
 
-  it('writes the time the CRM’s way', () => {
-    expect(hourOf(new Date(2026, 10, 6, 9, 5))).toBe('9\u00a0h\u00a005');
+  it('counts the minutes the CRM’s way', () => {
     expect(minutesSince(NOW, NOW)).toBe('1\u00a0min');
   });
 });

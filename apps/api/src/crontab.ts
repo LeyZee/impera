@@ -165,7 +165,7 @@ const CRON_JOBS: readonly CronJob[] = [
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
   },
   // No hourly identity of her native scripts any more (ADR 0161 § 5): the agent offers only the recognised copy of a
-  // script of ours, with our description, and reads no identity. `scripts.identify_backlog` stays a task, asked by no one.
+  // script of ours, with our description, and reads no identity. The identity job and its tasks are gone (21/11/2026).
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   {
     task: 'fans.purge_facts',

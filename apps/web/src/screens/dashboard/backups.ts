@@ -54,11 +54,11 @@ function day(iso: string, timeZone: string | undefined): string {
 }
 
 /**
- * Why the restore test is not fresh (ADR 0028 § 6), and what it holds back: a pay is not validated without one of
- * less than `RESTORE_TEST_FRESH_DAYS` days (EQ-17). Its counts only, never what the test printed.
+ * Why the restore test is not fresh (ADR 0028 § 6): one is due every `RESTORE_TEST_FRESH_DAYS` days. It holds no pay
+ * back (« ok 5 » de Charles, 21/11): an amber line, nothing more. Its counts only, never what the test printed.
  */
 function restoreLine(status: BackupStatus, timeZone: string | undefined): string {
-  const needed = `Il en faut un de moins de ${String(RESTORE_TEST_FRESH_DAYS)} jours pour valider une paie.`;
+  const needed = `Il en faut un tous les ${String(RESTORE_TEST_FRESH_DAYS)} jours : à refaire.`;
   const test = status.lastRestoreTest;
   if (test === null) return `Aucun essai de restauration n’est encore noté. ${needed}`;
   if (test.rowCountMismatches > 0) {
@@ -75,9 +75,7 @@ function restoreLine(status: BackupStatus, timeZone: string | undefined): string
 export function backupBannerOf(status: BackupStatus, timeZone?: string): BackupBanner | null {
   const restore = status.restoreTestFresh ? null : restoreLine(status, timeZone);
   if (status.state === 'ok') {
-    return restore === null
-      ? null
-      : { title: 'Aucun essai de restauration récent', text: restore, restore: null };
+    return restore === null ? null : { title: 'Essai de restauration à faire', text: restore, restore: null };
   }
   const running = status.lastRun?.status === 'running' ? ' Une sauvegarde est en cours.' : '';
   const failed = status.lastRun?.status === 'failed' ? 'La dernière tentative a échoué. ' : '';

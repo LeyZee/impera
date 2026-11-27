@@ -452,13 +452,34 @@ describe('commission statements (EQ-04): who reads and writes, and a past that n
   });
 
   describe('bonuses, penalties and adjustments', () => {
-    it('the agency writes them for others, never for itself; a chatter writes none', async () => {
-      await as(manager, (tx) => tx.insert(s.bonuses).values(bonusRow(manager, lea, '2025-11-01')));
+    it('the owner alone gives a bonus or an adjustment, a manager a penalty, never for oneself; a chatter writes none', async () => {
+      await as(owner, (tx) => tx.insert(s.bonuses).values(bonusRow(owner, lea, '2025-11-01')));
+      // What adds to a pay or corrects it is the owner's: a manager writes neither, for anyone.
+      for (const to of [lea, manager]) {
+        expect(
+          await failure(
+            as(manager, (tx) => tx.insert(s.bonuses).values(bonusRow(manager, to, '2025-11-01'))),
+          ),
+        ).toMatch(RLS);
+      }
       expect(
         await failure(
-          as(manager, (tx) => tx.insert(s.bonuses).values(bonusRow(manager, manager, '2025-11-01'))),
+          as(manager, (tx) =>
+            tx.insert(s.payAdjustments).values({
+              id: newId(PayAdjustmentIdSchema),
+              memberId: member(lea),
+              period: '2025-11-01',
+              amountMinor: 500,
+              reason: 'Vente oubliée',
+              createdBy: manager,
+            }),
+          ),
         ),
       ).toMatch(RLS);
+      // A manager still takes with a penalty.
+      await as(manager, (tx) =>
+        tx.insert(s.penalties).values(penaltyRow(manager, lea, '2025-11-16', '2025-11-16')),
+      );
       expect(
         await failure(as(theo, (tx) => tx.insert(s.bonuses).values(bonusRow(theo, lea, '2025-11-01')))),
       ).toMatch(RLS);
@@ -473,9 +494,7 @@ describe('commission statements (EQ-04): who reads and writes, and a past that n
       // Theo's period of October 1st is validated.
       await validate(manager, await draft(theo, '2025-10-01'));
       expect(
-        await failure(
-          as(manager, (tx) => tx.insert(s.bonuses).values(bonusRow(manager, theo, '2025-10-01'))),
-        ),
+        await failure(as(owner, (tx) => tx.insert(s.bonuses).values(bonusRow(owner, theo, '2025-10-01')))),
       ).toMatch(KEPT);
       expect(
         await failure(
@@ -490,18 +509,18 @@ describe('commission statements (EQ-04): who reads and writes, and a past that n
         period,
         amountMinor: -4_000,
         reason: 'Remboursement après paiement',
-        createdBy: manager,
+        createdBy: owner,
       });
       expect(
-        await failure(as(manager, (tx) => tx.insert(s.payAdjustments).values(adjustment('2025-10-01')))),
+        await failure(as(owner, (tx) => tx.insert(s.payAdjustments).values(adjustment('2025-10-01')))),
       ).toMatch(KEPT);
-      await as(manager, (tx) => tx.insert(s.payAdjustments).values(adjustment('2025-10-16')));
+      await as(owner, (tx) => tx.insert(s.payAdjustments).values(adjustment('2025-10-16')));
       expect(await failure(admin((tx) => tx.update(s.payAdjustments).set({ amountMinor: 1 })))).toMatch(KEPT);
     });
 
     it('a bonus is cancelled once, while its period is open; never deleted', async () => {
-      const row = bonusRow(manager, theo, '2025-10-16');
-      await as(manager, (tx) => tx.insert(s.bonuses).values(row));
+      const row = bonusRow(owner, theo, '2025-10-16');
+      await as(owner, (tx) => tx.insert(s.bonuses).values(row));
       const cancel = (by: string) =>
         as(by, (tx) =>
           tx
@@ -516,6 +535,7 @@ describe('commission statements (EQ-04): who reads and writes, and a past that n
         ),
       ).toMatch(KEPT);
       expect(await cancel(theo)).toEqual([]);
+      expect(await cancel(manager)).toEqual([]);
       expect(await cancel(owner)).toEqual([{ id: row.id }]);
       expect(await cancel(owner)).toEqual([]);
       expect(await failure(admin((tx) => tx.delete(s.bonuses).where(eq(s.bonuses.id, row.id))))).toMatch(

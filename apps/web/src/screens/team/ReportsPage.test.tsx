@@ -79,8 +79,30 @@ const shift = (n: number, memberId: string, day: number) => ({
   endsAt: `2026-10-${String(day)}T22:00:00.000Z`,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
 });
 const SHIFTS = [shift(1, THEO, 26), shift(2, BASILE, 26), shift(3, THEO, 25), shift(4, BASILE, 24)];
+
+/** A mini feedback as the list sends it; `patch` sets what the test is about. */
+const feedback = (n: number, patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+  id: id(500 + n),
+  shiftId: id(100 + n),
+  creatorId: id(1),
+  platformAccountId: id(11),
+  memberId: BASILE,
+  period: '2026-10-16',
+  nothingToReport: false,
+  comment: null,
+  incident: null,
+  signals: [],
+  draftReason: null,
+  incidentSeenAt: null,
+  incidentResolvedAt: null,
+  createdAt: '2026-10-26T22:00:00.000Z',
+  shiftStartsAt: '2026-10-26T16:00:00.000Z',
+  shiftEndsAt: '2026-10-26T22:00:00.000Z',
+  ...patch,
+});
 
 interface FakeReport {
   readonly id: string;
@@ -119,6 +141,10 @@ const report = (n: number, shiftIndex: number, patch: Record<string, unknown> = 
 
 let open: FakeReport[];
 let period: FakeReport[];
+/** The mini feedbacks: the incidents still open, and the period's (ADR 0050 § 10, trous béants n° 1). */
+let openIncidents: Record<string, unknown>[];
+let periodFeedbacks: Record<string, unknown>[];
+let missingFeedbacks: Record<string, unknown>[];
 /** The pay rules of the period for the shift corrected. */
 let rules: unknown;
 /** What a `POST` answers: the same for each, or from what it was sent. */
@@ -141,6 +167,13 @@ function serve(): void {
       switch (url.pathname) {
         case '/v1/scheduling/settings':
           return json(settingsOf());
+        case '/v1/scheduling/shift-feedback':
+          return json({
+            feedbacks: url.searchParams.has('period') ? periodFeedbacks : openIncidents,
+            accounts: [ACCOUNT],
+            members: MEMBERS,
+            missing: url.searchParams.has('period') ? missingFeedbacks : [],
+          });
         case '/v1/settings/sales-feeds/reveal/team/counts':
           return revealOpen ? json({ newCount: 0, removalCount: 0, abnormalRead: false }) : json(null, 403);
         case '/v1/team/members':
@@ -242,6 +275,9 @@ beforeEach(() => {
     report(3, 2, { canReview: false }),
   ];
   period = [];
+  openIncidents = [];
+  periodFeedbacks = [];
+  missingFeedbacks = [];
   rules = null;
   answer = { status: 200, body: { results: [] } };
   serve();
@@ -811,5 +847,84 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     const lines = [...(theo.closest('details')?.querySelectorAll('.rp-pline') ?? [])].map(text);
     expect(lines.find((line) => line.includes('écart +12,00 €'))).toContain('Validé');
     expect(lines.find((line) => line.includes('150,00 €'))).toContain('Validé automatiquement');
+  });
+  it('puts the incidents still open first, in red, and says « Vu » then « Réglé » (trous béants n° 1)', async () => {
+    const incident = feedback(1, { incident: 'Un fan menace de signaler le compte' });
+    openIncidents = [incident];
+    answer = {
+      status: 200,
+      body: {
+        ...incident,
+        shiftStartsAt: undefined,
+        shiftEndsAt: undefined,
+        incidentSeenAt: '2026-10-28T00:00:00.000Z',
+      },
+    };
+    renderPage();
+    const card = (await screen.findByText('1 incident à suivre')).closest('section');
+    if (card === null) throw new Error('no card');
+    expect(text(card)).toContain('Un fan menace de signaler le compte');
+    expect(text(card)).toContain('Basile');
+    expect(text(card)).toContain('1 pas encore vu');
+    expect(within(card).getByRole('list', { name: 'Incident : Envoyé' })).toBeTruthy();
+    // Before the reports to validate: the urgency first.
+    const board = card.parentElement;
+    expect(board?.firstElementChild).toBe(card);
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Vu' }));
+    await waitFor(() => {
+      expect(writes).toEqual([
+        {
+          method: 'POST',
+          path: `/v1/scheduling/shift-feedback/${id(501)}/incident`,
+          body: { step: 'seen' },
+        },
+      ]);
+    });
+  });
+
+  it('shows no incidents card when none waits, and the period’s feedbacks in figures and colours', async () => {
+    periodFeedbacks = [
+      feedback(1, { incident: 'Coupure de connexion', incidentSeenAt: '2026-10-27T08:00:00.000Z' }),
+      feedback(2, {
+        comment: 'Soirée calme',
+        signals: [
+          { category: 'missing_content', text: 'Une vidéo en extérieur' },
+          { category: 'fan_request', text: 'Une photo en robe rouge' },
+        ],
+      }),
+      feedback(3, { nothingToReport: true }),
+    ];
+    renderPage();
+    const panel = (await screen.findByText('3 retours')).closest('section');
+    if (panel === null) throw new Error('no panel');
+    expect(screen.queryByText(/incidents? à suivre/u)).toBe(null);
+    expect(text(panel)).toContain('1incident');
+    expect(text(panel)).toContain('1sans souci');
+    expect(text(panel)).toContain('Incident · Vu');
+    expect(text(panel)).toContain('Contenu manquant');
+    expect(text(panel)).toContain('Demande d’un fan');
+    expect(text(panel)).toContain('« Soirée calme »');
+    expect(text(panel)).toContain('0sans retour');
+  });
+
+  it('counts the shifts left without their feedback, never caught up (retour léger, 26/11)', async () => {
+    periodFeedbacks = [feedback(1, { nothingToReport: true, draftReason: 'too_long' })];
+    missingFeedbacks = [
+      {
+        shiftId: id(190),
+        creatorId: id(1),
+        platformAccountId: id(11),
+        memberId: BASILE,
+        startsAt: '2026-10-24T16:00:00.000Z',
+        endsAt: '2026-10-24T22:00:00.000Z',
+      },
+    ];
+    renderPage();
+    const panel = (await screen.findByText('1 retour')).closest('section');
+    if (panel === null) throw new Error('no panel');
+    expect(text(panel)).toContain('1sans retour');
+    expect(text(panel)).toContain('Sans retour');
+    expect(text(panel)).toContain('surtout : trop longues');
   });
 });
