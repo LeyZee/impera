@@ -155,9 +155,8 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     const { error } = ApiErrorSchema.parse(refused.json());
     expect(error.code).toBe('persona_sample_reply_unprocessable');
     const { faults } = PersonaSampleReplyUnprocessableDetailsSchema.parse(error.details);
-    expect(faults).toContainEqual({ index: 1, code: 'stage_direction' });
-    expect(faults).toContainEqual({ index: 1, code: 'meeting_promise' });
-    expect(faults.every((fault) => fault.index === 1)).toBe(true);
+    // stage_direction is soft since the context guards (a creator's style), so only the real meeting is refused.
+    expect(faults).toEqual([{ index: 1, code: 'meeting_promise' }]);
     await expect(
       app.modules.persona.versions.load(bea, withVersion(taught, '0.9.0'), {
         sourcePath: 'a.yaml',
