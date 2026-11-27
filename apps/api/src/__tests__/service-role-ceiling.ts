@@ -19,6 +19,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/content-drops': 14,
   'modules/contractors': 6,
   'modules/conversations': 1,
+  // +1 for « Écrire à l'agence » (recette 27/11, G4 and G13): who hears of her message and of its answer, her owners,
+  // the active managers who work on her and her own accounts, names of accounts only (one door for these reads).
+  'modules/creator-messages': 1,
   'modules/creator-tasks': 1,
   'modules/creator-week': 2,
   // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.
@@ -41,7 +44,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/team': 1,
   'modules/telegram': 10,
   'modules/trends': 8,
-  root: 52,
+  // −1: the agency's time zone read through one door for every reader (recette 27/11).
+  root: 51,
   scripts: 1,
   wiring: 7,
 };

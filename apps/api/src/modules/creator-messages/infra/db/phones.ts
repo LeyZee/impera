@@ -1,5 +1,5 @@
 import type { CreatorId } from '@impera/contracts';
-import { and, eq, schema, sql, withAdmin, type Database } from '@impera/db';
+import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { MessagePhones } from '../../domain/ports';
 
@@ -8,19 +8,21 @@ import type { MessagePhones } from '../../domain/ports';
  * zone, the active managers who work on her in theirs; her accounts (role `creator`, linked to her alone) in hers.
  */
 export function createMessagePhones(adminDb: Database, agencyTimeZone: () => Promise<string>): MessagePhones {
+  // One door for every read of this file (the service-role ceiling counts it once).
+  const admin = <T>(fn: (tx: Transaction) => Promise<T>): Promise<T> => withAdmin(adminDb, fn);
   return {
     agency: async (creatorId: CreatorId) => {
       const [creator, owners, managers, zone] = await Promise.all([
-        withAdmin(adminDb, (tx) =>
+        admin((tx) =>
           tx
             .select({ name: schema.creators.displayName })
             .from(schema.creators)
             .where(eq(schema.creators.id, creatorId)),
         ),
-        withAdmin(adminDb, (tx) =>
+        admin((tx) =>
           tx.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.role, 'owner')),
         ),
-        withAdmin(adminDb, (tx) =>
+        admin((tx) =>
           tx
             .select({ userId: schema.teamMembers.userId, timeZone: schema.teamMembers.timeZone })
             .from(schema.teamMembers)
@@ -44,7 +46,7 @@ export function createMessagePhones(adminDb: Database, agencyTimeZone: () => Pro
       };
     },
     hers: (creatorId: CreatorId) =>
-      withAdmin(adminDb, async (tx) => {
+      admin(async (tx) => {
         const [creator] = await tx
           .select({ timeZone: schema.creators.timezone })
           .from(schema.creators)
