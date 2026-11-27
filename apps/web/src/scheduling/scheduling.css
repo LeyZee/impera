@@ -1434,6 +1434,14 @@ button.sc-duty__one:active {
 
 /* Planned, not on post (recette MAN-02): an avertissement, amber, in words. */
 .sc-duty__late {
+  flex-shrink: 0;
   color: var(--nv-warning);
   font-weight: 600;
+}
+/* On a phone the late words stay whole: the creator's name gives way (ellipsis) before them. */
+.sc-duty__one:has(.sc-duty__late) {
+  overflow: hidden;
+}
+.sc-duty__one:has(.sc-duty__late) .sc-duty__where {
+  min-width: 0;
 }
