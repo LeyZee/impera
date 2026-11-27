@@ -864,7 +864,7 @@ function SystemLine({
               <Link to="/creatrices" search={creatorsSearch('persona', creator.id)} className="al-link">
                 {creators.length === 1
                   ? 'Modifier les mots dans sa persona'
-                  : `Persona de ${creator.displayName}`}
+                  : `Mots surveillés de ${creator.displayName}`}
               </Link>
             </span>
           ))}
