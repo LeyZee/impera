@@ -14,7 +14,13 @@ import { Empty } from '@/shell/states';
  * The member's initials, two letters as Équipe › Comptes Reveal writes them (« Chatteur Un » → « CU »), on his planning colour
  * once he has one: one letter made every « Chatteur … » the same « C » (recette visuelle 16/11, GES-21).
  */
-export function Avatar({ member, large = false }: { member: TeamMember; large?: boolean }): JSX.Element {
+export function Avatar({
+  member,
+  large = false,
+}: {
+  member: Pick<TeamMember, 'displayName' | 'color'>;
+  large?: boolean;
+}): JSX.Element {
   return (
     <span
       className={large ? 'nv-avatar tm-avatar' : 'nv-avatar nv-avatar--sm tm-avatar'}
