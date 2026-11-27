@@ -97,7 +97,12 @@ export function ShiftPanel({
     )
     .sort((a, b) => a.displayName.localeCompare(b.displayName, 'fr'));
   const [memberId, setMemberId] = useState('');
-  const chosen = eligible.find((member) => member.id === memberId) ?? eligible[0] ?? null;
+  // Never the first by the alphabet: a quick tap would place the wrong person (recette 27/11, G15). Only the one
+  // member who can work on her is chosen for the reader.
+  const chosen =
+    eligible.find((member) => member.id === memberId) ??
+    (eligible.length === 1 ? eligible[0] : undefined) ??
+    null;
   // The first slot still ahead: today's evening rather than a night already gone, else tomorrow's first. A stretch
   // to fill, or a shift to fill, keeps its own day and hours: one of the slots when they match, else the hours typed.
   const given = fill ?? start.hours;
@@ -274,6 +279,8 @@ export function ShiftPanel({
               {fill === undefined ? 'Aucun membre actif' : 'Aucun autre membre actif'} ne travaille sur{' '}
               {account?.creatorName ?? 'cette créatrice'}.
             </span>
+          ) : chosen === null ? (
+            <span className="tm-hint">Choisis qui travaille sur ce shift.</span>
           ) : null}
         </fieldset>
 
