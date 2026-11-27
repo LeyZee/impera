@@ -797,7 +797,7 @@
 }
 /* A closed line is its title alone on a phone; its sentence shows once opened. */
 @media (max-width: 640px) {
-  .dy-peek {
+  .dy-peek:not(.dy-peek--kept) {
     display: none;
   }
 }

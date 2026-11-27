@@ -195,12 +195,12 @@ function DayRow({
         <summary className="wk-line__summary">
           <span className="wk-line__words">
             <span className="wk-line__label">{line.label}</span>
-            <span className="wk-line__peek dy-peek">
-              {/* Done by her coffre: it says so under its words, its tick alone on the right (Design, 27/11). */}
-              {line.source === 'drop' && line.done >= line.target
-                ? 'Dans ton coffre'
-                : firstSentence(line.sheet)}
-            </span>
+            {/* Done by her coffre: it says so under its words, on a phone too, its tick alone on the right (Design, 27/11). */}
+            {line.source === 'drop' && line.done >= line.target ? (
+              <span className="wk-line__peek dy-peek dy-peek--kept">Dans ton coffre</span>
+            ) : (
+              <span className="wk-line__peek dy-peek">{firstSentence(line.sheet)}</span>
+            )}
           </span>
           <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
             <path d="m6 3 5 5-5 5" />
