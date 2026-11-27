@@ -72,6 +72,7 @@ export const JOB_NAMES = [
   'scheduling.check_agency_shares',
   'scheduling.check_reports',
   'scheduling.remind_reports',
+  'scheduling.notify_incident',
   'team.apply_roles',
   'owners.watch',
   'payroll.recalculate',
@@ -158,6 +159,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
+  'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
   'team.apply_roles': 'Rôles de l’équipe',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
@@ -372,6 +374,8 @@ export const JOB_PAYLOADS = {
    * the next one within its window, never later.
    */
   'scheduling.remind_reports': z.object({}),
+  // The creator rides with the feedback so that the read of its facts is bounded to her (Sécurité, #992).
+  'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -679,6 +683,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.check_reports': 1,
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
+  'scheduling.notify_incident': 3,
   'team.apply_roles': 1,
   // Every minute: the next run is the retry.
   'owners.watch': 1,

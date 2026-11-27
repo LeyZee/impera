@@ -9,6 +9,7 @@ describe('CreatorSettings', () => {
       autoApproveCategories: [],
       retention: { factMonthsAfterLastContact: 12, fanMediaDays: 30 },
       copilot: { fanCard: true, drafts: false },
+      fanTiers: { goodFromMinor: 5_000, veryGoodFromMinor: 20_000, whaleFromMinor: 50_000 },
     });
   });
 

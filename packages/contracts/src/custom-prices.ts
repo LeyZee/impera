@@ -35,6 +35,11 @@ export const CUSTOM_MINUTES_MAX = 240;
 /** At most this many supplements. */
 export const CUSTOM_SUPPLEMENTS_MAX = 40;
 export const CUSTOM_SUPPLEMENT_LABEL_MAX = 40;
+/** At most this many lines of videos already shot. */
+export const READY_VIDEOS_MAX = 40;
+export const READY_VIDEO_LABEL_MAX = 40;
+/** Lowest bound of a ready video's range, in minor units (1 €). */
+export const READY_VIDEO_MIN_MINOR = 100;
 
 const PriceMinorSchema = z.number().int().min(0).max(CUSTOM_PRICE_MAX_MINOR);
 const PercentSchema = z.number().int().min(0).max(CUSTOM_PERCENT_MAX);
@@ -86,11 +91,38 @@ export const CustomSupplementLineSchema = z
   .strict();
 export type CustomSupplementLine = z.infer<typeof CustomSupplementLineSchema>;
 
-/** Her whole grid: every format once, in `CUSTOM_FORMATS` order; then the supplements the owner added, in his order. */
+/** A ready video line's id: `rv_` and eight lowercase hex digits, drawn once by the screen and never reused. */
+export const ReadyVideoIdSchema = z.string().regex(/^rv_[0-9a-f]{8}$/u);
+export type ReadyVideoId = z.infer<typeof ReadyVideoIdSchema>;
+
+/**
+ * One kind of video she has already shot and sells outside scripts: a name the owner typed (the repository never
+ * names one), and the range its price is drawn in. `offered` false: none of this kind is sold, whatever is in stock.
+ */
+export const ReadyVideoLineSchema = z
+  .object({
+    id: ReadyVideoIdSchema,
+    label: z.string().trim().min(1).max(READY_VIDEO_LABEL_MAX),
+    offered: z.boolean(),
+    minMinor: z.number().int().min(READY_VIDEO_MIN_MINOR).max(CUSTOM_PRICE_MAX_MINOR),
+    maxMinor: z.number().int().min(READY_VIDEO_MIN_MINOR).max(CUSTOM_PRICE_MAX_MINOR),
+  })
+  .strict()
+  .refine((line) => line.maxMinor >= line.minMinor, {
+    message: 'Le haut de la fourchette passe sous le bas',
+    path: ['maxMinor'],
+  });
+export type ReadyVideoLine = z.infer<typeof ReadyVideoLineSchema>;
+
+/**
+ * Her whole grid: every format once, in `CUSTOM_FORMATS` order; then the supplements the owner added, in his order;
+ * then the videos already shot, in his order. A grid saved before that list existed reads with none.
+ */
 export const CustomPriceGridSchema = z
   .object({
     formats: z.array(CustomFormatLineSchema).length(CUSTOM_FORMATS.length),
     supplements: z.array(CustomSupplementLineSchema).max(CUSTOM_SUPPLEMENTS_MAX),
+    readyVideos: z.array(ReadyVideoLineSchema).max(READY_VIDEOS_MAX).default([]),
   })
   .strict()
   .refine((grid) => grid.formats.every((line, index) => line.format === CUSTOM_FORMATS[index]), {
@@ -105,6 +137,15 @@ export const CustomPriceGridSchema = z
     (grid) =>
       new Set(grid.supplements.map((line) => line.label.toLowerCase())).size === grid.supplements.length,
     { message: 'Deux suppléments portent le même nom', path: ['supplements'] },
+  )
+  .refine((grid) => new Set(grid.readyVideos.map((line) => line.id)).size === grid.readyVideos.length, {
+    message: 'Deux vidéos portent le même identifiant',
+    path: ['readyVideos'],
+  })
+  .refine(
+    (grid) =>
+      new Set(grid.readyVideos.map((line) => line.label.toLowerCase())).size === grid.readyVideos.length,
+    { message: 'Deux vidéos portent le même nom', path: ['readyVideos'] },
   );
 export type CustomPriceGrid = z.infer<typeof CustomPriceGridSchema>;
 
@@ -120,6 +161,7 @@ export function emptyCustomPriceGrid(): CustomPriceGrid {
       extraMinutePercent: null,
     })),
     supplements: [],
+    readyVideos: [],
   };
 }
 
@@ -235,4 +277,29 @@ export function quoteCustomOrder(grid: CustomPriceGrid, ask: CustomOrderAsk): Cu
     lines.push({ kind: 'supplement', id, percent, amountMinor });
   }
   return { kind: 'price', totalMinor: toEuro(total), lines };
+}
+
+/** FNV-1a over the seed's UTF-16 units: the same seed, the same number, on the server and on the screen. */
+function hashSeed(seed: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * The price of one video already shot, drawn in its line's range and rounded to the euro inside it: the same seed (a
+ * video's id), the same price. Pure: when it is drawn and where it is frozen belong to the sale, not to the grid. A
+ * range too narrow to hold a round euro gives its low end.
+ */
+export function readyVideoPriceMinor(
+  line: Pick<ReadyVideoLine, 'minMinor' | 'maxMinor'>,
+  seed: string,
+): number {
+  const lowEuro = Math.ceil(line.minMinor / 100);
+  const highEuro = Math.floor(line.maxMinor / 100);
+  if (highEuro < lowEuro) return line.minMinor;
+  return (lowEuro + (hashSeed(seed) % (highEuro - lowEuro + 1))) * 100;
 }

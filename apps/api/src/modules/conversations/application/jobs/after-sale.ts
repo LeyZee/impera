@@ -102,7 +102,7 @@ export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: A
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
+        stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
         scriptRun: await tx.scriptRuns.latest(conversation.id),
       };
     });

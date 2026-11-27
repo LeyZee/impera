@@ -1092,6 +1092,8 @@ describe('instagramComment (ADR 0122 § 2)', () => {
       postAgeHours: 3,
       repliesToHer: false,
       authorCommentedBefore: true,
+      mayAsk: false,
+      emojiOnly: false,
     },
     trace: { creatorId: 'creator-1' },
   };
@@ -1108,10 +1110,52 @@ describe('instagramComment (ADR 0122 § 2)', () => {
     const system = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'system'));
     expect(prompt).toContain('<instagram_comment>\\nTrop belle cette lumière\\n</instagram_comment>');
     expect(prompt).toContain('<instagram_caption>\\nDimanche matin\\n</instagram_caption>');
+    expect(prompt).toContain('Pas de question dans ta réponse cette fois.');
+    expect(prompt).not.toContain('<her_replies>');
     expect(prompt).toContain('un Reel');
     expect(prompt).toContain('<recent_replies>\\n- Contente que ça te plaise\\n</recent_replies>');
     expect(system).toContain('<comment_examples>\\nMerci, trop gentil 🌸');
     expect(log.since(new Date(0)).map((record) => record.purpose)).toEqual(['instagram_comment']);
+  });
+
+  it('puts her replies to close comments in the message, as data, and the room for a question', async () => {
+    const xai = scripted([{ text: JSON.stringify(reply) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.instagramComment({
+      ...base,
+      comment: { ...base.comment, mayAsk: true },
+      nearExamples: [{ comment: 'Belle   lumière', reply: 'Merciii 🫶🏻' }],
+    });
+
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'user'));
+    const system = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'system'));
+    expect(prompt).toContain(
+      '<her_replies>\\nCommentaire : Belle lumière\\nSa réponse : Merciii 🫶🏻\\n</her_replies>',
+    );
+    expect(prompt).toContain('Tu peux finir ta réponse par une question');
+    expect(system).not.toContain('Merciii');
+  });
+
+  it('gives the shape of her closest reply', async () => {
+    const xai = scripted([{ text: JSON.stringify(reply) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.instagramComment({ ...base, replyShape: { emojis: 0, exclaims: true, words: 2 } });
+
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'user'));
+    expect(prompt).toContain('quelques mots, aucun emoji, et un point d’exclamation');
+  });
+
+  it('asks for emojis only when he says he loves her, and no question', async () => {
+    const xai = scripted([{ text: JSON.stringify({ kind: 'reply', text: '🫶🏻', reason: 'amour' }) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.instagramComment({ ...base, comment: { ...base.comment, mayAsk: true, emojiOnly: true } });
+
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'user'));
+    expect(prompt).toContain('seulement un ou deux emojis, sans aucun mot ni question');
+    expect(prompt).not.toContain('Tu peux finir ta réponse par une question');
   });
 
   it('keeps an order written in the comment inside its block', async () => {

@@ -21,6 +21,7 @@ import {
   CloseCareBodySchema,
   ReleaseBodySchema,
   TakeoverBodySchema,
+  ToTalkSchema,
   UserIdSchema,
   type CreatorId,
   type CurrentUser,
@@ -121,6 +122,13 @@ export function createConversationRoutes(
         const page = await reads.list(viewerAt(request), creatorId, { limit, cursor });
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
+    );
+
+    // « À qui parler maintenant » (accueil du chatteur, Charles 21/11). Before `/conversations/:id`, which it is not.
+    app.get(
+      '/conversations/to-talk',
+      { ...read, schema: { querystring: CreatorQuerySchema, response: { 200: ToTalkSchema } } },
+      async (request) => reads.toTalk(viewerAt(request), request.query.creatorId, new Date()),
     );
 
     app.get(

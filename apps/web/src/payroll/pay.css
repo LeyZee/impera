@@ -1543,3 +1543,72 @@
     overflow: hidden;
   }
 }
+
+/* ───────────── « J'ai été décisif sur une vente » (ADR 0101 §§ 18 to 22, trou 15) ───────────── */
+
+/* Where a claim stands: amber while it waits, the success colour settled; not retained and withdrawn are closed,
+   never an alarm: quiet ink (Design, #1026). */
+.py-claim__state {
+  --_c: var(--nv-warning);
+}
+.py-claim__state[data-state='settled'] {
+  --_c: var(--nv-success);
+}
+.py-claim__state[data-state='not_retained'],
+.py-claim__state[data-state='withdrawn'] {
+  --_c: var(--nv-ink-faint);
+}
+/* « 2 en attente », the answer of the panel: amber, with its dot. */
+.py-claims__count {
+  --_c: var(--nv-warning);
+}
+.py-claims__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.py-claims__icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* One shift a line (Design, #1026): its day and hours first, never cut; the tick on the one chosen. */
+.py-claims__when {
+  white-space: nowrap;
+}
+.py-claims__shifts .sc-option__text {
+  flex: 1;
+}
+.py-claims__check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.py-claims__check[data-on='true'] {
+  opacity: 1;
+  transform: none;
+}
+.py-give__anchor {
+  scroll-margin-top: calc(env(safe-area-inset-top, 0px) + var(--nv-space-6));
+}
+/* The member who signals, his initial beside his name, as on Équipe › Rapports. */
+.py-claim .py-held__who {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}

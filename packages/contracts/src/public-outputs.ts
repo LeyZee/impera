@@ -23,6 +23,19 @@ const NUDITY_WORDS: readonly string[] = [
   'toute nue',
   'sans culotte',
   'sans soutien gorge',
+  // ADR 0168 § 4: Italian, Spanish, English.
+  'nuda',
+  'nudo',
+  'nudi',
+  'senza vestiti',
+  'senza reggiseno',
+  'desnuda',
+  'desnudo',
+  'desnudos',
+  'sin ropa',
+  'sin sujetador',
+  'no clothes',
+  'without clothes',
 ];
 
 /** The adult platforms Instagram must never hear of (ADR 0057 § 6). */
@@ -38,6 +51,9 @@ const ADULT_PLATFORMS: readonly string[] = [
   'lien en bio',
   'link in bio',
   'lien dans ma bio',
+  'link nella bio',
+  'link en la bio',
+  'enlace en la bio',
 ];
 
 /** The most keywords an Instagram text may carry (ADR 0057 § 6). */

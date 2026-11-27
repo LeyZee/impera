@@ -92,6 +92,7 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
       'Bots Telegram',
       'Modèles IA',
       'Consommation IA',
+      'Agents connectés',
       'Règles de paie',
       'Facturation',
       'Alertes',
@@ -128,7 +129,7 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
       vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
     );
     const lines = await settingsTabs(owner, '/reglages');
-    expect(lines).toHaveLength(10);
+    expect(lines).toHaveLength(11);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Réglages');
     expect(screen.queryByRole('link', { name: '← Réglages' })).toBeNull();
     expect(document.querySelector('.rgl-body')?.hasAttribute('data-open')).toBe(false);

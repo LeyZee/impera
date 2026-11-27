@@ -23,7 +23,7 @@ ADR 0112 (§§ 13, 14, 20-26), ADR 0145 (coffre), ADR 0149 (fiche créatrice), m
   - [x] 4 c : bilan d'un script sur 7, 30 ou 90 jours (fans exposés, achat par étape, argent rapporté, ligne de contrôle de Reveal) et sa route `GET …/platform-scripts/performance`.
   - [ ] 4 d : vue sous chaque script dans « Ses scripts », captures et avis de Design.
 - [ ] Langue du fan, lot 2 (ADR 0169) :
-  - [x] serveur : langue d'un script, version dans une autre langue liée à son script (migration 0271), lacunes `version_differs`, `version_name_same`, `version_mentions_price`, routes `…/versions` et `…/resync`, langue et famille dans `ours` pour l'agent ;
+  - [x] serveur : langue d'un script, version dans une autre langue liée à son script (migration 0290), lacunes `version_differs`, `version_name_same`, `version_mentions_price`, routes `…/versions` et `…/resync`, langue et famille dans `ours` pour l'agent ;
   - [ ] écran : langue d'un script, « Créer la version en … », « Reprendre la structure » (captures et avis de Design) ;
   - [ ] proposition de traduction par l'IA, relue par un humain (accord de Charles sur le coût).
 

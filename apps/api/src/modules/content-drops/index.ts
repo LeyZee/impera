@@ -34,10 +34,15 @@ import { createThumbnailer } from './infra/cleaning/thumbnail';
 import { dropsOfMedium, mediaOfDrop, type DropOfMedium } from './infra/db/described-drops';
 import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
-import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
+import {
+  createDrizzleCreatorDescriptionReview,
+  createDrizzleDescriptionReview,
+} from './infra/db/description-review-store';
+import { createDrizzleReservedMedia, type ReservedMediaStore } from './infra/db/reserved-media';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import { createDrizzleScriptSummaryStore } from './infra/db/script-summary-store';
+import { createDrizzleStockStore } from './infra/db/stock-store';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
@@ -49,6 +54,7 @@ import {
 } from './infra/db/store';
 import { createDrizzleThumbnailQueue } from './infra/db/thumbnail-queue';
 import { createContentDropRoutes, type RequireRole } from './infra/http/routes';
+import { createStockRoutes } from './infra/http/stock-routes';
 import { createGatewayScriptSummarizer } from './infra/script-summarizer';
 import { createS3DropStorage, type MediaBucketConfig } from './infra/storage/s3';
 
@@ -131,6 +137,11 @@ export interface ContentDropsModule {
     /** The steps of a script of hers, the agency's words; `null` for a drop that is not a script of hers. */
     scriptSteps(creatorId: string, reader: ContentReader, dropId: string): Promise<ScriptSteps | null>;
   };
+  /**
+   * What the AI sends from her coffre (ADR 0163 § 7), for the agent: a voice or a whale gift not sent to this fan yet,
+   * and the send noted once the platform confirmed it (replayable). Never a medium's key nor its address.
+   */
+  readonly reserved: ReservedMediaStore;
   /** The scripts the cadence asks of her (SC-02), written by the scripts' job as the owner's role, replayable. */
   readonly scriptRequests: {
     ask(request: ScriptContentRequest): Promise<void>;
@@ -192,15 +203,29 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
     name: 'content-drops',
-    routes: createContentDropRoutes(
-      createDrizzleCreatorContentStore(deps.db),
-      agency,
-      storage,
-      { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
-      createDrizzleDescriptionReview(deps.db),
-      deps.requireRole,
-      clock,
-    ),
+    routes: async (app) => {
+      await app.register(
+        createContentDropRoutes(
+          createDrizzleCreatorContentStore(deps.db),
+          agency,
+          storage,
+          { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
+          createDrizzleDescriptionReview(deps.db),
+          deps.requireRole,
+          clock,
+        ),
+      );
+      // Coffre Impera (ADR 0163): her stock by use, and her own review of her media.
+      await app.register(
+        createStockRoutes(
+          createDrizzleStockStore(deps.db),
+          createDrizzleCreatorDescriptionReview(deps.db),
+          storage,
+          deps.requireRole,
+          clock,
+        ),
+      );
+    },
     jobs: {
       receiveFile: (fileId, correlationId) => receiveFile(receipt, fileId, clock(), correlationId),
       convertFile: (fileId, correlationId) =>
@@ -296,6 +321,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
     },
     unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
+    reserved: createDrizzleReservedMedia(deps.db),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),
       last: (creatorId) => lastScriptRequest(deps.adminDb, creatorId),

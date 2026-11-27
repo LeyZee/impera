@@ -1,11 +1,12 @@
 import { Link } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import { Fragment, type JSX } from 'react';
 
 import { foldOf, heroState, gaugeClass, litParts } from './logic';
 import type { AgentState, Todo } from './model';
 import { Chevron, TONE_COLOR, type FloatingTip } from './parts';
 
 import { MODE_LABEL, type AgentMode } from '@/agent/mode';
+import { OrderUnfold } from '@/creators/custom-orders/OrderUnfold';
 
 /** The Dashboard is not where the lines are worked one by one, Suivi is: the gravest few, then a way there (DASH-12). */
 const SHOWN = 5;
@@ -102,39 +103,47 @@ export function AgentHero({
       {todos.length === 0 ? null : (
         <div className="nv-todos">
           {shown.map((todo, i) => (
-            <div
-              key={todo.id}
-              className={`nv-todo nv-swap nv-tone--${todo.tone}`}
-              style={{ '--nv-i': i }}
-              role="button"
-              tabIndex={0}
-              aria-label={`${todo.kind} : ${todo.title}`}
-              onClick={() => {
-                onOpen(todo);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
+            <Fragment key={todo.id}>
+              <div
+                className={`nv-todo nv-swap nv-tone--${todo.tone}`}
+                style={{ '--nv-i': i }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${todo.kind} : ${todo.title}`}
+                onClick={() => {
                   onOpen(todo);
-                }
-              }}
-            >
-              <span className="nv-todo__bar" />
-              <div className="nv-todo__body">
-                <div className="nv-todo__head">
-                  <span className="nv-todo__kind">{todo.kind}</span>
-                  <span className="nv-todo__title">{todo.title}</span>
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onOpen(todo);
+                  }
+                }}
+              >
+                <span className="nv-todo__bar" />
+                <div className="nv-todo__body">
+                  <div className="nv-todo__head">
+                    <span className="nv-todo__kind">{todo.kind}</span>
+                    <span className="nv-todo__title">{todo.title}</span>
+                  </div>
+                  <span className="nv-todo__why">{todo.why}</span>
                 </div>
-                <span className="nv-todo__why">{todo.why}</span>
+                <div className="nv-todo__side">
+                  {/* How long he has waited, amber past 10 min; the exact hour in the title (DASH-11). */}
+                  <span className="nv-todo__time" data-late={todo.late ? '' : undefined} title={todo.at}>
+                    {todo.waiting}
+                  </span>
+                  <Chevron className="nv-todo__go" />
+                </div>
               </div>
-              <div className="nv-todo__side">
-                {/* How long he has waited, amber past 10 min; the exact hour in the title (DASH-11). */}
-                <span className="nv-todo__time" data-late={todo.late ? '' : undefined} title={todo.at}>
-                  {todo.waiting}
-                </span>
-                <Chevron className="nv-todo__go" />
-              </div>
-            </div>
+              {todo.customOrder === undefined ? null : (
+                <OrderUnfold
+                  creatorId={todo.customOrder.creatorId}
+                  fanId={todo.customOrder.fanId}
+                  canAnswer={opensSettings}
+                />
+              )}
+            </Fragment>
           ))}
           {more === 0 ? null : (
             <Link to="/suivi" className="db-more nv-tap">

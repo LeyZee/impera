@@ -1,7 +1,8 @@
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { CreatorIdSchema, JOB_PAYLOADS, ShiftFeedbackIdSchema } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
+import { conversationReadsForShifts } from '../modules/conversations';
 import type { CreatorTasksModule } from '../modules/creator-tasks';
 import type { NotificationsModule } from '../modules/notifications';
 import { enqueuePayRecalculation, payReadsForPayRules } from '../modules/payroll';
@@ -49,6 +50,8 @@ export function wireScheduling(
     salesTotalsOf: salesFeedTotals.totalsOf,
     // A declared report against what the platform read during its shift (ADR 0073), in the reports' transaction.
     shiftSalesOf: salesFeedReadsForReports.shiftSales,
+    // The feedback's figures and its fans (ADR 0170 § 1), read by the conversations' own function in its transaction.
+    shiftActivityOf: conversationReadsForShifts.activity,
     // A creator's calendar link shows her agenda (CR-05 lot c2, ADR 0042 § 4), read by her agenda's own module.
     creatorAgendaFeed: deps.creatorTasks.feedOf,
     // The reminders of the reports ring through the push notifications (ADR 0077), as her agenda's reminders do.
@@ -111,6 +114,22 @@ export function wireScheduling(
             return;
           }
           context.logger.info(await module.jobs.remindReports(), 'scheduling: shift reports reminded');
+        },
+      ),
+      'scheduling.notify_incident': defineTask(
+        'scheduling.notify_incident',
+        JOB_PAYLOADS['scheduling.notify_incident'],
+        logger,
+        async (payload, context) => {
+          if (module.jobs.notifyIncident === null) {
+            context.logger.warn('scheduling: push is off, the incident waits in Équipe › Rapports');
+            return;
+          }
+          const rang = await module.jobs.notifyIncident(
+            ShiftFeedbackIdSchema.parse(payload.shiftFeedbackId),
+            CreatorIdSchema.parse(payload.creatorId),
+          );
+          context.logger.info({ rang }, 'scheduling: shift incident told to the agency');
         },
       ),
     },
