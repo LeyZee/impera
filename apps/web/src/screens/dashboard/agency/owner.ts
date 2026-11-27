@@ -1,6 +1,15 @@
 import type { AgencyInsights, AgencySteering } from '@impera/contracts';
 
-import { bestSlot, euros, kindSlices, moneyShares, sellerRanking, shareOf, slotLabel } from './view';
+import {
+  bestSlot,
+  euros,
+  frNumber,
+  kindSlices,
+  moneyShares,
+  sellerRanking,
+  shareOf,
+  slotLabel,
+} from './view';
 
 /*
  * The owner's Dashboard (maquette du 27/11, lot 1): what its money band and its folded cards say, computed from the
@@ -138,10 +147,10 @@ export function creatorsLine(
 /** « 366 premiers achats, dont 92 déjà revenus » over the steering's 30 days; null when nobody bought. */
 export function trafficLine(traffic: AgencySteering['traffic']): string | null {
   if (traffic.firstPurchase === 0) return null;
-  const first = `${traffic.firstPurchase.toLocaleString('fr-FR')} ${traffic.firstPurchase === 1 ? 'premier achat' : 'premiers achats'}`;
+  const first = `${frNumber(traffic.firstPurchase)} ${traffic.firstPurchase === 1 ? 'premier achat' : 'premiers achats'}`;
   return traffic.regular === 0
     ? `${first} sur 30 jours`
-    : `${first} sur 30 jours, dont ${traffic.regular.toLocaleString('fr-FR')} déjà revenus`;
+    : `${first} sur 30 jours, dont ${frNumber(traffic.regular)} déjà revenus`;
 }
 
 /** « 5 fans font 46 % du chiffre · 2 ont décroché »; null without a sale on the 30 days. */
@@ -169,8 +178,8 @@ export function hoursLine(hours: AgencyInsights['hours']): string | null {
 export function subscribersLine(subscribers: AgencyInsights['subscribers']): string | null {
   if (subscribers === null) return null;
   const { activeAtEnd, newSubscribers } = subscribers.current;
-  const fresh = `+${newSubscribers.toLocaleString('fr-FR')} ${newSubscribers === 1 ? 'nouveau' : 'nouveaux'}`;
-  return activeAtEnd === null ? fresh : `${activeAtEnd.toLocaleString('fr-FR')} actifs · ${fresh}`;
+  const fresh = `+${frNumber(newSubscribers)} ${newSubscribers === 1 ? 'nouveau' : 'nouveaux'}`;
+  return activeAtEnd === null ? fresh : `${frNumber(activeAtEnd)} actifs · ${fresh}`;
 }
 
 /** « 3 remboursements, 84 € »; null when none. */
@@ -183,5 +192,5 @@ export function refundsLine(insights: Pick<AgencyInsights, 'refundList'>): strin
 
 /** « Net 6 970 € · 94 ventes »: the answer of the detail of the money. */
 export function detailLine(current: AgencyInsights['totals']['current']): string {
-  return `Net ${euros(current.netMinor)} · ${current.sales.toLocaleString('fr-FR')} ventes`;
+  return `Net ${euros(current.netMinor)} · ${frNumber(current.sales)} ventes`;
 }

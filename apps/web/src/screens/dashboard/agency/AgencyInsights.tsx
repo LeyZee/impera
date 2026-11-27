@@ -57,6 +57,7 @@ import {
   refundDelayLabel,
   refundsKept,
   sellerKeyOf,
+  frNumber,
   SELLER_NOTES,
   sellerRanking,
   shareOf,
@@ -84,9 +85,9 @@ import { Failure } from '@/shell/states';
  */
 
 /** « 20 % »: the transfers' VAT rate as the code holds it (ADR 0106 § 7), never written twice. */
-const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00a0%`;
+const VAT_RATE = `${frNumber(AGENCY_TRANSFER_VAT_BPS / 100)}\u00a0%`;
 const formatEuros = (cents: number): string => euros(Math.round(cents));
-const formatCount = (n: number): string => Math.round(n).toLocaleString('fr-FR');
+const formatCount = (n: number): string => frNumber(Math.round(n));
 
 /**
  * Whether the register reaches back to the comparison's first day (ADR 0146 § 4): when it does not, no percentage of
@@ -617,13 +618,13 @@ export function Figures({
   const activity: readonly Tile[] = [
     {
       label: 'Ventes',
-      value: current.sales.toLocaleString('fr-FR'),
+      value: frNumber(current.sales),
       note: 'abonnements, PPV, tips… une ligne chacune',
       delta: [current.sales, previous.sales],
     },
     {
       label: 'Remboursements',
-      value: current.refunds.toLocaleString('fr-FR'),
+      value: frNumber(current.refunds),
       // A zero says itself: « aucun remboursement » under it would say it twice (PIL-21).
       note:
         current.sales === 0
@@ -959,10 +960,8 @@ export function Sellers({ insights, tip }: { insights: AgencyInsights; tip: Floa
               rows: [
                 ['Chiffre d’affaires', euros(one.revenueMinor)],
                 ['Part de l’agence', euros(one.agencyMinor)],
-                ['Ventes', one.sales.toLocaleString('fr-FR')],
-                ...(one.refunds > 0
-                  ? [['Remboursements', one.refunds.toLocaleString('fr-FR')] as const]
-                  : []),
+                ['Ventes', frNumber(one.sales)],
+                ...(one.refunds > 0 ? [['Remboursements', frNumber(one.refunds)] as const] : []),
                 ...(average === null ? [] : [['Panier moyen', euros(average)] as const]),
               ],
               ...(one.seller.kind === 'member' ? {} : { note: SELLER_NOTES[one.seller.kind] }),
@@ -978,7 +977,7 @@ export function Sellers({ insights, tip }: { insights: AgencyInsights; tip: Floa
               <span className="ins-rank__name">{name}</span>
               <span className="ins-rank__line">
                 <span className="ins-nowrap">
-                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
+                  {frNumber(one.sales)} vente{one.sales > 1 ? 's' : ''}
                 </span>
                 {average === null ? null : (
                   <>
@@ -1005,8 +1004,8 @@ export function Sellers({ insights, tip }: { insights: AgencyInsights; tip: Floa
             {one.seller.kind === 'unlinked' ? (
               <span className="ins-rank__fix">
                 <span>
-                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''} d’un compte Reveal que
-                  personne n’a relié à un membre.
+                  {frNumber(one.sales)} vente{one.sales > 1 ? 's' : ''} d’un compte Reveal que personne n’a
+                  relié à un membre.
                 </span>
                 <Link to="/equipe/reveal" className="nv-btn nv-btn--soft nv-btn--sm">
                   Relier
@@ -1050,7 +1049,7 @@ export function Creators({
                   ['Chiffre d’affaires', euros(one.revenueMinor)],
                   ['Part de l’agence', euros(one.agencyMinor)],
                   ['Net', euros(one.netMinor)],
-                  ['Ventes', one.sales.toLocaleString('fr-FR')],
+                  ['Ventes', frNumber(one.sales)],
                 ],
                 note: 'Ouvrir son Dashboard',
               })}
@@ -1297,7 +1296,7 @@ export function Refunds({ insights }: { insights: AgencyInsights }): JSX.Element
 
 /** A count of the snapshot: « en calcul » while the platform has not computed it. */
 const LATER = 'en calcul chez Reveal';
-const countText = (n: number | null): string => (n === null ? '—' : n.toLocaleString('fr-FR'));
+const countText = (n: number | null): string => (n === null ? '—' : frNumber(n));
 
 type SubscriberDays = NonNullable<AgencyInsights['subscribers']>['days'];
 
@@ -1348,8 +1347,8 @@ function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): 
     const i = days.findIndex((one) => one.active === value);
     return `${String(((points[i]?.y ?? 0) / frame.height) * 100)}%`;
   };
-  const first = read[0]?.toLocaleString('fr-FR') ?? '';
-  const last = read.at(-1)?.toLocaleString('fr-FR') ?? '';
+  const first = read[0] === undefined ? '' : frNumber(read[0]);
+  const last = read.at(-1) === undefined ? '' : frNumber(read.at(-1) ?? 0);
   const missing =
     unread === 0
       ? ''
@@ -1362,9 +1361,9 @@ function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): 
     >
       <div className="ins-subs__scale" aria-hidden="true">
         {/* In the flow, unseen: it gives the column the width of the widest number. */}
-        <i className="ins-subs__sizer">{high.toLocaleString('fr-FR')}</i>
-        <span style={{ top: at(high) }}>{high.toLocaleString('fr-FR')}</span>
-        {low === high ? null : <span style={{ top: at(low) }}>{low.toLocaleString('fr-FR')}</span>}
+        <i className="ins-subs__sizer">{frNumber(high)}</i>
+        <span style={{ top: at(high) }}>{frNumber(high)}</span>
+        {low === high ? null : <span style={{ top: at(low) }}>{frNumber(low)}</span>}
       </div>
       <div className="ins-subs__plot">
         <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
@@ -1410,7 +1409,7 @@ function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): 
                   title: dayLabel(one.day),
                   ...(one.active === null
                     ? { text: 'Pas encore lu chez Reveal.' }
-                    : { rows: [['Abonnés actifs, en fin de journée', one.active.toLocaleString('fr-FR')]] }),
+                    : { rows: [['Abonnés actifs, en fin de journée', frNumber(one.active)]] }),
                 },
                 { above: true },
               )}

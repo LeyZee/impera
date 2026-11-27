@@ -17,6 +17,8 @@ import { cumulative, moneyThirds, paceOf, todayAndYesterday, type MoneyThird, ty
 import { againstText, comparable, readName, shortDate } from './period';
 import { dayLabel, euros, hoursLabel, moneyTip, shortDay, shortEuros } from './view';
 
+import { Meter } from '@/shell/figures/figures';
+
 /*
  * « L'argent » on the owner's Dashboard (maquette du 27/11, D1 and D2 of the audit): one figure, the period's revenue,
  * against the month's objective when one is set, with the mark of where the month should be by now; one curve, the
@@ -180,6 +182,20 @@ function TotalCurve({
               <stop offset="1" className="ins-curve__fill-bottom" />
             </linearGradient>
           </defs>
+          {[0, 0.5, 1].map((share) => {
+            const y = frame.padTop + (1 - share) * (frame.height - frame.padTop - frame.padBottom);
+            return (
+              <line
+                key={share}
+                className="nv-chart__grid"
+                x1="0"
+                x2={frame.width}
+                y1={y}
+                y2={y}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
           {behind === null ? null : (
             <path className="own-curve__before" d={linePath(behind)} vectorEffect="non-scaling-stroke" />
           )}
@@ -189,9 +205,30 @@ function TotalCurve({
           <path className="ins-curve__area" d={area} fill={`url(#${fill})`} />
           <path className="ins-curve__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
         </svg>
-        <span className="own-curve__top" aria-hidden="true">
-          {shortEuros(top)}
-        </span>
+        {[1, 0.5].map((share) => (
+          <span
+            key={share}
+            className="own-curve__tick"
+            style={{
+              '--_y': `${String(((frame.padTop + (1 - share) * (frame.height - frame.padTop - frame.padBottom)) / frame.height) * 100)}%`,
+            }}
+            aria-hidden="true"
+          >
+            {shortEuros(Math.round(top * share))}
+          </span>
+        ))}
+        {last === undefined || at !== null ? null : (
+          <span
+            className="own-curve__end"
+            style={{
+              '--_x': `${String((last.x / frame.width) * 100)}%`,
+              '--_y': `${String((last.y / frame.height) * 100)}%`,
+            }}
+            aria-hidden="true"
+          >
+            {shortEuros(points.at(-1)?.total ?? 0)}
+          </span>
+        )}
         {lit === undefined ? null : (
           <span
             className="ins-curve__hair"
@@ -234,20 +271,16 @@ function lastDayOf(from: string, days: number): string {
   return day.toISOString().slice(0, 10);
 }
 
-/** The bar under the figure: its fill, the mark of where the month should be by now, and their words. */
+/** The bar under the figure: the design system's meter, its mark where the month should be by now, and their words. */
 function PaceBar({ pace }: { pace: Pace }): JSX.Element {
   return (
-    <div className="own-pace" data-tone={pace.tone}>
-      <div
-        className="own-pace__bar"
-        role="img"
-        aria-label={`${String(pace.fill)} % de l’objectif atteint${pace.mark === null ? '' : `, ${String(pace.mark)} % attendus à ce jour`}`}
-      >
-        <span className="own-pace__fill" style={{ '--_w': `${String(pace.fill)}%` }} />
-        {pace.mark === null ? null : (
-          <span className="own-pace__mark" style={{ '--_x': `${String(pace.mark)}%` }} />
-        )}
-      </div>
+    <div className="own-pace">
+      <Meter
+        percent={pace.fill}
+        {...(pace.mark === null ? {} : { mark: pace.mark })}
+        colour={TONE[pace.tone]}
+        label={`${String(pace.fill)} % de l’objectif atteint${pace.mark === null ? '' : `, ${String(pace.mark)} % attendus à ce jour`}`}
+      />
       <div className="own-pace__legend">
         <span>{String(pace.fill)}&nbsp;% atteint</span>
         {pace.mark === null ? null : <span>le trait : où tu devrais être aujourd’hui</span>}
@@ -255,6 +288,11 @@ function PaceBar({ pace }: { pace: Pace }): JSX.Element {
     </div>
   );
 }
+
+const TONE: Readonly<Record<Pace['tone'], string>> = {
+  up: 'var(--nv-trend-up)',
+  down: 'var(--nv-trend-down)',
+};
 
 /** Where the period's money goes, one bar that makes 100: the agency, the creators, the platform and the VAT. */
 function Split({
@@ -309,10 +347,10 @@ function Split({
           ),
         )}
       </div>
-      <ul className="own-split__keys">
+      <ul className="nv-keys own-split__keys">
         {thirds.map((third) => (
           <li key={third.key} tabIndex={0} {...tip.bind(tipOf(third), { around: true })}>
-            <span className="own-split__key" data-part={third.key} aria-hidden="true" />
+            <span className="nv-key" data-part={third.key} aria-hidden="true" />
             {third.label} <b>{euros(third.cents)}</b> {String(third.share)}&nbsp;%
           </li>
         ))}
@@ -367,8 +405,10 @@ export function OwnerMoney({
                 sur <b>{objectiveEuros(pace.goalMinor)}</b> d’objectif du mois
               </span>
               <PaceBar pace={pace} />
-              <span className="own-money__pill" data-tone={pace.tone}>
-                <span className="own-money__pill-dot" aria-hidden="true" />
+              <span
+                className="nv-tag nv-tag--tint nv-tag--lg own-money__pill"
+                style={{ '--_c': TONE[pace.tone] }}
+              >
                 {pace.word}
               </span>
               {pace.projectedMinor === null ? null : (

@@ -311,7 +311,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     );
     show(agencyPage);
     expect(await screen.findByText('Dans les clous')).toBeTruthy();
-    expect(document.querySelector('.own-pace')?.getAttribute('data-tone')).toBe('up');
+    expect(document.querySelector('.own-pace .nv-meter .nv-meter__mark')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Fixer l’objectif du mois' })).toBeNull();
   });
 

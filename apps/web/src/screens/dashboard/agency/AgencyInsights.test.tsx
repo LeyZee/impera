@@ -576,7 +576,7 @@ describe('Les abonnés (ADR 0081)', () => {
     const day = subscribers.days[last - 1];
     if (day === undefined || day.active === null) throw new Error('fixture');
     expect(block.querySelector('.ins-subs .ins-lead__value')?.textContent).toBe(
-      day.active.toLocaleString('fr-FR'),
+      day.active.toLocaleString('fr-FR').replace(/\u202f/gu, '\u00a0'),
     );
     expect(block.textContent).toContain('le dernier jour lu');
     expect(within(block).queryByRole('img', { name: /Abonnés actifs jour par jour/u })).toBeNull();

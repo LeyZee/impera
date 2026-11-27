@@ -3,7 +3,7 @@ import { useState, type JSX } from 'react';
 
 import { ObjectiveNotSaved, useSetObjective } from './api';
 import { monthLabel } from './period';
-import { shareOf } from './view';
+import { frNumber, shareOf } from './view';
 
 import { eurosInput, parseEuros } from '@/settings/billing/model';
 import { Meter } from '@/shell/figures/figures';
@@ -13,18 +13,18 @@ type Row = Objectives['creators'][number];
 
 /** « 2 698 € »: the card's figures in whole euros, the same rule for what is done and what is aimed at. */
 export function wholeEuros(cents: number): string {
-  return `${Math.round(cents / 100).toLocaleString('fr-FR')}\u00a0€`;
+  return `${frNumber(Math.round(cents / 100))}\u00a0€`;
 }
 
 /** An objective as the owner typed it: whole euros, or its cents when it has some, never rounded up (PRO1-17). */
 export function objectiveEuros(cents: number): string {
   if (cents % 100 === 0) return wholeEuros(cents);
-  return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+  return `${frNumber(cents / 100, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
 }
 
 /** « environ 5 060 € »: a projection is no reading, so it is said to ten euros (Design, 20/11). */
 export function aboutEuros(cents: number): string {
-  return `environ ${(Math.round(cents / 1000) * 10).toLocaleString('fr-FR')}\u00a0€`;
+  return `environ ${frNumber(Math.round(cents / 1000) * 10)}\u00a0€`;
 }
 
 /** A shortfall: rounded like a projection, but never « environ 0 € » when it is a few euros. */
