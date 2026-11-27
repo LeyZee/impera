@@ -73,6 +73,7 @@ export const JOB_NAMES = [
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
   'scheduling.check_uncovered',
+  'scheduling.check_not_taken',
   'scheduling.check_reports',
   'scheduling.remind_reports',
   'scheduling.notify_incident',
@@ -164,6 +165,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
   'scheduling.check_uncovered': 'Comptes sans personne',
+  'scheduling.check_not_taken': 'Shifts non pris',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
@@ -388,6 +390,11 @@ export const JOB_PAYLOADS = {
    * It writes nothing else.
    */
   'scheduling.check_uncovered': z.object({}),
+  /**
+   * Every five minutes (ADR 0094 § 1, lot b): the shifts begun the agency's delay ago whose member has not taken them,
+   * one `shift_not_taken` each. Off while the agency has set no delay.
+   */
+  'scheduling.check_not_taken': z.object({}),
   'scheduling.check_reports': z.object({}),
   /**
    * Every five minutes (ADR 0077): the member of a shift ended without its report is reminded on his phone, 15 minutes
@@ -720,6 +727,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.check_agency_shares': 3,
   // Every five minutes, looking back a quarter of an hour: the next run is the retry, the event is published once.
   'scheduling.check_uncovered': 1,
+  'scheduling.check_not_taken': 1,
   'scheduling.check_reports': 1,
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,

@@ -33,6 +33,11 @@ export const CREATOR_ALERT_CODES = [
    * and a fan wrote in the 24 hours before (ADR 0094 § 1, « compte sans personne »). Never to a chatter.
    */
   'uncovered_account',
+  /**
+   * A shift on one of her accounts began a while ago (the agency's delay, Réglages › Planning) and its member has not
+   * taken it (« Je prends mon poste », EQ-12) (ADR 0094 § 1, « chatteur pas là »). Never to a chatter.
+   */
+  'shift_not_taken',
 ] as const;
 export const CreatorAlertCodeSchema = z.enum(CREATOR_ALERT_CODES);
 export type CreatorAlertCode = z.infer<typeof CreatorAlertCodeSchema>;
@@ -52,6 +57,7 @@ export const CREATOR_ALERT_FAMILY: Readonly<Record<CreatorAlertCode, CreatorAler
   ai_budget: 'system',
   session_expired: 'system',
   uncovered_account: 'steering',
+  shift_not_taken: 'steering',
 };
 
 /** Who an alert may reach. `chatter_on_shift`: the chatters whose shift covers her at the time of the alert. */
@@ -89,6 +95,7 @@ export const CREATOR_ALERT_DEFAULTS: Readonly<Record<CreatorAlertCode, CreatorAl
   ai_budget: routing('deliver', 'deliver', 'off'),
   session_expired: routing('deliver', 'deliver', 'muted'),
   uncovered_account: routing('deliver', 'deliver', 'off'),
+  shift_not_taken: routing('deliver', 'deliver', 'off'),
 };
 
 /** Always delivered to every role (ADR 0150 § 6): no mute, no off. These rules come before any setting. */
@@ -102,7 +109,10 @@ export function isCreatorAlertLocked(code: CreatorAlertCode): boolean {
  * Never to a chatter (ADR 0094 § 3): the steering alerts are for the owner and the managers. Their « chatteur en
  * shift » is closed on `off`, whatever is asked; the code decides, never a setting.
  */
-export const CHATTER_CLOSED_CREATOR_ALERTS: readonly CreatorAlertCode[] = ['uncovered_account'];
+export const CHATTER_CLOSED_CREATOR_ALERTS: readonly CreatorAlertCode[] = [
+  'uncovered_account',
+  'shift_not_taken',
+];
 
 export function isClosedToChatters(code: CreatorAlertCode): boolean {
   return CHATTER_CLOSED_CREATOR_ALERTS.includes(code);

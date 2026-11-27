@@ -312,6 +312,11 @@
   --nv-pill-choice: 32px;
   --nv-pill-count: 18px;
 
+  /* On a photo or a video (a play mark, a length): a video does not change with the theme, so neither does its
+     veil. A dark veil and white ink in Nuit as in Jour, as in her phone's gallery (Design, 27/11). */
+  --nv-media-scrim: rgba(0, 0, 0, 0.62);
+  --nv-media-ink: #ffffff;
+
   /* Radii: everything you touch is a capsule */
   --nv-radius-xs: 8px;
   --nv-radius-sm: 12px;

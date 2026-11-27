@@ -67,6 +67,7 @@ const TITLES: Readonly<Record<CreatorAlertCode, string>> = {
   ai_budget: 'Budget IA',
   session_expired: 'Session Reveal expirée',
   uncovered_account: 'Compte sans personne',
+  shift_not_taken: 'Chatteur pas là',
 };
 
 const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
@@ -81,6 +82,7 @@ const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
   session_expired: 'Reconnecte la session pour que l’IA reprenne.',
   uncovered_account:
     'Un créneau commence sans chatteur et l’IA n’est pas en Automatique : des fans attendent.',
+  shift_not_taken: 'Un shift a commencé et son chatteur n’a pas pris son poste : à joindre ou à remplacer.',
 };
 
 const AMOUNT: Readonly<Record<SaleSaid['currency'], Intl.NumberFormat>> = {
@@ -94,9 +96,9 @@ const SOLD_BY: Readonly<Record<SaleSaid['by'], string>> = {
   unknown: 'Lue sur la plateforme, sans vendeur relié.',
 };
 
-/** Where the notification opens: the planning for a créneau nobody holds, the conversation otherwise. */
+/** Where the notification opens: the planning for a créneau or a shift nobody holds, the conversation otherwise. */
 function urlOf(code: CreatorAlertCode, conversationId: string | null): string {
-  if (code === 'uncovered_account') return '/equipe/planning';
+  if (code === 'uncovered_account' || code === 'shift_not_taken') return '/equipe/planning';
   return conversationId === null ? '/suivi' : `/suivi?conversation=${conversationId}`;
 }
 
