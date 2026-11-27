@@ -16,8 +16,9 @@ Fait : les constats de la recette complète du 27/11 (main 4ff57d6a), sur une co
 - G6. « À faire » demande au chatteur d'installer et relier l'extension tant qu'aucun navigateur n'est relié.
 - P2. La clé d'accès (Face ID) est proposée juste après les codes de secours, à l'activation.
 - P7. Deux textes au masculin rendus neutres.
+- Réponses de Charles (27/11) : pas de pays par défaut à l'ajout d'un membre ; trois scripts complets dans le coffre (plus quatre) ; G7, un QR code pour la double authentification sur PC (dépendance `uqr` 0.1.3, sans dépendance, encodage local, acceptée par Charles) ; P1, une page d'accueil par rôle à la première connexion (maquette validée).
 - F1, F2, F6. Pas de cadre de focus sur le titre de page ; cases de Ma journée à 44 px au téléphone ; une semaine pas encore calculée répond 204 au lieu de 404.
-Pas fait : G1, F3 (attendent les réponses de Charles sur la story et le nombre de scripts) ; G7 (QR code de la double authentification : demande une dépendance, à accepter) ; G5 et l'écran d'accueil par rôle (maquette d'abord) ; C2, C3, G2, G11, G18 sont dans une autre PR ouverte.
+Pas fait : G1, la story Reveal devient la vidéo du feed planifiée par Impera (décision de Charles, transmise au fil du coffre) ; G5 (ordre de Contenu) ; C2, C3, G2, G11, G18 sont dans une autre PR ouverte.
 Décisions : C6 retiré, le compte en « ventes lues » ne fait plus saisir de montant ; G11, G12, G16 et deux points de G20 laissés tels quels (voulus ou propres au bac à sable).
 Découvertes : P6, « Mot de passe oublié » n'envoie le lien que par Telegram.
 Candidats à suppression : aucun.
