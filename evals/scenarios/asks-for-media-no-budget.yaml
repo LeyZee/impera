@@ -22,4 +22,5 @@ expect:
     bubbles_max: 4
     must_not_match:
       - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
-      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b
+      # « je viens » d’une rencontre, jamais le passé récent (« je viens à peine de… », « je viens de… »).
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens(?!\s+(?:(?:à|a)\s+peine\s+|juste\s+|tout\s+juste\s+|seulement\s+)?(?:de|d['’]|du|des)\b)|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

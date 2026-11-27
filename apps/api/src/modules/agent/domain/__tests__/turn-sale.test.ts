@@ -158,6 +158,22 @@ describe('the offer decided by code', () => {
     expect(asksMoreTonight(asks, OFFER, false)).toBe(false);
     expect(asksMoreTonight(undefined, tonight, false)).toBe(false);
   });
+
+  it('steers no fan with no money now to a custom or a cam, the evening he had his script', () => {
+    const tonight = { ...OFFER, lastOfferAt: minutesAgo(60) };
+    const asks: TurnReading = { ...READ, intent: 'asks_for_media' };
+    expect(asksMoreTonight({ ...asks, risks: ['no_budget'] }, tonight, false)).toBe(false);
+    expect(asksMoreTonight({ ...asks, risks: ['money_trouble'] }, tonight, false)).toBe(false);
+    expect(asksMoreTonight({ ...asks, risks: ['distress'] }, tonight, false)).toBe(false);
+    const frozen: OfferInput = {
+      ...tonight,
+      flags: {
+        ...tonight.flags,
+        salesFrozen: { reason: 'money_trouble', since: '2026-11-10T10:00:00.000Z' },
+      },
+    };
+    expect(asksMoreTonight(asks, frozen, false)).toBe(false);
+  });
 });
 
 describe('the moves after a sale', () => {

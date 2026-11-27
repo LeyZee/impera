@@ -3,7 +3,13 @@ import type { ObjectionReplies } from '@impera/contracts';
 import type { ScriptStart, ScriptStartBlock } from './availability';
 import type { CustomOrderDecision } from './custom-order';
 import { pickObjectionReply, type PickedObjectionReply } from './objections';
-import { asksMoreSameEvening, offerDecision, offerSignals, type OfferBlock } from './policy';
+import {
+  asksMoreSameEvening,
+  maySuggestCustom,
+  offerDecision,
+  offerSignals,
+  type OfferBlock,
+} from './policy';
 import { refusalMove, type RefusalMove } from './refusal';
 import {
   complainsOfPurchase,
@@ -183,9 +189,12 @@ export function saleMovesOf(
   return { refusal, reminds, saleTrouble, waitingStep, complaint };
 }
 
-/** He asks for more the evening he had his script: nothing more tonight, a custom request instead (passe 18). */
+/**
+ * He asks for more the evening he had his script: nothing more tonight, a custom request instead (passe 18). Never to a
+ * fan nobody may sell to, nor one who says he has no money now (`maySuggestCustom`): no custom nor cam pushed at him.
+ */
 export function asksMoreTonight(
-  brief: Pick<TurnReading, 'intent' | 'sentiment' | 'desireSignals'> | undefined,
+  brief: Pick<TurnReading, 'intent' | 'sentiment' | 'desireSignals' | 'risks'> | undefined,
   offer: OfferInput | undefined,
   hasScriptStep: boolean,
 ): boolean {
@@ -193,6 +202,7 @@ export function asksMoreTonight(
     brief !== undefined &&
     offer !== undefined &&
     !hasScriptStep &&
+    maySuggestCustom({ risks: brief.risks, flags: offer.flags }) &&
     asksMoreSameEvening({ ...offer, fanAsksForPaid: offerSignals(brief).fanAsksForPaid })
   );
 }

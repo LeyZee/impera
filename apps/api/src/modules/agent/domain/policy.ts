@@ -159,6 +159,40 @@ export function asksMoreSameEvening(
 }
 
 /**
+ * He says he has no money right now (eval asks-for-media-no-budget, 27/11): the brain reads « à sec » (`no_budget`) or
+ * money trouble on this message, or money trouble froze her sales. Then nothing paid is pushed at him: no script, and
+ * no custom video nor cam suggested in its place. His own asking lifts the stored no-budget mark for a script he asks
+ * for (`offerDecision`), never what he says on this very message.
+ */
+export function saysNoMoneyNow(context: {
+  readonly risks: readonly string[];
+  readonly flags?: FanFlags;
+}): boolean {
+  return (
+    context.risks.includes('no_budget') ||
+    context.risks.includes('money_trouble') ||
+    context.flags?.salesFrozen?.reason === 'money_trouble'
+  );
+}
+
+/**
+ * Whether she may steer him to something made for him (a custom video, a cam) instead of a script: never to a fan
+ * nobody may sell to (« Ne plus lui écrire », sales frozen, a risk where selling is out), nor one with no money now.
+ */
+export function maySuggestCustom(context: {
+  readonly risks: readonly string[];
+  readonly flags: FanFlags;
+}): boolean {
+  const { flags } = context;
+  return (
+    flags.doNotContact !== true &&
+    flags.salesFrozen === undefined &&
+    !context.risks.some((risk) => NO_SALE_RISKS.includes(risk)) &&
+    !saysNoMoneyNow(context)
+  );
+}
+
+/**
  * Broke until his pay but a fan who already paid (passe 11a, Charles 21/11): she keeps him warm, words only. No offer
  * and no media this time, no freeze and no flag on him. A fan who never paid keeps the plain no-budget stop.
  */
