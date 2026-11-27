@@ -1,5 +1,13 @@
 # 0060. Veille et idées de contenu : des signaux de sources propres, des idées filtrées par le code, validées par l'agence, proposées à la créatrice
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0151 · Les idées apprennent ses goûts et ce qui marche : un profil de goûts tenu par le code, un dosage entre valeur sûre, variation et nouveauté, une mesure rapportée à son audience](0151-ideas-learn-her-taste-and-what-works.md) : Amende : l'ADR 0060 § 4, filtre « une idée trop proche d'une idée des 30 derniers jours est retirée » (§ 3 ci-dessous).
+>
+> Toutes les décisions du même sujet : [`docs/regles/publication.md`](../regles/publication.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 03/11/2026, 11 h 32, « je te donne mon OK aux deux ADR qui attendent » ; capture passive par l'extension : « Go extension alors ;) », 11 h 34 ; « c'est moi qui va pouvoir scroll […] il n'y a pas besoin de payer quelqu'un », 11 h 34 ; phrases ajoutées après le « ok » et relectures Extension et Bilan : « ok phrases 0060 », 12 h 00 ; captures de l'onglet : « ok capture 0060 », 12 h 24 ; demande de Charles du 03/11/2026, 11 h 19, fil « Faire la veille Instagram pour les modèles » ; étude et variantes : `/mnt/project-files/veille-instagram/`, hors dépôt). **Amendée le 07/11/2026** (§ 2, veille sans chatteurs) sur la demande de Charles du 07/11/2026, 12 h 13 : « la veille, ça doit concerner que la modèle et à aucun moment un chatter n'est appliqué. Il ne devrait même pas avoir ça sur son écran »
 Date : 2026-11-03
 Précise : l'ADR 0042 (§ 4 suggestions et fiche de tournage ; catégorie « Réseaux » de l'agenda, remplie par ce chantier), l'ADR 0055 (§ 1 catégories, § 4 demande de contenu), l'ADR 0056 (§ 2 file des structures), l'ADR 0057 (§ 1 API officielles seulement, § 3 statistiques à 48 h, § 6 garde Instagram), l'ADR 0030 (description validée), l'ADR 0010 (aucune donnée réelle dans le dépôt).

@@ -1,5 +1,5 @@
 # DSH-09 Le pilotage de l'agence : objectif du jour, trafic, gros fans, IA
-Statut : in-progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in-progress
 Phase : pilotage
 Dépend de : DSH-08, ADR 0092 (avenant du 21/11/2026)
 Branche : claude/project-thread-igl0y6

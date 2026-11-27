@@ -1,6 +1,6 @@
 # P3-08 Recette du copilote : ce que Charles voit dans Suivi, de bout en bout, avec FakeReveal
 
-Statut : todo (écrite le 2026-10-27 par le fil Agent ; ID validé par Charles le 27/10/2026 à 17h56, carte « P3-08 »)
+Statut : todo (prioritaire avant le premier shift réel ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo (écrite le 2026-10-27 par le fil Agent ; ID validé par Charles le 27/10/2026 à 17h56, carte « P3-08 »)
 Phase : 3
 Dépend de : `PROPOSED-reveal-connector.md` (`RevealApiConnector` pointé sur FakeReveal), `PROPOSED-copilot-api.md`, clé xAI posée, #166 (FakeReveal)
 Branche : task/P3-08-copilot-recette

@@ -1,5 +1,17 @@
 # 0044. Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0055 · Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque](0055-drop-categories-and-content-requests.md) : Remplace : dans l'ADR 0044 § 1, l'usage à deux valeurs (`feed` | `mass_dm`) et la phrase « elle dépose depuis son téléphone, dans Contenu » en tant que seule description du dépôt ; dans l'ADR 0044 § 2, le point de départ des 30 jours (« jusqu'à leur publication ou leur envoi ») pour un média qui part sur plusieurs sorties.
+>
+> - [0136 · Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait](0136-feed-and-stories-published-on-their-own.md) : Amende : ADR 0044 § 3 (cadence, visibilité, acceptation humaine obligatoire), ADR 0044 § 4 (ce qu'on mesure), ADR 0055 § 5 (seuils du stock).
+>
+> - [0137 · Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle](0137-mass-dm-after-a-post-and-wake-up.md) : Amende : ADR 0044 § 5 (le Mass DM ne part plus seulement d'un dépôt Relance : il peut être un texte qui accompagne une publication).
+>
+> Toutes les décisions du même sujet : [`docs/regles/creatrice-et-contenu.md`](../regles/creatrice-et-contenu.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 02/11/2026 16h17, « ok 0044 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Remplace : dans l'ADR 0030 § 2, les mots « Nirvana ne téléverse rien vers une plateforme et n'a pas de dossier à lui », et dans l'ADR 0030 § 4, la règle « Fichiers : on garde le minimum », **pour le seul contenu déposé pour le feed et les Mass DM**. Pour tout le reste (scripts, médias privés vendus en message), l'ADR 0030 s'applique telle quelle : le coffre de la plateforme fait foi. L'ADR 0030 reste telle quelle ; l'index des ADR renvoie d'elle à celle-ci.
