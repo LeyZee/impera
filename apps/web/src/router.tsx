@@ -110,7 +110,6 @@ import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
-import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
 import { scopesCreators } from './shell/CreatorScope';
 import { ErrorPage } from './shell/ErrorPage';
@@ -1201,17 +1200,7 @@ const telegram = createRoute({
       throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
-  validateSearch: parseTelegramSearch,
-  component: function Telegram() {
-    const search = telegram.useSearch();
-    const navigate = telegram.useNavigate();
-    return (
-      <TelegramPage
-        tab={tabOfSearch(search)}
-        onTab={(tab) => void navigate({ search: searchOfTab(tab), replace: true })}
-      />
-    );
-  },
+  component: TelegramPage,
 });
 const alerts = createRoute({
   getParentRoute: () => settings,
@@ -1331,7 +1320,7 @@ const extensionHelp = createRoute({
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
     // The trend watch is the owner's alone (ADR 0024, amendement du 16/11): the team is shown the copilot instead.
-    return <ExtensionPage watches={user.role === 'owner'} />;
+    return <ExtensionPage watches={user.role === 'owner'} security={securityPathOf(user)} />;
   },
 });
 /**

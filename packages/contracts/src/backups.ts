@@ -15,7 +15,7 @@ export type BackupRunStatus = z.infer<typeof BackupRunStatusSchema>;
 /**
  * `ok`: an export succeeded within the last 26 hours. `overdue`: the last success is older. `never`: no export has
  * ever succeeded. The rule is the server's (ADR 0028 § 5); the Dashboard shows `overdue` and `never` in amber.
- * Telegram follows `overdue`, and `never` only once the service has been trying for 26 hours: with no row at all
+ * The agency alert follows `overdue`, and `never` only once the service has been trying for 26 hours: with no row at all
  * in `backup_runs` (the service never ran), the amber of the Dashboard is the only signal.
  */
 export const BACKUP_STATES = ['ok', 'overdue', 'never'] as const;

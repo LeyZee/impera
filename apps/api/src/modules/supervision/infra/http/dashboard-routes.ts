@@ -45,7 +45,6 @@ import type {
   OnShiftView,
   RevealSalesView,
   SalesFeedState,
-  TelegramView,
   UsdRateView,
   VoiceVersion,
 } from '../../domain/dashboard-ports';
@@ -79,8 +78,6 @@ export interface DashboardRouteDeps {
   readonly onShift: OnShiftView;
   /** Every platform's feed as Réglages › Ventes shows it: a stopped one is named on the panel (AGT-11). */
   readonly salesFeeds: () => Promise<readonly SalesFeedState[]>;
-  /** Absent when Telegram is off (no encryption key): both Telegram fields are null. */
-  readonly telegram?: TelegramView;
   /** Every creator, for the owner's « À traiter » across creators (`persona` module, by the composition root). */
   readonly allCreatorIds: () => Promise<readonly CreatorId[]>;
   /** The agency's insights, read creator by creator in the registers (ADR 0078). */
@@ -134,8 +131,7 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           usdRate,
         );
         if (read === undefined) throw new DomainError('creator_not_found', 'Créatrice introuvable');
-        const [telegram, automatic, stuckJobs, sales] = await Promise.all([
-          deps.telegram?.read(creatorId),
+        const [automatic, stuckJobs, sales] = await Promise.all([
           deps.automatic.read(creatorId),
           deps.stuckJobs(creatorId),
           deps.revealSales.read(
@@ -151,9 +147,8 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           window: read.window,
           budget: deps.budget(),
           voice: deps.voiceHealth(),
-          // The agency's jobs (pay, Telegram) are the owner's to see, never counted in her agent's health (PRO-10).
+          // The agency's jobs (pay, backups) are the owner's to see, never counted in her agent's health (PRO-10).
           jobs: stuckJobsOf(stuckJobs, user.role === 'owner'),
-          telegram,
           automatic,
           revealSales:
             sales === undefined

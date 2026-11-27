@@ -283,7 +283,7 @@ function ChannelForm({
                       value: choice.chatId,
                       label: choice.title,
                       ...(hint === undefined ? {} : { hint }),
-                      disabled: choice.takenByOther || choice.routedForAlerts,
+                      disabled: choice.takenByOther,
                     };
                   })}
                   onChange={(chatId) => {

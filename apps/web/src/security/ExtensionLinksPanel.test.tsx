@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { ExtensionLinkSchema } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ExtensionLinksPanel, labelProblem, suggestedLabel } from './ExtensionLinksPanel';
+import { ExtensionLinksPanel, labelProblem, linksTitle, suggestedLabel } from './ExtensionLinksPanel';
 
 /** Invented links and an invented token: nothing real. */
 const LINK_A = {
@@ -81,7 +82,7 @@ describe('Relier l’extension', () => {
   it('says what the link is for: the copilot for a chatter, the watch too for whom it is theirs', async () => {
     serve({ 'GET ': [{ status: 200, body: { items: [] } }] });
     render(<ExtensionLinksPanel watches={false} />);
-    expect(await screen.findByText('Aucun navigateur relié.')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'Aucun navigateur relié' })).toBeDefined();
     expect(screen.getByText('Extension Impera')).toBeDefined();
     const chatter = screen.getByText(/tes gestes du copilote comptent alors à ton nom/u).textContent;
     expect(chatter).not.toContain('Instagram');
@@ -119,8 +120,8 @@ describe('Relier l’extension', () => {
       ],
     });
     render(<ExtensionLinksPanel watches />);
-    await screen.findByText('Aucun navigateur relié.');
-    fireEvent.click(screen.getByRole('button', { name: 'Relier un navigateur' }));
+    await screen.findByRole('heading', { name: 'Aucun navigateur relié' });
+    fireEvent.click(screen.getByRole('button', { name: 'Relier l’extension' }));
     const field = screen.getByLabelText('Nom de ce navigateur');
     fireEvent.change(field, { target: { value: '  ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Relier' }));
@@ -141,7 +142,7 @@ describe('Relier l’extension', () => {
     serve({ 'GET ': [{ status: 200, body: { items: [LINK_A, LINK_B, LINK_C] } }] });
     render(<ExtensionLinksPanel watches />);
     expect(await screen.findByText(/3 navigateurs sont reliés/u)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Relier un navigateur' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Relier l’extension' })).toBeNull();
   });
 
   it('says why the server refused a link', async () => {
@@ -150,7 +151,7 @@ describe('Relier l’extension', () => {
       'POST ': [{ status: 409, body: apiError('extension_links_full_conflict') }],
     });
     render(<ExtensionLinksPanel watches />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Relier un navigateur' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Relier l’extension' }));
     fireEvent.click(screen.getByRole('button', { name: 'Relier' }));
     expect(
       await screen.findByText('Trois navigateurs sont déjà reliés : délies-en un d’abord.'),
@@ -170,7 +171,7 @@ describe('Relier l’extension', () => {
       'POST /v1/auth/reauthenticate': [{ status: 200, body: {} }],
     });
     render(<ExtensionLinksPanel watches />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Relier un navigateur' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Relier l’extension' }));
     fireEvent.click(screen.getByRole('button', { name: 'Relier' }));
     expect(
       await screen.findByText('Pour relier ce navigateur, confirme ton mot de passe et ton code.'),
@@ -229,6 +230,20 @@ describe('Relier l’extension', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Le serveur ne répond pas. Réessaie dans un instant.',
     );
-    expect(screen.queryByRole('button', { name: 'Relier un navigateur' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Relier l’extension' })).toBeNull();
+  });
+});
+
+// Avis Design du 27/11: the title is the answer, how many browsers are linked.
+describe('linksTitle', () => {
+  const a = ExtensionLinkSchema.parse(LINK_A);
+  const b = ExtensionLinkSchema.parse(LINK_B);
+  it.each([
+    [null, 'Navigateurs reliés'],
+    [[], 'Aucun navigateur relié'],
+    [[a], '1 navigateur relié sur 3'],
+    [[a, b], '2 navigateurs reliés sur 3'],
+  ])('says how many browsers are linked', (links, title) => {
+    expect(linksTitle(links)).toBe(title);
   });
 });

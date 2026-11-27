@@ -25,7 +25,6 @@ const PUBLIC: Readonly<Record<string, string>> = {
   'POST /v1/auth/sign-out': 'ends a session, if any',
   'POST /v1/auth/two-factor/verify-totp': 'second factor, under the sign-in cookie',
   'POST /v1/auth/two-factor/verify-backup-code': 'second factor, under the sign-in cookie',
-  'POST /v1/auth/password-reset': 'asks for a reset link, says the same whoever asks',
   'POST /v1/auth/password-reset/inspect': 'reads a reset link by its token',
   'POST /v1/auth/password-reset/redeem': 'uses a reset link by its token',
   'POST /v1/invitation-links/inspect': 'reads an invitation by its token',

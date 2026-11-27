@@ -230,6 +230,9 @@ jobs:
           curl -fsSI http://127.0.0.1:8080/manifest.webmanifest | grep -i "cache-control: no-cache" >/dev/null
           curl -fsS http://127.0.0.1:8080/manifest.webmanifest | grep '"display": "standalone"' >/dev/null
           curl -fsSI http://127.0.0.1:8080/icons/icon-512.png | grep -i "content-type: image/png" >/dev/null
+          # The extension the guide offers (/aide/extension, ADR 0067), built with the CRM: served as a file, never as the
+          # app's page, or the guide says it is missing and a new chatter cannot install it (recette du 27/11, CH-06).
+          curl -fsSI http://127.0.0.1:8080/extension/impera.zip | grep -i "content-type: application/zip" >/dev/null
       # Least privilege: the owner's URL reaches only the services that run as the owner, never the API nor the worker.
       - name: The owner's URL only where migrations and ops scripts run
         run: |

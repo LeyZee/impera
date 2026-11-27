@@ -17,7 +17,7 @@ describe('budget_threshold_crossed in the outbox', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    // Graphile's schema, so that the Telegram trigger (0006) has somewhere to enqueue.
+    // Graphile's schema, so that a trigger left behind would have somewhere to enqueue.
     queue = await createJobQueue(test.admin.pool);
   });
 
@@ -48,10 +48,10 @@ describe('budget_threshold_crossed in the outbox', () => {
         payload: { kind: 'reached', spentMinor: 1600, capMinor: 2000, currency: 'EUR', day: '2026-10-17' },
       },
     ]);
-    // The Telegram trigger saw them: one scan waits, whatever the number of events (job key).
+    // No Telegram scan any more (ADR 0176): its trigger is gone, nothing waits for the agency's events.
     const scans = await test.admin.db.execute(
       sql`select count(*)::int as n from graphile_worker.jobs where task_identifier = 'telegram.scan'`,
     );
-    expect(scans.rows).toEqual([{ n: 1 }]);
+    expect(scans.rows).toEqual([{ n: 0 }]);
   });
 });

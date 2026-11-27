@@ -1,12 +1,6 @@
 import { Writable } from 'node:stream';
 
-import {
-  CreatorIdSchema,
-  PASSWORD_RESET_REQUESTED_MESSAGE,
-  TeamMemberIdSchema,
-  UserIdSchema,
-  newId,
-} from '@impera/contracts';
+import { CreatorIdSchema, TeamMemberIdSchema, UserIdSchema, newId } from '@impera/contracts';
 import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -15,7 +9,7 @@ import { z } from 'zod';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
-import { createPasswordResetRoutes } from '../password-reset';
+import { createPasswordResetRoutes, issuePasswordResetLink } from '../password-reset';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -29,7 +23,10 @@ const BREACHED = 'un mot de passe déjà fuité';
 
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string() }) });
 
-/** SEC-05 lot 3, ADR 0068 §§ 2–5: « Mot de passe oublié », the link sent to the account's private Telegram chat. */
+/**
+ * SEC-05 lot 3, ADR 0068 §§ 2–5 amended 27/11/2026: the link is made on the server (`pnpm ops:password-reset-link`) and
+ * printed there; nothing is asked from the sign-in page any more, nothing is sent to Telegram.
+ */
 describe('forgotten password', () => {
   let test: TestDb;
   let app: App;
@@ -38,10 +35,7 @@ describe('forgotten password', () => {
   let ownerId = '';
   const logs: string[] = [];
   let address = 0;
-  /** The accounts whose private chat is linked, and what the chat received. */
-  const linked = new Set<string>();
-  const sent: { userId: string; text: string }[] = [];
-  let pending: Promise<void>[] = [];
+  let webOrigin = '';
 
   const post = (target: Server, url: string, payload: Record<string, unknown>) =>
     target.inject({
@@ -52,17 +46,12 @@ describe('forgotten password', () => {
       remoteAddress: `10.1.${String(Math.floor(address / 250))}.${String((address++ % 250) + 1)}`,
     });
 
-  /** The request, then its work after the answer, waited for. */
-  async function ask(email: string) {
-    const response = await post(resets, '/v1/auth/password-reset', { email });
-    await Promise.all(pending);
-    pending = [];
-    return response;
-  }
+  /** The server's command line. */
+  const ask = (email: string) => issuePasswordResetLink(app.adminDb.db, email, webOrigin);
 
   const tokenOf = (text: string): string => {
     const match = /\/mot-de-passe-oublie#t=([A-Za-z0-9_-]{43})/u.exec(text);
-    if (match?.[1] === undefined) throw new Error('no link in the message');
+    if (match?.[1] === undefined) throw new Error('no link');
     return match[1];
   };
 
@@ -85,6 +74,7 @@ describe('forgotten password', () => {
       DATABASE_SERVICE_URL: test.serviceUrl,
       LOG_LEVEL: 'info',
     });
+    webOrigin = config.WEB_ORIGIN;
     const sink = new Writable({
       write(chunk: Buffer, _encoding, done) {
         logs.push(chunk.toString());
@@ -104,18 +94,7 @@ describe('forgotten password', () => {
         createPasswordResetRoutes({
           auth: app.auth,
           adminDb: app.adminDb.db,
-          config,
           passwordBreaches: (password) => Promise.resolve(password === BREACHED),
-          privateChat: {
-            has: (userId) => Promise.resolve(linked.has(userId)),
-            send: (userId, text) => {
-              sent.push({ userId, text });
-              return Promise.resolve('sent');
-            },
-          },
-          later: (work) => {
-            pending.push(work());
-          },
         }),
       ],
     });
@@ -135,18 +114,10 @@ describe('forgotten password', () => {
     await test.close();
   });
 
-  it('answers the same, at once, whatever the address, and sends only to a linked chat', async () => {
-    const answers = [await ask('nobody@example.test'), await ask('not an address'), await ask(OWNER.email)];
-    for (const answer of answers) {
-      expect(answer.statusCode).toBe(202);
-      expect(answer.json()).toEqual({ message: PASSWORD_RESET_REQUESTED_MESSAGE });
-    }
-    expect(new Set(answers.map((answer) => answer.body)).size).toBe(1);
-    // The owner has no linked chat yet: nothing made, nothing sent.
-    expect(sent).toEqual([]);
-    expect(await test.admin.db.select().from(schema.passwordResetLinks)).toEqual([]);
-    expect((await auditOf(ownerId)).map((row) => row.details)).toContainEqual({ outcome: 'no_channel' });
-    // The unknown address is not kept.
+  it('asks nothing from the sign-in page any more, and keeps an unknown address out of the log', async () => {
+    const page = await post(resets, '/v1/auth/password-reset', { email: OWNER.email });
+    expect(page.statusCode).toBe(404);
+    expect(await ask('nobody@example.test')).toEqual({ kind: 'unknown' });
     const unknown = await auditOf(null);
     expect(unknown.map((row) => row.details)).toEqual([{ outcome: 'unknown' }]);
     expect(JSON.stringify(unknown)).not.toContain('nobody@example.test');
@@ -182,32 +153,26 @@ describe('forgotten password', () => {
       status: 'left',
       leftOn: '2026-11-01',
     });
-    linked.add(creatorId);
-    linked.add(leftId);
-    expect((await ask('creator@example.test')).statusCode).toBe(202);
-    expect((await ask('left@example.test')).statusCode).toBe(202);
-    expect(sent).toEqual([]);
+    expect(await ask('creator@example.test')).toEqual({ kind: 'unknown' });
+    expect(await ask('left@example.test')).toEqual({ kind: 'unknown' });
+    expect(await test.admin.db.select().from(schema.passwordResetLinks)).toEqual([]);
   });
 
-  it('sends a link of 15 minutes once per 5 minutes, which sets the password and keeps the code', async () => {
+  it('makes an owner a link of 15 minutes once per 5 minutes, which sets the password and keeps the code', async () => {
     const cookie = await signIn(server, OWNER.email, OWNER.password);
-    linked.add(ownerId);
     const before = Date.now();
-    expect((await ask(' Owner@Example.test ')).statusCode).toBe(202);
-    expect(sent).toHaveLength(1);
-    const message = sent[0];
-    if (message === undefined) throw new Error('nothing sent');
-    expect(message.userId).toBe(ownerId);
-    expect(message.text).toContain('ce lien vaut 15 minutes : http://localhost:5173/mot-de-passe-oublie#t=');
-    const token = tokenOf(message.text);
+    const made = await ask(' Owner@Example.test ');
+    if (made.kind !== 'made') throw new Error('no link made');
+    expect(made.minutes).toBe(15);
+    expect(made.url).toContain('http://localhost:5173/mot-de-passe-oublie#t=');
+    const token = tokenOf(made.url);
     const [stored] = await test.admin.db.select().from(schema.passwordResetLinks);
     expect(stored?.tokenHash).not.toContain(token);
     expect((stored?.expiresAt.getTime() ?? 0) - before).toBeGreaterThan(14.9 * 60_000);
     expect((stored?.expiresAt.getTime() ?? 0) - before).toBeLessThan(15.1 * 60_000);
 
     // Asked again within 5 minutes: nothing new.
-    expect((await ask(OWNER.email)).statusCode).toBe(202);
-    expect(sent).toHaveLength(1);
+    expect(await ask(OWNER.email)).toEqual({ kind: 'too_soon' });
 
     const preview = await post(resets, '/v1/auth/password-reset/inspect', { token });
     expect(preview.json()).toMatchObject({ email: OWNER.email });
@@ -250,9 +215,9 @@ describe('forgotten password', () => {
       .update(schema.passwordResetLinks)
       .set({ createdAt: sql`now() - interval '6 minutes'` })
       .where(eq(schema.passwordResetLinks.userId, ownerId));
-    await ask(OWNER.email);
-    expect(sent).toHaveLength(2);
-    const later = tokenOf(sent[1]?.text ?? '');
+    const again = await ask(OWNER.email);
+    if (again.kind !== 'made') throw new Error('no second link');
+    const later = tokenOf(again.url);
     await test.admin.db
       .update(schema.passwordResetLinks)
       .set({ createdAt: sql`now() - interval '20 minutes'`, expiresAt: sql`now() - interval '1 minute'` })
@@ -264,7 +229,6 @@ describe('forgotten password', () => {
 
     const actions = (await auditOf(ownerId)).map((row) => row.action);
     expect(actions).toContain('password_reset.request');
-    expect(actions).toContain('password_reset.send');
     expect(actions).toContain('password_reset.redeem');
     const written = JSON.stringify(await auditOf(ownerId));
     expect(written).not.toContain(token);

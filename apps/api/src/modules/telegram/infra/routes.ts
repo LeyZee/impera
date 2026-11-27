@@ -9,21 +9,13 @@ import {
   TELEGRAM_CHANNEL_INVALID,
   TelegramChannelRefusalBodySchema,
   TelegramChannelViewSchema,
-  SaveTelegramRoutesBodySchema,
   SaveTelegramTokenBodySchema,
   TelegramBotIdSchema,
   TelegramBotSchema,
   TelegramChatIdSchema,
-  TelegramDeliveriesSchema,
-  TELEGRAM_ROUTES_CONFLICT,
-  TELEGRAM_TEST_UNPROCESSABLE,
   TELEGRAM_TOKEN_UNPROCESSABLE,
   TelegramOverviewSchema,
   TelegramRefusalBodySchema,
-  TelegramRoutesSchema,
-  TelegramSalesSettingsSchema,
-  TelegramTestResultSchema,
-  TelegramTopicSchema,
   type ChannelTryRefusalKind,
 } from '@impera/contracts';
 import type { preValidationAsyncHookHandler } from 'fastify';
@@ -33,16 +25,13 @@ import { z } from 'zod';
 import type { TelegramApi } from '../application/api';
 import {
   TelegramBotNotFound,
-  TelegramChatInvalid,
   TelegramChatMemberConflict,
   TelegramChannelCreatorNotFound,
   TelegramChatNotFound,
-  TelegramCreatorInvalid,
-  TelegramRouteToChannel,
 } from '../domain/errors';
 
 export interface TelegramRoutesOptions {
-  /** `requireRole('owner')`: bots and routing are agency settings. */
+  /** `requireRole('owner')`: the bots are agency settings. */
   readonly guard: preValidationAsyncHookHandler;
   /** `requireRecentLogin` (ADR 0016): adding, replacing or removing a bot needs a sign-in under 10 minutes. */
   readonly recentLogin: preValidationAsyncHookHandler;
@@ -128,23 +117,7 @@ export function createTelegramRoutes(
       },
     );
 
-    app.post(
-      '/settings/telegram/chats/:id/test',
-      {
-        schema: {
-          params: ChatParamsSchema,
-          response: { 200: TelegramTestResultSchema, 422: TelegramRefusalBodySchema },
-        },
-      },
-      async (request) => {
-        const result = await telegram.sendTest(request.params.id);
-        if (result === null) throw new TelegramChatNotFound();
-        if (!result.ok) throw new RefusalError(TELEGRAM_TEST_UNPROCESSABLE, result.error);
-        return result.value;
-      },
-    );
-
-    // REG-28: « Retirer de la liste », only a group the bot left or was banned from. No token is touched: the owner's
+    // REG-28: « Retirer de la liste », only a channel the bot left or was banned from. No token is touched: the owner's
     // guard is enough, without the password asked again.
     app.delete(
       '/settings/telegram/chats/:id',
@@ -156,54 +129,6 @@ export function createTelegramRoutes(
         if (result === 'refused') throw new TelegramChatMemberConflict();
         return reply.code(204).send(null);
       },
-    );
-
-    app.get('/settings/telegram/sales', { schema: { response: { 200: TelegramSalesSettingsSchema } } }, () =>
-      telegram.saleSettings(),
-    );
-
-    app.put(
-      '/settings/telegram/sales',
-      { schema: { body: TelegramSalesSettingsSchema, response: { 200: TelegramSalesSettingsSchema } } },
-      async (request) => {
-        if (request.user === null) throw new Error('requireRole ran without a user');
-        const result = await telegram.saveSaleSettings(request.body.settings, request.user.id);
-        if (!result.ok) throw new TelegramCreatorInvalid();
-        return result.value;
-      },
-    );
-
-    app.put(
-      '/settings/telegram/routes',
-      {
-        schema: {
-          body: SaveTelegramRoutesBodySchema,
-          response: { 200: TelegramRoutesSchema, 409: TelegramRefusalBodySchema },
-        },
-      },
-      async (request) => {
-        const result = await telegram.saveRoutes(request.body.version, request.body.routes);
-        if (result.ok) return result.value;
-        if (result.error === 'unknown_chat') throw new TelegramChatInvalid();
-        if (result.error === 'creator_channel') throw new TelegramRouteToChannel();
-        throw new RefusalError(TELEGRAM_ROUTES_CONFLICT, result.error);
-      },
-    );
-
-    app.get(
-      '/settings/telegram/deliveries',
-      {
-        schema: {
-          querystring: z.object({
-            topic: TelegramTopicSchema.optional(),
-            limit: z.coerce.number().int().min(1).max(200).default(50),
-          }),
-          response: { 200: TelegramDeliveriesSchema },
-        },
-      },
-      async (request) => ({
-        deliveries: await telegram.listDeliveries(request.query.topic ?? null, request.query.limit),
-      }),
     );
 
     // ADR 0080 § 6: Réglages › Créatrices › Canal Telegram. A change asks for a sign-in under 10 minutes: the redirect

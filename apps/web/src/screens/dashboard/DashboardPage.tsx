@@ -25,7 +25,6 @@ import { useAgentModeWriter } from '@/agent/write';
 import { CreatorFace } from '@/creators/CreatorFace';
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
-import { NightBanner } from '@/settings/telegram/NightBanner';
 import { PageHeader } from '@/shell/layout';
 import { Failure } from '@/shell/states';
 
@@ -379,10 +378,6 @@ function Loaded({
       {/* Read top to bottom (recette visuelle 16/11, PIL-01 and PIL-04): her agent's state and what waits for a human,
           then the figures, then what the agency runs. */}
       {agentHero}
-
-      {/* Who is warned of an urgency at night: part of her agent's state, said right under it. The night's alerts and
-          where they go are the owner's to set (Réglages › Bots Telegram): anyone else reads it. */}
-      <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
       {/* What she has not answered yet, the owner answering in her place (INS-05): here while one ends soon, else under
           the day's goal; nothing if nothing waits. */}
