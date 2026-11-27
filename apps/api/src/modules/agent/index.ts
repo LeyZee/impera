@@ -21,6 +21,7 @@ import { guardSettingsOf, languagesOf, type PersonaForModels } from './infra/per
 /** Public entry point of the `agent` module (ADR 0002). Other modules import this file only. */
 export {
   checkVoiceOutput,
+  checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
   type GuardSettings,
