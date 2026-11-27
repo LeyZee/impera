@@ -26,3 +26,15 @@ export type FaultCode = z.infer<typeof FaultCodeSchema>;
 /** The tone a card takes, read from the level and the count (ADR 0170 § 30). */
 export const FaultToneSchema = z.enum(['advice', 'explain', 'firm', 'grave']);
 export type FaultTone = z.infer<typeof FaultToneSchema>;
+
+export const FAULT_LEVELS = FaultLevelSchema.options;
+
+/** How a manager settles a contested remark (ADR 0170 § 14). */
+export const RemarkRulingSchema = z.enum(['upheld', 'dropped']);
+export type RemarkRuling = z.infer<typeof RemarkRulingSchema>;
+export const REMARK_RULINGS = RemarkRulingSchema.options;
+
+/** A fault's label, as the owner saves it out of the repository. */
+export const FAULT_LABEL_MAX = 200;
+/** A contest in one line (ADR 0170 § 14). */
+export const REMARK_CONTEST_MAX = 300;
