@@ -286,7 +286,10 @@ function PeriodView({
       setClosing(batch);
       return;
     }
-    hold(batch);
+    // The password and the code at the click, before the countdown, never after it (recette navigation PARC-02).
+    confirm.askFirst(() => {
+      hold(batch);
+    });
   };
 
   /** Validates `batch` after the app's hold, then says what passed and what did not, the first closing included. */
@@ -660,7 +663,9 @@ function PeriodView({
           batch={closing}
           onConfirm={() => {
             setClosing(null);
-            hold(closing);
+            confirm.askFirst(() => {
+              hold(closing);
+            });
           }}
           onClose={() => {
             setClosing(null);

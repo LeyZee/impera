@@ -2,10 +2,15 @@ import { useState, type JSX } from 'react';
 
 import { PasswordPrompt } from './PasswordPrompt';
 
+import { confirmationHolds } from '@/auth/session';
+
 /** What a gesture on a member, a rate, pay or billing says before the fields (EQ-15). */
 export const MONEY_LEAD = 'Ce geste touche à l’argent : confirme ton mot de passe et ton code.';
 export const MEMBER_LEAD = 'Ce geste touche à un membre : confirme ton mot de passe et ton code.';
 export const BILLING_LEAD = 'Ce geste touche à la facturation : confirme ton mot de passe et ton code.';
+
+/** A hold's five seconds, the server's answer, and a margin: a confirmation that ends sooner is asked for again first. */
+const ASK_FIRST_MARGIN_MS = 60_000;
 
 export interface ConfirmAgain {
   /** Whether a write waits for the password and the code. */
@@ -15,6 +20,14 @@ export interface ConfirmAgain {
    * `giveUp` runs instead when the prompt is cancelled.
    */
   readonly ask: (again: () => void, giveUp?: () => void) => void;
+  /**
+   * For a gesture that waits before it writes (a hold's countdown, recette navigation PARC-02): runs `run` at once when
+   * this session's confirmation still holds for `forMs`, otherwise asks first, at the click, and runs it after.
+   */
+  readonly askFirst: (
+    run: () => void,
+    options?: { readonly forMs?: number; readonly giveUp?: () => void },
+  ) => void;
   /** Gives the write up, as « Annuler » does: for a dialog closed around the prompt. */
   readonly cancel: () => void;
   /** The prompt while a write waits, `null` otherwise: put where the form's foot or body would be. */
@@ -40,6 +53,12 @@ export function useConfirmAgain(): ConfirmAgain {
     asking: again !== null,
     ask: (run, giveUp = () => undefined) => {
       setAgain({ run, giveUp });
+    },
+    askFirst: (run, { forMs = ASK_FIRST_MARGIN_MS, giveUp = () => undefined } = {}) => {
+      void confirmationHolds(forMs).then((holds) => {
+        if (holds) run();
+        else setAgain({ run, giveUp });
+      });
     },
     cancel,
     prompt: ({ lead, layout = 'dialog', onBusyChange }) =>

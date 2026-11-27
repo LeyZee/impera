@@ -88,6 +88,8 @@ let settingsDown: boolean;
 let team: readonly TeamMember[];
 /** The platform's team as Équipe › Comptes Reveal reads it (ADR 0076); `'down'` answers a refused list. */
 let revealTeam: { platformChatterId: string; firstName: string; lastName: string }[] | 'down';
+/** Until when the session's confirmation holds, as `GET /v1/auth/reauthenticate` says it (recette PARC-02). */
+let confirmedUntil: string | null;
 
 function serve(): void {
   vi.stubGlobal(
@@ -102,6 +104,7 @@ function serve(): void {
         const answered = answer(url.pathname);
         return json(answered.body, answered.status);
       }
+      if (url.pathname === '/v1/auth/reauthenticate') return json({ confirmedUntil });
       reads.push(`${url.pathname}${url.search}`);
       const giving = /^\/v1\/payroll\/periods\/([^/]+)\/sales-to-give$/u.exec(url.pathname)?.[1];
       if (giving !== undefined) {
@@ -278,6 +281,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-02T09:00:00Z'));
   writes.length = 0;
   gate = null;
+  confirmedUntil = '2026-11-02T09:09:00.000Z';
   settingsDown = false;
   team = MEMBERS;
   revealTeam = [];
@@ -490,6 +494,36 @@ describe('Paie › Quinzaine', () => {
     const said = text(screen.getAllByRole('alert').find((one) => one.classList.contains('rp-island')));
     expect(said).toContain('3 validés, 1 non validé');
     expect(said).toContain('Basile : Ce relevé a changé depuis que tu l’as ouvert.');
+  });
+
+  it('asks for the password and the code at the click, before the countdown, when the confirmation is old (recette PARC-02)', async () => {
+    confirmedUntil = null;
+    answer = () => ({ status: 200, body: statementOf(THEO, OCT2, { status: 'validated' }) });
+    confirmIdentity.mockImplementation(() => Promise.resolve('ok'));
+    renderPage(OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: 'Valider (4)' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clore et valider 4 relevés' }),
+    );
+    // Asked at once: no countdown runs while the password is missing, nothing is written.
+    const dialog = await screen.findByRole('dialog', { name: 'Valider les relevés' });
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(writes).toEqual([]);
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
+    // Then the hold, then the four.
+    expect(text(await screen.findByRole('status'))).toContain('Validation de 4 relevés');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await waitFor(() => {
+      expect(writes).toHaveLength(4);
+    });
   });
 
   it('sends every held validation at once when the tab closes, the count saying what is being validated (recette 27/11, C4)', async () => {

@@ -369,7 +369,9 @@ function PayoutForm({
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
-    save();
+    if (!parsed.success || busy) return;
+    // Recette PARC-02 : le mot de passe et le code se demandent au clic, pas après un refus.
+    confirm.askFirst(save);
   };
 
   const prompt = confirm.prompt({ lead: MONEY_LEAD, layout: 'inline', onBusyChange: setBusy });

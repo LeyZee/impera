@@ -19,6 +19,7 @@ import {
   PasskeySchema,
   REAUTHENTICATION_ERROR_CODE,
   ReauthenticateBodySchema,
+  ReauthenticationStateSchema,
   SECOND_FACTOR_ERROR_CODE,
   SecondFactorEnableBodySchema,
   SecondFactorVerifyBodySchema,
@@ -1487,6 +1488,23 @@ export function createAuthRoutes(
           .where(eq(schema.session.id, result.session.id));
         await audit(request, request.user.id, 'auth.reauthenticated');
         return reply.code(204).send();
+      },
+    );
+
+    // Until when this session's confirmation holds (recette navigation PARC-02): read only, so the page asks at the click
+    // rather than after a countdown. Nothing secret: the instant the session was confirmed, on this session only.
+    app.get(
+      '/auth/reauthenticate',
+      { preValidation: [requireRole(...UserRoleSchema.options)] },
+      async (request) => {
+        const result = await sessionOf(auth, db, request);
+        if (result === null) throw new SessionUnauthenticated();
+        const confirmedAt = result.session.reauthenticatedAt;
+        const until =
+          confirmedAt === null || confirmedAt === undefined ? null : confirmedAt.getTime() + RECENT_LOGIN_MS;
+        return ReauthenticationStateSchema.parse({
+          confirmedUntil: until === null || until <= Date.now() ? null : new Date(until).toISOString(),
+        });
       },
     );
 
