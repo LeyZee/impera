@@ -797,7 +797,7 @@
 }
 /* A closed line is its title alone on a phone; its sentence shows once opened. */
 @media (max-width: 640px) {
-  .dy-peek {
+  .dy-peek:not(.dy-peek--kept) {
     display: none;
   }
 }
@@ -873,4 +873,20 @@
   .wk-bar i {
     transition: none;
   }
+}
+
+/* A line her coffre does (avenant du 27/11): its tick drawn, nothing to tap; else « Déposer ». */
+.dy-tick--still {
+  background: var(--wk-c);
+  cursor: default;
+}
+.dy-tick--still::before {
+  content: none;
+}
+.dy-tick--still svg {
+  opacity: 1;
+}
+.dy-drop {
+  flex: none;
+  align-self: center;
 }

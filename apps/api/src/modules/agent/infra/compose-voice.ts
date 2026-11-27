@@ -6,6 +6,7 @@ import { checkCare, checkHelpNumber } from '../domain/care';
 import { checkNoCommitment } from '../domain/custom-order';
 import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
 import {
+  asLastWriting,
   checkExplicit,
   checkMoans,
   checkMoodKillers,
@@ -108,7 +109,8 @@ export async function writeFollowUp(
   );
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
-  const violations = [
+  // A follow-up is written once: what a rewrite would have read first blocks now.
+  const violations = asLastWriting([
     ...checkVoiceOutput(written, persona.guardSettings, {
       ...guardContextOf(base.history, false, undefined, meetingTier === undefined ? {} : { meetingTier }),
       languages,
@@ -118,7 +120,7 @@ export async function writeFollowUp(
     ...checkHelpNumber(written),
     // As the main answer (Sécurité, #1043): her aftercare follows a sexual exchange.
     ...checkYouthWords(written, sexual),
-  ];
+  ]);
   return {
     ...(droppedNotes.length > 0 && { droppedNotes }),
     brief,
@@ -221,7 +223,9 @@ export async function writeAnswer(
           },
         })
       : undefined;
-  const { voice, written, violations } = retried ?? first;
+  const { voice, written } = retried ?? first;
+  // Written again and still holding a refund he did not ask for: blocked (ADR 0158 § 48, avenant du 27/11).
+  const violations = retried === undefined ? first.violations : asLastWriting(retried.violations);
   return {
     voice,
     written,

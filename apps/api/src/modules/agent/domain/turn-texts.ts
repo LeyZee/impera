@@ -38,6 +38,8 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
     'ses emojis : seulement en fin de bulle, une seule sorte par message (deux en plein flirt), jamais trois, et pas d’emoji du tout s’il y en avait dans ses derniers messages',
   close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
   help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
+  refund_unasked: 'elle parlait de remboursement alors qu’il n’en demande pas',
+  refund_promise: 'elle promettait de le rembourser elle-même : un remboursement se demande à Reveal',
 };
 
 /** The codes of the blocking guards an answer broke, each once. */
@@ -147,11 +149,18 @@ export const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
 /**
- * He complains about what he bought (ADR 0156 § 7, ADR 0158 § 48): she wants to understand, gives nothing for free,
- * and sends him to Reveal for a refund. Said again soon after, a human answers.
+ * He complains about what he bought (ADR 0156 § 7, ADR 0158 § 48): she wants to understand and gives nothing for free.
+ * She never brings up a refund herself (avenant du 27/11): only `REFUND_ASKED_HINT`, when he asks. Said again soon
+ * after, a human answers.
  */
 export const PURCHASE_COMPLAINT_HINT =
-  'il se plaint de ce qu’il a acheté : elle lui demande d’abord gentiment ce qui ne lui a pas plu et ce qu’il attendait, puis lui dit qu’il peut demander un remboursement à Reveal, sans attendre qu’il le réclame ; jamais un contenu en compensation, rien à vendre';
+  'il se plaint de ce qu’il a acheté : elle lui demande gentiment ce qui ne lui a pas plu et ce qu’il attendait ; jamais un contenu en compensation, rien à vendre';
+/**
+ * He asks for a refund or his money back (ADR 0158 § 48, avenant du 27/11, `asksForRefund`): it is done on Reveal, by
+ * the platform's own process; she never refunds him nor decides it (`refund_promise`).
+ */
+export const REFUND_ASKED_HINT =
+  'il demande à être remboursé : elle lui dit simplement que ça se fait sur Reveal, par la plateforme ; elle ne le rembourse pas elle-même, ne promet pas qu’il le sera et n’en décide rien';
 /**
  * He insults or belittles her (passe 8 and 16, Charles 21/11): she answers herself, calm, never sorry; her words for it
  * are her persona's.
