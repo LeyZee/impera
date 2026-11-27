@@ -19,6 +19,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { NotTakenDelay } from './NotTakenDelay';
+import { SessionReminder } from './SessionReminder';
 import {
   ALERTS_ERRORS,
   ALERTS_QUERY_KEY,
@@ -218,10 +219,11 @@ export function AlertsSection(): JSX.Element {
           Pilotage
         </h3>
         <p className="ps-muted al-group__lede">
-          Ce qui manque à l’équipe, pas aux fans. Le délai vaut pour toute l’agence.
+          Ce qui manque à l’équipe, pas aux fans. Ces réglages valent pour toute l’agence.
         </p>
         <ul className="al-list">
           <NotTakenDelay index={0} />
+          <SessionReminder index={1} />
         </ul>
       </section>
     </section>

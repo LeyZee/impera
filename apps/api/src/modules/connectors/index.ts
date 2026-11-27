@@ -24,6 +24,7 @@ import {
   createReadConversationJob,
   type ConversationReadAsk,
 } from './application/read-conversation';
+import { tellingSessionDeaths } from './application/read-health';
 import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
@@ -43,6 +44,7 @@ import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
 import type { LinkServiceReader } from './domain/link-service';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
+import { readServiceOf, type ReadHealth } from './domain/read-health';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
@@ -330,7 +332,7 @@ export interface ConnectorsDeps {
   readonly detectedAccounts: SalesFeedDeps['detectedAccounts'];
   /**
    * `connection_state_changed` (Telegram P3-12), wired by the composition root: Reveal's register is the service
-   * `reveal_crm`; the outbox keeps the transitions only.
+   * `reveal_crm`, the AI's read of its messages `reveal_read` (27/11/2026); the outbox keeps the transitions only.
    */
   readonly publishConnectionState?: (
     service: ConnectionService,
@@ -361,7 +363,16 @@ const systemClock: Clock = { now: () => new Date() };
 
 export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const clock = deps.clock ?? systemClock;
-  const accounts = createDrizzleAccountStore(deps.db, deps.adminDb);
+  const publish = deps.publishConnectionState;
+  // The AI's read of the fans' messages, told to the owners when it stops and when it comes back (décision du 27/11).
+  const readHealth: ReadHealth | undefined =
+    publish === undefined
+      ? undefined
+      : async (platform, signal, correlationId) => {
+          const service = readServiceOf(platform);
+          if (service !== null) await publish(service, signal, correlationId);
+        };
+  const accounts = tellingSessionDeaths(createDrizzleAccountStore(deps.db, deps.adminDb), readHealth);
   const vault = deps.sessionKeys === null ? null : createSessionVault(deps.sessionKeys);
   const resolver = createConnectorResolver({
     accounts,
@@ -384,6 +395,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       ),
   });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
+  const pollJobs = readHealth === undefined ? accountJobs : { ...accountJobs, readHealth };
   const avatars: AvatarPorts | null =
     deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
   const teamStore = createDrizzleTeamImportStore(deps.db);
@@ -447,7 +459,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
         clock,
         ...(deps.random === undefined ? {} : { random: deps.random }),
       }),
-      poll: createPollJob(accountJobs),
+      poll: createPollJob(pollJobs),
       reconcile: createReconcileJob(accountJobs),
       readConversation: createReadConversationJob(accountJobs),
       readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),

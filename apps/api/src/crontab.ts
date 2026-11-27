@@ -93,6 +93,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.remind_safety'] },
   },
+  // The AI's platform sessions to reconnect (décision du 27/11/2026): at the agency's hour, an hour later if nothing
+  // changed, and 2 h before a token dies. Each ring once per account, day and token: a run again rings nothing new.
+  {
+    task: 'alerts.remind_sessions',
+    match: '*/5 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.remind_sessions'] },
+  },
   {
     task: 'telegram.dispatch_polls',
     match: '* * * * *',

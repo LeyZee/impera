@@ -90,6 +90,11 @@ export const schedulingSettings = pgTable(
      * off until the owner sets it.
      */
     notTakenDelayMinutes: integer('not_taken_delay_minutes'),
+    /**
+     * The minute of the agency's day when every owner is told to reconnect the AI's platform sessions (décision de
+     * Charles du 27/11/2026): 18 h by default, never off, since Reveal's token dies 24 h after the login.
+     */
+    sessionReminderMinute: integer('session_reminder_minute').notNull().default(1080),
     updatedBy: text('updated_by')
       .notNull()
       .references(() => user.id),
@@ -106,6 +111,7 @@ export const schedulingSettings = pgTable(
       'scheduling_settings_not_taken_delay_check',
       sql`${t.notTakenDelayMinutes} is null or ${t.notTakenDelayMinutes} between 5 and 240`,
     ),
+    check('scheduling_settings_session_reminder_check', sql`${t.sessionReminderMinute} between 0 and 1439`),
     check(
       'scheduling_settings_report_gap_check',
       sql`${t.reportGapBps} between 0 and 10000 and ${t.reportGapMinor} between 0 and 100000`,

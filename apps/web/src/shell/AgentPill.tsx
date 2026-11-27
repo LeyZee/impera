@@ -29,31 +29,48 @@ export function AgentPill(): JSX.Element {
   const view = useAgentMode(shown);
   const live = view.source === 'live' ? view : null;
   const stalled = live?.stalled ?? null;
-  const pill = pillOf(live?.mode ?? null, stalled === null);
+  const base = pillOf(live?.mode ?? null, stalled === null);
+  // The read of Reveal says itself in the bar of every screen (27/11/2026): cut in red, late in amber, the mode after.
+  const reveal = live?.mode === 'stop' ? 'ok' : (live?.reveal ?? 'ok');
+  const pill =
+    reveal === 'cut'
+      ? { label: 'Reveal coupé', tone: 'bad' as const, live: false }
+      : reveal === 'late'
+        ? { label: 'Reveal en retard', tone: 'warn' as const, live: false }
+        : base;
   const several = (useCreators().data?.length ?? 0) >= 2;
   const mode = view.source === 'loading' ? '…' : view.source === 'empty' ? 'Sans créatrice' : pill.label;
   const label = live !== null && several ? `${live.creatorName} · ${mode}` : mode;
+  // The title keeps the mode the pill gives up to the read of Reveal.
+  const modeName = live !== null && several ? `${live.creatorName} · ${base.label}` : base.label;
   const title =
     view.source === 'loading'
       ? 'Agent : lecture en cours.'
       : view.source === 'unavailable' || view.source === 'empty'
         ? TITLE[view.source]
-        : stalled !== null && live?.mode !== 'stop'
-          ? `Agent : ${label}, mais rien ne tourne : ${stalled}. Voir le Dashboard.`
-          : `Agent : ${label}. Le changer sur le Dashboard.`;
+        : reveal === 'cut'
+          ? `Agent : ${modeName}. La lecture de Reveal est coupée : l’IA ne lit plus les fans. Voir le Dashboard.`
+          : reveal === 'late'
+            ? `Agent : ${modeName}. Reveal est lu avec du retard. Voir le Dashboard.`
+            : stalled !== null && live?.mode !== 'stop'
+              ? `Agent : ${label}, mais rien ne tourne : ${stalled}. Voir le Dashboard.`
+              : `Agent : ${label}. Le changer sur le Dashboard.`;
   return (
     <Link
       to="/"
       search={shown === null ? {} : { creatrice: shown }}
       className="nv-rail__agent"
       data-tone={pill.tone}
+      data-reveal={reveal === 'cut' ? 'cut' : undefined}
       title={title}
       aria-label={title}
     >
-      <span
-        className={`nv-dot${pill.tone === 'unknown' ? '' : ` nv-tone--${pill.tone}`}${pill.live ? ' nv-dot--live' : ''}`}
-        aria-hidden="true"
-      />
+      {/* Running, the dot beats once at each read of Reveal (Charles, 27/11/2026), never in a loop. */}
+      <span className={`nv-dot${pill.tone === 'unknown' ? '' : ` nv-tone--${pill.tone}`}`} aria-hidden="true">
+        {pill.live && live?.lastReadAt != null ? (
+          <span key={live.lastReadAt} className="nv-rail__beat" />
+        ) : null}
+      </span>
       {/* A long name is cut with « … » inside the pill, its title keeping it whole (recette 05/11, PRO-12). */}
       {live !== null && several ? (
         <>

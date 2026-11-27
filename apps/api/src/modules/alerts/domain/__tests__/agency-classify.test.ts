@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { classify } from '../agency/classify';
+import { agencyMessage } from '../agency/message';
 
 const conversationId = newId(ConversationIdSchema);
 
@@ -187,6 +188,53 @@ describe('agency alerts (ADR 0020 §2, kept for the owners)', () => {
     );
     // Back: nothing rings, the Dashboard says it.
     expect(classify({ kind: 'connection_back', service: 'elevenlabs' })).toBeNull();
+  });
+
+  it('rings even at night when the AI no longer reads Reveal, and says its return in silence (27/11/2026)', () => {
+    expect(classify({ kind: 'connection_down', service: 'reveal_read', reason: 'format_changed' })).toEqual({
+      kind: 'notice',
+      topic: 'urgent',
+      threadKey: 'connection:reveal_read',
+      title: 'URGENT',
+      body: 'Reveal a changé sa façon de répondre : l’IA ne lit plus les fans et ne leur répond plus. La lecture doit être adaptée côté Impera.',
+      link: { label: 'Ouvrir le Dashboard', path: '/' },
+      tag: 'connection:reveal_read',
+    });
+    expect(
+      classify({ kind: 'connection_down', service: 'reveal_read', reason: 'session_expired' }),
+    ).toMatchObject({
+      topic: 'urgent',
+      body: 'La session Reveal de l’IA a expiré : elle ne lit plus les fans. Dans le profil Chrome de l’IA, reconnecte le « bot », puis « Synchroniser ».',
+    });
+    expect(
+      classify({ kind: 'connection_down', service: 'reveal_read', reason: 'unreachable' }),
+    ).toMatchObject({
+      topic: 'urgent',
+      body: 'Reveal ne répond plus depuis plusieurs minutes : l’IA ne lit plus les fans et ne leur répond plus.',
+    });
+    expect(classify({ kind: 'connection_back', service: 'reveal_read' })).toMatchObject({
+      topic: 'info',
+      silent: true,
+      tag: 'connection:reveal_read',
+      body: 'La lecture de Reveal est rétablie : l’IA lit et répond de nouveau.',
+    });
+    const down = { kind: 'connection_down', service: 'reveal_read', reason: 'format_changed' } as const;
+    const downNotice = classify(down);
+    expect(downNotice === null ? null : agencyMessage(down, downNotice, null)).toMatchObject({
+      title: 'Urgent · Lecture Reveal coupée',
+      url: '/',
+      tag: 'connection:reveal_read',
+    });
+    const back = { kind: 'connection_back', service: 'reveal_read' } as const;
+    const backNotice = classify(back);
+    // The return replaces the outage on the screen, without a sound.
+    expect(backNotice === null ? null : agencyMessage(back, backNotice, null)).toEqual({
+      title: 'Lecture Reveal rétablie',
+      body: 'La lecture de Reveal est rétablie : l’IA lit et répond de nouveau.',
+      url: '/',
+      tag: 'connection:reveal_read',
+      silent: true,
+    });
   });
 
   it('says the budget alert in amber and the cap reached in red', () => {

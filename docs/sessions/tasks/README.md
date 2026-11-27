@@ -187,6 +187,7 @@ Branche : task/<id>-<slug>
 | OPS-21 | Le prévisionnel du coût de l'IA | exploitation | review | OPS-08 |
 | OPS-22 | Un worker arrêté se voit de l'extérieur, et le compte de l'IA se corrige | exploitation | review | OPS-19 |
 | OPS-23 | Le développement, les tests et la sauvegarde sur Postgres 17, la version de la production | exploitation | review | OPS-19 |
+| OPS-24 | Rappel quotidien de reconnexion Reveal | exploitation | review | TG-01 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |

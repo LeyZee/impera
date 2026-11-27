@@ -82,6 +82,7 @@ import {
   pgErrorOf,
   RatedRulesRowSchema,
   reportSource,
+  sessionReminderClock,
   shiftColumns,
   StoredAccountSchema,
   toMember,
@@ -879,6 +880,39 @@ export function createDrizzleShiftReportStore(
           { ...delay },
         );
         return delay;
+      }),
+
+    sessionReminder: (actor) =>
+      withMember(db, actor, async (tx) => ({ minute: (await sessionReminderClock(tx)).minute })),
+
+    saveSessionReminder: (actor, reminder) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new OwnerOnly();
+        const values = {
+          sessionReminderMinute: reminder.minute,
+          updatedBy: actor.userId,
+          updatedAt: new Date(),
+        };
+        // A first save keeps the module's defaults for the rest of the settings, as `saveSettings` does.
+        await tx
+          .insert(schedulingSettings)
+          .values({
+            id: 1,
+            timeZone: DEFAULT_SCHEDULING_SETTINGS.timeZone,
+            accessMarginMinutes: DEFAULT_SCHEDULING_SETTINGS.accessMarginMinutes,
+            slotStartMinute: 0,
+            slotLengthMinutes: 360,
+            ...values,
+          })
+          .onConflictDoUpdate({ target: schedulingSettings.id, set: values });
+        await audit(
+          tx,
+          actor,
+          'scheduling_settings.session_reminder',
+          { kind: 'scheduling_settings', id: '1' },
+          { ...reminder },
+        );
+        return reminder;
       }),
   };
 }

@@ -19,6 +19,7 @@ import { CreatorScope, scopesCreators } from './CreatorScope';
 import { MediaBlurToggle } from './MediaBlurToggle';
 import { NavIcon } from './NavIcon';
 import { RailCount } from './RailCount';
+import { RevealCutMark } from './RevealCutMark';
 import { keepTabInside } from './focus';
 import { seesHerMedia } from './media-blur';
 import {
@@ -377,6 +378,7 @@ export function RailNav({
       <NavIcon name={item.icon} />
       <span className="nv-rail__label">{item.label}</span>
       <RailCount section={item.to} />
+      {item.to === '/' ? <RevealCutMark /> : null}
     </Link>
   );
 

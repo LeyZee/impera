@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AgentHoursNowSchema } from './agent-hours';
 import { AutomaticGateSchema } from './automatic';
 import { PlatformSchema } from './enums';
-import { HandoffCauseSchema } from './events';
+import { ConnectionDownReasonSchema, HandoffCauseSchema } from './events';
 import { ConversationIdSchema, CreatorIdSchema, FanIdSchema, TeamMemberIdSchema } from './ids';
 
 /**
@@ -235,6 +235,11 @@ export const DashboardSchema = z.object({
      * (worker stopped, polls failing). The screen says « en retard », not « connectée ».
      */
     late: z.boolean(),
+    /**
+     * The AI's read of Reveal told cut to the owners (`connection_state_changed`, `reveal_read`, 27/11/2026): its cause
+     * and since when, or `null` while it reads.
+     */
+    outage: z.object({ reason: ConnectionDownReasonSchema, since: at }).nullable().default(null),
     conversations: count,
   }),
   voice: z.object({

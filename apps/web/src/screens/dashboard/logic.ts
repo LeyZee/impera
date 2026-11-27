@@ -208,6 +208,7 @@ export interface Hero {
   readonly lead: string;
   readonly action?: string;
   readonly actionTo?: AgentState['actionTo'];
+  readonly actionStrong?: AgentState['actionStrong'];
   readonly leadWithoutAction?: AgentState['leadWithoutAction'];
 }
 

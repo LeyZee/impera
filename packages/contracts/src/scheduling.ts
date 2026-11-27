@@ -186,6 +186,22 @@ export const NotTakenDelaySchema = z.strictObject({
 export type NotTakenDelay = z.infer<typeof NotTakenDelaySchema>;
 
 /**
+ * The daily reminder to reconnect the AI's platform session (décision de Charles du 27/11/2026, audit de robustesse
+ * R3), an agency setting (`GET` for the owner and an active manager, `PUT /v1/scheduling/session-reminder` for the
+ * owner, Réglages › Alertes): the minute of the agency's day when every owner is told to reconnect the accounts whose
+ * token will not last another day. 18 h by default, never off: Reveal's token dies 24 h after the login.
+ */
+export const SESSION_REMINDER_MINUTE_DEFAULT = 18 * 60;
+export const SessionReminderSchema = z.strictObject({
+  minute: z
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 60 - 1),
+});
+export type SessionReminder = z.infer<typeof SessionReminderSchema>;
+
+/**
  * The owner's planning settings (`GET`, `PUT /v1/scheduling/settings`). `versions` are the créneaux' versions, oldest
  * first: the one in force at the start of what is read (`at` for `GET`, the window of a planning or calendar read),
  * then those that take effect after it, within that window (every one ahead for `GET`). A week can so hold two

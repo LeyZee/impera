@@ -210,6 +210,18 @@ async function facts(
     sql`select session_state, last_poll_at, session_updated_at, paused_until, connector_config from platform_accounts
         where platform = 'reveal' order by created_at limit 1`,
   );
+  // The read cut (27/11/2026): the breaker's events since the last good read, the first one says since when.
+  const breakerErrors =
+    account?.paused_until === null || account?.paused_until === undefined
+      ? []
+      : await rows(
+          tx,
+          z.object({ code: z.string().nullable(), created_at: timestamp }),
+          sql`select payload->>'code' as code, created_at from domain_events
+              where type = 'error' and payload->>'jobName' = 'poll'
+                and created_at > coalesce(${account.last_poll_at}::timestamptz, '-infinity'::timestamptz)
+              order by created_at asc limit 50`,
+        );
   const voice = await first(
     tx,
     z.object({ median_ms: nullableNumber, outage_hours: int }),
@@ -411,6 +423,20 @@ async function facts(
       lastReadAt: account?.last_poll_at ?? null,
       sessionSince: account?.session_updated_at ?? null,
       pollEverySeconds: rhythm.pollIntervalSeconds + rhythm.jitterSeconds,
+      outage:
+        account?.session_state === 'expired'
+          ? {
+              reason: 'session_expired',
+              since: account.last_poll_at ?? account.session_updated_at ?? window.now,
+            }
+          : breakerErrors[0] === undefined
+            ? null
+            : {
+                reason: breakerErrors.some((e) => e.code === 'connector_shape_changed')
+                  ? 'format_changed'
+                  : 'unreachable',
+                since: breakerErrors[0].created_at,
+              },
       conversations: counts.total,
     },
     voice: { medianWriteMs: voice.median_ms, outageHoursLast7d: voice.outage_hours },

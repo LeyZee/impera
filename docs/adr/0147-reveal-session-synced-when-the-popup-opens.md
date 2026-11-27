@@ -50,3 +50,24 @@ Une connexion automatique à Reveal est exclue : elle demanderait de garder les 
 - Écoute permanente des requêtes de Reveal en tâche de fond : elle lirait l'onglet sans que personne ne l'ait demandé. L'ouverture du popup est un geste du propriétaire.
 - Recharger l'onglet en automatique, comme au clic : c'est une action sur Reveal que personne n'a demandée.
 - Renouveler le jeton par une route de Reveal : aucune n'est connue, et ce serait un appel de plus vers Reveal.
+
+### Avenant du 27/11/2026 : le rappel quotidien de reconnexion
+
+Décision de Charles du 27/11/2026 (« oki parfait pour le 3 », audit de robustesse R3) : la reconnexion quotidienne qui reste (Conséquences, « Négatives ») est rappelée par Impera, puisqu'aucune route de Reveal ne renouvelle le jeton.
+
+- À l'heure de l'agence réglée dans Réglages › Alertes › Pilotage (« Reconnexion Reveal », 18 h par défaut, jamais éteinte), chaque propriétaire reçoit une notification pour chaque compte dont le jeton ne tiendra pas jusqu'au lendemain : moins de 20 h devant lui, expiré, ou sans échéance lisible.
+- Une heure après, si rien n'a bougé, la notification revient une fois.
+- 2 h avant la fin d'un jeton, une relance part, seulement si aucun rappel du jour ne l'a signalé : un jeton synchronisé peu avant l'heure, qui meurt avant la suivante. Avec 18 h, elle tombe entre 12 h et 16 h, jamais la nuit. Un jeton qui meurt la nuit a toujours été signalé par le rappel de la veille au soir, puisqu'une relance retenue pendant les heures calmes arriverait trop tard.
+- Ces notifications sont des alertes de l'agence (`agency_alert`, ADR 0176 § 3) : hors plafond du jour, retenues pendant les heures calmes. Le rappel ne réveille jamais ; une session qui meurt quand même la nuit est dite par l'alerte « Lecture Reveal coupée » ci-dessous.
+- Le message dit le geste avec le compte du « bot », jamais le sien (P2-02). Rien ne part sans notifications activées sur au moins un appareil d'un propriétaire.
+- La connexion automatique à Reveal par le serveur reste écartée (Alternatives rejetées). Elle se rediscute après une à deux semaines de vrai fonctionnement, sur le mot écrit de Charles.
+
+### Avenant du 27/11/2026 (2) : la lecture Reveal coupée réveille
+
+Décision de Charles du 27/11/2026, 17 h 47 : l'IA répond toute la nuit, donc une lecture de Reveal qui s'arrête la laisse muette jusqu'au réveil. Elle peut le réveiller.
+
+- La lecture est dite coupée à tous les propriétaires (`connection_state_changed`, service `reveal_read`, `agency_urgent` : elle sonne même pendant les heures calmes) quand le coupe-circuit du relevé des messages s'ouvre (environ 5 minutes d'échecs d'affilée au rythme par défaut), avec la cause : Reveal a changé sa façon de répondre, ou ne répond plus ; et dès qu'une session de l'IA passe à `expired`, quel que soit le chemin qui l'a vue.
+- L'outbox ne garde que les bascules : une panne de plusieurs heures sonne une fois. La première lecture réussie après un arrêt (coupe-circuit, ou plus de 5 minutes sans lecture) la dit rétablie, sans son, à la place de l'alerte sur l'écran.
+- Un fan qui attend ne réveille jamais personne ; le rappel quotidien de reconnexion reste muet la nuit.
+- L'état est celui du service, pas d'un compte : avec plusieurs créatrices sur Reveal, un compte rétabli peut dire la lecture rétablie pendant qu'un autre reste coupé. Le voyant par compte du Dashboard viendra le préciser.
+- Qu'un agent IA de Charles se reconnecte lui-même à Reveal reste écarté, comme la connexion automatique par le serveur ci-dessus.

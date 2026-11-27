@@ -5,6 +5,7 @@ import {
   type CreatorId,
   type RejectShiftReportBody,
   type NotTakenDelay,
+  type SessionReminder,
   type ReportGapThreshold,
   type ShiftId,
   type ShiftReport,
@@ -50,6 +51,8 @@ export interface ShiftReportService {
   saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
   notTakenDelay(actor: UserId): Promise<NotTakenDelay>;
   saveNotTakenDelay(actor: Actor, delay: NotTakenDelay): Promise<NotTakenDelay>;
+  sessionReminder(actor: UserId): Promise<SessionReminder>;
+  saveSessionReminder(actor: Actor, reminder: SessionReminder): Promise<SessionReminder>;
   /**
    * `scheduling.check_reports` (ADR 0073 § 4): each submitted report whose complete check is within the threshold,
    * validated in the name of the automatic check, one transaction each, under the lock and at the version it was
@@ -151,6 +154,13 @@ export function createShiftReportService(
     },
 
     saveNotTakenDelay: (actor, delay) => store.saveNotTakenDelay(actor, delay),
+
+    sessionReminder: async (actor) => {
+      if (!isAgency(await store.reader(actor))) throw new ShiftReportForbidden();
+      return store.sessionReminder(actor);
+    },
+
+    saveSessionReminder: (actor, reminder) => store.saveSessionReminder(actor, reminder),
 
     checkReports: async () => {
       const due = await store.checkCandidatesUnscoped(now());

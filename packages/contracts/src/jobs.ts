@@ -67,6 +67,7 @@ export const JOB_NAMES = [
   'alerts.route',
   'alerts.agency',
   'alerts.remind_safety',
+  'alerts.remind_sessions',
   'notifications.creator_sale',
   'notifications.creator_notices',
   'creator_tasks.remind',
@@ -156,6 +157,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'alerts.route': 'Alertes de l’équipe',
   'alerts.agency': 'Alertes de l’agence',
   'alerts.remind_safety': 'Relance des relais de sécurité',
+  'alerts.remind_sessions': 'Rappel de reconnexion des sessions',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'notifications.creator_notices': 'Demandes, propositions et semaine dites à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
@@ -344,6 +346,11 @@ export const JOB_PAYLOADS = {
   'alerts.agency': z.object({}),
   /** A safety relay nobody took rings again every 5 minutes for an hour; once per account and reminder. */
   'alerts.remind_safety': z.object({}),
+  /**
+   * Every five minutes (crontab): the daily reminder to reconnect the AI's platform sessions at the agency's hour, once
+   * more an hour later, and 2 h before a token's expiry; once per account, day and token.
+   */
+  'alerts.remind_sessions': z.object({}),
   /**
    * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
    * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
@@ -721,6 +728,7 @@ export const JOB_MAX_ATTEMPTS = {
   'alerts.route': 1,
   'alerts.agency': 1,
   'alerts.remind_safety': 1,
+  'alerts.remind_sessions': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
   // Every five minutes, and each notification rings once: the next run is the retry.

@@ -50,6 +50,12 @@ export function replyDelay(minutes: number): string {
     : `${String(Math.floor(seconds / 60))} min ${String(rest).padStart(2, '0')}`;
 }
 
+/** « 17 h 06 », the time of a read, on this device's clock. */
+export function clockOf(iso: string): string {
+  const at = new Date(iso);
+  return `${String(at.getHours())}\u00a0h\u00a0${String(at.getMinutes()).padStart(2, '0')}`;
+}
+
 /** « il y a 14 s », « il y a 3 min », « il y a 2 h », « il y a 4 j ». */
 export function ago(iso: string, now: Date): string {
   const seconds = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 1000));
@@ -116,6 +122,8 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
   const unlinked = !reveal.connected && reveal.lastReadAt === null;
   // The session holds but nobody reads it any more: never green, the last read says since when.
   const late = reveal.connected && reveal.late;
+  // Told cut to the owners (27/11/2026), or its session dead after it was read.
+  const cut = reveal.outage !== null || (!reveal.connected && !unlinked);
   const relays = GUARD_CAUSES.reduce((sum, cause) => sum + guards.today[cause], 0);
   // « 64,5 % validés sans retouche, objectif 80 % »: the rate with what it aims at (DASH-16).
   const rateText =
@@ -148,23 +156,31 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
   const cards: AgentState['cards'] = [
     {
       id: 'reveal',
-      tone: late ? 'warn' : reveal.connected ? 'ok' : unlinked ? 'idle' : 'bad',
+      tone: cut ? 'bad' : late ? 'warn' : reveal.connected ? 'ok' : unlinked ? 'idle' : 'bad',
       title: 'Connexion à Reveal',
-      value: late
-        ? 'Lecture en retard'
-        : reveal.connected
-          ? 'Connectée'
-          : unlinked
-            ? 'Pas encore reliée'
-            : 'Déconnectée',
+      value: cut
+        ? 'Lecture coupée'
+        : late
+          ? 'Lecture en retard'
+          : reveal.connected
+            ? 'Connectée'
+            : unlinked
+              ? 'Pas encore reliée'
+              : 'Déconnectée',
       sub: lastRead === null ? 'jamais lue' : `lue ${lastRead}`,
       rows: [
         ['Dernière lecture', lastRead ?? 'jamais'],
         ['Conversations suivies', String(reveal.conversations)],
       ],
-      alarm: late ? 'La messagerie Reveal n’est plus lue' : 'La messagerie Reveal est déconnectée',
+      alarm: cut
+        ? 'La lecture de Reveal est coupée'
+        : late
+          ? 'Reveal est lu avec du retard'
+          : 'La messagerie Reveal est déconnectée',
       // « Messagerie »: the sales key is another link, Réglages › Plateformes may show Reveal linked (choix de Charles 12/11).
-      brief: `Messagerie Reveal ${late ? 'lue en retard' : reveal.connected ? 'connectée' : unlinked ? 'pas encore reliée' : 'déconnectée'}`,
+      brief: cut
+        ? 'Lecture Reveal coupée'
+        : `Messagerie Reveal ${late ? 'lue en retard' : reveal.connected ? 'connectée' : unlinked ? 'pas encore reliée' : 'déconnectée'}`,
     },
     {
       id: 'voice',
@@ -290,6 +306,11 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ]),
   ].join(' · ');
   const base = {
+    beat: {
+      tone: cut ? 'bad' : late ? 'warn' : 'ok',
+      lastReadAt: reveal.lastReadAt,
+      cutSince: reveal.outage?.since ?? null,
+    } as const,
     eyebrow: plural(reveal.conversations, 'conversation', 'conversations'),
     foldSummary: summary,
     cards,
@@ -325,26 +346,43 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
     };
   }
   // An agent in trouble says so before anything that waits: Reveal first, it is what everything reads.
+  // The read of Reveal cut (27/11/2026): the cause in plain words, the last read, the gesture when there is one.
+  const lastClock = reveal.lastReadAt === null ? '' : ` Dernière lecture à ${clockOf(reveal.lastReadAt)}.`;
   if (!reveal.connected) {
     return {
       ...base,
       tone: 'bad',
-      headline: 'La messagerie Reveal est **déconnectée**',
-      // Since when, in the sentence itself, not only in the fold (DASH-18).
-      lead: `${lastRead === null ? '' : `Dernière lecture ${lastRead}. `}L’agent ne lit plus les conversations. Reconnecte la session Reveal depuis l’extension.${alsoVoice}`,
+      headline: 'La lecture de Reveal est **coupée**',
+      lead: `La session Reveal de l’IA a expiré.${lastClock} Dans le profil Chrome de l’IA, reconnecte son compte Reveal, puis « Synchroniser » dans l’extension.${alsoVoice}`,
       action: 'Reconnecter Reveal',
       actionTo: '/aide/reveal',
+      actionStrong: true,
       foldTitle: 'Quelque chose ne va pas',
     };
   }
-  // The session holds, nothing reads it: not an outage of Reveal, but the fans' messages no longer come in.
+  if (reveal.outage !== null) {
+    const cause =
+      reveal.outage.reason === 'format_changed'
+        ? 'Reveal a changé sa façon de répondre : l’IA ne lit plus les fans et ne leur répond plus.'
+        : 'Reveal ne répond plus : l’IA ne lit plus les fans et ne leur répond plus.';
+    return {
+      ...base,
+      tone: 'bad',
+      headline: 'La lecture de Reveal est **coupée**',
+      lead: `${cause}${lastClock} Rien à réparer de ton côté : Impera s’en occupe. Vérifie qu’un chatteur est en poste.${alsoVoice}`,
+      action: 'Voir qui est en poste',
+      actionTo: '/equipe/planning',
+      foldTitle: 'Quelque chose ne va pas',
+    };
+  }
+  // The session holds, the read lags: Impera tries again by itself, the owners are told past 5 minutes.
   if (late && reveal.lastReadAt !== null) {
     return {
       ...base,
       tone: 'warn',
       stalled: true,
-      headline: 'La messagerie Reveal n’est **plus lue**',
-      lead: `La session tient, mais la messagerie a été lue pour la dernière fois ${ago(reveal.lastReadAt, now)}. Les nouveaux messages des fans n’arrivent plus à l’agent.${alsoVoice}`,
+      headline: 'Reveal est lu **avec du retard**',
+      lead: `Dernière lecture ${ago(reveal.lastReadAt, now)}. Impera réessaie seul ; si ça dure, tu es prévenu.${alsoVoice}`,
       foldTitle: 'Quelque chose ne va pas',
     };
   }

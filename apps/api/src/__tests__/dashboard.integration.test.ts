@@ -657,6 +657,51 @@ describe('GET /v1/dashboard', () => {
     await account({ lastPollAt: new Date() });
   });
 
+  it('names the cause of a read cut and since when, then forgets it at the next good read (décision du 27/11/2026)', async () => {
+    const account = (set: Partial<typeof schema.platformAccounts.$inferInsert>) =>
+      test.admin.db
+        .update(schema.platformAccounts)
+        .set(set)
+        .where(eq(schema.platformAccounts.id, platformAccountId));
+    const reveal = async () =>
+      DashboardSchema.parse((await call(`/v1/dashboard?creatorId=${creatorId}`, ownerCookie)).json()).reveal;
+    const breaker = (code: string, at: Date) =>
+      test.admin.db.insert(schema.domainEvents).values({
+        id: newId(EventIdSchema),
+        creatorId,
+        type: 'error',
+        payload: { code, jobName: 'poll', retryable: true },
+        actor: 'system',
+        correlationId: 'test-read-cut',
+        createdAt: at,
+      });
+    const lastRead = new Date(Date.now() - 20 * 60_000);
+    const opened = new Date(Date.now() - 10 * 60_000);
+
+    expect((await reveal()).outage).toBeNull();
+    // An old breaker, before the last good read, says nothing.
+    await account({ lastPollAt: lastRead });
+    await breaker('connector_shape_changed', new Date(Date.now() - 60 * 60_000));
+    await account({ pausedUntil: new Date(Date.now() + 10 * 60_000) });
+    expect((await reveal()).outage).toBeNull();
+    await breaker('connector_shape_changed', opened);
+    expect((await reveal()).outage).toEqual({ reason: 'format_changed', since: opened.toISOString() });
+    // The read comes back: the breaker is closed.
+    await account({ pausedUntil: null, lastPollAt: new Date() });
+    expect((await reveal()).outage).toBeNull();
+    // Reveal not answering: the cause is « unreachable »; the shape changed before the last good read is forgotten.
+    const readAgain = new Date(Date.now() - 5 * 60_000);
+    await account({ lastPollAt: readAgain, pausedUntil: new Date(Date.now() + 10 * 60_000) });
+    await breaker('connector_network', new Date(Date.now() - 60_000));
+    expect((await reveal()).outage).toMatchObject({ reason: 'unreachable' });
+    // A dead session wins, since its last read.
+    await account({ pausedUntil: null, sessionState: 'expired' });
+    expect(await reveal()).toMatchObject({
+      outage: { reason: 'session_expired', since: readAgain.toISOString() },
+    });
+    await account({ sessionState: 'valid', lastPollAt: new Date() });
+  });
+
   it('gathers « À traiter » of every creator followed, each line naming hers, never one not followed (SUIVI-09)', async () => {
     // Inès, a second invented creator (ADR 0010): Arthur's send failed for good.
     const ines = newId(CreatorIdSchema);

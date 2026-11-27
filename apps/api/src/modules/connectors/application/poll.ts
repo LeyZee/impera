@@ -2,6 +2,7 @@ import type { JobPayload, SessionState } from '@impera/contracts';
 
 import { ConnectorError, type PlatformConnector } from '../domain/platform-connector';
 import type { AccountStore, Clock, ConnectorAccount, IngestMessage, JobLogger } from '../domain/ports';
+import { readCameBack, type ReadHealth } from '../domain/read-health';
 import { isPaused, POLL_OVERLAP_SECONDS } from '../domain/rhythm';
 
 import { recordConnectorFailure } from './failures';
@@ -57,6 +58,8 @@ export interface AccountJobDeps {
   readonly resolver: ConnectorResolver;
   readonly ingest: IngestMessage;
   readonly clock: Clock;
+  /** Tells the owners whether the AI still reads (décision du 27/11/2026); absent in a test that does not watch it. */
+  readonly readHealth?: ReadHealth;
 }
 
 /** The account if a job may talk to its platform now; the reason it may not, otherwise. */
@@ -118,7 +121,21 @@ export function createPollJob(deps: AccountJobDeps) {
       await deps.accounts.recordPoll(account.creatorId, account.id, now);
       logger.info({ platformAccountId: account.id, conversations: snapshots.length, created }, 'poll: done');
     } catch (error) {
-      await recordConnectorFailure(deps.accounts, account, error, { meta, logger, jobName: 'poll' });
+      await recordConnectorFailure(deps.accounts, account, error, {
+        meta,
+        logger,
+        jobName: 'poll',
+        ...(deps.readHealth === undefined ? {} : { readHealth: deps.readHealth }),
+      });
+      return;
+    }
+    // The read is told back after a stop only: the regular rhythm never asks the outbox.
+    if (deps.readHealth !== undefined && readCameBack(account, now)) {
+      await deps
+        .readHealth(account.platform, { state: 'back' }, payload.correlationId)
+        .catch((err: unknown) => {
+          logger.warn({ platformAccountId: account.id, err }, 'poll: read back not told');
+        });
     }
   };
 }

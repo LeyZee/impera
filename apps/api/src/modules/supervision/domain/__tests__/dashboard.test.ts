@@ -37,6 +37,7 @@ const FACTS: DashboardFacts = {
     lastReadAt: minutesAgo(1),
     sessionSince: minutesAgo(90),
     pollEverySeconds: 80,
+    outage: null,
     conversations: 4,
   },
   voice: { medianWriteMs: 1412.5, outageHoursLast7d: 0 },
@@ -239,6 +240,7 @@ describe('revealLate (recette 28/10, G8)', () => {
       lastReadAt: minutesAgo(60),
       sessionSince: minutesAgo(90),
       pollEverySeconds: 80,
+      outage: null,
       conversations: 4,
     };
     expect(assemble({ reveal: { connected: true, ...stale } }).reveal).toMatchObject({
@@ -247,6 +249,13 @@ describe('revealLate (recette 28/10, G8)', () => {
     });
     expect(assemble({ reveal: { connected: false, ...stale } }).reveal.late).toBe(false);
     expect(assemble().reveal.late).toBe(false);
+  });
+
+  it('gives the cause of a read cut and since when, as the Dashboard says it (27/11/2026)', () => {
+    const since = minutesAgo(12);
+    const cut = assemble({ reveal: { ...FACTS.reveal, outage: { reason: 'format_changed', since } } }).reveal;
+    expect(cut.outage).toEqual({ reason: 'format_changed', since: since.toISOString() });
+    expect(assemble().reveal.outage).toBeNull();
   });
 });
 

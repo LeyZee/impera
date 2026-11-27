@@ -9,7 +9,7 @@ import {
   type ShiftId,
   type UserId,
 } from '@impera/contracts';
-import type { Database, Transaction } from '@impera/db';
+import { withAdmin, type Database, type Transaction } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -69,7 +69,7 @@ import type { ShiftSalesReader } from './infra/report-check';
 import { createDrizzleReportReminderSource } from './infra/report-reminders';
 import { createDrizzleShiftReportStore } from './infra/report-store';
 import { createSchedulingRoutes, type RequireRole } from './infra/routes';
-import { agencyTimeZone } from './infra/rows';
+import { agencyTimeZone, sessionReminderClock } from './infra/rows';
 import { createDrizzleSwapStore } from './infra/swap-store';
 import { createDrizzleUncoveredCheck } from './infra/uncovered-check';
 
@@ -128,6 +128,11 @@ export interface SchedulingModule {
    * is only in their margin. Read as the system, for whoever asks: another door reads `reads.onShiftNow`, as the person.
    */
   onShift(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
+  /**
+   * The daily reminder to reconnect the AI's platform sessions (décision du 27/11/2026), read as the system for
+   * `alerts.remind_sessions`: the agency's minute (18 h until the owner sets one) and its clock.
+   */
+  sessionReminderClock(): Promise<{ readonly minute: number; readonly timeZone: string }>;
   /**
    * The shifts, the reports and who is on shift now for a door other than the routes (ADR 0026 § 1, the MCP): as the
    * person, under the same policies as the screen, confined to the creators named, never a creator's account
@@ -360,6 +365,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   return {
     name: 'scheduling',
     onShift: (creatorId, at) => admin.onShiftUnscoped(creatorId, at),
+    sessionReminderClock: () => withAdmin(deps.adminDb, sessionReminderClock),
     reads: createSchedulingReads(planning, reportStore, deps.creators, now),
     game: {
       ownValidatedShifts: async (userId) =>

@@ -30,7 +30,7 @@ import type { Logger } from './logger';
 import type { AccountingModule } from './modules/accounting';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
-import { createAgencyAlerts, createAlertRouter } from './modules/alerts';
+import { createAgencyAlerts, createAlertRouter, createSessionReminders } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
 import type {
   AvatarPorts,
@@ -722,6 +722,34 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
           { asked: await agency.remindSafety(new Date()) },
           'alerts: safety relays reminded',
         );
+      },
+    ),
+    // 27/11/2026 (audit de robustesse R3): the owners told to reconnect the AI's platform sessions at the agency's hour,
+    // once more an hour later, and 2 h before a token dies. Nothing while push is off.
+    'alerts.remind_sessions': defineTask(
+      'alerts.remind_sessions',
+      JOB_PAYLOADS['alerts.remind_sessions'],
+      logger,
+      async (_payload, context) => {
+        const notify = notifications.module.notify;
+        if (notify === null) {
+          context.logger.warn('alerts: push is off, the reminder to reconnect the sessions rings nowhere');
+          return;
+        }
+        const remind = createSessionReminders({
+          adminDb: adminDb.db,
+          agencyTimeZone,
+          clocks: () => connectors.module.sessions.clocks(),
+          reminder: () => scheduling.module.sessionReminderClock(),
+          notify,
+          onFailure: (step, error) => {
+            context.logger.error(
+              { err: error, step },
+              'alerts: a session reminder failed, the others went on',
+            );
+          },
+        });
+        context.logger.info({ asked: await remind(new Date()) }, 'alerts: session reminders');
       },
     ),
     'rate_limit.purge': defineTask(

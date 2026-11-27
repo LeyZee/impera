@@ -71,6 +71,14 @@ export interface DashboardFacts {
     readonly sessionSince: Date | null;
     /** The longest the account waits between two polls (its interval plus its jitter), in seconds. */
     readonly pollEverySeconds: number;
+    /**
+     * The read cut (27/11/2026): its session expired, or its breaker opened since its last good read, with the cause
+     * the breaker kept (`connector_shape_changed`: Reveal changed its answers) and since when; `null` while it reads.
+     */
+    readonly outage: {
+      readonly reason: 'format_changed' | 'unreachable' | 'session_expired';
+      readonly since: Date;
+    } | null;
     readonly conversations: number;
   };
   readonly voice: { readonly medianWriteMs: number | null; readonly outageHoursLast7d: number };

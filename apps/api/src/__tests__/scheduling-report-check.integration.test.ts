@@ -301,6 +301,27 @@ describe('Rapports de fin de shift comparés à Reveal (ADR 0073)', () => {
     expect((await call('PUT', path, owner, { minutes: null })).json()).toEqual({ minutes: null });
   });
 
+  it('gives the agency the hour of the reminder to reconnect, 18 h by default, and only the owner sets it (27/11)', async () => {
+    const path = '/scheduling/session-reminder';
+    expect((await call('GET', path, noraCookie)).json()).toEqual({ minute: 1080 });
+    expect(codeOf(await call('GET', path, theoCookie))).toBe('shift_report_forbidden');
+    expect((await call('PUT', path, noraCookie, { minute: 1110 })).statusCode).toBe(403);
+    expect((await call('PUT', path, owner, { minute: 1440 })).statusCode).toBe(400);
+    expect((await call('PUT', path, owner, {})).statusCode).toBe(400);
+    const saved = await call('PUT', path, owner, { minute: 1110 });
+    expect(saved.statusCode, saved.body).toBe(200);
+    expect((await call('GET', path, noraCookie)).json()).toEqual({ minute: 1110 });
+    const [audit] = await test.admin.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'scheduling_settings.session_reminder'));
+    expect(audit).toMatchObject({ details: { minute: 1110 } });
+    const [row] = await test.admin.db
+      .select({ minute: schema.schedulingSettings.sessionReminderMinute })
+      .from(schema.schedulingSettings);
+    expect(row).toEqual({ minute: 1110 });
+  });
+
   it('validates by itself a report within the threshold and not above Reveal, once, in no one’s name (§ 4)', async () => {
     const shift = await shiftOf(-1);
     // 120,00 € sold, 20,00 € of it refunded since: Reveal read 100,00 €. A sale outside the window is not the shift's,

@@ -283,6 +283,10 @@ export function assembleDashboard(input: {
       connected: facts.reveal.connected,
       lastReadAt: facts.reveal.lastReadAt?.toISOString() ?? null,
       late: facts.reveal.connected && revealLate(facts.reveal, window.now, facts.reveal.pollEverySeconds),
+      outage:
+        facts.reveal.outage === null
+          ? null
+          : { reason: facts.reveal.outage.reason, since: facts.reveal.outage.since.toISOString() },
       conversations: facts.reveal.conversations,
     },
     voice: {
