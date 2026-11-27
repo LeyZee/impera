@@ -852,6 +852,8 @@ export interface ComposedTurn {
   readonly bubbles: readonly string[];
   readonly voiceFailure?: LlmFailure;
   readonly violations: readonly GuardViolation[];
+  /** The turn was sexual (her register or her script running): what a voice compared on it is guarded the same way. */
+  readonly sexualTurn?: boolean;
   readonly isBlocked: boolean;
   readonly costUsd: number;
   readonly latencyMs: number;
@@ -958,6 +960,7 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
   exampleIds: readonly string[],
+  sexual = false,
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
   const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
@@ -966,6 +969,8 @@ async function writeFollowUp(
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
     ...checkExplicit(written),
+    // As the main answer (Sécurité, #1043): her aftercare follows a sexual exchange.
+    ...checkYouthWords(written, sexual),
   ];
   return {
     ...(droppedNotes.length > 0 && { droppedNotes }),
@@ -1058,7 +1063,15 @@ export async function composeTurn(
   if (input.followUp !== undefined)
     return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped, exampleIds);
   if (input.aftercare !== undefined)
-    return writeFollowUp(gateway, persona, base, aftercareBrief(input.aftercare), notes.dropped, exampleIds);
+    return writeFollowUp(
+      gateway,
+      persona,
+      base,
+      aftercareBrief(input.aftercare),
+      notes.dropped,
+      exampleIds,
+      true,
+    );
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   // His desire map, from the notes kept (Charles 26/11): the scripts closest to his fantasy come first.
@@ -1728,6 +1741,7 @@ export async function composeTurn(
     bubbles,
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
+    sexualTurn,
     isBlocked: isBlocked(violations) || !voice.ok,
     costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
     latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),

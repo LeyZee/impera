@@ -2102,6 +2102,17 @@ describe('createDraftComposer, her word after a sale of his (ADR 0156 § 2)', ()
     expect(ended?.replyBrief).toContain('petit mot tendre');
   });
 
+  it('guards her word after a sale as a sexual turn: a word of youth is held (Sécurité, #1043)', async () => {
+    const { draftComposer } = composer(
+      { voice: { bubbles: ['Merci, ta petite fille sage 😘'] } },
+      undefined,
+      limitsOf({}).limits,
+    );
+    const held = await draftComposer.compose(AFTERCARE);
+    expect(held).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(held.kind === 'held' ? held.detail : []).toContain('youth_word_in_sex');
+  });
+
   it('thanks him for a tip in its own words', async () => {
     const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
     await draftComposer.compose({
