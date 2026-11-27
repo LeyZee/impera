@@ -17,6 +17,8 @@ const screen = (now: string, text = ''): PanelScreen => ({
   draft: {
     kind: 'ready',
     bubbles: ['coucou'],
+    translation: null,
+    translationOpen: false,
     placed: false,
     pending: true,
     mode: 'editing',
