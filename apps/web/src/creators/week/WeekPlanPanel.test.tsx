@@ -48,7 +48,9 @@ function serve(read: unknown, status = 200): unknown[] {
         answer = { ...computed, plan, state: 'validated', validatedAt: '2026-11-22T19:00:00.000Z' };
         return Promise.resolve(new Response(JSON.stringify(answer)));
       }
-      return Promise.resolve(new Response(JSON.stringify(answer), { status }));
+      return Promise.resolve(
+        status === 204 ? new Response(null, { status }) : new Response(JSON.stringify(answer), { status }),
+      );
     }),
   );
   return posts;
@@ -74,8 +76,8 @@ afterEach(() => {
 
 describe('her week, as the owner reads it', () => {
   it('says when it is not computed yet', async () => {
-    // A week not computed yet is a normal answer, never a 404 (MAN-08, DS-14).
-    serve({ week: null });
+    // A week not computed yet is a normal answer, 204, never a 404 (MAN-08, DS-14).
+    serve(null, 204);
     show(true);
     expect(await screen.findByText(/Pas encore préparée/)).toBeTruthy();
   });

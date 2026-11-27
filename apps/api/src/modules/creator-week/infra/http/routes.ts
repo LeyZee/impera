@@ -62,9 +62,6 @@ async function asCreator<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Her week, or `{ week: null }` while it is not computed yet. */
-const AgencyCreatorWeekReadSchema = z.union([AgencyCreatorWeekSchema, z.strictObject({ week: z.null() })]);
-
 const AcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
 
 /**
@@ -82,16 +79,20 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
       '/creators/:creatorId/weeks/:week',
       {
         preValidation: deps.requireRole('owner', 'operator'),
-        schema: { params: CreatorWeekParamsSchema, response: { 200: AgencyCreatorWeekReadSchema } },
+        schema: {
+          params: CreatorWeekParamsSchema,
+          response: { 200: AgencyCreatorWeekSchema, 204: z.null() },
+        },
       },
-      async (request) => {
+      // 204 while the Sunday job has not computed it: an ordinary state, never a 404 the browser logs as an error
+      // (MAN-08, DS-14, recette 27/11).
+      async (request, reply) => {
         const week = await deps.drafts.read(
           request.params.creatorId,
           signedIn(request.user),
           mondayOf(request.params.week),
         );
-        // A week not computed yet is a normal case, never a 404 the browser logs as an error (MAN-08, DS-14).
-        return week ?? { week: null };
+        return week === null ? reply.code(204).send(null) : reply.code(200).send(week);
       },
     );
 

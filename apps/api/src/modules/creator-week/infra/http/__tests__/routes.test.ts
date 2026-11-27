@@ -47,11 +47,11 @@ async function serve(read: WeekDraftStore['read']) {
 }
 
 describe('GET /v1/creators/:creatorId/weeks/:week', () => {
-  it('answers 200 with `week: null` while her week is not computed yet (MAN-08, DS-14)', async () => {
+  it('answers 204 while her week is not computed yet (MAN-08, DS-14)', async () => {
     const app = await serve(() => Promise.resolve(null));
     const response = await app.inject({ method: 'GET', url: `/v1/creators/${CREATOR}/weeks/2026-11-16` });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ week: null });
+    expect(response.statusCode).toBe(204);
+    expect(response.body).toBe('');
   });
 
   it('answers her week once computed', async () => {
