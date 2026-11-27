@@ -1,7 +1,13 @@
-import { newId, ShiftSwapRequestIdSchema, type Shift, type SwapCandidates } from '@impera/contracts';
+import {
+  newId,
+  ShiftSwapRequestIdSchema,
+  type Shift,
+  type ShiftSwapList,
+  type SwapCandidates,
+} from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
-import { proposeSwap, useRefreshPlanning, useSwapCandidates, type Refusal } from '@/scheduling/api';
+import { proposeSwap, useRefreshPlanning, useSwapCandidates, useSwaps, type Refusal } from '@/scheduling/api';
 import { READ_AGAIN, swapRefusalText, swapShiftLine } from '@/scheduling/model';
 import { Dialog } from '@/shell/Dialog';
 import { Failure } from '@/shell/states';
@@ -26,6 +32,18 @@ export function backsOf(candidate: Candidate, shift: Pick<Shift, 'startsAt' | 'e
 }
 
 /**
+ * The colleagues to whom `shiftId` is already offered and who have not answered yet (recette CHAT-06): marked « Déjà
+ * proposé », never offered twice.
+ */
+export function offeredTo(list: ShiftSwapList | undefined, shiftId: string): ReadonlySet<string> {
+  return new Set(
+    (list?.swapRequests ?? [])
+      .filter((swap) => swap.shiftId === shiftId && swap.status === 'proposed')
+      .map((swap) => swap.targetMemberId),
+  );
+}
+
+/**
  * « Proposer un échange » (ADR 0031, without a manager): one of the member's shifts to a colleague who works on its
  * creator, given or in exchange for one of theirs. The colleague answers; the agency hears of it and can undo it. The
  * proposal's id is made when the panel opens, so a retry records one proposal.
@@ -44,6 +62,7 @@ export function SwapPanel({
   const id = useId();
   const refresh = useRefreshPlanning();
   const candidates = useSwapCandidates(shift.id);
+  const already = offeredTo(useSwaps().data, shift.id);
   const [requestId] = useState(() => newId(ShiftSwapRequestIdSchema));
   const [memberId, setMemberId] = useState<string | null>(null);
   const [backId, setBackId] = useState<string | null>(null);
@@ -113,7 +132,8 @@ export function SwapPanel({
           ) : (
             <div className="sc-options" role="radiogroup" aria-label="Collègue">
               {list.map((candidate, index) => {
-                const possible = candidate.freeThen || backsOf(candidate, shift).length > 0;
+                const asked = already.has(candidate.member.id);
+                const possible = !asked && (candidate.freeThen || backsOf(candidate, shift).length > 0);
                 return (
                   <button
                     key={candidate.member.id}
@@ -140,11 +160,13 @@ export function SwapPanel({
                     <span className="sc-option__text">
                       <span className="sc-option__title">{candidate.member.displayName}</span>
                       <span className="sc-option__sub">
-                        {candidate.freeThen
-                          ? 'Libre à ces heures'
-                          : possible
-                            ? 'Déjà en shift à ces heures : seulement contre celui-là'
-                            : 'Déjà en shift à ces heures'}
+                        {asked
+                          ? 'Déjà proposé : sa réponse est attendue'
+                          : candidate.freeThen
+                            ? 'Libre à ces heures'
+                            : possible
+                              ? 'Déjà en shift à ces heures : seulement contre celui-là'
+                              : 'Déjà en shift à ces heures'}
                       </span>
                     </span>
                   </button>

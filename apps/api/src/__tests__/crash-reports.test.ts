@@ -47,10 +47,13 @@ function fixture(enabled = true) {
 }
 
 describe('reportCrashes (OPS-18)', () => {
-  it('listens to nothing without Sentry: Node keeps its own behaviour', () => {
-    const { listeners, source, reporter, logger } = fixture(false);
+  it('without Sentry, stops on a rejection nobody handled as Node would, after writing it', () => {
+    const { listeners, exits, source, reporter, logger, lines } = fixture(false);
     reportCrashes(reporter, logger, 'api', source);
-    expect(listeners.size).toBe(0);
+    expect([...listeners.keys()]).toEqual(['unhandledRejection']);
+    listeners.get('unhandledRejection')?.(new Error('nobody awaited'));
+    expect(exits).toEqual([1]);
+    expect(lines.join('')).toContain('process crashed');
   });
 
   it('sends an uncaught error, waits for it to leave, then exits with 1, once', async () => {
@@ -74,5 +77,21 @@ describe('reportCrashes (OPS-18)', () => {
     expect(exits).toEqual([1]);
     expect(lines.join('')).toContain('"origin":"unhandledRejection"');
     expect(lines.join('')).toContain('process crashed');
+  });
+
+  it('keeps the process when the database is out of reach for a moment, Sentry or not (recette CHAT-03, COUV-14)', async () => {
+    const cut = (): Error => new Error('timeout exceeded when trying to connect');
+    const reset = (): Error => Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+    for (const enabled of [true, false]) {
+      const { listeners, exits, captured, source, reporter, logger, lines } = fixture(enabled);
+      reportCrashes(reporter, logger, 'api', source);
+      listeners.get('unhandledRejection')?.(cut());
+      listeners.get('unhandledRejection')?.(reset());
+      await Promise.resolve();
+      expect(exits).toEqual([]);
+      expect(captured).toHaveLength(enabled ? 2 : 0);
+      expect(lines.join('')).toContain('database unavailable, process kept');
+      expect(lines.join('')).not.toContain('process crashed');
+    }
   });
 });

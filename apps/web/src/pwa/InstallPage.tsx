@@ -12,6 +12,7 @@ import {
   type Platform,
 } from './install';
 
+/** In the steps, guillemets and colons hold to their words (no-break space): never « at the end of a line (Design, 27/11). */
 const STEPS: Record<
   Exclude<Platform, 'other'>,
   { readonly title: string; readonly steps: readonly string[] }
@@ -21,8 +22,8 @@ const STEPS: Record<
     steps: [
       'Ouvre Impera dans Safari (pas dans une autre application).',
       'Touche le bouton Partager, le carré avec une flèche vers le haut.',
-      'Choisis « Sur l’écran d’accueil », puis « Ajouter ».',
-      'Ouvre Impera depuis son icône : c’est là que les notifications arrivent.',
+      'Choisis «\u00a0Sur l’écran d’accueil\u00a0», puis «\u00a0Ajouter\u00a0».',
+      'Ouvre Impera depuis son icône\u00a0: c’est là que les notifications arrivent.',
     ],
   },
   android: {
@@ -30,7 +31,7 @@ const STEPS: Record<
     steps: [
       'Ouvre Impera dans Chrome.',
       'Touche le menu ⋮ en haut à droite.',
-      'Choisis « Installer l’application », puis « Installer ».',
+      'Choisis «\u00a0Installer l’application\u00a0», puis «\u00a0Installer\u00a0».',
       'Ouvre Impera depuis son icône.',
     ],
   },

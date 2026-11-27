@@ -48,6 +48,8 @@ export const GUARD_CODES = [
   'language_not_covered',
   // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
   'minor_reference',
+  // Charles 26/11: in a sexual message, no word of youth for her or for anyone (« petite », « jeunette », « lolita »…).
+  'youth_word_in_sex',
   // Charles 26/11 (« go voix »): her emojis, at the end of a bubble, one kind a message (two in a flirt), never three,
   // and not on every message. Soft: rewritten once, then her answer goes.
   'emoji_misuse',

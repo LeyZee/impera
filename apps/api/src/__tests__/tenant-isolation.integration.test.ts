@@ -51,6 +51,11 @@ const bodiesFor = (
     confirm: null,
     idempotencyKey: newId(PlatformAccountIdSchema),
   },
+  'POST /v1/creators/:creatorId/vault/media/:platformMediaId/description': {
+    kind: 'validate',
+    platformAccountId: newId(PlatformAccountIdSchema),
+    descriptionId: newId(PlatformAccountIdSchema),
+  },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
   'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },

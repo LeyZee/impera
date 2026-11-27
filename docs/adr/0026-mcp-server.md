@@ -1,5 +1,15 @@
 # 0026. Serveur MCP de Nirvana : une seconde porte sur les mêmes commandes
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0058 · Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui](0058-external-agents-may-publish.md) : Remplace : dans l'ADR 0026 § 5, la règle « **un agent connecté peut freiner, jamais accélérer** » devient « un agent connecté peut freiner, jamais accélérer, **sauf pour préparer et publier le contenu public de la créatrice, dans les limites de l'ADR 0058** ». Tout le reste de l'ADR 0026 reste tel quel.
+>
+> - [0105 · Le MCP d'Impera remis à jour : un agent connecté lit, freine et prépare, un humain confirme](0105-mcp-agents-read-brake-and-prepare.md) : **Amende l'ADR 0026, acceptée** (§ 2 à § 5, § 7 et § 9) ; ne touche pas l'ADR 0058.
+>
+> Toutes les décisions du même sujet : [`docs/regles/acces-et-agents.md`](../regles/acces-et-agents.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 27/10/2026)
 Date : 2026-10-27
 

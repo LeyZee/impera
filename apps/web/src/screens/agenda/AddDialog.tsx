@@ -239,10 +239,13 @@ export function AddDialog({
   zone,
   preset,
   onClose,
+  onAdded = () => undefined,
 }: {
   zone: string;
   preset: AddPreset;
   onClose: () => void;
+  /** A task added on a day of its own: the agenda goes to that day, so that she sees it (recette MOD-13). */
+  onAdded?: (day: string) => void;
 }): JSX.Element {
   const [what, setWhat] = useState<'task' | 'dispo'>('task');
   const [opened] = useState(() => new Date());
@@ -267,6 +270,7 @@ export function AddDialog({
               reminderMinutes: null,
             }}
             onClose={onClose}
+            onAdded={onAdded}
           />
         ) : (
           <DispoForm
@@ -434,10 +438,12 @@ function TaskForm({
   zone,
   initial,
   onClose,
+  onAdded,
 }: {
   zone: string;
   initial: TaskDraft;
   onClose: () => void;
+  onAdded: (day: string) => void;
 }): JSX.Element {
   const id = useId();
   const client = useQueryClient();
@@ -469,6 +475,7 @@ function TaskForm({
       }
       await client.invalidateQueries({ queryKey: AGENDA_KEY });
       onClose();
+      if (draft.kind !== 'routine') onAdded(draft.day);
     });
   };
   return (

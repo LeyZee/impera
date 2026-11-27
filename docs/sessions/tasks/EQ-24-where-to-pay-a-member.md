@@ -9,7 +9,7 @@ Le propriétaire verse chaque relevé par WorldRemit sans chercher le numéro ai
 
 ## Fait
 - [x] ADR 0165 (proposée) et avis de Sécurité du 21/11 : bloc scellé avec `CREDENTIALS_ENCRYPTION_KEYS`, contexte membre et version ; écriture par le membre seul avec connexion récente ; lecture par lui et le propriétaire, qui révèle un membre à la fois, journalisé ; aucun accès du rôle de service ; `Cache-Control: no-store` ; 3 changements par jour au plus.
-- [x] Table `payout_destinations` en ajout seul (migration 0283), FORCE RLS, déclencheur `refuse_change`, aucun GRANT à `impera_service` (`CLOSED` du test du rôle de service).
+- [x] Table `payout_destinations` en ajout seul (migration 0279), FORCE RLS, déclencheur `refuse_change`, aucun GRANT à `impera_service` (`CLOSED` du test du rôle de service).
 - [x] Routes : `GET /v1/payroll/payout-destinations` (propriétaire, sans numéro), `GET` et `PUT …/contractors/:memberId/payout-destination` (le membre), `POST …/reveal` (propriétaire, connexion récente).
 - [x] Journal : `payout_destination.update` (façon de recevoir et version, jamais une valeur), `payout_destination.reveal`.
 - [x] Notification `payout_change` au membre sur chacun de ses appareils, même en heures calmes, par le job `payroll.notify_payout_change`.

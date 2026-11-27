@@ -1,5 +1,5 @@
 # SC-07 Mode tournage et ordre de tournage sur le téléphone de la créatrice
-Statut : todo (idée acceptée par Charles le 03/11/2026, 13 h 38 : « ça peut être pas mal oui mais il va falloir que ce soit bien exécuté »)
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo (idée acceptée par Charles le 03/11/2026, 13 h 38 : « ça peut être pas mal oui mais il va falloir que ce soit bien exécuté »)
 Phase : scripts (ADR 0056)
 Dépend de : SC-02 (la demande et la pile de cartons), SC-01 lot c2 (tenue et lieu par étape)
 Branche : task/sc-07-shooting-mode

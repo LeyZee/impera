@@ -1,4 +1,11 @@
-import { isGuardedLanguage, normalise, unmask, type GuardCode, type Language } from '@impera/contracts';
+import {
+  isGuardedLanguage,
+  normalise,
+  normaliseWords,
+  unmask,
+  type GuardCode,
+  type Language,
+} from '@impera/contracts';
 
 import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
 import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
@@ -73,6 +80,13 @@ export interface GuardContext {
    */
   readonly fanTier?: number;
   /**
+   * The sums he wrote since her last answer, in minor units (Charles 27/11): she may say one back without agreeing to
+   * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
+   */
+  readonly fanAmountsMinor?: readonly number[];
+  /** He asked a price since her last answer (Sécurité, #1043): a sum she writes now is a price of hers. */
+  readonly fanAskedPrice?: boolean;
+  /**
    * The languages she may write in to him (ADR 0168 § 4): her persona's, among those the guards cover. Absent, any
    * covered language passes; a language outside the coverage never does.
    */
@@ -108,14 +122,56 @@ const CITY =
  */
 const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|ce week-end|cette semaine|dispo|disponible|\\d{1,2} ?h|${CITY})\\b`;
 
+/** A child or a minor named, on the normalised text: the `minor_reference` guard, and the desire map's filter. */
+export const MINOR_REFERENCE =
+  /\b(enfants?|gamine?s?|(?<!beau )gosses?|momes?|fillettes?|petite fille|petit garcon|mineure?s?|ados|ado|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?)\b/;
+
+// Charles 21/11, a hard rule: she never compares anyone to a child or a minor, to mock him or otherwise (« on dirait
+// celle d'un enfant », « comme une gamine », « t'es qu'un gamin »). Read on every text. « T'es un grand enfant » is a
+// figure of speech, no comparison.
+const MINOR_COMPARISON =
+  /\b(t'?es qu'|tu (n'?)?es qu'|comme|on dirait|celle d'|celui d'|ceux d'|celles d'|l'air d'|digne d'|taille d'|like|come|como)\s?(une?|a|an|una?|uno|des|les)? ?(enfants?|gamine?s?|gosses?|momes?|fillettes?|petite fille|petit garcon|ados?|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|little girls?|bambin[aeio]|ragazzin[aeio]|nin[ao]s?)\b/;
+
+// Procreation between adults is no minor (Charles 26/11): a child or a baby right after a verb of making one (« te
+// faire un enfant », « que tu me fasses un enfant », « porter ton enfant », « te remplir pour te faire un bébé », « give
+// you a baby », « mi farai un bambino », « me harás un hijo »), in the present, the subjunctive and the future. Only a pronoun, « pour te faire » and an article may stand between; « une enfant » is a girl, never a birth.
+// Read on `normaliseWords` (apostrophes and hyphens as spaces).
+const PROCREATION = new RegExp(
+  [
+    '\\b(?:fais|faire|fait|ferai|ferais|feras|fera|ferez|fasse|fasses|fassiez|faites|avoir|aurai|veux|voudrais|envie d',
+    '|porter|porte|portes|porterai|porteras|mettre|mets|met|remplir|remplis|engrosser|donner|donne|donnes|donnerai',
+    '|donneras|make|making|have|having|give|giving|carry|carrying|want|wanna|fare|faccia|farai|fara|fai|avere|dare',
+    '|darai|dai|voglio|vorrei|hacer|hacerte|hagas|haga|haras|hara|tener|dar|darte|daras|quiero)',
+    '(?: (?:te|me|lui|vous|nous|t|m|you|me|her|ti|mi|le|toi|moi))?',
+    '(?: pour (?:te|me|lui|vous|nous|t|m) faire)?',
+    '(?: (?:un|des|mon|ton|son|notre|votre|nos|vos|a|an|your|my|our|uno|tuo|mio|nostro|tu|mi|nuestro))?',
+    ' (?:enfants?|bebes?|babies|baby|child|children|kids?|figli[oa]?|bambin[aeio]|hij[oa]s?)(?: (?:avec|with|con) (?:toi|moi|you|me|te|ti))?\\b',
+  ].join(''),
+  'gu',
+);
+
+/** A text's words (`normaliseWords`) without what speaks of making a child between adults. */
+export function withoutProcreation(words: string): string {
+  return words.replace(PROCREATION, ' ');
+}
+
+/** A child or a minor named in a text, procreation between adults left out: the word, or `undefined`. */
+function minorNamed(bubble: string): string | undefined {
+  return MINOR_REFERENCE.exec(withoutProcreation(normaliseWords(bubble)))?.[0];
+}
+
+// A means of paying outside Reveal (recette MOT-04). « Wise » counts only as a means: « that's wise » is innocent.
+const PAYMENT_MEANS =
+  '(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)(?! (a|au|pour) ((ma|mon|sa|son) (mere|pere|soeur|frere|proprio|proprietaire|banque|pote|copine|copain|ex|coloc|daronne|daron|famille|mamie|papy)|(mes|ses) (parents|potes)))';
+// A plausible handle or identifier: a dot or an underscore inside a word, letters then digits, an « @ ».
+const HANDLE = '(?<![\\w@])[a-z][a-z0-9]*([._][a-z0-9]+)+|(?<![\\w@])[a-z]{3,}\\d{2,}\\b|@[a-z0-9_.]{2,}';
+// Two words after « cherche », « tape »: a name to type in a search (« cherche lina rose »).
+const SEARCH_TWO_WORDS = '\\b(cherche|tape|search|type|cerca|busca|scrivi)( moi)? [a-z0-9]+ [a-z0-9]+';
+// A network or another platform, where he could find or pay her elsewhere.
+const NETWORK =
+  '(snap(chat)?|whatsapp|insta(gram)?|telegram|tik ?tok|twitter|facebook|messenger|fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)';
+
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
-  // Charles 21/11, a hard rule: she never names a child or a minor, to mock him or in anything sexual. Read on every
-  // text, whatever the context: an innocent one is rewritten once, then goes to a human.
-  {
-    code: 'minor_reference',
-    pattern:
-      /\b(enfants?|gamine?s?|(?<!beau )gosses?|momes?|fillettes?|petite fille|petit garcon|mineure?s?|ados|ado|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?)\b/,
-  },
   {
     code: 'ai_disclosure',
     // « je suis modèle photo », « je suis assistante dentaire » are jobs: the article is required for those words.
@@ -129,8 +185,10 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   },
   {
     code: 'ai_disclosure',
+    // Her instructions always; a product only said of herself (« je tourne sous gpt », « créée par openai »): « t'as
+    // essayé chatgpt pour ton taf ? » is a topic (Sécurité, #1043).
     pattern:
-      /\b(prompt|language model|modele de langage|mes instructions|grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|deepseek|perplexity)\b/,
+      /\b(prompt|language model|modele de langage|mes instructions|mes consignes)\b|\b(je suis|j'?suis|jsuis|chui|moi c'est|i am|i'?m|je tourne sous|je tourne avec|propulsee? par|powered by|basee? sur|developpee? par|creee? par|concue? par|made by|built on) (une? |un simple )?(grok|openai|xai|chatgpt|gpt|llm|anthropic|gemini|mistral ai|le chat de mistral|llama|deepseek|perplexity)\b/,
   },
   // Naming herself after a model: « je suis claude », « moi c'est mistral ».
   {
@@ -145,7 +203,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     pattern: new RegExp(
       [
         `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | rien qu'| rien d'autre qu')?\\s?(une? |un simple |une simple )(modele|programme|logiciel|application|appli|simulation)(?! (photo|pour|nue?|lingerie|charme|glamour|insta|instagram|en |de |d'))(?![a-z])`,
-        `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | )(une? |ta |ton )?((fille|femme|meuf|personne|copine|creature|amie) )?(artificielle?|virtuelle?|simulee?|generee? par)(?![a-z])`,
+        `\\b(je (ne )?suis|j'?suis|jsuis|chui|chuis|chu)( qu'| que | juste | seulement | )(une? |ta |ton )?((fille|femme|meuf|personne|copine|creature|amie) )?(artificielle?|virtuelle?|simulee?|generee? par)(?![a-z])(?!\\s*\\?)`,
       ].join('|'),
     ),
   },
@@ -194,14 +252,17 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   },
   {
     code: 'love_declaration',
-    pattern: /\b(je t'?\s?aime|j'?t'?aime|jtm|je suis amoureuse de toi|i love you|te (quiero|amo))\b/,
+    // « Je t'aime bien » is no declaration (Charles 27/11), nor « je t'aime pas quand… », nor a « je t'aime » she
+    // quotes (« tu dis je t'aime à toutes ? », « elle m'a dit je t'aime »), Sécurité #1043.
+    pattern:
+      /(?<!\b(dis|dit|dire|dites|disent|disais|ecris|ecrit|says?|said|tell|told) (que )?)\b(je t'?\s?aime|j'?t'?aime|jtm|je suis amoureuse de toi|i love you|te (quiero|amo))\b(?! bien| pas(?! mal)| plus(?! que| qu'| fort)| point)/,
   },
   // A concrete meeting (a day, a place, a visit) is blocked; the playful « un jour, peut-être » stays allowed, and
   // so do the live, the DMs and the bed: « on se voit au prochain live », « viens me voir en privé ».
   {
     code: 'meeting_promise',
     pattern:
-      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|mon adresse|rendez-vous (a |au |chez ))/,
+      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|mon adresse|(?<!(j'?ai|j'avais|j'aurai|t'?as|tu as|il a|elle a|un|mon|ton) )rendez-vous (a |au |chez ))/,
   },
   {
     code: 'meeting_promise',
@@ -230,7 +291,8 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
         `\\bon (se )?(fait|donne|fixe|prend) (un )?(rdv|rendez ?-? ?vous)\\b`,
         `\\bje te donne (un )?(rdv|rendez ?-? ?vous)(?!${ONLINE})\\b`,
         `\\b(rdv|rendez ?-? ?vous) (le \\d|(le )?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|cette semaine|ce week-end)\\b)`,
-        `\\brdv (a|au|chez|devant)(?!${ONLINE})\\b`,
+        // A meeting of hers with someone else passes: « j'ai rdv chez le coiffeur » (Charles 27/11).
+        `(?<!(j'?ai|j'avais|j'aurai|t'?as|tu as|il a|elle a|un|mon|ton) )\\brdv (a|au|chez|devant)(?!${ONLINE})\\b`,
         `\\bon (pourrait |peut |va |devrait )?se (voit|voie|voir|verra|retrouve|retrouver|retrouvera|rencontre|rencontrer|rencontrera) (en vrai|pour de vrai|irl|en personne|en chair et en os|dans la vraie vie)\\b`,
       ].join('|'),
     ),
@@ -238,12 +300,31 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   { code: 'contact_info', pattern: /\b(https?:\/\/|www\.)\S+/ },
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
-  { code: 'contact_info', pattern: /\b(snap(chat)?|whatsapp|insta(gram)?|telegram)\b/ },
-  // Another platform, where he could find or pay her elsewhere.
+  // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
+  // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there
+  // never does (« ajoute-moi sur snap », « viens sur telegram », « mon insta c'est… », « rejoins-moi sur discord »). The
+  // invitation verbs in Italian and Spanish too (ADR 0168 § 4): « scrivimi su whatsapp », « escríbeme por telegram ».
   {
     code: 'contact_info',
-    pattern:
-      /\b(fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)\b/,
+    pattern: new RegExp(
+      [
+        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?|scrivi|scrivimi|scrivetemi|aggiungi|aggiungimi|seguimi|vieni|contattami|escribe|escribeme|escribime|agrega|agregame|anademe|sigueme|ven|contactame|hablame)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
+        `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
+        `\\b(mon|ma|mes|my|mi|il mio|la mia) (compte |account |cuenta )?${NETWORK}\\b`,
+        // « discord c'est pour les gamers » is a topic: after « c'est », only a handle (Sécurité, #1043).
+        `\\b${NETWORK} ?(:|=) ?@?[a-z0-9_.]{3,}`,
+        `\\b${NETWORK} ?(c'?est|est|is|es|e) ?(${HANDLE})`,
+        `(^|\\s)@[a-z0-9_.]{3,}`,
+      ].join('|'),
+    ),
+  },
+  // A network named with a plausible handle in the same bubble (Sécurité, #1043): « insta, lina.xx », « snap lina92 »,
+  // « cherche lina rose sur tiktok », or « tu me trouves sur … ». Handles and addresses in tests are invented.
+  {
+    code: 'contact_info',
+    pattern: new RegExp(
+      `^(?=[\\s\\S]*\\b${NETWORK}\\b)[\\s\\S]*?(${HANDLE}|${SEARCH_TWO_WORDS}|\\btu me trouve(s|ras)?\\b)`,
+    ),
   },
   // A link without its scheme: « monsite.com », « linktr.ee/lina », « t.me/lina ». Endings that are also French words
   // (« .me », « .co », « .de ») are read only with a path.
@@ -271,7 +352,10 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'contempt',
     pattern:
-      /\b(sale|espece de|t'?es (qu'?)?une?|tu es (qu'?)?une?|quel|quelle) (radin|radine|rapiat|rapiate|menteur|menteuse|mendiant|mendiante|crevard|crevarde|minable|pauvre type)s?\b|\b(mendiant|mendiante|crevard|crevarde|pauvre type)s?\b/,
+      // Only said to him (Charles 27/11): « pauvre type celui qui t'a fait ça » passes.
+      // Only the words of money, said to him (Sécurité, #1043): « t'es un menteur 😏 » or « minable au bowling » are
+      // teasing, the rest is for the judge in context.
+      /\b(sale|espece de|t'?es (qu'?)?(une? )?|tu es (qu'?)?(une? )?|toi,? |quel |quelle ) ?(gros |grosse |petit |petite |vrai |vraie )?(radin|radine|rapiat|rapiate|mendiant|mendiante|crevard|crevarde)s?\b/,
   },
   // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat. Nor
   // « ahah » nor « lol », stretched or not (Charles 26/11).
@@ -285,10 +369,24 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   // A payment outside the platform (recette MOT-04): Reveal is the only till, as it is the only inbox. Even her refusal
   // (« pas de paypal 😘 ») names the means, so it is blocked too, like a contact. « Wise » counts only as a means
   // (« par Wise », « wise transfer »): « that's wise » to an English-speaking fan is innocent (review of #529).
+  // Since 27/11 (Charles, banc de la Sécurité), only a payment between her and him: the means after a word of paying
+  // or of hers (« envoie par paypal », « mon iban », « paie-moi en crypto »). « Tu bosses dans la crypto ? », « le
+  // virement de ma paie » or her refusal « pas de paypal ici » pass.
   {
     code: 'off_platform_payment',
-    pattern:
-      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|(par|sur|via|avec|mon|ton|en|t'?as|tu as|on|by|through|my|your|got) wise|wise (transfer|account|compte|tag)|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
+    pattern: new RegExp(
+      [
+        `\\b(pay\\w*|paie\\w*|regle\\w*|envoi\\w*|envoy\\w*|vers\\w*|vire\\w*|transfer\\w*|accept\\w*|prend\\w*|send\\w*|fais[ -]moi|par|via|avec|through|by|voici|voila|here'?s)\\b[^.!?]{0,25}\\b${PAYMENT_MEANS}\\b`,
+        `\\b(mon|ma|mes|ton|ta|tes|my|your|mi|tu|il mio|il tuo|un|une) ${PAYMENT_MEANS}\\b`,
+        `\\b${PAYMENT_MEANS} ?(:|=|c'?est|est|is) ?[a-z0-9@+]`,
+        `\\b(t'?as|tu as|on|got) wise\\b|\\bwise (transfer|account|compte|tag)\\b`,
+      ].join('|'),
+    ),
+  },
+  // A means of paying named with an identifier in the same bubble (Sécurité, #1043): « paypal x@… », « lydia lina.xx ».
+  {
+    code: 'off_platform_payment',
+    pattern: new RegExp(`^(?=[\\s\\S]*\\b${PAYMENT_MEANS}\\b)[\\s\\S]*?(${HANDLE})`),
   },
   // A price is the script's, set in code and carried by the offer itself: never a sum in her words (recette MOT-04,
   // Charles 05/11). Her thanks for a tip (« merci pour les 20 € 🥰 ») pass.
@@ -302,13 +400,14 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'discount',
     pattern:
-      /\b(je (te|vous) (fais|fait|ferai|ferais|laisse|propose|offre) (un|une|le|la) (petit |petite |bon |super )?(prix|remise|reduc|reduction|ristourne|promo|rabais|geste)|(un|une|le) (prix d'ami|prix special|petit prix|code promo)|a moitie prix|\d+ ?% de (remise|reduc|reduction|rabais)|je (te |vous )?(baisse|descends|brade) (le|mon|son|ce) prix|au lieu de \d+ ?(€|euros?|balles)|je (te |vous )?(le|la|les) (laisse|fais) (a|pour) \d+|on (peut )?(negocie|negocier|s'arrange|s'arranger) (sur|pour) le prix)/,
+      /\b(je (te|vous) (fais|fait|ferai|ferais|laisse|propose|offre) (un|une|le|la) (petit |petite |bon |super )?(prix|remise|reduc|reduction|ristourne|promo|rabais|geste)|(un|une|le) (prix d'ami|prix special|petit prix|code promo)|a moitie prix(?! (chez|au|aux|a la|dans|en ligne|sur (vinted|amazon|le site|internet)))|(moitie prix|half price|meta prezzo|mitad de precio) (pour toi|for you|per te|para ti)|je te (la |le |les |l')?(fais|laisse|donne) (gratuit|gratuite|gratuits|gratuites|gratos|pour rien|a l'?oeil)|\d+ ?% de (remise|reduc|reduction|rabais)|je (te |vous )?(baisse|descends|brade) (le|mon|son|ce) prix|au lieu de \d+ ?(€|euros?|balles)|je (te |vous )?(le|la|les) (laisse|fais) (a|pour) \d+|on (peut )?(negocie|negocier|s'arrange|s'arranger) (sur|pour) le prix)/,
   },
-  // A percentage off, said about a price: « -30 % sur le pack », « 20 % de moins pour toi ». « -10 % de batterie » passes.
+  // A percentage off, said about a price: « -30 % sur le pack », « 20 % de moins pour toi ». « -10 % de batterie » passes,
+  // and so do the shops' sales: « promo -20 % sur les jeans », « à moitié prix chez zara » (Sécurité, #1043).
   {
     code: 'discount',
     pattern:
-      /(^|\s)(moins |-) ?\d+ ?% (sur (le|la|les|ce|cette|ces|mon|ma|mes|ton|ta|tes|tout)|pour toi|de remise|de reduc|si tu)|\b\d+ ?% (de moins|moins cher) (sur|pour)\b/,
+      /(?<!\b(promo|promos|solde|soldes|reduc|black friday)( a)? ?:? ?)(^|\s)(moins |-) ?\d+ ?% (sur (le|la|les|ce|cette|ces|mon|ma|mes|ton|ta|tes|tout)|pour toi|de remise|de reduc|si tu)|\b\d+ ?% (de moins|moins cher) (sur|pour)\b/,
   },
   // ADR 0168 § 4, « couverture des langues par les gardes »: the same refusals in English, Italian and Spanish, read on
   // the normalised text (accents off). Each has its cases per language in `language-coverage.test.ts`.
@@ -420,7 +519,8 @@ const AI_TICS: readonly RegExp[] = [
   /\bje suis la pour toi\b/,
   /\bjuste pour toi\b/,
   // A note-taker's line, never hers (Playground, Charles 16/11): « je note ton âge », « c'est noté ».
-  /\bje (te |le |l'|ca |bien )?(note|retiens)\b/,
+  // « Je te retiens » in a sexto is her holding him back (Charles 26/11): only a note-taker's « je retiens ça ».
+  /\bje (te |le |l'|ca |bien )?note\b|\bje (le |l'|ca |bien )?retiens\b(?! (mon|ton|ma|ta) (souffle|envie))/,
   /\b(c'est|bien) note\b/,
   /\bje prends note\b/,
   /—/,
@@ -785,6 +885,35 @@ function amountMinorOf(written: string): number | undefined {
   return digits === undefined ? undefined : Math.round(Number(digits.replace(',', '.')) * 100);
 }
 
+// What she sells, around a sum (Charles 27/11): a sum in such a sentence is a price of hers. Without it, a sum is
+// everyday life (« 5 € mon café », « t'as gagné 100 euros au poker ? ») and passes.
+const SALE_WORDS =
+  /\b(pour toi|c'?est|ca fait|ca te fait|ca (te )?coute|coute|prix|tarif|je te (le |la |les )?(fais|laisse|propose|vends|envoie|debloque|mets)|debloquer?|unlock|photos?|videos?|vids?|packs?|contenus?|medias?|ppv|exclus?|appels?|call|visio|facetime|vocal|vocaux|audio|it'?s|for you|price|tu as tout|t'?as tout|(elle|il|elles|ils) (est|sont) a|yours|seulement)\b|\bpour (\d|€|\$)/;
+// A made-to-measure, priced in any way, without her accord: never a sum.
+const CUSTOM_WORDS =
+  /\b(custom|sur[- ]mesure|perso|personnalise(e|s|es)?|rien que pour toi|fait pour toi|just for you)\b/;
+// She agrees to a sum: « ok 10 € », « d'accord pour 10 », « va pour 10 », « deal ».
+const AGREEMENT_WORDS =
+  /\b(ok|okay|d'?accord|dac|deal|va pour|vendu|ca marche|c'?est bon|allez|banco|marche)\b/;
+
+// A sentence that is a sum alone, a sign or an emoji around it: « 15 euros », « 15€ 😘 ».
+const BARE_SUM = /^[^\p{L}\d]*\d+([.,]\d{1,2})? ?(€|\$|euros?|eur|balles|dollars?|usd)?[^\p{L}\d]*$/u;
+// He asks a price: « c'est combien ? », « quel prix ? », « how much? », « quanto costa? », « ¿cuánto? ».
+const ASKS_PRICE =
+  /\b(combien|quel prix|le prix|ton prix|tes prix|tarifs?|how much|price|quanto|cuanto|precio|prezzo)\b/;
+
+/** Whether his message asks her a price. */
+export function asksPrice(written: string): boolean {
+  return ASKS_PRICE.test(normalise(written));
+}
+
+/** The sentence of a text around a position: what a sum is said with. */
+function sentenceAround(text: string, at: number): string {
+  const start = Math.max(...['.', '!', '?', '\n'].map((mark) => text.lastIndexOf(mark, at - 1))) + 1;
+  const ends = ['.', '!', '?', '\n'].map((mark) => text.indexOf(mark, at)).filter((index) => index >= 0);
+  return text.slice(start, ends.length === 0 ? text.length : Math.min(...ends));
+}
+
 // « On se retrouve demain » said as she goes to bed: to talk again here, the next day (passe 2 du 26/11, conversation
 // 40). Only « retrouve », only a moment without a day of the week or an hour, and only beside a goodnight or « ici »:
 // « on se voit demain », « on se retrouve demain au café », « … samedi », « … à 20 h » stay meetings.
@@ -804,14 +933,45 @@ function chatGoodbye(text: string, match: string, index: number, message: string
 }
 
 /**
- * The first match of a blocking pattern in the text. A sum is read one by one: the price code allowed (ADR 0156 § 4)
- * passes, any other one blocks.
+ * Whether a sum she writes is a price outside her offer (Charles 27/11): a made-to-measure priced, a sum agreed to that
+ * is not her offer's, or a price for what she sells that is not her offer's (no offer: any). Her offer's price said as
+ * it is, a sum of everyday life, or a sum of his said back without agreeing to it pass.
  */
+function priceOutsideOffer(
+  text: string,
+  at: number,
+  amount: number | undefined,
+  context: GuardContext,
+): boolean {
+  const sentence = sentenceAround(text, at);
+  if (CUSTOM_WORDS.test(sentence)) return true;
+  const offered = amount !== undefined && amount === context.allowedPriceMinor;
+  if (AGREEMENT_WORDS.test(sentence)) return !offered;
+  // A bubble of a sum alone (« 15 euros »), or a sum right after he asked a price, is a price of hers (Sécurité).
+  const priced = SALE_WORDS.test(sentence) || BARE_SUM.test(sentence) || context.fanAskedPrice === true;
+  if (!priced) return false;
+  return !offered && !(amount !== undefined && (context.fanAmountsMinor ?? []).includes(amount));
+}
+
+/** The sums a text names, in minor units: what he wrote, for `GuardContext.fanAmountsMinor`. */
+export function sumsMinorOf(written: string): number[] {
+  const text = normalise(written);
+  return [
+    ...text.matchAll(
+      /(\d+([.,]\d{1,2})?) ?(€|\$|euros?\b|eur\b|balles\b|dollars?\b|usd\b)|(€|\$) ?(\d+([.,]\d{1,2})?)/g,
+    ),
+  ].flatMap((match) => {
+    const digits = match[1] ?? match[5];
+    return digits === undefined ? [] : [Math.round(Number(digits.replace(',', '.')) * 100)];
+  });
+}
+
+/** The first match of a blocking pattern in the text; a sum is read one by one (`priceOutsideOffer`). */
 function blockingMatch(
   code: GuardCode,
   pattern: RegExp,
   text: string,
-  allowedPriceMinor: number | undefined,
+  context: GuardContext,
   /** The whole message, normalised, when `text` is one bubble of it: a goodnight may be in another bubble. */
   message: string = text,
 ): string | undefined {
@@ -821,11 +981,11 @@ function blockingMatch(
     }
     return undefined;
   }
-  if (code !== 'price_outside_offer' || allowedPriceMinor === undefined) return pattern.exec(text)?.[0];
+  if (code !== 'price_outside_offer') return pattern.exec(text)?.[0];
   for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
     // « €12.50 » matches as « €1 »: the sum is read on, past the match.
-    if (amountMinorOf(text.slice(match.index, match.index + match[0].length + 8)) !== allowedPriceMinor)
-      return match[0];
+    const amount = amountMinorOf(text.slice(match.index, match.index + match[0].length + 8));
+    if (priceOutsideOffer(text, match.index, amount, context)) return match[0];
   }
   return undefined;
 }
@@ -834,7 +994,7 @@ function wholeMessage(
   bubbles: readonly string[],
   forbidden: readonly string[],
   found: readonly GuardViolation[],
-  allowedPriceMinor: number | undefined,
+  context: GuardContext,
 ): GuardViolation[] {
   const joined = bubbles.join(' ');
   // Also glued (« je suis un b » then « ot ») and without emoji (« 06 12 34 🙈 56 78 »).
@@ -847,7 +1007,7 @@ function wholeMessage(
   for (const { code, pattern } of BLOCKING_PATTERNS) {
     if (has(code)) continue;
     const match = readings
-      .map((text) => blockingMatch(code, pattern, text, allowedPriceMinor))
+      .map((text) => blockingMatch(code, pattern, text, context))
       .find((m) => m !== undefined);
     if (match !== undefined) violations.push({ code, severity: 'blocking', match });
   }
@@ -881,9 +1041,12 @@ export function checkVoiceOutput(
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
     for (const { code, pattern } of BLOCKING_PATTERNS) {
-      const match = blockingMatch(code, pattern, text, context.allowedPriceMinor, message);
+      const match = blockingMatch(code, pattern, text, context, message);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
+    const compared = MINOR_COMPARISON.exec(text)?.[0];
+    if (compared !== undefined)
+      violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
     const stage = STAGE_DIRECTION.map((pattern) => pattern.exec(bubble)?.[0]).find((m) => m !== undefined);
     if (stage !== undefined) {
       violations.push({ code: 'stage_direction', severity: 'blocking', bubbleIndex, match: stage });
@@ -935,7 +1098,19 @@ export function checkVoiceOutput(
       violations.push({ code: 'bubble_too_long', severity: 'soft', bubbleIndex });
     }
   });
-  violations.push(...wholeMessage(bubbles, forbidden, violations, context.allowedPriceMinor));
+  // A child or a minor named in a message explicit by its own words (Charles 27/11 at 0:06): blocked. Outside the
+  // sexual register, « t'as des enfants ? » or « quand j'étais ado » are hers; on a sexual turn the composer reads
+  // them with `checkYouthWords`.
+  if (checkExplicit(bubbles).length > 0)
+    bubbles.forEach((bubble, bubbleIndex) => {
+      const named = minorNamed(bubble);
+      if (
+        named !== undefined &&
+        !violations.some((v) => v.code === 'minor_reference' && v.bubbleIndex === bubbleIndex)
+      )
+        violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named });
+    });
+  violations.push(...wholeMessage(bubbles, forbidden, violations, context));
   const language = languageMatch(bubbles, context.languages);
   if (language !== undefined)
     violations.push({ code: 'language_not_covered', severity: 'blocking', match: language });
@@ -1033,7 +1208,7 @@ export function wantsRewrite(violations: readonly GuardViolation[]): boolean {
 
 // Explicit words, on the normalised text: « un baiser », « la queue au cinéma » or « ma chatte Moka » are not.
 const EXPLICIT =
-  /\b(bite|queue (dure|raide|en moi)|ta queue(?! de)|ma queue(?! de)|chatte (mouillee|trempee|humide)|ma chatte (te |pour toi|mouille|a envie|est trempee)|sucer|suce|te sucer|me baiser|te baiser|baise[- ]moi|on baise|baiser fort|jouir|jouis|orgasme|levrette|fellation|sodomie|branler|branle|me toucher|je me touche|mouillee pour toi|trempee pour toi|bander|tu bandes|je te fais bander|toute nue|tout nu|a poil|seins nus|mes seins|tes seins|mon cul|ton cul|clito|gode|sextoy)\b/;
+  /\b(bite|queue (dure|raide|en moi)|ta queue(?! de)|ma queue(?! de)|chatte (mouillee|trempee|humide)|ma chatte (te |pour toi|mouille|a envie|est trempee)|sucer|suce|te sucer|me baiser|te baiser|baise[- ]moi|on baise|baiser fort|jouir|jouis|orgasme|levrette|fellation|sodomie|branler|(?<!m'en |m en |s'en |t'en |j'm'en )branle|me toucher(?! (avec|par) (tes|ces|des|mes|les) mots| le (coeur|cœur)| au (coeur|cœur))|je me touche|mouillee pour toi|trempee pour toi|bander|tu bandes|je te fais bander|toute nue|tout nu|a poil|seins nus|mes seins|tes seins|mon cul|ton cul|clito|gode|sextoy)\b/;
 
 // ADR 0168 § 4: the same in English, Italian and Spanish. « cazzo » alone is also an oath: before his age, still too much.
 const EXPLICIT_OTHERS =
@@ -1057,4 +1232,41 @@ export function checkExplicit(bubbles: readonly string[]): GuardViolation[] {
     if (match) violations.push({ code: 'explicit_before_age', severity: 'blocking', match: match[0] });
   }
   return violations;
+}
+
+// Words that describe her, or a character, as young (Charles 26/11, narrowed 27/11 at 0:05): never in a sexual message.
+// « Petite » before a part of the body, a piece of clothing, a thing or a sweet word passes (« ta petite coquine », « la
+// mia piccola »), and so does a figure of speech (« toute jeune dans ma tête »). French, English, Italian and Spanish.
+export const YOUTH_WORDS =
+  /\b(petites? filles?|petit garcon|gamines?|ados?|adolescentes?|lolitas?|jeunettes?|fillettes?|ecolieres?|collegiennes?|lyceennes?|si jeune|jeune fille|little girls?|young girls?|teens?|teenagers?|schoolgirls?|barely legal|ragazzin[ae]|bambin[ae]|liceal[ei]|scolarett[ae]|jovencitas?|colegialas?)\b/;
+// Read before `normalise`, which would make « niña » the first name Nina.
+export const YOUTH_WORDS_ACCENTED = /(^|[^\p{L}])(niñ[ao]s?)($|[^\p{L}])/iu;
+// She looks or plays an age under 18: « j'ai l'air d'avoir 15 ans », « comme si j'avais 16 ans ».
+const YOUTH_AGE =
+  /\b(l'?air d'avoir|comme si j'?avais|look(s|ing)? like|sembr[oa] (di )?avere|parezco tener|aparento) (1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix-sept|dix sept|fifteen|sixteen|seventeen)\b/;
+
+/**
+ * No word of youth in a sexual message (Charles 26/11): blocking, so her answer is written once more, then a human
+ * answers. `sexual`: the composer knows the turn is (a heated exchange, a script running); a message explicit by its
+ * own words is sexual anyway. Outside, « une petite photo » stays hers. On a sexual turn a child or a minor named is
+ * blocked too (`minor_reference`), procreation between adults left out.
+ */
+export function checkYouthWords(bubbles: readonly string[], sexual: boolean): GuardViolation[] {
+  const ownWords = checkExplicit(bubbles).length > 0;
+  if (!sexual && !ownWords) return [];
+  return bubbles.flatMap((bubble, bubbleIndex) => {
+    const text = normalise(bubble);
+    const match =
+      YOUTH_WORDS.exec(text)?.[0] ?? YOUTH_AGE.exec(text)?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
+    const youth: GuardViolation[] =
+      match === undefined ? [] : [{ code: 'youth_word_in_sex', severity: 'blocking', bubbleIndex, match }];
+    // A child or a minor named on a sexual turn (Charles 27/11 at 0:06), procreation between adults left out. A
+    // message explicit by its own words is read by `checkVoiceOutput` already.
+    const named = ownWords ? undefined : minorNamed(bubble);
+    const minor: GuardViolation[] =
+      named === undefined
+        ? []
+        : [{ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named }];
+    return [...youth, ...minor];
+  });
 }

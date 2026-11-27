@@ -90,6 +90,7 @@ export function Workshop({
   const [saving, setSaving] = useState(false);
   const sending = useRef(false);
   const previewRef = useRef<HTMLElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const flowRef = useRef<HTMLOListElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -157,7 +158,14 @@ export function Workshop({
   const blocked = issues.size > 0 ? 'Corrige d’abord ce qui est signalé.' : null;
 
   async function save(): Promise<void> {
-    if (blocked !== null || sending.current) return;
+    if (sending.current) return;
+    if (blocked !== null) {
+      // « Enregistrer » stays live and leads to the first place to correct, a tap as much as a pointer (recette COUV-10).
+      const segment = draft.segments.find((one) => issues.has(one.key));
+      if (issues.has('name') || segment === undefined) nameRef.current?.focus();
+      else select(segment.key);
+      return;
+    }
     sending.current = true;
     setSaving(true);
     setProblem(null);
@@ -230,6 +238,7 @@ export function Workshop({
           Nom de la structure
         </label>
         <input
+          ref={nameRef}
           id={`${id}-name`}
           className="st-bar__name"
           value={draft.name}
@@ -247,8 +256,7 @@ export function Workshop({
         <button
           type="button"
           className="nv-btn nv-btn--neon nv-btn--sm"
-          disabled={blocked !== null || saving || (!dirty && basedOn !== null)}
-          title={blocked ?? undefined}
+          disabled={saving || (!dirty && basedOn !== null)}
           aria-busy={saving}
           onClick={() => void save()}
         >

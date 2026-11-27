@@ -16,6 +16,8 @@ import { DayReplies } from './ReplyLines';
 import { SuggestionCard, UndatedSuggestions } from './SuggestionCard';
 import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
+import { useCreatorDay } from './day-api';
+import { tallyOf } from './day-model';
 import { timedSuggestionsOf } from './grid';
 import {
   closedTickWords,
@@ -252,6 +254,9 @@ function DayStrip({
 const streakWords = (days: number, medal: CreatorMedalKind | null): string =>
   `${String(days)} ${days > 1 ? 'jours' : 'jour'} de suite${medal === null ? '' : `, médaille ${medalName(medal)}`} : voir mes trophées`;
 
+/** The end of a free time, « minuit » rather than « 0 h » (recette H-06). */
+const endClockOf = (minute: number): string => (minute % 1440 === 0 ? 'minuit' : clockOf(minute));
+
 export function Glance({
   plan,
   agenda,
@@ -273,6 +278,23 @@ export function Glance({
   const left = total - done;
   // A day to come: nothing yet to do but what is dated, a routine waits for its day (Design, recette 16/11).
   const ahead = plan.day > agenda.today;
+  // A day gone by: what is left was not done, never « à faire » (recette MOD-13).
+  const past = plan.day < agenda.today;
+  // Her day's essentials (Ma journée) left to post today: the agenda's count is not all she has to do, so the glance
+  // never says « Rien à faire » nor « bravo » over them (recette MOD-01, MOD-02).
+  const her = useCreatorDay().data;
+  const essentials = her?.day !== plan.day ? null : tallyOf(her.lines.filter((line) => line.essential));
+  const essentialLeft = essentials !== null && essentials.done < essentials.total;
+  const pending = owes || essentialLeft;
+  const essentialWords =
+    essentials === null
+      ? ''
+      : `L’essentiel du jour : ${String(essentials.done)} sur ${String(essentials.total)} fait.`;
+  // Nothing at the agenda but her essentials left: the ring and the title speak of them, the empty agenda goes below
+  // (Design, 27/11).
+  const essentialOnly =
+    total === 0 && plan.suggestions.length === 0 && !owes && essentialLeft ? essentials : null;
+  const essentialsLeft = essentialOnly === null ? 0 : essentialOnly.total - essentialOnly.done;
   const firstAny = firstOf(plan, nowMinute);
   const first = ahead && firstAny?.task.when.kind === 'routine' ? null : firstAny;
   const proposed = plan.suggestions.length;
@@ -281,15 +303,22 @@ export function Glance({
     total === 0
       ? proposed > 0
         ? `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} à regarder`
-        : owes
-          ? 'Rien à l’agenda'
-          : 'Rien à faire'
+        : essentialOnly !== null
+          ? `${String(essentialsLeft)} ${essentialsLeft > 1 ? 'choses' : 'chose'} à faire aujourd’hui`
+          : pending
+            ? 'Rien à l’agenda'
+            : 'Rien à faire'
       : left === 0
-        ? 'Tout est fait'
+        ? pending
+          ? 'L’agenda est fait'
+          : 'Tout est fait'
         : ahead
           ? `${String(left)} ${left > 1 ? 'choses prévues' : 'chose prévue'}`
-          : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
-  const share = total === 0 ? 0 : done / total;
+          : past
+            ? `${String(left)} ${left > 1 ? 'choses pas faites' : 'chose pas faite'}`
+            : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
+  const share =
+    essentialOnly !== null ? essentialOnly.done / essentialOnly.total : total === 0 ? 0 : done / total;
   // Her timed tasks whose time is over and that she has not ticked: said in amber, never left out of the glance
   // (recette visuelle 16/11, CRE-05).
   const missed =
@@ -309,9 +338,21 @@ export function Glance({
           className="ag-ring"
           share={share}
           full={total > 0 && left === 0}
-          label={total === 0 ? 'Rien à faire' : `${String(done)} sur ${String(total)} fait`}
+          label={
+            essentialOnly !== null
+              ? `L’essentiel du jour : ${String(essentialOnly.done)} sur ${String(essentialOnly.total)} fait`
+              : total === 0
+                ? pending
+                  ? 'Rien à l’agenda'
+                  : 'Rien à faire'
+                : `${String(done)} sur ${String(total)} fait`
+          }
         >
-          {total === 0 ? '–' : `${String(done)}/${String(total)}`}
+          {essentialOnly !== null
+            ? `${String(essentialOnly.done)}/${String(essentialOnly.total)}`
+            : total === 0
+              ? '–'
+              : `${String(done)}/${String(total)}`}
         </Ring>
         <div className="ag-glance__text">
           <b>{title}</b>
@@ -323,11 +364,21 @@ export function Glance({
                 'Aucune tâche ce jour-là.'
               ) : owes ? (
                 'Tes envois sont juste au-dessus.'
+              ) : essentialOnly !== null ? (
+                'Ton essentiel du jour, juste au-dessus. Rien d’autre à l’agenda.'
+              ) : essentialLeft ? (
+                essentialWords
               ) : (
                 'Profite de ta journée.'
               )
             ) : left === 0 ? (
-              `${String(done)} sur ${String(total)}, bravo.`
+              owes ? (
+                'Il reste tes envois, juste au-dessus.'
+              ) : essentialLeft ? (
+                essentialWords
+              ) : (
+                `${String(done)} sur ${String(total)}, bravo.`
+              )
             ) : first === null ? (
               ahead ? (
                 'Ta routine se coche le jour même.'
@@ -559,7 +610,7 @@ function Program({
                 type="button"
                 className="ag-free"
                 data-open={row.open ? 'true' : undefined}
-                aria-label={`Libre de ${clockOf(row.start)} à ${clockOf(row.end)} : ajouter une tâche`}
+                aria-label={`Libre de ${clockOf(row.start)} à ${endClockOf(row.end)} : ajouter une tâche`}
                 onClick={() => {
                   actions.onAdd({
                     day: plan.day,
@@ -571,7 +622,7 @@ function Program({
                 <span>
                   <b>Libre</b>{' '}
                   <span className="nv-num">
-                    {clockOf(row.start)} – {clockOf(row.end)}
+                    {clockOf(row.start)} – {endClockOf(row.end)}
                   </span>
                   {row.open ? <em>dispo pour l’agence</em> : null}
                 </span>

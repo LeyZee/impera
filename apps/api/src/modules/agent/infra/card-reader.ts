@@ -2,6 +2,7 @@ import type { FanCardRead } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
 
 import { screenNotes } from '../domain/injection';
+import { safetySigns } from '../domain/safety-net';
 
 /** A message of the conversation the read gets, numbered: `conversations`' `CardReader` input, matched by shape. */
 interface CardReadInput {
@@ -40,7 +41,10 @@ export function createCardReader(deps: {
         deps.onDroppedNotes?.({ conversationId: input.conversationId, dropped: screened.dropped.length });
       const result = await deps.gateway.readCard({
         card: screened.kept === '' ? [] : screened.kept.split('\n'),
-        messages: input.messages,
+        // A fantasy of his on minors never enters his card (Charles 26/11 at 23:45): the message is not read.
+        messages: input.messages.filter(
+          (message) => message.from !== 'fan' || !safetySigns(message.text).includes('minor_fantasy'),
+        ),
         trace: { creatorId: input.creatorId, conversationId: input.conversationId },
       });
       if (result.ok) return { ok: true, read: result.value.output };

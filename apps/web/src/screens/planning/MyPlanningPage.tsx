@@ -761,7 +761,10 @@ function MyShiftRow({
               ? 'Renvoyé · Reprendre'
               : explain
                 ? GAP_TO_EXPLAIN
-                : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
+                : report.report.status === 'submitted'
+                  ? // Sent, waiting for the agency: never read as one still to make (recette CHAT-09).
+                    `Rapport envoyé · ${MEMBER_STATUS.submitted.toLowerCase()}`
+                  : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
         </button>
       )}
       {/* Away from the team, he holds no shift: none to offer, the agency places them (recette 16/11, CHT-31). */}

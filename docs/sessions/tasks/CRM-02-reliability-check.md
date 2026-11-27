@@ -1,6 +1,6 @@
 # CRM-02 Prouver la fiabilité sur une quinzaine passée
 
-Statut : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 (ADR 0050 § 8 amendé le 11/11/2026 : le dashboard de Reveal n'en offre pas)
 Branche : task/crm-02-reliability-check

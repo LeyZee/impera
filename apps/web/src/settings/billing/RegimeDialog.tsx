@@ -27,9 +27,12 @@ import { BILLING_LEAD } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 
-/** What the code prints on every invoice already: a regime's mentions never say it again. */
+/**
+ * What the code prints on every invoice already: a regime's mentions never say it again. No-break spaces hold the badge's
+ * name to its quotes at a line's end (recette COUV-15).
+ */
 export const PRINTED_BY_CODE =
-  'Le texte d’un régime ne répète pas ce que le code imprime déjà : le badge « Autofacturation », le mandat, la catégorie de l’opération, la TVA et l’échéance.';
+  'Le texte d’un régime ne répète pas ce que le code imprime déjà\u00A0: le badge «\u00A0Autofacturation\u00A0», le mandat, la catégorie de l’opération, la TVA et l’échéance.';
 
 /**
  * A new billing regime (EQ-06 lot 8c), as the agency's accountant wrote it, for one country or more. Never changed once
@@ -162,6 +165,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
               {VAT_CHOICES.map((choice) => (
                 <label key={choice.value} className="bf-choice">
                   <input
+                    className="nv-radio"
                     type="radio"
                     name={`${id}-vat`}
                     value={choice.value}
@@ -207,6 +211,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
             <div className="bf-choices">
               <label className="bf-choice">
                 <input
+                  className="nv-radio"
                   type="radio"
                   name={`${id}-withholding`}
                   checked={treaty}
@@ -223,6 +228,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
               </label>
               <label className="bf-choice">
                 <input
+                  className="nv-radio"
                   type="radio"
                   name={`${id}-withholding`}
                   checked={!treaty}
@@ -246,6 +252,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
                 return (
                   <label key={kind} className="bf-choice">
                     <input
+                      className="nv-check"
                       type="checkbox"
                       checked={draft.documents.includes(kind)}
                       disabled={locked}
@@ -266,6 +273,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
               })}
               <label className="bf-choice">
                 <input
+                  className="nv-check"
                   type="checkbox"
                   checked={draft.taxIdRequired}
                   onChange={(event) => {

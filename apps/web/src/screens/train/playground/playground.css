@@ -106,7 +106,7 @@
   width: 120px;
   height: 5px;
   border-radius: 99px;
-  background: var(--nv-glass-fill-strong);
+  background: var(--nv-fill-track);
 }
 .pg-meter i {
   position: absolute;
@@ -1878,7 +1878,8 @@
   transform: translateY(-1px);
 }
 .pg-script__why a {
-  color: var(--nv-neon-ink);
+  color: var(--nv-ink);
+  text-decoration: underline;
   font-weight: 500;
   text-underline-offset: 2px;
 }

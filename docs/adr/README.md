@@ -4,7 +4,10 @@ Une ADR (Architecture Decision Record) fige une décision structurante avec son 
 
 ## Règles
 
-- Une ADR est **immuable** une fois `accepted`. Pour changer d'avis : nouvelle ADR qui `supersedes` l'ancienne (l'ancienne passe en `superseded`).
+- Une ADR `accepted` ne se réécrit pas : son texte d'origine reste lisible. Pour changer d'avis, deux voies (décision de Charles du 27/11/2026, qui entérine la pratique) :
+  - **amender en place** : un ajout daté en fin de fichier (« Avenant du JJ/MM : … », avec les mots de Charles), et le statut qui le dit ; ou
+  - **une nouvelle ADR** dont la ligne « Remplace : » ou « Amende : » cite le passage exact qu'elle change. L'ancienne reçoit alors en tête le bandeau « Changée en partie depuis » (voir `docs/regles/`), ou passe en `superseded` si elle est remplacée en entier.
+- Dans les deux cas, la page du sujet dans `docs/regles/` est mise à jour dans la même PR.
 - Statuts : `proposed` (une session Opus peut en créer une) → `accepted` (Charles ou la session d'architecture) → `superseded` / `rejected`.
 - Numérotation séquentielle à 4 chiffres, nom `NNNN-slug.md`.
 - Une session de code qui prend une décision structurante non couverte **doit** créer une ADR `proposed` et le dire dans sa fiche de tâche. Elle ne doit pas passer outre une ADR `accepted`.

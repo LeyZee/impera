@@ -3,7 +3,7 @@ import { createServer } from 'node:net';
 import { describe, expect, it } from 'vitest';
 
 import { AVATAR_MAX_BYTES } from '../../../domain/avatar';
-import { createAvatarFetch, isPrivateAddress, pinnedGet } from '../fetch-avatar';
+import { confinePinnedGets, createAvatarFetch, isPrivateAddress, pinnedGet } from '../fetch-avatar';
 
 const PUBLIC = [{ address: '203.0.113.7', family: 4 }];
 const publicLookup = () => Promise.resolve(PUBLIC);
@@ -110,5 +110,36 @@ describe('the request of a creator photo', () => {
     ).rejects.toThrow();
     expect(connections).toBe(1);
     await new Promise((resolve) => server.close(resolve));
+  });
+});
+
+describe('the GET in the recette sandbox (ADR 0075, recette MED-12)', () => {
+  it('never leaves this machine while confined, and reaches it as before', async () => {
+    let connections = 0;
+    const server = createServer((socket) => {
+      connections += 1;
+      socket.destroy();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const bound = server.address();
+    const port = typeof bound === 'object' && bound !== null ? bound.port : 0;
+    confinePinnedGets(true);
+    try {
+      const away = pinnedGet('https://links.example.test/v1', {}, { address: '203.0.113.7', family: 4 });
+      await expect(away).rejects.toThrow('fetch failed');
+      await expect(
+        away.catch((error: unknown) => (error instanceof Error ? error.cause : null)),
+      ).resolves.toEqual(
+        new Error('blocked by the sandbox: links.example.test is not this machine (ADR 0075)'),
+      );
+      // This machine stays reachable: the connection is made (and cut by the server).
+      await expect(
+        pinnedGet(`https://world.invalid:${String(port)}/v1`, {}, { address: '127.0.0.1', family: 4 }),
+      ).rejects.toThrow();
+      expect(connections).toBe(1);
+    } finally {
+      confinePinnedGets(false);
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

@@ -30,6 +30,9 @@ const typed = (saleType: FigureLine['saleType'], netMinor: number, period = P_NO
   saleType,
 });
 
+/** A shift's net taken alone, as its own line gives it: 80 % rounded. */
+const mulDiv = (grossMinor: number): number => Math.round((grossMinor * 8_000) / 10_000);
+
 const figures = (lines: readonly FigureLine[], memberZone = PARIS) =>
   myFigures({ lines, now: NOW, agencyZone: PARIS, memberZone, period: P_NOV_1 });
 
@@ -177,6 +180,30 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     expect(read.records.bestPeriod).toEqual({ period: P_NOV_1, currency: 'EUR', netMinor: 33_000 });
     // Un rapport donne un total, pas l'heure d'une vente : la grille ne lit que la vente relevée.
     expect(read.hours).toMatchObject({ sales: 1, cells: [{ weekday: 2, hour: 21, sales: 1 }] });
+  });
+
+  it('compte le net de la quinzaine comme le relevé : les bruts d’un compte additionnés, une seule chaîne (PRO2-06)', () => {
+    // 151,34 € déclarés en deux shifts, sans TVA, 20 % pour la plateforme : 121,07 € comme le relevé, jamais
+    // 60,54 € + 60,54 € = 121,08 €.
+    const shift = (at: string, grossMinor: number): FigureLine => ({
+      ...line(P_NOV_1, at, mulDiv(grossMinor)),
+      saleType: null,
+      chain: { grossMinor, vatBps: 0, platformFeeBps: 2_000 },
+    });
+    const read = myFigures({
+      lines: [],
+      reportLines: [shift('2026-11-03T17:00:00.000Z', 7_567), shift('2026-11-04T17:00:00.000Z', 7_567)],
+      now: NOW,
+      agencyZone: PARIS,
+      memberZone: PARIS,
+      period: P_NOV_1,
+    });
+    expect(read.days.map((day) => day.nets)).toEqual([
+      [{ currency: 'EUR', netMinor: 6_054 }],
+      [{ currency: 'EUR', netMinor: 6_054 }],
+    ]);
+    expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 12_107 }]);
+    expect(read.records.bestPeriod).toEqual({ period: P_NOV_1, currency: 'EUR', netMinor: 12_107 });
   });
 
   it('dit d’où vient le net de la quinzaine par type de vente, un remboursement retiré de son type (ADR 0104 § 6)', () => {
