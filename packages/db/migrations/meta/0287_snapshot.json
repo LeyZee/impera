@@ -1,6 +1,6 @@
 {
-  "id": "a14643e0-66d8-4d64-9657-16c9b811d556",
-  "prevId": "fadb9004-0ea6-458f-847c-e91c541c5624",
+  "id": "822b9374-af6b-4966-9edd-09f12b03f1ca",
+  "prevId": "d857c43f-2e5f-47c7-8103-4875cb282c1d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -11782,7 +11782,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change', 'agency_alert', 'agency_urgent')"
         }
       },
       "isRLSEnabled": false

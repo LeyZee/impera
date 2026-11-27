@@ -1524,7 +1524,14 @@
     {
       "idx": 217,
       "version": "7",
-      "when": 1795791187303,
+      "when": 1795791194075,
+      "tag": "0286_telegram_channels_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 218,
+      "version": "7",
+      "when": 1795793057119,
       "tag": "0287_first_steps",
       "breakpoints": true
     }

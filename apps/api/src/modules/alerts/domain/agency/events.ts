@@ -1,5 +1,4 @@
 import {
-  AlertRefSchema,
   AutomaticMissingSchema,
   ConversationIdSchema,
   CreatorIdSchema,
@@ -14,26 +13,17 @@ import {
 } from '@impera/contracts';
 import { z } from 'zod';
 
-import type { ScannedEvent, Signal } from '../domain/signals';
+import type { ScannedEvent, Signal } from './signals';
 
 /**
- * Reads a `domain_events` row into a signal (ADR 0020 §3). Local, tolerant schemas: the module reads the facts it
- * needs and nothing else, accepts rows written before a field existed, and skips a row it cannot read rather than
- * blocking the scan behind it. Types without a producer yet (validations) give `null` here until their payload enters
- * the contract.
+ * Reads a `domain_events` row into a signal (ADR 0020 §3). Local, tolerant schemas: the agency's alerts read the facts
+ * they need and nothing else, accept rows written before a field existed, and skip a row they cannot read rather than
+ * blocking the others.
  */
 
 const HandoffSchema = z.object({
   conversationId: ConversationIdSchema.optional().catch(undefined),
   cause: HandoffCauseSchema.optional().catch(undefined),
-  // Which alert of hers paused the agent, to name it; a trigger it cannot read never holds the handoff back.
-  trigger: z.object({ alert: AlertRefSchema }).optional().catch(undefined),
-});
-
-// `conversationId` since #60 on `takeover_started`; a row without it (an older one) closes nothing.
-const TakeoverSchema = z.object({
-  conversationId: ConversationIdSchema.optional().catch(undefined),
-  userId: z.string().min(1).optional().catch(undefined),
 });
 
 const BudgetSchema = z.object({
@@ -55,25 +45,11 @@ const QuotaExhaustedSchema = z.object({
   mode: z.enum(['credits', 'subscription']),
 });
 
-const SessionSchema = z.object({
-  platformAccountId: z.string().min(1),
-  from: z.string(),
-  to: z.string(),
-});
-
 const KillSwitchSchema = z.object({
   scope: KillSwitchScopeSchema,
   scopeId: z.string().nullable(),
   active: z.boolean(),
   reason: z.string(),
-});
-
-// Only which alert rang: how it matched and the declared word stay out (the word is what the fan wrote too). Sent only
-// when her alert asked for it at the time (`notify`, true for the system's); a row without it is not sent.
-const AlertTriggeredSchema = z.object({
-  conversationId: ConversationIdSchema,
-  trigger: z.object({ alert: AlertRefSchema }),
-  notify: z.boolean(),
 });
 
 // Only the last failure counts: the retries before it are the platform's hiccups, not news. No fallback on the
@@ -84,7 +60,7 @@ const SendFailedSchema = z.object({
   isFinal: z.literal(true),
 });
 
-// The voice version (`voicePrompt`, `voiceModel`) stays out: Telegram never gets anything of the voice.
+// The voice version (`voicePrompt`, `voiceModel`) stays out: the agency's alerts never say anything of the voice.
 const AutomaticClosedSchema = z.object({
   missing: z.array(AutomaticMissingSchema).min(1),
   conversations: z.number().int().min(1),
@@ -92,14 +68,14 @@ const AutomaticClosedSchema = z.object({
 
 const BackupOverdueSchema = z.object({ lastSucceededAt: z.iso.datetime().nullable() });
 
-// Only the currency and the ECB's day of its last rate: no figure of the agency's pay goes to Telegram (ADR 0033).
+// Only the currency and the ECB's day of its last rate: no figure of the agency's pay is notified (ADR 0033).
 const ExchangeRateOverdueSchema = z.object({
   currency: z.string().regex(/^[A-Z]{3}$/),
   lastRateDay: z.iso.date().nullable(),
 });
 
-// The period, the document and the reason only: the member and the amount stay in Impera (no figure of the pay goes to
-// Telegram, ADR 0033).
+// The period, the document and the reason only: the member and the amount stay in Impera (no figure of the pay is notified, ADR
+// 0033).
 const InvoiceNotIssuedSchema = z.object({
   period: PayPeriodSchema,
   document: InvoiceKindSchema,
@@ -133,18 +109,8 @@ const InvoiceDueSchema = EVENT_PAYLOADS.invoice_due_soon.pick({
   payoutBlock: true,
 });
 
-// The sale's kind, the price the fan paid and its seller (CRM-04 lot b): the sale's key, the account and the shares stay
-// in Impera, and the payload never holds the fan.
-const SaleDetectedSchema = EVENT_PAYLOADS.sale_detected.pick({
-  saleType: true,
-  occurredAt: true,
-  currency: true,
-  grossInclVatMinor: true,
-  seller: true,
-});
-
 // The platform, the fortnight and how many days and accounts differ (CRM-04 b3): the nets and the differences stay in
-// Impera, since a group of alerts may hold managers and Telegram never says a figure pay rests on.
+// Impera, and a notification never says a figure pay rests on.
 const SalesFeedMismatchSchema = EVENT_PAYLOADS.sales_feed_mismatch
   .pick({ platform: true, from: true })
   .extend({
@@ -176,25 +142,6 @@ function signalOf(type: string, payload: unknown): Signal | null {
         kind: 'handoff',
         conversationId: parsed.data.conversationId ?? null,
         cause: parsed.data.cause ?? null,
-        ...(parsed.data.trigger !== undefined && { alert: parsed.data.trigger.alert }),
-      };
-    }
-    case 'takeover_started': {
-      const parsed = TakeoverSchema.safeParse(payload);
-      if (!parsed.success) return null;
-      return {
-        kind: 'takeover',
-        conversationId: parsed.data.conversationId ?? null,
-        userId: parsed.data.userId ?? null,
-      };
-    }
-    case 'takeover_ended': {
-      const parsed = TakeoverSchema.safeParse(payload);
-      if (!parsed.success) return null;
-      return {
-        kind: 'release',
-        conversationId: parsed.data.conversationId ?? null,
-        userId: parsed.data.userId ?? null,
       };
     }
     case 'budget_threshold_crossed': {
@@ -217,23 +164,10 @@ function signalOf(type: string, payload: unknown): Signal | null {
       if (!parsed.success) return null;
       return { kind: 'ai_quota_exhausted', ...parsed.data };
     }
-    case 'session_state_changed': {
-      const parsed = SessionSchema.safeParse(payload);
-      if (!parsed.success) return null;
-      const { platformAccountId, from, to } = parsed.data;
-      if (to === 'expired' && from !== 'expired') return { kind: 'session_expired', platformAccountId };
-      if (to === 'valid' && from === 'expired') return { kind: 'session_back', platformAccountId };
-      return null;
-    }
     case 'kill_switch_toggled': {
       const parsed = KillSwitchSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'kill_switch', ...parsed.data };
-    }
-    case 'alert_triggered': {
-      const parsed = AlertTriggeredSchema.safeParse(payload);
-      if (!parsed.success || !parsed.data.notify) return null;
-      return { kind: 'alert', conversationId: parsed.data.conversationId, alert: parsed.data.trigger.alert };
     }
     case 'send_failed': {
       const parsed = SendFailedSchema.safeParse(payload);
@@ -285,11 +219,6 @@ function signalOf(type: string, payload: unknown): Signal | null {
       if (!parsed.success) return null;
       const { memberId, kind, lastDay } = parsed.data;
       return { kind: 'contractor_document_expiring', memberId, document: kind, lastDay };
-    }
-    case 'sale_detected': {
-      const parsed = SaleDetectedSchema.safeParse(payload);
-      if (!parsed.success) return null;
-      return { kind: 'sale', ...parsed.data, occurredAt: new Date(parsed.data.occurredAt) };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);
@@ -359,16 +288,13 @@ export interface EventRow {
   readonly creatorId: string | null;
   readonly type: string;
   readonly payload: unknown;
-  readonly createdAt: Date;
 }
 
 /** Null for a row the module has nothing to say about. */
 export function toScannedEvent(row: EventRow): ScannedEvent | null {
   const signal = signalOf(row.type, row.payload);
   if (signal === null) return null;
-  if (row.creatorId === null) return { id: row.id, creatorId: null, createdAt: row.createdAt, signal };
+  if (row.creatorId === null) return { id: row.id, creatorId: null, signal };
   const creatorId = CreatorIdSchema.safeParse(row.creatorId);
-  return creatorId.success
-    ? { id: row.id, creatorId: creatorId.data, createdAt: row.createdAt, signal }
-    : null;
+  return creatorId.success ? { id: row.id, creatorId: creatorId.data, signal } : null;
 }

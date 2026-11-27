@@ -183,7 +183,6 @@ export const sameConfig = (a: TelegramChannelConfig, b: TelegramChannelConfig): 
 /** How a channel reads in the list: its title, and why it cannot be chosen when it cannot. */
 export function choiceHint(choice: ChannelChoice): string | undefined {
   if (choice.takenByOther) return 'Canal d’une autre créatrice';
-  if (choice.routedForAlerts) return 'Reçoit des alertes de l’agence';
   if (choice.membership !== 'member') return 'Le bot n’y est plus';
   if (!choice.canPost) return 'Le bot ne peut pas y publier';
   return undefined;

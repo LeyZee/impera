@@ -8,7 +8,6 @@ import {
   type CreatorAlertsView,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
 import { useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { ALERTS_ERRORS, alertsErrorKind, alertsQueryKey, saveCreatorAlert, useCreatorAlerts } from './api';
@@ -104,13 +103,6 @@ export function AlertsTab({
             </li>
           ))}
         </ul>
-        <p className="ca-head__aside">
-          Les groupes Telegram de l’agence se règlent à part, dans{' '}
-          <Link to="/reglages/telegram" className="ca-link">
-            Réglages › Bots Telegram
-          </Link>
-          .
-        </p>
         <p
           className="ca-status"
           role={status?.failed === true ? 'alert' : 'status'}

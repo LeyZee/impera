@@ -2,6 +2,7 @@
 
 Statut : accepted (demande de Charles du 17/11/2026, 13 h 28 et 13 h 31, fil « Créer les alertes par créatrice » ; acceptée par Charles le 17/11/2026 à 14 h 39, « ok alertes »)
 Date : 2026-11-17
+Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.
 Précise : P4-01 (Réglages › Alertes), ADR 0020 (notifications Telegram), ADR 0042 § 7 (notifications push), ADR 0091 (dépense IA), ADR 0128 § C (stock de scripts), ADR 0143 § 13 (note quand l'agent oriente vers un compte). S'insère dans la fiche créatrice à sept onglets (ADR 0149, 6e onglet « Alertes », `/creatrices?onglet=alertes&creatrice=<id>`) et prend le choix par sorte des notifications de la créatrice que lui confie l'ADR 0149 § 4. Ne remplace aucun ADR.
 
 ## Contexte
@@ -124,3 +125,7 @@ Négatives :
 
 1. 17/11/2026, 13 h 35 (carte de choix) : « offre proposée » = tout ce qui se vend hors des scripts, venant de l'IA ou du fan (§§ 12–13).
 2. 19/11/2026, 17 h 26 (carte de choix) : les alertes de l'équipe autres que les relais de sécurité sonnent toute la journée hors du plafond de notifications du jour, et la nuit attendent le récapitulatif du matin (§ 6).
+
+## Amendement du 27/11/2026 : plus de canal Telegram (ADR 0176 § 10)
+
+Le § 5 tombe : Telegram n'est plus un canal d'alerte. L'onglet ne rappelle plus aucun groupe, Réglages › Alertes non plus. La case d'une alerte personnalisée devient « Prévenir l'équipe » ; décochée, l'alerte reste dans l'historique du Suivi, sans notification.

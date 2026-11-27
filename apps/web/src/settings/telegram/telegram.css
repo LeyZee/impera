@@ -1,7 +1,7 @@
 /*
  * Réglages › Bots Telegram (fiche P3-07), drawn after the validated mockup. Built on the design-system tokens and nv-*
- * classes; only what the package has no class for lives here, prefixed `tg-`. Content sits on plates; the tab bar and
- * the sheets, which float, are glass. Selection is neutral, a refused input or a failed save is amber (docs/design).
+ * classes; only what the package has no class for lives here, prefixed `tg-`. Content sits on plates; the sheets, which
+ * float, are glass. Selection is neutral, a refused input or a failed save is amber (docs/design).
  */
 
 .tg-page {
@@ -12,24 +12,11 @@
   flex-direction: column;
   gap: 24px;
 }
-/* Nothing shrinks: the tab bar scrolls sideways, so a column flex would otherwise squash it to nothing. */
-.tg-page > *,
-.tg-panel > * {
+/* Nothing shrinks: a column flex would otherwise squash a list to nothing. */
+.tg-page > * {
   flex-shrink: 0;
 }
-.tg-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-  animation: nv-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
-}
-.tg-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+
 .tg-lede {
   margin: 0;
   max-width: 60ch;
@@ -57,12 +44,7 @@
 .tg-hint[data-error='true'] {
   color: var(--nv-warning);
 }
-.tg-pad {
-  padding: 10px 4px 0;
-}
-.tg-top {
-  margin-top: 12px;
-}
+
 .tg-grow {
   flex: 1;
 }
@@ -85,11 +67,7 @@
   font-size: var(--nv-text-callout);
   background: color-mix(in srgb, var(--nv-warning) 12%, var(--nv-glass-fill));
 }
-.tg-sent {
-  color: var(--nv-success);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-}
+
 .tg-av {
   width: 28px;
   height: 28px;
@@ -102,144 +80,7 @@
   background: var(--nv-fill-track);
 }
 
-/* Health strip: is anything broken, then the counts. */
-.tg-health {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 14px var(--nv-plate-pad);
-}
-.tg-health__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--nv-text-callout);
-  color: var(--nv-ink-muted);
-}
-.tg-health__item b {
-  color: var(--nv-ink);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.tg-health__counts {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.tg-health__sep {
-  width: 1px;
-  height: 18px;
-  background: var(--nv-hairline);
-}
-/* Something to fix: the whole strip leads to the tab where it is fixed. */
-.tg-health--link {
-  appearance: none;
-  width: 100%;
-  font: inherit;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-  transition:
-    background-color var(--nv-dur-base) var(--nv-ease-out),
-    transform var(--nv-dur-base) var(--nv-ease-out);
-}
-.tg-health--link:hover {
-  background: var(--nv-select-strong);
-}
-.tg-health--link:active {
-  transform: scale(0.99);
-  transition-duration: var(--nv-dur-instant);
-}
-.tg-health--link:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-}
-.tg-health__go {
-  margin-left: auto;
-  font-size: var(--nv-text-callout);
-  font-weight: 600;
-  color: var(--nv-ink-muted);
-}
-.tg-health--link:hover .tg-health__go {
-  color: var(--nv-ink);
-}
-.tg-state-dot {
-  --_c: var(--nv-success);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--_c);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--_c) 18%, transparent);
-}
-.tg-state-dot[data-tone='warn'] {
-  --_c: var(--nv-warning);
-}
-.tg-state-dot[data-tone='bad'] {
-  --_c: var(--nv-danger);
-}
-.tg-state-dot[data-tone='empty'] {
-  --_c: var(--nv-ink-faint);
-}
-
-/* Tabs */
-.tg-tabs {
-  --_radius: var(--nv-radius-full);
-  display: flex;
-  gap: 2px;
-  padding: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-.tg-tabs::-webkit-scrollbar {
-  display: none;
-}
-.tg-tab {
-  appearance: none;
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--nv-ink-muted);
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    color var(--nv-dur-base) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.tg-tab:hover {
-  color: var(--nv-ink);
-  background: var(--nv-glass-fill);
-}
-.tg-tab:active {
-  transform: scale(0.96);
-  transition-duration: var(--nv-dur-instant);
-}
-.tg-tab:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: -2px;
-}
-.tg-tab[aria-selected='true'] {
-  color: var(--nv-ink);
-  background: var(--nv-select-strong);
-}
-.tg-tab svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Coverage: the one thing that dominates a tab. */
+/* The page's one block when there is nothing to list, or a bot to reconnect. */
 .tg-cover {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -247,24 +88,7 @@
   align-items: center;
   padding: var(--nv-plate-pad);
 }
-.tg-cover__orb {
-  --_c: var(--nv-success);
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--_c);
-  background: color-mix(in srgb, var(--_c) 14%, transparent);
-}
-/* Amber: a setting to make or a server that does not answer, never an urgency (the red stays the urgencies'). */
-.tg-cover[data-state='warn'] .tg-cover__orb {
-  --_c: var(--nv-warning);
-}
-.tg-cover__orb svg {
-  width: 26px;
-  height: 26px;
-}
+
 .tg-cover__title {
   margin: 0;
   font-size: var(--nv-text-title-2);
@@ -275,318 +99,6 @@
 }
 .tg-cover__sub {
   margin: 2px 0 0;
-  font-size: var(--nv-text-callout);
-  color: var(--nv-ink-muted);
-}
-
-/* Sales settings (CRM-04) */
-.tg-sales {
-  min-height: 48px;
-}
-.tg-sales__inherit,
-.tg-sales__notice {
-  margin: 0;
-  padding: 14px 18px 0;
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.tg-sales__notice {
-  padding-bottom: 14px;
-  color: var(--nv-warning);
-}
-.tg-sales__who {
-  margin: 8px 4px 0;
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-faint);
-}
-.tg-sales__switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-self: start;
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.tg-sales__amount {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-self: start;
-}
-.tg-sales__amount input {
-  width: 110px;
-}
-
-/* Routing */
-.tg-scope {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 4px 10px;
-}
-.tg-route {
-  display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-  padding: 14px 18px;
-}
-.tg-lvl {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.tg-lvl b {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-.tg-lvl small {
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-faint);
-}
-.tg-lvl small.tg-route__warn {
-  color: var(--nv-warning);
-}
-.tg-route__link {
-  color: var(--nv-ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-color: var(--nv-ink-faint);
-}
-.tg-route__link:hover {
-  text-decoration-color: currentColor;
-}
-.tg-route__link:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-.tg-dot {
-  --_c: var(--nv-ink-faint);
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--_c);
-}
-.tg-dot[data-topic='urgent'] {
-  --_c: var(--nv-danger);
-}
-.tg-dot[data-topic='important'] {
-  --_c: var(--nv-warning);
-}
-.tg-dot[data-topic='info'] {
-  --_c: var(--nv-success);
-}
-.tg-dot[data-topic='sale'] {
-  --_c: var(--nv-sale);
-}
-.tg-dot[data-topic='keyword'],
-.tg-dot[data-topic='validation'] {
-  --_c: var(--nv-ink-muted);
-}
-.tg-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-.tg-gchip {
-  appearance: none;
-  border: 0;
-  font: inherit;
-  cursor: pointer;
-  max-width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 12px 0 5px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-callout);
-  color: var(--nv-ink-faint);
-  background: var(--nv-glass-fill);
-  -webkit-tap-highlight-color: transparent;
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    color var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.tg-gchip:hover:not(:disabled) {
-  color: var(--nv-ink);
-  background: var(--nv-glass-fill-strong);
-}
-.tg-gchip:active:not(:disabled) {
-  transform: scale(0.95);
-  transition-duration: var(--nv-dur-instant);
-}
-.tg-gchip:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-}
-.tg-gchip .tg-av {
-  width: 24px;
-  height: 24px;
-  font-size: 11px;
-}
-.tg-gchip span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tg-gchip[aria-checked='true'] {
-  color: var(--nv-ink);
-  background: var(--nv-select-strong);
-}
-.tg-gchip[aria-checked='true'] .tg-av {
-  background: var(--nv-ink);
-  color: var(--nv-void);
-}
-/* Already sent for every creator: shown on, but quiet and not clickable here. */
-.tg-gchip[data-inherited='true'] {
-  cursor: default;
-  opacity: 0.6;
-}
-
-/* Journal */
-.tg-log {
-  display: grid;
-  grid-template-columns: 48px auto minmax(0, 1fr) auto;
-  gap: 4px 12px;
-  align-items: center;
-  padding: 10px 2px;
-  font-size: var(--nv-text-callout);
-}
-.tg-log time {
-  font-family: var(--nv-font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-faint);
-}
-.tg-log p {
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tg-log small {
-  color: var(--nv-ink-faint);
-}
-.tg-log em {
-  font-style: normal;
-  font-size: var(--nv-text-footnote);
-  white-space: nowrap;
-  color: var(--nv-warning);
-}
-.tg-log em[data-ok='true'] {
-  color: var(--nv-success);
-}
-
-/* Telegram preview: drawn in Telegram's own night colours, the only non-token colours of the page. */
-.tg-preview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-}
-.tg-phone {
-  --tg-bg: #17212b;
-  --tg-bubble: #182533;
-  --tg-text: #e9eef3;
-  --tg-link: #6ab3f3;
-  --tg-muted: #8fa3b5;
-  --tg-ok: #7fd18b;
-  padding: 14px;
-  border-radius: var(--nv-radius-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: var(--tg-text);
-  background: color-mix(in srgb, var(--tg-bg) 92%, var(--nv-void));
-}
-.tg-phone__bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid color-mix(in srgb, var(--tg-text) 8%, transparent);
-}
-.tg-phone__av {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--tg-text);
-  background: color-mix(in srgb, var(--tg-link) 45%, var(--tg-bg));
-}
-.tg-phone__bar b {
-  display: block;
-  font-size: 14px;
-}
-.tg-phone__bar small {
-  font-size: 12px;
-  color: var(--tg-muted);
-}
-.tg-msg {
-  align-self: flex-start;
-  max-width: 94%;
-  padding: 8px 10px 6px;
-  border-radius: 12px 12px 12px 4px;
-  font-size: 13.5px;
-  line-height: 19px;
-  background: var(--tg-bubble);
-}
-.tg-msg[data-reply='true'] {
-  border-left: 2px solid var(--tg-link);
-}
-.tg-msg__from {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--tg-link);
-}
-.tg-msg__link {
-  color: var(--tg-link);
-}
-.tg-msg__quote {
-  display: block;
-  margin-bottom: 4px;
-  padding-left: 6px;
-  border-left: 2px solid var(--tg-link);
-  font-size: 12px;
-  color: var(--tg-muted);
-}
-.tg-msg__edit {
-  display: block;
-  margin-top: 4px;
-  font-weight: 600;
-  color: var(--tg-ok);
-}
-.tg-msg__meta {
-  float: right;
-  margin: 6px 0 0 10px;
-  font-size: 11px;
-  color: var(--tg-muted);
-}
-.tg-preview__note {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 4px;
-}
-.tg-preview__note h3 {
-  margin: 0;
-}
-.tg-preview__note ul {
-  margin: 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   font-size: var(--nv-text-callout);
   color: var(--nv-ink-muted);
 }
@@ -610,12 +122,6 @@
   flex: none;
   margin-top: 1px;
   color: var(--nv-ink-faint);
-}
-.tg-words {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 18px;
 }
 
 /* Bots */
@@ -694,22 +200,7 @@
 .tg-chat__t small[data-warning='true'] {
   color: var(--nv-warning);
 }
-.tg-topics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: var(--nv-text-caption);
-  color: var(--nv-ink-muted);
-}
-.tg-topics > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.tg-topics .tg-dot {
-  width: 6px;
-  height: 6px;
-}
+
 .tg-actions {
   display: flex;
   gap: 8px;
@@ -1051,26 +542,8 @@
   width: 32px;
   height: 32px;
 }
-.tg-sw {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 0;
-}
-.tg-sw + .tg-sw {
-  border-top: 1px solid var(--nv-hairline);
-}
 
-@media (max-width: 860px) {
-  .tg-preview {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 @media (max-width: 560px) {
-  .tg-route {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .tg-chat,
   .tg-bot__foot,
   .tg-bot__empty {
@@ -1090,25 +563,8 @@
     grid-column: 2;
     justify-content: flex-start;
   }
-  .tg-log {
-    grid-template-columns: 44px auto minmax(0, 1fr);
-  }
-  .tg-log em {
-    grid-column: 3;
-  }
-  /* The counts stay on a phone; only the rule between them goes, since the strip may wrap there. */
-  .tg-health__sep {
-    display: none;
-  }
-  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs wrap like chips, each at its own
-   * width, so none is hidden and none is stretched. */
-  .tg-tabs {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tg-panel,
   .tg-sheet,
   .tg-scrim,
   .tg-found,
@@ -1116,11 +572,5 @@
   .tg-radar::after,
   .tg-spin {
     animation: none;
-  }
-  .tg-health--link {
-    transition: none;
-  }
-  .tg-health--link:active {
-    transform: none;
   }
 }

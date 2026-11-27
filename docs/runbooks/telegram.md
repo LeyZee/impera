@@ -1,25 +1,13 @@
-# Notifications Telegram
+# Bot du canal Telegram
 
-Les groupes Telegram reçoivent ce qui demande un humain (ADR 0020). Un message ne contient jamais le texte d'un fan : il dit quoi, pour quelle créatrice, et donne un lien vers le CRM.
+Telegram ne sert plus qu'au canal de chaque créatrice (ADR 0080, ADR 0176) : un bot y publie ses posts à leurs créneaux. Les alertes de l'agence ne passent plus par Telegram : voir `alerts.md`.
 
-## À la réception
+## Un post ne part plus
 
-| Message | Que faire |
-|---|---|
-| 🔴 **URGENT** (mineur possible, non-consentement, détresse, rencontre, manipulation) | Ouvrir le lien tout de suite. L'agent n'écrit plus à ce fan. Prendre la conversation (« Reprendre la main ») : le message passe « ✓ Pris en main par … » pour le reste du groupe. Mineur ou non-consentement : ne rien envoyer, prévenir Charles. |
-| 🟠 **Important**, passage à l'humain | Ouvrir le lien quand possible ; l'agent attend un humain pour ce fan. |
-| 🟠 **Important**, plafond IA | À 16 € : rien à faire, surveiller. Atteint : plus de génération jusqu'à minuit, les chatteurs reprennent. |
-| 🟠 **Important**, session Reveal expirée | Suivre `session-expired.md`. Le groupe reçoit « Résolu » au retour de la session. |
-| 🟠 **Important**, agent arrêté | Quelqu'un a tiré l'interrupteur d'arrêt ; la raison est dans le message. « Résolu » quand il est relâché. |
-| 🔵 Bilan du matin | Rien à faire. |
-
-## Quand plus rien n'arrive
-
-1. Réglages › Telegram › Bots et groupes : l'état du bot et du groupe dit la cause, en une phrase.
-2. « Jeton refusé » : le jeton a été révoqué. Dans @BotFather, `/token` pour en obtenir un, puis « Remplacer le jeton ». Les messages en attente partent dans l'heure qui suit.
+1. Réglages › Bots Telegram : l'état du bot dit la cause, en une phrase.
+2. « Jeton refusé » : le jeton a été révoqué. Dans @BotFather, `/token` pour en obtenir un, puis « Remplacer le jeton ».
 3. « Utilisé ailleurs » : un autre programme lit le même bot. L'arrêter, ou créer un bot réservé à Impera.
-4. « Le bot ne peut plus écrire dans ce groupe » : le rajouter au groupe, puis « Envoyer un test ».
-5. Bandeau « Personne n'est prévenu la nuit » : onglet Alertes, choisir un groupe pour l'urgent.
+4. Le bot n'est plus administrateur du canal : l'y rajouter avec le droit de publier, puis relire sa fiche (Créatrices › Canal Telegram).
 
 ## Jeton fuité
 

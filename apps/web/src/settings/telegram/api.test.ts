@@ -1,6 +1,5 @@
 import {
   REAUTHENTICATION_ERROR_CODE,
-  TELEGRAM_LINK_NO_BOT_UNPROCESSABLE,
   TelegramBotIdSchema,
   TelegramChatIdSchema,
   newId,
@@ -9,20 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReauthRequired } from '../services/api';
 
-import {
-  LinkRateLimited,
-  LinkUnavailable,
-  TelegramForbidden,
-  TelegramOff,
-  addBot,
-  fetchOverview,
-  fetchPrivateLink,
-  removeBot,
-  removeChat,
-  requestLinkCode,
-  saveRoutes,
-  unlinkPrivateChat,
-} from './api';
+import { TelegramForbidden, TelegramOff, addBot, fetchOverview, removeBot, removeChat } from './api';
 
 /** A refusal in the common body, its kind in `details` (MOT-13). */
 const refusalBody = (code: string, kind: string, message: string): object => ({
@@ -31,8 +17,8 @@ const refusalBody = (code: string, kind: string, message: string): object => ({
 
 const bot = {
   id: newId(TelegramBotIdSchema),
-  username: 'demo_alertes_bot',
-  displayName: 'Démo Alertes',
+  username: 'demo_canal_bot',
+  displayName: 'Démo Canal',
   state: 'active',
   lastPolledAt: null,
   chats: [],
@@ -71,17 +57,6 @@ describe('Telegram API client', () => {
     });
   });
 
-  it('reads a version conflict on the routes as a refusal', async () => {
-    answer(
-      409,
-      refusalBody('telegram_routes_conflict', 'routes_version_conflict', 'Quelqu’un a changé ces réglages.'),
-    );
-    expect(await saveRoutes(2, [])).toMatchObject({
-      ok: false,
-      refusal: { kind: 'routes_version_conflict' },
-    });
-  });
-
   it('tells a server without Telegram from one that fails', async () => {
     answer(404, { error: 'Not Found' });
     await expect(fetchOverview()).rejects.toBeInstanceOf(TelegramOff);
@@ -113,7 +88,7 @@ describe('Telegram API client', () => {
     await expect(fetchOverview()).rejects.toThrow('GET : 500');
   });
 
-  it('removes a group the bot is out of, already gone counts, the bot back in keeps it (REG-28)', async () => {
+  it('removes a channel the bot is out of, already gone counts, the bot back in keeps it (REG-28)', async () => {
     const id = newId(TelegramChatIdSchema);
     answer(204, null);
     expect(await removeChat(id)).toBe('removed');
@@ -126,55 +101,5 @@ describe('Telegram API client', () => {
     expect(await removeChat(id)).toBe('still_member');
     answer(500, null);
     await expect(removeChat(id)).rejects.toThrow();
-  });
-});
-
-describe('the private chat link (SEC-05 lot 2)', () => {
-  const linked = { linked: true, botUsername: 'demo_bot', linkedAt: '2026-11-06T05:40:00.000Z' };
-  const unlinked = { linked: false, botUsername: null, linkedAt: null };
-
-  it('reads the link of the signed-in account, never a chat id', async () => {
-    answer(200, linked);
-    expect(await fetchPrivateLink()).toEqual(linked);
-    expect(calls[0]?.url).toBe('/v1/auth/telegram-link');
-  });
-
-  it('is not served to a creator, nor on a server without Telegram', async () => {
-    answer(403, { error: { code: 'role_forbidden', message: 'Interdit', details: {}, requestId: 'r' } });
-    await expect(fetchPrivateLink()).rejects.toBeInstanceOf(LinkUnavailable);
-    answer(404, { error: { code: 'not_found', message: 'Introuvable', details: {}, requestId: 'r' } });
-    await expect(fetchPrivateLink()).rejects.toBeInstanceOf(LinkUnavailable);
-  });
-
-  it('asks a code, the password again when the sign-in is old, and says when no bot can take it', async () => {
-    const code = {
-      code: 'ABCDEFGH23',
-      botUsername: 'demo_bot',
-      url: 'https://t.me/demo_bot?start=ABCDEFGH23',
-      expiresAt: '2026-11-06T05:50:00.000Z',
-    };
-    answer(200, code);
-    expect(await requestLinkCode()).toEqual(code);
-    expect(calls[0]?.url).toBe('/v1/auth/telegram-link/code');
-    expect(calls[0]?.init?.method).toBe('POST');
-
-    answer(403, {
-      error: { code: REAUTHENTICATION_ERROR_CODE, message: 'Confirme', details: {}, requestId: 'r' },
-    });
-    await expect(requestLinkCode()).rejects.toBeInstanceOf(ReauthRequired);
-
-    answer(422, {
-      error: { code: TELEGRAM_LINK_NO_BOT_UNPROCESSABLE, message: 'Aucun bot', details: {}, requestId: 'r' },
-    });
-    expect(await requestLinkCode()).toBe('no_bot');
-
-    answer(429, { error: { code: 'rate_limited', message: 'Trop', details: {}, requestId: 'r' } });
-    await expect(requestLinkCode()).rejects.toBeInstanceOf(LinkRateLimited);
-  });
-
-  it('unlinks, and answers the state after', async () => {
-    answer(200, unlinked);
-    expect(await unlinkPrivateChat()).toEqual(unlinked);
-    expect(calls[0]?.init?.method).toBe('DELETE');
   });
 });

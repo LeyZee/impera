@@ -328,7 +328,7 @@ export function runwayText(card: AiCredits): string {
   if (card.state === 'quota_reached' && card.quotaRefusedAt !== null)
     return `Depuis ${refusedText(card.quotaRefusedAt)}, l’agent répond avec son modèle de repli jusqu’à la remise à zéro.`;
   if (card.mode === 'subscription')
-    return 'Les appels passent sur le quota de ton abonnement. S’il est épuisé, Telegram te prévient.';
+    return 'Les appels passent sur le quota de ton abonnement. S’il est épuisé, une notification te prévient.';
   if (card.state === 'empty') return 'Épuisés d’après le décompte : recharge, puis note-le ici.';
   if (card.perDayMinor === 0) return 'Rien dépensé ces derniers jours : le solde ne baisse pas.';
   if (card.daysLeft === null || card.runsOutOn === null)
