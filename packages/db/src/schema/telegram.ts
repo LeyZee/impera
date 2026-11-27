@@ -1,10 +1,8 @@
 import {
   TelegramBotStateSchema,
   TelegramChatKindSchema,
-  TelegramDeliveryStatusSchema,
   TelegramErrorKindSchema,
   TelegramMembershipSchema,
-  TelegramTopicSchema,
 } from '@impera/contracts';
 import {
   bigint,
@@ -22,6 +20,16 @@ import {
 import { user } from './auth';
 import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
 import { creators } from './tenancy';
+
+/**
+ * 27/11/2026: Telegram serves the creators' channels only. The tables of the agency's alerts (`telegram_routes`,
+ * `telegram_deliveries`, `telegram_settings`, `telegram_private_links`, `telegram_state`) are no longer read nor
+ * written, and stay until the owner says to drop them: their checks keep the values they were made with, frozen here.
+ */
+const LEGACY_TOPICS = ['urgent', 'important', 'info', 'sale', 'keyword', 'validation', 'custom'];
+const LEGACY_DELIVERY_STATUSES = ['pending', 'sending', 'sent', 'failed', 'unknown'];
+/** The error kinds a row may hold: today's, and the two of the alerts' queue. */
+const STORED_ERROR_KINDS = [...TelegramErrorKindSchema.options, 'routes_version_conflict', 'chat_removed'];
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
@@ -50,7 +58,7 @@ export const telegramBots = pgTable(
   },
   (t) => [
     enumCheck('telegram_bots', t.state, TelegramBotStateSchema.options),
-    enumCheck('telegram_bots', t.lastPollError, TelegramErrorKindSchema.options),
+    enumCheck('telegram_bots', t.lastPollError, STORED_ERROR_KINDS),
   ],
 );
 
@@ -80,7 +88,7 @@ export const telegramChats = pgTable(
     unique('telegram_chats_bot_chat_unique').on(t.botId, t.telegramChatId),
     enumCheck('telegram_chats', t.kind, TelegramChatKindSchema.options),
     enumCheck('telegram_chats', t.membership, TelegramMembershipSchema.options),
-    enumCheck('telegram_chats', t.lastErrorKind, TelegramErrorKindSchema.options),
+    enumCheck('telegram_chats', t.lastErrorKind, STORED_ERROR_KINDS),
   ],
 );
 
@@ -98,7 +106,7 @@ export const telegramRoutes = pgTable(
   },
   (t) => [
     unique('telegram_routes_unique').on(t.creatorId, t.topic, t.chatId).nullsNotDistinct(),
-    enumCheck('telegram_routes', t.topic, TelegramTopicSchema.options),
+    enumCheck('telegram_routes', t.topic, LEGACY_TOPICS),
   ],
 );
 
@@ -142,10 +150,10 @@ export const telegramDeliveries = pgTable(
     index('telegram_deliveries_chat_status_idx').on(t.chatId, t.status, t.runAfter),
     index('telegram_deliveries_thread_idx').on(t.threadKey),
     index('telegram_deliveries_created_idx').on(t.createdAt),
-    enumCheck('telegram_deliveries', t.topic, TelegramTopicSchema.options),
+    enumCheck('telegram_deliveries', t.topic, LEGACY_TOPICS),
     enumCheck('telegram_deliveries', t.action, ['send', 'edit', 'reply']),
-    enumCheck('telegram_deliveries', t.status, TelegramDeliveryStatusSchema.options),
-    enumCheck('telegram_deliveries', t.errorKind, TelegramErrorKindSchema.options),
+    enumCheck('telegram_deliveries', t.status, LEGACY_DELIVERY_STATUSES),
+    enumCheck('telegram_deliveries', t.errorKind, STORED_ERROR_KINDS),
   ],
 );
 

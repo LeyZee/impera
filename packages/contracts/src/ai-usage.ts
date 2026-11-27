@@ -136,7 +136,7 @@ export type AddAiCreditEntryBody = z.infer<typeof AddAiCreditEntryBodySchema>;
 
 /**
  * When to recharge (Charles, « ok conso-ia », 11/11): amber under five days of credits at the pace of the last full
- * days, red under two, and a Telegram alert the first time each is crossed.
+ * days, red under two, and a notification the first time each is crossed.
  */
 export const AI_CREDIT_LOW_DAYS = 5;
 export const AI_CREDIT_CRITICAL_DAYS = 2;

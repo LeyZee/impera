@@ -27,6 +27,8 @@ function harness(options: {
         ),
       ),
     events: () => (fails('events') ? down() : Promise.resolve(options.events)),
+    agencyEvents: () => Promise.resolve([]),
+    waitingSafety: () => Promise.resolve([]),
     lines: options.lines ?? (() => Promise.resolve(creatorAlertLines([]))),
     creators: () => Promise.resolve([{ id: NORA, name: 'Nora' }]),
     owners: () => Promise.resolve([{ userId: 'owner', timeZone: 'Europe/Paris' }]),
@@ -165,7 +167,7 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     expect(await h.run()).toBe(0);
   });
 
-  it('tells the agency’s budget once to each role, never to a chatter', async () => {
+  it('tells the agency’s budget once to each manager, never to a chatter; the owners by the agency’s alerts', async () => {
     const budget: RoutedEventRow = {
       id: 'event-4',
       creatorId: null,
@@ -175,7 +177,6 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     const h = harness({ events: [budget], onShift: ['member-1'] });
     await h.run();
     expect(h.asked.map((r) => [r.userId, r.message.title])).toEqual([
-      ['owner', 'Budget IA'],
       ['manager', 'Budget IA'],
       ['manager-of-iris', 'Budget IA'],
     ]);

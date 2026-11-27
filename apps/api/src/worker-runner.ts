@@ -7,6 +7,7 @@ import { run, type Runner, type WorkerEvents } from 'graphile-worker';
 import type { App } from './composition-root';
 import { parsedCronJobs, type CronJob } from './crontab';
 import { purgeDeadJobs } from './dead-jobs';
+import type { HeartbeatPing } from './heartbeat-ping';
 import { workerLoggerFrom, type Logger } from './logger';
 import { releaseIdleLocks, releaseOrphanedLocks } from './orphaned-locks';
 import { useFrenchValidationMessages } from './validation-messages';
@@ -18,6 +19,8 @@ export interface WorkerOptions {
   readonly release: string;
   /** Tests pass a shorter interval; production writes every 30 s and `/ready` tolerates 90 s. */
   readonly heartbeatIntervalMs?: number;
+  /** Tells a watcher outside the machine, after each heartbeat written, that this worker lives (OPS-22). */
+  readonly heartbeatPing?: HeartbeatPing;
   /** How often this worker frees the locks of dead workers (`releaseOrphanedLocks`); 60 s in production. */
   readonly unlockIntervalMs?: number;
   /** How often this worker deletes the jobs given up on long ago (`purgeDeadJobs`); hourly in production. */
@@ -102,7 +105,10 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
         });
     } catch (error) {
       logger.warn({ err: error }, 'heartbeat failed');
+      return;
     }
+    // Only after a heartbeat the database took: a worker cut from its base stays silent outside too (OPS-22).
+    await options.heartbeatPing?.();
   };
   await beat();
   const heartbeat = setInterval(() => void beat(), options.heartbeatIntervalMs ?? 30_000);

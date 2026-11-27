@@ -26,9 +26,11 @@
     "ops:kill-switch": "tsx --env-file-if-exists=../../.env src/scripts/ops-kill-switch.ts",
     "ops:revoke-sessions": "tsx --env-file-if-exists=../../.env src/scripts/ops-revoke-sessions.ts",
     "ops:reset-second-factor": "tsx --env-file-if-exists=../../.env src/scripts/ops-reset-second-factor.ts",
+    "ops:password-reset-link": "tsx --env-file-if-exists=../../.env src/scripts/ops-password-reset-link.ts",
     "ops:reencrypt-sessions": "tsx --env-file-if-exists=../../.env src/scripts/ops-reencrypt-sessions.ts",
     "ops:reencrypt-credentials": "tsx --env-file-if-exists=../../.env src/scripts/ops-reencrypt-credentials.ts",
     "ops:check-keys": "tsx --env-file-if-exists=../../.env src/scripts/ops-check-keys.ts",
+    "ops:release-ai-account": "tsx --env-file-if-exists=../../.env src/scripts/ops-release-ai-account.ts",
     "sandbox:world": "tsx --env-file-if-exists=../../.env src/__tests__/sandbox-world/main.ts"
   },
   "dependencies": {

@@ -335,7 +335,7 @@ export function DropSheet({
                       </span>
                     ) : null}
                     <span className="ct-chosen__visual">
-                      <Thumb file={item.file} kind={kind} />
+                      <Thumb file={item.file} kind={kind} ms={item.ms} />
                       <span className="ct-chosen__rank nv-num" aria-hidden="true">
                         {index + 1}
                       </span>

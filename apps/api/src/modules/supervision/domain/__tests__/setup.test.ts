@@ -18,7 +18,7 @@ const ready: CreatorSetupFacts = {
   hasAgencyRate: true,
   hasLinkedReveal: true,
   access: 'used',
-  telegramReachable: true,
+  nightAlertsReach: true,
   hasOwnHours: true,
   hasShifts: true,
   mode: 'copilot',
@@ -39,7 +39,7 @@ describe('creatorSetup', () => {
       'agency_rate',
       'access',
       'pay_rules',
-      'telegram',
+      'night_alerts',
       'agent_hours',
       'shifts',
       'agent_mode',
@@ -71,7 +71,7 @@ describe('creatorSetup', () => {
       hasAgencyRate: false,
       hasLinkedReveal: false,
       access: 'none',
-      telegramReachable: false,
+      nightAlertsReach: false,
       hasOwnHours: false,
       hasShifts: false,
       mode: 'copilot',
@@ -117,11 +117,12 @@ describe('creatorSetup', () => {
     );
   });
 
-  it('says Telegram is off rather than ticking it', () => {
-    const telegram = creatorSetup({ ...ready, telegramReachable: null }).find(
-      (step) => step.key === 'telegram',
+  it('says the notifications are off rather than ticking the night alerts', () => {
+    const night = creatorSetup({ ...ready, nightAlertsReach: null }).find(
+      (step) => step.key === 'night_alerts',
     );
-    expect(telegram).toEqual({ key: 'telegram', state: 'todo', note: { kind: 'telegram_off' } });
+    expect(night).toEqual({ key: 'night_alerts', state: 'todo', note: { kind: 'push_off' } });
+    expect(stateOf(creatorSetup({ ...ready, nightAlertsReach: false }), 'night_alerts')).toBe('todo');
   });
 
   it('leaves a stopped agent to put right, and gives the mode in force', () => {

@@ -23,9 +23,7 @@ const dashboard = {
   replies: { medianReplyMinutes: 3.5, fansWaitingOver10Min: 1, conversationsOpen: 12 },
   guards: {
     today: { ...Object.fromEntries(HANDOFF_CAUSES.map((cause) => [cause, 0])), minor: 1, meeting: 2 },
-    telegramAlertsTonight: 2,
   },
-  telegramCoverage: { urgentReachable: true },
   budget: { spentToday: 3.2, cap: 20, alertAt: 16, costPerEuroSold: null },
   todos: [
     {
@@ -77,7 +75,7 @@ describe('dashboard contract', () => {
     expect(
       DashboardSchema.safeParse({
         ...dashboard,
-        guards: { today: { minor: 1 }, telegramAlertsTonight: null },
+        guards: { today: { minor: 1 } },
       }).success,
     ).toBe(false);
   });

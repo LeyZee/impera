@@ -176,6 +176,7 @@ Chaque écran se relit à la place d'un nouvel utilisateur, qui connaît le chat
 | `success` (cyan), `warning`, `danger`, `sale`                                                                 | Envoi vérifié ; à valider ; erreur ; vente. Toujours avec un mot ou une icône : `danger` est proche du néon. |
 | `info` | Un état à connaître, ni tâche ni alarme (un fan en mode soin) : bleu calme, toujours avec un mot ou une icône. |
 | `focus`                                                                                                       | Anneau de focus blanc chaud, 2px plein, décalé de 3px.                                                       |
+| `media-scrim`, `media-ink` | Sur une photo ou une vidéo (triangle de lecture, durée) : voile noir à 62 % et encre blanche, les mêmes en Nuit et en Jour, car une image ne change pas avec le thème. |
 
 Contraste garanti par le test : `ink`, `ink-muted`, `ink-faint` ≥ 4,5:1 sur `void`, `abyss`, `surface-raised` et sur le verre au pire cas (au-dessus du point le plus lumineux de l'aura) ; `neon`, `neon-ink`, `danger`, `success`, `warning`, `sale` ≥ 4,5:1 sur `void` ; `on-neon` ≥ 4,5:1 sur `neon-solid` ; `focus` ≥ 3:1 sur `void` et `surface-raised`. Modifier un token qui casse une paire fait échouer `pnpm test`.
 

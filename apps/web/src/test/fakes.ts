@@ -50,9 +50,7 @@ export function apiDashboard(patch: Partial<ApiDashboard> = {}): ApiDashboard {
         custom_order: 0,
         sale_trouble: 0,
       },
-      telegramAlertsTonight: null,
     },
-    telegramCoverage: null,
     budget: { spentToday: 7.4, cap: 20, alertAt: 16, costPerEuroSold: null },
     todos: [
       {

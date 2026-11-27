@@ -47,17 +47,6 @@ const SYSTEM = [
   { code: 'identity_doubt', locked: false, creators: [] },
 ];
 
-/** Léa has no group for her own alerts; Nora gets everything. */
-const OVERVIEW = {
-  bots: [],
-  routes: [{ creatorId: null, topic: 'urgent', chatId: '0192f3a0-0000-7000-8000-0000000000e1' }],
-  coverage: [
-    { creatorId: NORA, displayName: 'Nora Vidal', urgentReachable: true, topicsWithoutGroup: [] },
-    { creatorId: LEA, displayName: 'Léa', urgentReachable: true, topicsWithoutGroup: ['custom'] },
-  ],
-  version: 3,
-};
-
 interface Reply {
   readonly status: number;
   readonly body?: unknown;
@@ -97,7 +86,6 @@ const ok = (body: unknown) => (): Reply => ({ status: 200, body });
 const BASE = {
   'GET /v1/creators': ok({ creators: CREATORS }),
   'GET /v1/alerts': ok({ custom: [ALERT], system: SYSTEM }),
-  'GET /v1/settings/telegram': ok(OVERVIEW),
   'GET /v1/scheduling/not-taken-delay': ok({ minutes: null }),
 };
 
@@ -163,7 +151,7 @@ describe('Réglages › Alertes when it cannot load (P4-01)', () => {
 });
 
 describe('her own alerts', () => {
-  it('shows one line by alert, then what it watches, what it does and where it does not go on Telegram', async () => {
+  it('shows one line by alert, then what it watches and what it does, and nothing of Telegram', async () => {
     serve(BASE);
     renderSection();
     const title = await screen.findByText('Vidéo perso', { selector: '.al-line__name' });
@@ -178,27 +166,23 @@ describe('her own alerts', () => {
     expect(
       within(item).getByText('Met l’agent en pause sur ce fan et passe la main à un humain'),
     ).toBeTruthy();
+    // It tells the team: nothing more to say, and Telegram is the channels' only.
+    expect(within(item).queryByText(/sans notification/)).toBeNull();
+    expect(screen.queryByText(/Telegram/)).toBeNull();
+  });
+
+  it('says when an alert tells nobody', async () => {
+    serve({ ...BASE, 'GET /v1/alerts': ok({ custom: [{ ...ALERT, notify: false }], system: SYSTEM }) });
+    renderSection();
+    const item = await line('Vidéo perso');
+    // Opened, one line says it once, and never « prévient » (Design, 27/11).
     expect(
-      within(item).getByText('Aucun groupe Telegram ne reçoit « Alertes personnalisées » pour Léa'),
+      within(item).getByText(
+        'Met l’agent en pause sur ce fan, sans prévenir personne. Gardée dans l’historique du Suivi.',
+      ),
     ).toBeTruthy();
-    const link = within(item).getByRole('link', { name: 'Choisir le groupe' });
-    expect(link.getAttribute('href')).toBe('/reglages/telegram');
-  });
-
-  it('says once when Telegram is not plugged in, rather than an error on every line', async () => {
-    serve({ ...BASE, 'GET /v1/settings/telegram': () => ({ status: 404 }) });
-    renderSection();
-    expect(await screen.findByText(/Telegram n’est pas branché sur ce serveur/)).toBeTruthy();
-    expect(within(await line('Vidéo perso')).queryByText(/Telegram/)).toBeNull();
-  });
-
-  it('says once when no group gets anything yet, and leads to the bots', async () => {
-    serve({ ...BASE, 'GET /v1/settings/telegram': ok({ ...OVERVIEW, routes: [] }) });
-    renderSection();
-    expect(await screen.findByText(/Aucun groupe Telegram ne reçoit encore rien/)).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Brancher un groupe' }).getAttribute('href')).toBe(
-      '/reglages/telegram?onglet=bots',
-    );
+    expect(within(item).queryByText(/sans notification/)).toBeNull();
+    expect(within(item).queryByText(/Prévient/)).toBeNull();
   });
 
   it('invites her to write one when she has none', async () => {

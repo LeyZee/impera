@@ -40,7 +40,6 @@ const view = (config: TelegramChannelConfig, patch: Record<string, unknown> = {}
       membership: 'member',
       canPost: true,
       takenByOther: false,
-      routedForAlerts: false,
     },
     {
       chatId: TAKEN,
@@ -48,7 +47,6 @@ const view = (config: TelegramChannelConfig, patch: Record<string, unknown> = {}
       membership: 'member',
       canPost: true,
       takenByOther: true,
-      routedForAlerts: false,
     },
   ],
   warnings: ['no_channel', 'no_link'],

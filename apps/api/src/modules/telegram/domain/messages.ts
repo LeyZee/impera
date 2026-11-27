@@ -19,15 +19,11 @@ export function describeTelegramError(kind: TelegramErrorKind): string {
     case 'bot_conflict':
       return 'Un autre programme utilise déjà ce bot. Arrête-le, ou crée un bot réservé à Impera.';
     case 'chat_unreachable':
-      return 'Le bot ne peut plus écrire dans ce groupe. Rajoute-le au groupe, puis réessaie.';
+      return 'Le bot ne peut plus écrire dans ce canal. Rajoute-le au canal, puis réessaie.';
     case 'rate_limited':
       return 'Telegram demande de ralentir : le message partira dans quelques secondes.';
     case 'unreachable':
       return 'Telegram ne répond pas. Rien n’est perdu : Impera réessaie tout seul.';
-    case 'routes_version_conflict':
-      return 'Quelqu’un a changé ces réglages en même temps que toi. Recharge la page pour voir les siens.';
-    case 'chat_removed':
-      return 'Le groupe a été retiré de la liste avant l’envoi : ce message n’est pas parti.';
   }
 }
 

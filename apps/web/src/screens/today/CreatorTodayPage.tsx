@@ -62,11 +62,7 @@ export function CreatorTodayPage(): JSX.Element {
   const down = (day.isError && day.data === undefined) || onDuty.isError;
   return (
     <Page width="narrow">
-      <PageHeader
-        eyebrow={longDay(today)}
-        title="Aujourd’hui"
-        lead="Ta journée d’abord, puis tes chiffres."
-      />
+      <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée d’abord." />
       <div className="sc-today ag-scope">
         {down ? (
           <Failure
@@ -165,7 +161,14 @@ function HerDay({
     <>
       {/* A copy kept on her phone says so: being updated, or old, and why (CRE-02). */}
       <FreshnessNote read={read} from={monday} to={sunday} quiet={quiet} />
-      <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)} owes={owes}>
+      <Glance
+        plan={plan}
+        agenda={agenda}
+        now={now}
+        nowMinute={minuteOf(now, agenda.timeZone)}
+        owes={owes}
+        quietWhenEssentialOnly
+      >
         <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm sc-day__open">
           Ouvrir l’agenda
         </Link>
