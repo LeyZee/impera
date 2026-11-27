@@ -498,7 +498,9 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           const config = deps.config.roles[role];
           return [
             { role, ref: { provider: config.provider, model: config.model } },
-            ...(config.fallback ? [{ role, ref: config.fallback }] : []),
+            ...(config.fallback
+              ? [{ role, ref: { provider: config.fallback.provider, model: config.fallback.model } }]
+              : []),
           ];
         })
         .find(({ ref }) => ref.provider === provider);

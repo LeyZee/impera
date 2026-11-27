@@ -5,6 +5,7 @@ import type { TimeWasterLevel } from './attention';
 import { asksAvailability, type ScriptStart } from './availability';
 import type { MeetingAnswer } from './meeting';
 import { paceHints } from './pace';
+import { asksForRefund } from './refund';
 import type { RefusalMove } from './refusal';
 import { asksSchoolRole } from './safety-net';
 import { insistsForMore, mentionsOtherWoman } from './sexting-moves';
@@ -55,6 +56,7 @@ import {
   PROJECTION_HINT,
   PROOF_HINTS,
   PURCHASE_COMPLAINT_HINT,
+  REFUND_ASKED_HINT,
   REFUSAL_HINTS,
   REGISTER_HINTS,
   SAYS_LOVE_HINT,
@@ -251,6 +253,8 @@ export function toneHintsOfTurn(facts: TurnHintFacts): string[] {
       : [SPENDER_REGISTER_HINTS[facts.spenderRegister]]),
     ...(facts.hasWaitingStep ? [PAYMENT_HELP_HINT] : []),
     ...(facts.complaint ? [PURCHASE_COMPLAINT_HINT, DISAPPOINTED_MEDIA_HINT] : []),
+    // Only when he asks, never on her own (ADR 0158 § 48, avenant du 27/11).
+    ...(!care && asksForRefund(facts.fanText) ? [REFUND_ASKED_HINT] : []),
     ...(facts.complaint && insistsForMore(facts.fanText) ? [INSISTS_FOR_MORE_HINT] : []),
     ...(facts.refusal === null ? [] : [REFUSAL_HINTS[facts.refusal]]),
     ...(facts.teases === null ? [] : [ABANDON_HINTS[facts.teases]]),

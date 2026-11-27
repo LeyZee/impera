@@ -1,6 +1,6 @@
 # 0176. Telegram ne sert plus qu'aux canaux des créatrices ; les alertes passent par les notifications d'Impera
 
-Statut : proposed (décision de Charles du 27/11/2026, 00 h 31 : « les seuls trucs sur Telegram que j'ai envie de faire, c'est uniquement pour gérer le canal Telegram des modèles […] tout ce qui est en dehors de ça, on peut supprimer Telegram » ; 00 h 35 : les alertes urgentes de nuit par « notification Impera plus relance » ; confirmée le 27/11/2026 à 01 h 13 dans le fil « Remettre la documentation au propre » : « j'ai déjà tranché, ça sert plus à rien »)
+Statut : accepted (avenant du 27/11/2026, audit des contradictions : le code a été fusionné par la PR #1052 le 27/11, migration 0286, sur la décision de Charles citée ici ; la décision passe donc de « proposée » à « acceptée ») — décision de Charles du 27/11/2026, 00 h 31 : « les seuls trucs sur Telegram que j'ai envie de faire, c'est uniquement pour gérer le canal Telegram des modèles […] tout ce qui est en dehors de ça, on peut supprimer Telegram » ; 00 h 35 : les alertes urgentes de nuit par « notification Impera plus relance » ; confirmée le 27/11/2026 à 01 h 13 dans le fil « Remettre la documentation au propre » : « j'ai déjà tranché, ça sert plus à rien »)
 Date : 2026-11-27
 Remplace : 0020 (notifications Telegram).
 Amende, en place et datées du 27/11/2026 : 0046 § 8 (alertes de sécurité), 0059 (écarts de persona), 0068 (mot de passe oublié), 0080 (aperçu des posts), 0088 § 5 (rappel au bout d'une heure), 0150 (alertes de chaque créatrice).

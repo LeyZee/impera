@@ -4,7 +4,7 @@ import { addDays } from '../../scheduling/pure';
 
 /**
  * Her day (ADR 0140, second avenant of 20/11/2026): what she posts each day, dictated by Charles (20/11), as lists she
- * ticks. Nothing here is ever published for her. Until her own settings come, these are the values every day reads.
+ * ticks, her video of the day done by her coffre (avenant du 27/11). Nothing here is ever published. Until her own settings come, these are the values every day reads.
  */
 export interface DaySettings {
   /** Her video of the day on Reveal's public video feed (one a day), never on Instagram. */
@@ -35,6 +35,8 @@ interface ItemRule {
   readonly platform: DayPlatform;
   /** One of the essentials of the day (Charles, 20/11: her story to Reveal, her video). */
   readonly essential: boolean;
+  /** `drop`: done by her coffre, never ticked (avenant du 27/11). */
+  readonly source: 'tick' | 'drop';
   readonly target: (settings: DaySettings) => number;
   readonly label: (target: number) => string;
   readonly sheet: string;
@@ -50,22 +52,26 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
   reveal_story: {
     platform: 'reveal',
     essential: true,
+    source: 'tick',
     target: () => 0,
     label: (n) => (n === 1 ? 'Ta story Reveal' : `${String(n)} stories Reveal`),
     sheet:
       'Un moment de ta journée, ce que tu veux. Tes abonnés voient que tu es là, et ça leur donne envie de t’écrire.',
   },
+  // She drops it, Impera puts it out (Charles, 27/11): done by her coffre, never by a tick (avenant du 27/11).
   reveal_video: {
     platform: 'reveal',
     essential: true,
+    source: 'drop',
     target: (s) => s.revealVideos,
     label: (n) => (n === 1 ? 'Ta vidéo du jour sur Reveal' : `${String(n)} vidéos du jour sur Reveal`),
     sheet:
-      'Une des vidéos du jour de ton tournage, sur le fil vidéo public de Reveal. Elle reste sur Reveal : jamais sur Instagram.',
+      'Une vidéo du feed dans ton coffre : Impera la publie pour toi sur le fil vidéo public de Reveal. Elle reste sur Reveal, jamais sur Instagram.',
   },
   insta_cta_story: {
     platform: 'instagram',
     essential: true,
+    source: 'tick',
     target: () => 1,
     label: () => 'Ta story qui mène à Reveal',
     sheet:
@@ -74,6 +80,7 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
   insta_stories: {
     platform: 'instagram',
     essential: false,
+    source: 'tick',
     target: (s) => Math.max(0, s.instaStories - 1),
     label: (n) => plural(n, 'autre story Instagram', 'autres stories Instagram'),
     sheet: 'Ton quotidien, tes coulisses, ce qui te rend proche. Rien qui vienne de Reveal.',
@@ -81,6 +88,7 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
   insta_posts: {
     platform: 'instagram',
     essential: false,
+    source: 'tick',
     target: (s) => s.instaPosts,
     label: (n) => plural(n, 'post Instagram', 'posts Instagram'),
     sheet:
@@ -89,6 +97,7 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
   insta_reel: {
     platform: 'instagram',
     essential: false,
+    source: 'tick',
     target: (s) => s.instaReels,
     label: (n) => (n === 1 ? 'Ton Reel d’essai' : `${String(n)} Reels d’essai`),
     sheet: 'Un Reel court, pour tester une idée. On garde ce qui marche.',
@@ -96,6 +105,7 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
   telegram_posts: {
     platform: 'telegram',
     essential: false,
+    source: 'tick',
     target: (s) => s.telegramWritten,
     label: (n) => plural(n, 'post écrit sur Telegram', 'posts écrits sur Telegram'),
     sheet: 'Quelques mots à ton canal : une pensée, une question, une nouvelle de ta journée.',
@@ -103,6 +113,7 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
   telegram_video: {
     platform: 'telegram',
     essential: false,
+    source: 'tick',
     target: (s) => s.telegramVideos,
     label: () => 'Ce soir, ta vidéo du jour sur Telegram',
     sheet: 'Le soir, ta vidéo du jour de Reveal sur ton canal Telegram. Celle-là, tu peux la reprendre.',
@@ -113,11 +124,24 @@ const RULES: Readonly<Record<DayItem, ItemRule>> = {
 export const targetOf = (item: DayItem, settings: DaySettings): number =>
   Math.min(DAY_TARGET_MAX, Math.max(0, RULES[item].target(settings)));
 
+/** What a day counts, line by line: what she ticked, and the feed's videos her coffre has for that day. */
+export interface DayCounts {
+  readonly ticked: Partial<Readonly<Record<DayItem, number>>>;
+  readonly videos: number;
+}
+
+/** What she did of a line: her ticks, or her coffre for a line done by it; a tick on such a line counts for nothing. */
+const doneOf = (item: DayItem, counts: DayCounts): number =>
+  RULES[item].source === 'drop' ? counts.videos : (counts.ticked[item] ?? 0);
+
+/** Whether she ticks a line: never one her coffre does. */
+export const isTicked = (item: DayItem): boolean => RULES[item].source === 'tick';
+
 /**
  * Her day as she reads it: the essentials first, then the bonus, each in the order of `DAY_ITEMS`. A line that asks
  * nothing is left out; what she did counts up to what the line asks, never beyond.
  */
-export function dayLines(settings: DaySettings, done: Partial<Readonly<Record<DayItem, number>>>): DayLine[] {
+export function dayLines(settings: DaySettings, counts: DayCounts): DayLine[] {
   const lines = DAY_ITEMS.flatMap((item): DayLine[] => {
     const target = targetOf(item, settings);
     if (target === 0) return [];
@@ -129,8 +153,9 @@ export function dayLines(settings: DaySettings, done: Partial<Readonly<Record<Da
         label: rule.label(target),
         sheet: rule.sheet,
         target,
-        done: Math.min(target, Math.max(0, done[item] ?? 0)),
+        done: Math.min(target, Math.max(0, doneOf(item, counts))),
         essential: rule.essential,
+        source: rule.source,
       },
     ];
   });

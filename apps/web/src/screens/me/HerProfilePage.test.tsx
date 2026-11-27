@@ -33,9 +33,15 @@ function renderPage(): void {
     path: '/moi/profil',
     component: () => <HerProfilePage user={NORA_ME} />,
   });
-  const others = ['/moi/persona', '/moi/trophees', '/moi/securite', '/moi/preferences'].map((path) =>
-    createRoute({ getParentRoute: () => root, path, component: () => null }),
-  );
+  const others = [
+    '/moi/persona',
+    '/moi/liens',
+    '/moi/trophees',
+    '/moi/securite',
+    '/moi/aide',
+    '/moi/preferences',
+    '/notifications',
+  ].map((path) => createRoute({ getParentRoute: () => root, path, component: () => null }));
   const router = createRouter({
     routeTree: root.addChildren([page, ...others]),
     history: createMemoryHistory({ initialEntries: ['/moi/profil'] }),
@@ -75,7 +81,7 @@ describe('Moi › Profil, the creator’s (recette visuelle 16/11, CRE-03)', () 
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('leads to each of her other screens of Moi, one line each', async () => {
+  it('leads to each of her other screens of Moi, one line each, none left out (MOD-07)', async () => {
     renderPage();
     const list = (await screen.findByRole('heading', { level: 2, name: 'Dans Moi' })).closest('section');
     if (list === null) throw new Error('no list');
@@ -83,6 +89,14 @@ describe('Moi › Profil, the creator’s (recette visuelle 16/11, CRE-03)', () 
       within(list)
         .getAllByRole('link')
         .map((link) => link.getAttribute('href')),
-    ).toEqual(['/moi/persona', '/moi/trophees', '/moi/securite', '/moi/preferences']);
+    ).toEqual([
+      '/moi/persona',
+      '/moi/liens',
+      '/moi/trophees',
+      '/moi/securite',
+      '/moi/aide',
+      '/moi/preferences',
+      '/notifications',
+    ]);
   });
 });
