@@ -63,8 +63,9 @@ describe('the reads of alerts.route (ADR 0150 § 18)', () => {
       await test.admin.db
         .insert(schema.user)
         .values({ id: key, name: key, email: `${key}@example.test`, creatorIds });
+      const memberId = newId(TeamMemberIdSchema);
       await test.admin.db.insert(schema.teamMembers).values({
-        id: newId(TeamMemberIdSchema),
+        id: memberId,
         userId: key,
         teamRole: 'manager',
         firstName: 'Inventé',
@@ -76,8 +77,9 @@ describe('the reads of alerts.route (ADR 0150 § 18)', () => {
         joinedOn: '2026-10-01',
         ...(status === 'left' && { leftOn: '2026-11-01' }),
       });
+      return memberId;
     };
-    await manager('manager-nora', [nora]);
+    const noraManager = await manager('manager-nora', [nora]);
     await manager('manager-iris', [iris]);
     await manager('manager-gone', [nora], 'left');
 
@@ -90,5 +92,8 @@ describe('the reads of alerts.route (ADR 0150 § 18)', () => {
       ]),
     );
     expect(managers.map((m) => m.userId)).not.toContain('manager-gone');
+    // Who sold, by the name the team gives him (recette 27/11, G19); none for an id unknown.
+    expect(await reads.memberName(noraManager)).toBe('manager-nora');
+    expect(await reads.memberName(newId(TeamMemberIdSchema))).toBeNull();
   });
 });

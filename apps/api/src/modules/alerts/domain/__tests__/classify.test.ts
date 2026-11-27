@@ -59,7 +59,28 @@ describe('which alert of her tab an event is (ADR 0150 § B)', () => {
         creatorMinor: 1_000,
         seller: { kind: 'agent' },
       })?.sale,
-    ).toEqual({ grossMinor: 2_500, currency: 'EUR', by: 'agent' });
+    ).toEqual({ grossMinor: 2_500, currency: 'EUR', by: 'agent', memberId: null });
+    // A member's sale names him, for his name in the notification (recette 27/11, G19).
+    expect(
+      classifyEvent('sale_detected', {
+        saleId: '01900000-0000-7000-8000-000000000051',
+        platform: 'reveal',
+        platformAccountId: '01900000-0000-7000-8000-000000000040',
+        saleType: 'ppv',
+        occurredAt: '2026-11-27T01:00:00.000Z',
+        currency: 'EUR',
+        grossInclVatMinor: 2_500,
+        netMinor: 2_000,
+        agencyMinor: 1_000,
+        creatorMinor: 1_000,
+        seller: { kind: 'member', memberId: '01900000-0000-7000-8000-000000000060' },
+      })?.sale,
+    ).toEqual({
+      grossMinor: 2_500,
+      currency: 'EUR',
+      by: 'member',
+      memberId: '01900000-0000-7000-8000-000000000060',
+    });
     expect(classifyEvent('budget_threshold_crossed', {})?.code).toBe('ai_budget');
     expect(classifyEvent('ai_credits_low', {})?.code).toBe('ai_budget');
     const account = '01900000-0000-7000-8000-000000000040';

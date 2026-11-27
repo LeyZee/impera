@@ -73,9 +73,18 @@ describe('who an alert reaches (ADR 0150 § A)', () => {
   });
 
   it('says a sale’s amount and who sold it, never the fan (recette 27/11, G19)', () => {
-    const said = (by: 'agent' | 'member' | 'unknown') =>
-      alertMessage('sale', 'Nora', null, true, { grossMinor: 2_500, currency: 'EUR', by });
+    const said = (by: 'agent' | 'member' | 'unknown', seller: string | null = null) =>
+      alertMessage(
+        'sale',
+        'Nora',
+        null,
+        true,
+        { grossMinor: 2_500, currency: 'EUR', by, memberId: null },
+        seller,
+      );
     expect(said('agent')).toMatchObject({ title: 'Nora · Vente de 25,00\u00a0€', body: 'Vendue par l’IA.' });
+    // The member by his name; his name unknown, the one on shift (recette 27/11, G19).
+    expect(said('member', 'Basile').body).toBe('Vendue par Basile.');
     expect(said('member').body).toBe('Vendue par le chatteur en poste.');
     expect(said('unknown').body).toBe('Lue sur la plateforme, sans vendeur relié.');
     expect(alertMessage('sale', 'Nora', null, false).title).toBe('Nora · Vente détectée');

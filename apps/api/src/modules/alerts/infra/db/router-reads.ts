@@ -167,5 +167,13 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
       );
       return rows.map((row) => ({ userId: row.userId, timeZone: row.timeZone }));
     },
+
+    async memberName(memberId) {
+      const table = schema.teamMembers;
+      const rows = await admin((tx) =>
+        tx.select({ name: table.displayName }).from(table).where(eq(table.id, memberId)).limit(1),
+      );
+      return rows[0]?.name ?? null;
+    },
   };
 }

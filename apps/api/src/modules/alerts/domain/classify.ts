@@ -23,6 +23,8 @@ export interface SaleSaid {
   readonly grossMinor: number;
   readonly currency: Currency;
   readonly by: 'agent' | 'member' | 'unknown';
+  /** The member who sold, when one did: his name is read when the notification goes (recette 27/11, G19). */
+  readonly memberId: string | null;
 }
 
 /** The human relays for safety (ADR 0150 § 6): locked on « reçoit » for every role. */
@@ -82,7 +84,12 @@ export function classifyEvent(type: string, payload: unknown): ClassifiedAlert |
       if (!parsed.success) return { code: 'sale', conversationId: null };
       const { grossInclVatMinor, currency, seller } = parsed.data;
       const by = seller.kind === 'agent' ? 'agent' : seller.kind === 'member' ? 'member' : 'unknown';
-      return { code: 'sale', conversationId: null, sale: { grossMinor: grossInclVatMinor, currency, by } };
+      const memberId = seller.kind === 'member' ? seller.memberId : null;
+      return {
+        code: 'sale',
+        conversationId: null,
+        sale: { grossMinor: grossInclVatMinor, currency, by, memberId },
+      };
     }
     case 'budget_threshold_crossed':
     case 'ai_credits_low':
