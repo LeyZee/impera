@@ -215,6 +215,61 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns(text)).toEqual(['self_harm']);
   });
 
+  // ADR 0168 § 4, read sentence by sentence (27/11): a sentence in a language the guards do not read keeps its number.
+  it.each([
+    'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir',
+    'ich bin 15. salut ça va, tu fais quoi ce soir',
+    'jestem 15 i chodze do szkoly. coucou toi, tu fais quoi ce soir ?',
+    'ich bin 15. salut',
+    '15 jahre. salut',
+  ])('reads the bare number of a sentence the guards do not read in « %s »', (text) => {
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual(['minor_suspected']);
+  });
+
+  it.each([
+    'ciao bello. tu fais quoi ce soir ? on se parle à 15h',
+    'ok baby. j’ai fini le boulot, je suis crevé',
+    'Lukas. c’est mon prénom, et toi ?',
+    'danke. je rentre le 15, tu seras là ?',
+    'ich bin müde und gehe schlafen. bonne nuit ma belle',
+    'rdv le 15. bisous',
+    'à 16h. bisous',
+    'le 12 décembre. ciao',
+  ])('lets « %s » through: a lone foreign word, a name, no number in the other sentence', (text) => {
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual([]);
+  });
+
+  // ADR 0168 § 4, two levels (Sécurité, 27/11): with his kept language covered, a bare number is an age doubt only
+  // alone in its sentence, after her question about his age, or beside a word of an uncovered language.
+  it.each([
+    'salut. 15',
+    'lol. 17 !',
+    'ich bin 15. salut',
+    '15 jahre. salut',
+    'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir',
+  ])('freezes on « %s » for a fan whose kept language is French', (text) => {
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual(['minor_suspected']);
+  });
+
+  it.each([
+    'niveau 15. trop dur ce jeu',
+    'étage 12. tu montes ?',
+    'saison 12. tu regardes ?',
+    'chambre 14. je t’attends en rêve',
+    'ligne 13. quelle galère ce matin',
+    'j’habite au 14. viens en rêve',
+    'bah 15 mdr',
+  ])('does not freeze on « %s » for a fan whose kept language is French', (text) => {
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual([]);
+  });
+
+  it('reads a bare number as his age when it answers her question about it', () => {
+    expect(safetySigns('bah 15 mdr', new Date(), 't’as quel âge ?', 'french')).toEqual(['minor_suspected']);
+    expect(safetySigns('saison 12. tu regardes ?', new Date(), 'how old are you?', 'french')).toEqual([
+      'minor_suspected',
+    ]);
+  });
+
   it('says both, the minor first, when he says both', () => {
     expect(safetySigns('j’ai 15 ans et je veux mourir')).toEqual(['minor_suspected', 'self_harm']);
   });
