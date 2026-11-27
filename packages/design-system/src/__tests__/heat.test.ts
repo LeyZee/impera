@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { FIRE_STOPS, fireAt } from '../heat.js';
 
 const tokens = readFileSync(fileURLToPath(new URL('../styles/tokens.css', import.meta.url)), 'utf8');
+const components = readFileSync(fileURLToPath(new URL('../styles/components.css', import.meta.url)), 'utf8');
 
 describe('fireAt', () => {
   it('gives each stop its own colour, cold to burning', () => {
@@ -35,5 +36,34 @@ describe('fireAt', () => {
       const pattern = new RegExp(`--nv-fire-${names[index] ?? ''}: ${hex};`, 'gu');
       expect(tokens.match(pattern)).toHaveLength(2);
     });
+  });
+});
+
+describe('the fire without motion', () => {
+  // The block that stills the fire: the reduced-motion block that names the sparks.
+  const still = [...components.matchAll(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/gu)].find(
+    (found) => found[1]?.includes('.nv-spark-dot') === true,
+  );
+
+  it('stills every rule that moves the fire, after it and at its weight (Design 27/11)', () => {
+    expect(still).toBeDefined();
+    const at = still?.index ?? 0;
+    const body = still?.[1] ?? '';
+    // Every top-level rule that sets a moving animation on the flame, its core or a spark.
+    const moving = [...components.matchAll(/\n([^\n{}@][^{}]*)\{([^{}]*)\}/gu)].filter(
+      (rule) => /\banimation: nv-/u.test(rule[2] ?? '') && /nv-flame|nv-spark-dot/u.test(rule[1] ?? ''),
+    );
+    expect(moving.length).toBeGreaterThanOrEqual(3);
+    for (const rule of moving) {
+      expect(rule.index, rule[1]).toBeLessThan(at);
+      for (const selector of (rule[1] ?? '').split(',').map((part) => part.trim())) {
+        expect(body, selector).toContain(selector);
+      }
+    }
+    expect(body).toMatch(/animation: none;/u);
+  });
+
+  it('draws no spark at all rather than sparks frozen on screen', () => {
+    expect(still?.[1]).toMatch(/\.nv-sparks \{\s*display: none;/u);
   });
 });

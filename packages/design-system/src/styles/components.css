@@ -2966,17 +2966,6 @@
   fill: color-mix(in srgb, var(--_c) 30%, #fff3c4);
   animation: nv-flame-core 1.2s ease-in-out infinite;
 }
-/* The fire stays still for who asked for no motion: no flicker, no sparks, the fill at once. */
-@media (prefers-reduced-motion: reduce) {
-  .nv-flame,
-  .nv-flame__core,
-  .nv-spark-dot {
-    animation: none;
-  }
-  .nv-heat__fill {
-    transition: none;
-  }
-}
 @keyframes nv-flicker {
   0%,
   100% {
@@ -3037,6 +3026,24 @@
   100% {
     opacity: 0;
     transform: translate(var(--dx), calc(var(--dy) + 10px)) scale(0.4);
+  }
+}
+/* The fire stays still for who asked for no motion: no flicker, no sparks, the fill at once. After every rule of the
+   fire and at the weight of the rules that move it, or they win (Design 27/11). Sparks frozen on screen would be worse
+   than none: they are not drawn at all. */
+@media (prefers-reduced-motion: reduce) {
+  .nv-heat[data-lit='true'] .nv-flame,
+  .nv-heat[data-party='true'] .nv-flame,
+  .nv-heat[data-lit='true'] .nv-flame__core,
+  .nv-heat[data-party='true'] .nv-flame__core,
+  .nv-spark-dot {
+    animation: none;
+  }
+  .nv-sparks {
+    display: none;
+  }
+  .nv-heat__fill {
+    transition: none;
   }
 }
 
