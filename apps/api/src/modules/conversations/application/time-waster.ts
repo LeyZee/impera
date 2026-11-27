@@ -2,6 +2,7 @@ import type { FanFlags, FanSign, TimeWasterSetting } from '@impera/contracts';
 
 import {
   fanStanding,
+  type FanStanding,
   nextLocalTime,
   slowedReplyAt,
   timeWasterLevel,
@@ -47,11 +48,19 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 const TIRESOME_WINDOW_MS = TIRESOME_WINDOW_DAYS * DAY_MS;
 
-/** `null` when he is answered as usual: no rule, not a time-waster, or protected. */
-export function timeWasterWait(read: TimeWasterRead): TimeWasterWait | null {
-  const { setting, flags } = read;
-  if (setting === undefined || flags === null) return null;
-  const standing = fanStanding(
+/** His proofs asked before this message, ever (method § 10.25.1). */
+export function proofAsksOf(read: Pick<TimeWasterRead, 'fanSigns'>): number {
+  return read.fanSigns.filter(({ sign }) => sign === 'asks_proof').length;
+}
+
+/**
+ * Where he stands with her (ADR 0135), read once: the same reading decides her rhythm here, and the proof and his photo
+ * in the composer. Without her rule, nobody is a time-waster by his scripts; his third doubt after a proof, never
+ * having paid, makes him one whatever (method § 10.25.1).
+ */
+export function standingOf(read: Omit<TimeWasterRead, 'flags' | 'careOpen' | 'history'>): FanStanding {
+  const { setting } = read;
+  return fanStanding(
     {
       now: read.now,
       knownHours:
@@ -59,9 +68,19 @@ export function timeWasterWait(read: TimeWasterRead): TimeWasterWait | null {
       spentCents: read.spentMinor,
       ...(read.lastPurchaseAt !== undefined && { lastSpentAt: read.lastPurchaseAt }),
       unenteredScripts: read.unboughtRuns,
+      proofAsksBefore: proofAsksOf(read),
     },
-    { minUnenteredScripts: setting.minUnenteredScripts, provenHours: setting.provenHours },
+    setting === undefined
+      ? undefined
+      : { minUnenteredScripts: setting.minUnenteredScripts, provenHours: setting.provenHours },
   );
+}
+
+/** `null` when he is answered as usual: no rule, not a time-waster, or protected. */
+export function timeWasterWait(read: TimeWasterRead): TimeWasterWait | null {
+  const { setting, flags } = read;
+  if (setting === undefined || flags === null) return null;
+  const standing = standingOf(read);
   const level = timeWasterLevel({
     standing,
     unenteredScripts: read.unboughtRuns,
@@ -92,9 +111,12 @@ export function timeWasterWait(read: TimeWasterRead): TimeWasterWait | null {
 }
 
 /** From when the signs count (ADR 0135, 14 days). */
-export function signsSince(now: Date): Date {
+function signsSince(now: Date): Date {
   return new Date(now.getTime() - TIRESOME_WINDOW_MS);
 }
+
+/** Every sign journaled is read: his proofs asked count since the start (§ 10.25.1), the others over 14 days. */
+export const ALL_SIGNS_SINCE = new Date(0);
 
 /** A purchase promised is broken once this old with nothing bought (Charles, 27/11). */
 const PROMISE_KEPT_WITHIN_MS = 48 * HOUR_MS;
@@ -111,7 +133,10 @@ function tiresomeSigns(read: TimeWasterRead): Set<string> {
   const window = signsSince(read.now).getTime();
   const apology = read.fanSigns.findLast(({ sign }) => sign === 'apologised')?.at.getTime() ?? 0;
   const since = Math.max(window, apology);
-  const seen = read.fanSigns.filter(({ sign, at }) => sign !== 'apologised' && at.getTime() > since);
+  // An apology starts them again, and a proof asked is never a sign by itself (§ 10.25.1 counts those).
+  const seen = read.fanSigns.filter(
+    ({ sign, at }) => sign !== 'apologised' && sign !== 'asks_proof' && at.getTime() > since,
+  );
   const counts = new Map<FanSign, number>();
   for (const { sign, at } of seen) {
     // A promise counts once it is broken: old enough, and nothing bought since.

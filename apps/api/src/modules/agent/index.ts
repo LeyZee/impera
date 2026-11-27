@@ -45,7 +45,7 @@ export { withoutOrders } from './domain/injection';
 /** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
 export { safetySigns } from './domain/safety-net';
 export { declaredAdultAge } from './domain/sexualization';
-export { fanStanding } from './domain/standing';
+export { fanStanding, type FanStanding } from './domain/standing';
 export {
   slowedReplyAt,
   timeWasterLevel,

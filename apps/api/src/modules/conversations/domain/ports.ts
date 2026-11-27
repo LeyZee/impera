@@ -695,6 +695,10 @@ export interface ProposedFact {
 export interface ComposeInput {
   /** He is a time-waster at this level (ADR 0135), as code read it before the AI: she writes short, busy, kind. */
   readonly timeWaster?: 'slowed' | 'dormant';
+  /** Where he stands (ADR 0135), read once by code with her rule: the proof, his photo and her rhythm agree. */
+  readonly standing?: 'payer' | 'new' | 'time_waster' | 'proven_time_waster';
+  /** His proofs asked before this message (method § 10.25.1). */
+  readonly proofAsksBefore?: number;
   readonly creatorId: CreatorId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;

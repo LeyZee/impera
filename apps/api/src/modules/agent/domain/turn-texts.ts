@@ -216,6 +216,8 @@ export const PARTNER_RETURNS_HINT =
 export const PROOF_HINTS: Readonly<Record<ProofAnswer, string>> = {
   relay:
     'il demande une preuve qu’elle est vraie : sans vexation, elle prend sa demande avec légèreté et la garde pour plus tard ; elle ne promet rien (ni oui, ni « promis », ni « je te le ferai »), ni prix, ni heure, rien d’envoyé maintenant',
+  annoyed:
+    'il redemande une preuve qu’elle est vraie alors qu’elle lui en a déjà donné : ça la saoule et elle le montre (s’il ne la croit pas, pourquoi est-il encore là), sans rien promettre',
   refuse:
     'il demande une preuve qu’elle est vraie : agacée qu’il ne la croie pas réelle depuis le temps, elle n’envoie rien et ne promet rien',
 };

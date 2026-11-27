@@ -2,7 +2,7 @@ import { newId, ScriptRunIdSchema, type TimeWasterSetting } from '@impera/contra
 import { describe, expect, it } from 'vitest';
 
 import type { StoredScriptRun } from '../../domain/ports';
-import { timeWasterWait, type TimeWasterRead } from '../time-waster';
+import { proofAsksOf, standingOf, timeWasterWait, type TimeWasterRead } from '../time-waster';
 
 // Invented values: the agency's own are entered in the CRM, never written in the repository.
 const SETTING: TimeWasterSetting = {
@@ -152,5 +152,28 @@ describe('timeWasterWait (ADR 0135 § 6)', () => {
       const old = [sign('haggles', '2026-11-01T10:00:00Z'), sign('pressure', '2026-11-25T10:00:00Z')];
       expect(timeWasterWait({ ...tripled, fanSigns: old })?.level).toBe('slowed');
     });
+  });
+});
+
+describe('one reading of where he stands (ADR 0135, method § 10.25.1)', () => {
+  const asked = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      sign: 'asks_proof' as const,
+      at: at(`2026-11-2${String(index)}T10:00:00Z`),
+    }));
+
+  it('reads the same standing for her rhythm and her answers, nobody without her rule', () => {
+    expect(standingOf(base)).toBe('time_waster');
+    expect(standingOf({ ...base, setting: undefined })).toBe('new');
+  });
+
+  it('makes a time-waster of his third doubt never having paid, even without her rule, but never counts it as a sign', () => {
+    const doubting = { ...base, unboughtRuns: 0, fanSigns: asked(2) };
+    expect(proofAsksOf(doubting)).toBe(2);
+    expect(standingOf({ ...doubting, setting: undefined })).toBe('proven_time_waster');
+    expect(timeWasterWait({ ...doubting, setting: undefined })).toBeNull();
+    expect(timeWasterWait(doubting)?.level).toBe('slowed');
+    // Many proofs asked by a fan otherwise tiresome: one kind, never the two signs « endormi » asks.
+    expect(timeWasterWait({ ...base, unboughtRuns: 9, fanSigns: asked(6) })?.level).toBe('slowed');
   });
 });

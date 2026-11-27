@@ -165,10 +165,14 @@ export function decideTurn(
   const cursored = cameBackIfWaited(within, input.waited === true);
   const steersBack = sexualization?.kind === 'steer_back';
   const standingFacts = standingFactsOf(situation, input.scripts?.history);
-  const standing = fanStanding(standingFacts, input.standingLimits);
+  // Where he stands, read once by `conversations` with her time-waster rule (ADR 0135): the same for the proof, his photo
+  // and her rhythm. Computed here only where nobody read it (the playground).
+  const proofAsksBefore = input.proofAsksBefore ?? 0;
+  const standing = input.standing ?? fanStanding({ ...standingFacts, proofAsksBefore }, input.standingLimits);
   // A proof he asks of her (« un selfie avec deux doigts sur la joue »), relayed by where he stands: made for him, so a
   // custom order the team takes; she never promises it herself (passe 2 du 26/11, conversation 31).
-  const proofRelayed = brief?.occasion === 'asks_proof' && proofAnswer(standing) === 'relay';
+  const proofRelayed =
+    brief?.occasion === 'asks_proof' && proofAnswer(standing, proofAsksBefore) !== 'refuse';
   // The care mode (ADR 0088) comes before any sale: no custom order, no objection reply, no script step.
   const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
   const { customOrder, customOrderKept } = customOrderOf({
@@ -349,6 +353,7 @@ export function decideTurn(
         care,
         customOrder: customOrder !== undefined,
         standing,
+        proofAsksBefore,
         ageConfirmed,
         noExplicit,
       }),

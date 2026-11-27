@@ -142,6 +142,8 @@ export const FAN_SIGNS = [
   'contact_insistence',
   'purchase_promise',
   'apologised',
+  /** He asks a proof she is real, whoever he is (§ 10.25.1): counted for the third doubt, never a sign alone. */
+  'asks_proof',
 ] as const;
 export const FanSignSchema = z.enum(FAN_SIGNS);
 export type FanSign = z.infer<typeof FanSignSchema>;

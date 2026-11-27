@@ -36,7 +36,7 @@ import type { ScriptTurn } from '../domain/script-turn';
 import type { SexualizationDecision, SexualizationLimits } from '../domain/sexualization';
 import type { Situation } from '../domain/situation';
 import type { SpenderRegister } from '../domain/spender-register';
-import type { StandingLimits } from '../domain/standing';
+import type { FanStanding, StandingLimits } from '../domain/standing';
 import type { TrapAssessment } from '../domain/traps';
 import type { AftercareTurn, FollowUpTurn } from '../domain/turn-briefs';
 import type { OfferRefusal } from '../domain/turn-sale';
@@ -196,6 +196,10 @@ export interface ComposeTurnInput {
   readonly saleTrouble?: { readonly seen: SaleTroubleSeen; readonly hasBought: boolean };
   /** What makes him a time-waster (ADR 0135, guide 26/11), the agency's settings; absent, nobody is one. */
   readonly standingLimits?: StandingLimits;
+  /** Where he stands, read by `conversations` with her time-waster rule (ADR 0135); absent, read here. */
+  readonly standing?: FanStanding;
+  /** His proofs asked before this message (method § 10.25.1); absent, none. */
+  readonly proofAsksBefore?: number;
   /** When he asks to see her (Charles 21/11): the reasons she already gave him (the journal), and her one tease. */
   readonly meeting?: {
     readonly given: readonly MeetingReason[];

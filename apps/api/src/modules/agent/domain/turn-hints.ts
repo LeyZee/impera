@@ -137,6 +137,8 @@ export function occasionHintsOf(
     readonly care: boolean;
     readonly customOrder: boolean;
     readonly standing: FanStanding;
+    /** His proofs asked before this message (§ 10.25.1). */
+    readonly proofAsksBefore?: number;
     readonly ageConfirmed: boolean;
     readonly noExplicit: boolean;
   },
@@ -148,8 +150,10 @@ export function occasionHintsOf(
         ...(brief.occasion === 'says_love' ? [SAYS_LOVE_HINT] : []),
         ...(brief.occasion === 'partner_returns' ? [PARTNER_RETURNS_HINT] : []),
         // Relayed, her answer is the custom order's: no hint of her own beside it.
-        ...(brief.occasion === 'asks_proof' && !facts.customOrder
-          ? [PROOF_HINTS[proofAnswer(facts.standing)]]
+        // Relayed, her answer is the custom order's; asked again, her weariness is said beside it (§ 10.25.1).
+        ...(brief.occasion === 'asks_proof' &&
+        (!facts.customOrder || proofAnswer(facts.standing, facts.proofAsksBefore) === 'annoyed')
+          ? [PROOF_HINTS[proofAnswer(facts.standing, facts.proofAsksBefore)]]
           : []),
         ...(brief.occasion === 'unsolicited_explicit'
           ? [

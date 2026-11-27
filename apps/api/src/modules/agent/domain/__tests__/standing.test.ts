@@ -52,4 +52,18 @@ describe('where he stands with her (ADR 0135, guide 26/11)', () => {
     expect(proofAnswer('time_waster')).toBe('relay');
     expect(proofAnswer('proven_time_waster')).toBe('refuse');
   });
+
+  it('wears her out at his second doubt and refuses the third, whoever he is (method § 10.25.1)', () => {
+    expect(proofAnswer('payer', 1)).toBe('annoyed');
+    expect(proofAnswer('new', 2)).toBe('refuse');
+    expect(proofAnswer('payer', 2)).toBe('refuse');
+  });
+
+  it('makes a time-waster at once of his third doubt when he never paid, without any rule set', () => {
+    expect(fanStanding(facts({ spentCents: 0, unenteredScripts: 0, proofAsksBefore: 2 }))).toBe(
+      'proven_time_waster',
+    );
+    expect(fanStanding(facts({ spentCents: 0, unenteredScripts: 0, proofAsksBefore: 1 }))).toBe('new');
+    expect(fanStanding(facts({ spentCents: 500, proofAsksBefore: 5 }))).toBe('payer');
+  });
 });

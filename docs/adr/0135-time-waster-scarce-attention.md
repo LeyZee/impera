@@ -93,6 +93,11 @@ Chaque effet est une valeur que le code lit ou un texte versionné que le code c
 - **Sortie.** Un achat ou un pourboire : rythme normal sur-le-champ (§ 13). Des **excuses** pour son comportement : retour à `slowed`, pas plus.
 - **Mise en œuvre** (PR #1045) : l'attente est décidée avant tout appel d'IA, dans le job de réponse (`reply_deferred`, raison `time_waster`) ; les réglages vivent dans `creators.settings.timeWaster`, sans valeur dans le dépôt ; sans réglage, personne n'est classé. Le signe (6) se lit dans les déroulés ; les autres attendent leur journal (`fan_signs_seen`, migration à numéroter par Bilan).
 
+## Une seule lecture, et le troisième doute (27/11/2026, audit des contradictions)
+
+- **Une seule définition.** Où il se tient (payeur, nouveau, time waster, time waster avéré) est lu une fois, par le job de réponse, avec la règle de la créatrice : la même lecture décide du rythme (« hésitant », « vraiment pénible ») et, dans le composeur, de la preuve et de la réponse à sa photo. Le composeur ne la recalcule que là où personne ne l'a lue (le bac à sable).
+- **Le troisième doute (méthode § 10.25.1).** Chaque preuve demandée est journalisée pour tout fan (`asks_proof`), jamais comptée comme un signe de time waster. À la deuxième demande, elle montre que ça la saoule et peut retenter une preuve ; à la troisième, plus aucune preuve, pour tout le monde, et s'il n'a jamais rien payé il est time waster avéré tout de suite, même sans règle saisie (il n'attend son tour que si la règle existe).
+
 ## Partage du travail
 
 | Lot | Contenu | Fil |
