@@ -401,6 +401,14 @@ export function createDrizzleCreatorDirectory(
       });
     },
 
+    async translateForNets(id) {
+      const [row] = await db
+        .select({ settings: schema.creators.settings })
+        .from(schema.creators)
+        .where(eq(schema.creators.id, id));
+      return row === undefined ? null : settingsOf(row.settings).translateForNets;
+    },
+
     async fanTiers(id) {
       const [row] = await db
         .select({ settings: schema.creators.settings })

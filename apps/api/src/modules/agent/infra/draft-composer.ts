@@ -45,6 +45,14 @@ import { herDayEndsSoon } from '../domain/day-end';
 import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
+  frenchOf,
+  liftHumanOnly,
+  mergeSigns,
+  textForNets,
+  type FanTextTranslator,
+  type TranslationRead,
+} from '../domain/guard-translation';
+import {
   holdDecision,
   riskCauseOf,
   isCareRisk,
@@ -76,6 +84,7 @@ import {
   type ScriptsInput,
 } from './compose';
 import type { FanLimits } from './fan-limits';
+import { translationForNets } from './fan-text-translator';
 
 /**
  * The agent seen by `conversation.respond` (conversations' `DraftComposer` port, matched by shape: `agent` does
@@ -407,7 +416,22 @@ export interface DraftComposerDeps {
    * as a plain answer.
    */
   readonly scripts?: ScriptSource;
+  /**
+   * His message into French for the nets (ADR 0168 § 5, amended 27/11), used only when `translateForNetsOf` says her
+   * setting is on. Without it, nothing is translated and `humanOnly` stays.
+   */
+  readonly translator?: FanTextTranslator;
+  /** Her setting `translateForNets` (off by default); absent or unreadable: off. */
+  readonly translateForNetsOf?: (creatorId: string) => Promise<boolean>;
 }
+
+/** Her setting for the translation for the nets; absent or unreadable, off (ADR 0168 § 5, amended 27/11). */
+async function translateForNetsOn(deps: DraftComposerDeps, creatorId: string): Promise<boolean> {
+  if (deps.translateForNetsOf === undefined) return false;
+  return deps.translateForNetsOf(creatorId).catch(() => false);
+}
+
+const NOT_ASKED: TranslationRead = { kind: 'not_asked' };
 
 /**
  * The connector's reads a script decision needs, as minimal views until the contract carries them (P2-02:
@@ -1190,7 +1214,23 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
       // His kept language (ADR 0168 § 4): a bare number in a short message of his is read by his covered language.
       const keptLanguage = await keptLanguageOf(deps.limits, input);
-      const signs = safetySigns(fanText, input.now, keptLanguage?.value ?? null);
+      const originalSigns = safetySigns(fanText, input.now, keptLanguage?.value ?? null);
+      // In a language the nets do not read, and her setting on (ADR 0168 § 5, amended 27/11): his original in French,
+      // which every net reads too; a sign raised on either keeps all its effects. A doubt on his age needs none.
+      const translated = originalSigns.includes('minor_suspected')
+        ? NOT_ASKED
+        : await translationForNets(deps.translator, {
+            on: await translateForNetsOn(deps, input.creatorId),
+            fanText,
+            kept: keptLanguage?.value ?? null,
+            trace: {
+              creatorId: input.creatorId,
+              conversationId: input.conversationId,
+              draftId: input.draftId,
+            },
+          });
+      const french = frenchOf(translated);
+      const signs = mergeSigns(originalSigns, french === null ? [] : safetySigns(french, input.now));
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
@@ -1218,7 +1258,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const { settings } = read;
       // Her words, in code and at no cost (P4-01): one that pauses hands him over before any model. The journal names
       // the word she declared, never his.
-      const coded = keywordAlerts(fanText, withHer.alertKeywords ?? [], settings);
+      const coded = keywordAlerts(textForNets(fanText, translated), withHer.alertKeywords ?? [], settings);
       const early = settleAlerts(coded);
       if (early.pause !== null)
         return withNotices(
@@ -1249,6 +1289,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         history,
         keptLanguage,
         fanText: ownText,
+        ...(french !== null && { netTranslation: french }),
         media,
         fanNotes: input.fan.notes.join('\n'),
         ...(input.fan.brainNotes !== undefined &&
@@ -1343,8 +1384,27 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
+      // `humanOnly` lifted only by a valid translation that raised nothing (ADR 0168 § 5, amended 27/11).
+      const decided =
+        composed.language === undefined
+          ? composed
+          : {
+              ...composed,
+              language: liftHumanOnly(
+                composed.language,
+                translated,
+                {
+                  signs,
+                  alerts: fired.length,
+                  trap: composed.trap?.isTrap === true,
+                  risks: composed.brief?.risks ?? [],
+                  care: careForced || composed.care === true,
+                },
+                withHer.persona.spokenLanguages,
+              ),
+            };
       const traced =
-        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(composed, scripts) } : settled;
+        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(decided, scripts) } : settled;
       const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
       const withAvailability =
         availability === undefined ? traced : { ...traced, fanAvailability: availability };

@@ -54,6 +54,10 @@ describe('prompts', () => {
     const summary = loadPrompt('brain', 'script-summary');
     expect(summary.header).toMatchObject({ role: 'brain', output_schema: 'ScriptDropSummary' });
     expect(summary.variables).toEqual(['canary']);
+    const translation = loadPrompt('sense', 'fan-translation');
+    expect(translation.header).toMatchObject({ role: 'sense', output_schema: 'FanTranslation' });
+    // French is fixed in the prompt: no variable could choose another language (ADR 0168 § 5, 27/11).
+    expect(translation.variables).toEqual(['canary']);
     const card = loadPrompt('brain', 'fan-card');
     expect(card.header).toMatchObject({ role: 'brain', output_schema: 'FanCardRead' });
     expect(card.variables).toEqual(['canary']);

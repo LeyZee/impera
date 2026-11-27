@@ -66,6 +66,11 @@ export interface CreatorDirectory {
     change: Partial<CopilotSwitches>,
     userId: string,
   ): Promise<CopilotSwitches | null>;
+  /**
+   * Her translation for the nets (ADR 0168 § 5, amended 27/11), off when never set or when her settings no longer read;
+   * `null` when she does not exist. No route sets it yet: the owner turns it on after the cost is known.
+   */
+  translateForNets(id: CreatorId): Promise<boolean | null>;
   /** Her fans' tier thresholds (Charles, 21/11), the defaults when never set; `null` when she does not exist. */
   fanTiers(id: CreatorId): Promise<FanTiersSetting | null>;
   /** Sets all three, audited with the owner who set them; `null` when she does not exist. */

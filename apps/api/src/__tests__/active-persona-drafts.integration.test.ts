@@ -111,6 +111,7 @@ const GATEWAY: LlmGateway = {
   summarizeScript: () => Promise.reject(new Error('not used')),
   identifyScript: () => Promise.reject(new Error('not used')),
   readCard: () => Promise.reject(new Error('not used')),
+  translateFanText: () => Promise.reject(new Error('not used')),
   promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
   brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
   voice: () => Promise.resolve({ ok: true, value: { output: { bubbles: ['Coucou toi'] }, meta: META } }),
