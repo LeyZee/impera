@@ -2,7 +2,7 @@
 
 Relevé le 27/11/2026 sur `main`. Le « statut écrit » est celui de la fiche ; la colonne « Constat » le croise avec le journal des sessions (`docs/sessions/log/`) et la date du dernier changement de la fiche. Aucune fiche n’a été modifiée : c’est un relevé, pas une correction.
 
-Sur 221 fiches : 56 en cours, 9 en revue, 17 bloquée, 12 à faire, 23 proposée, 5 remplacée, 99 finie. Parmi celles qui ne sont pas finies, **21 ont une entrée de journal qui dit « done »** : soit la fiche est finie et n’a pas été mise à jour, soit seul un lot l’est. À confirmer contre le code avant de la passer en « finie ».
+Sur 221 fiches : 56 en cours, 9 en revue, 12 bloquée, 17 à faire, 23 proposée, 5 remplacée, 99 finie. Parmi celles qui ne sont pas finies, **21 ont une entrée de journal qui dit « done »** : soit la fiche est finie et n’a pas été mise à jour, soit seul un lot l’est. À confirmer contre le code avant de la passer en « finie ».
 
 Ce relevé ne remplace pas la fiche : il dit où regarder. Les fiches « en attente d’une décision » et celles sans mouvement depuis une semaine sont listées pour Charles, qui dit si elles sont encore voulues.
 
@@ -81,44 +81,44 @@ Ce relevé ne remplace pas la fiche : il dit où regarder. Les fiches « en atte
 | [P1-02 Analyse de l'API Reveal et FakeReveal](tasks/P1-02-reveal-api-analysis.md) | review (PR ouverte le 2026-11-10) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [Coffre Reveal : synchroniser dossiers et médias dans l'ordre de Reveal](tasks/PROPOSED-vault-sync.md) | review (ID à donner ; branche `task/vault-sync` ; ADR 0099 temps 1 ; propriétaire proposé : Bilan, modules `connectors`, `media`, `packages/… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 
-## Bloquée (17)
+## Bloquée (12)
 
 | Fiche | Statut écrit (début) | Fiche modifiée le | Constat |
 |---|---|---|---|
 | [CR-03 Ventes saisies par le chatteur et rapport de fin de shift qui les reprend](tasks/CR-03-chatter-sale-entries.md) | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | 2026-11-19 | journal « done » le 02/11 : finie ou seulement un lot ? à vérifier |
 | [EQ-08 Mode hybride : passage à l'humain pour vendre, routage et attribution](tasks/EQ-08-hybrid-sale-handoff.md) | blocked (lot 4 de l'ADR 0023, ID validé par Charles le 27/10/2026 ; attend la capture Reveal et les clés) | 2026-11-19 | journal « done » le 27/10 : finie ou seulement un lot ? à vérifier |
-| [CR-07 Topo de la semaine : faits calculés, suggestions rédigées, relues par l'ag](tasks/CR-07-weekly-brief.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [CR-08 Plan de publication du feed : la semaine préparée, acceptée d'un geste, pr](tasks/CR-08-feed-publishing.md) | blocked (capture Reveal : publication, programmation, visibilité, statistiques) (ADR 0044 § 3, § 4 et § 6, acceptée par Charles le 02/11/202… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [CR-10 Retours de l'IA aux chatteurs, chaque semaine, sans effet sur la paie](tasks/CR-10-chatting-feedback.md) | blocked (lecture des messages de Reveal avec leur auteur, clé du fournisseur) (ADR 0043 § 6, acceptée par Charles le 02/11/2026) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [CR-11 Mass DM : les médias déposés, envoyés aux listes de fans, jamais deux fois](tasks/CR-11-mass-dm.md) | blocked (capture Reveal : listes et Mass DM ; prix, listes et cadence à décider avec Charles) (ADR 0044 § 5, acceptée par Charles le 02/11/2… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [EQ-07 Import de l'historique d'Imperium (optionnel)](tasks/EQ-07-imperium-import.md) | blocked (ID validé par Charles le 27/10/2026 ; optionnelle : aucune copie de la base d'Imperium, son serveur est arrêté. Charles, 27/10 à 14… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [EQ-16 S'entraîner : les recrues s'exercent contre des fans simulés](tasks/EQ-16-recruit-practice.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [MCP-PUB Publication par un agent externe : préparer, puis publier dans un plafon](tasks/MCP-PUB-external-agent-publishing.md) | blocked (lot a du MCP) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [PUB-02 Connecteur de publication Instagram : Reels, stories, photos, avec l'acco](tasks/PUB-02-instagram-publishing.md) | blocked (compte professionnel de la créatrice ; application Meta de l'agence) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [PUB-03 Légende Instagram : ce que le fil montre avant « … plus », vérifié pour l](tasks/PUB-03-caption-window.md) | blocked (PUB-02 : compte pro de la créatrice, appli Meta ; le lot a peut s'écrire avant, voir « Ordre ») | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [SC-05 Textes de vente d'un script, proposés par le modèle et validés par l'agenc](tasks/SC-05-script-sales-texts.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [SC-06 Téléverser un script dans Reveal, dans l'ordre](tasks/SC-06-script-upload-to-reveal.md) | blocked (capture Reveal : coffre, dossiers, scripts natifs) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [VEI-03 Le job du matin : signaux de Grok et idées du jour](tasks/VEI-03-morning-ideas-and-grok-signals.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [VEI-04 Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire](tasks/VEI-04-content-profile.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [VEI-05 Statistiques du compte de la créatrice comme signaux](tasks/VEI-05-own-account-insights.md) | blocked (INS-01 ; ADR 0120 : ne dépend plus de PUB-02) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 | [VEI-06 Comptes de référence par Business Discovery](tasks/VEI-06-reference-accounts.md) | blocked (compte pro de l'agence relié à une page Facebook, revue de Meta) | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
 
-## À faire (12)
+## À faire (17)
 
 | Fiche | Statut écrit (début) | Fiche modifiée le | Constat |
 |---|---|---|---|
-| [CRM-06 CA de l'agent et achats dans la mémoire du fan](tasks/CRM-06-agent-and-memory.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | journal « done » le 02/11 : finie ou seulement un lot ? à vérifier |
-| [ARC-04 Les frontières vérifiées aussi à l'intérieur d'un module](tasks/ARC-04-boundaries-inside-modules.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
+| [CRM-06 CA de l'agent et achats dans la mémoire du fan](tasks/CRM-06-agent-and-memory.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | journal « done » le 02/11 : finie ou seulement un lot ? à vérifier |
+| [ARC-04 Les frontières vérifiées aussi à l'intérieur d'un module](tasks/ARC-04-boundaries-inside-modules.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | active |
+| [CR-07 Topo de la semaine : faits calculés, suggestions rédigées, relues par l'ag](tasks/CR-07-weekly-brief.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-27 | active |
 | [EQ-15 Double authentification pour le propriétaire et les managers](tasks/EQ-15-two-factor.md) | todo (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous ») | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [EQ-19 « Voir comme » : l'écran exact d'un chatteur, en lecture seule](tasks/EQ-19-view-as.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
+| [EQ-16 S'entraîner : les recrues s'exercent contre des fans simulés](tasks/EQ-16-recruit-practice.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-27 | active |
+| [EQ-19 « Voir comme » : l'écran exact d'un chatteur, en lecture seule](tasks/EQ-19-view-as.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | active |
 | [P2-04 Réconciliation Reveal : envois perdus, ventes, historique](tasks/P2-04-reveal-reconciliation.md) | todo | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [P2-05 Runbooks Reveal testés sur le compte de test](tasks/P2-05-reveal-runbooks-tested.md) | todo (prioritaire avant le premier shift réel ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentati… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [P2-06 Déploiement du connecteur Reveal](tasks/P2-06-reveal-deployment.md) | todo (avec la mise en ligne sur le VPS ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au p… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [P3-08 Recette du copilote : ce que Charles voit dans Suivi, de bout en bout, ave](tasks/P3-08-copilot-recette.md) | todo (prioritaire avant le premier shift réel ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentati… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [SC-07 Mode tournage et ordre de tournage sur le téléphone de la créatrice](tasks/SC-07-shooting-mode.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [SC-08 Photo d'exemple par étape](tasks/SC-08-stage-example-photo.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [SC-09 Séries proposées par l'IA](tasks/SC-09-ai-series-ideas.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
-| [VEI-07 Veille : les relevés deviennent des signaux, sur la médiane du compte, et](tasks/VEI-07-standout-median.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-19 | aucun mouvement depuis plus d’une semaine |
+| [P2-05 Runbooks Reveal testés sur le compte de test](tasks/P2-05-reveal-runbooks-tested.md) | todo (prioritaire avant le premier shift réel ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentati… | 2026-11-27 | active |
+| [P2-06 Déploiement du connecteur Reveal](tasks/P2-06-reveal-deployment.md) | todo (avec la mise en ligne sur le VPS ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au p… | 2026-11-27 | active |
+| [P3-08 Recette du copilote : ce que Charles voit dans Suivi, de bout en bout, ave](tasks/P3-08-copilot-recette.md) | todo (prioritaire avant le premier shift réel ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentati… | 2026-11-27 | active |
+| [SC-05 Textes de vente d'un script, proposés par le modèle et validés par l'agenc](tasks/SC-05-script-sales-texts.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-27 | active |
+| [SC-07 Mode tournage et ordre de tournage sur le téléphone de la créatrice](tasks/SC-07-shooting-mode.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | active |
+| [SC-08 Photo d'exemple par étape](tasks/SC-08-stage-example-photo.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | active |
+| [SC-09 Séries proposées par l'IA](tasks/SC-09-ai-series-ideas.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | active |
+| [VEI-03 Le job du matin : signaux de Grok et idées du jour](tasks/VEI-03-morning-ideas-and-grok-signals.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-27 | active |
+| [VEI-04 Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire](tasks/VEI-04-content-profile.md) | todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/1… | 2026-11-27 | active |
+| [VEI-07 Veille : les relevés deviennent des signaux, sur la médiane du compte, et](tasks/VEI-07-standout-median.md) | todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la d… | 2026-11-27 | active |
 
 ## Proposée (23)
 
@@ -152,11 +152,11 @@ Ce relevé ne remplace pas la fiche : il dit où regarder. Les fiches « en atte
 
 | Fiche | Statut écrit (début) | Fiche modifiée le | Constat |
 |---|---|---|---|
-| [H-01 Première session d'hygiène](tasks/H-01-first-hygiene-pass.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : knip, l'audit des d… | 2026-11-19 |  |
-| [P1-01 Extension : enregistreur d'API](tasks/P1-01-extension-recorder.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'API Reveal a été … | 2026-11-19 |  |
-| [P6-01 Catalogue tarifé : index des scripts Reveal, de leurs étapes et de leurs b](tasks/P6-01-sales-catalog.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'index des scripts… | 2026-11-19 |  |
+| [H-01 Première session d'hygiène](tasks/H-01-first-hygiene-pass.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : knip, l'audit des d… | 2026-11-27 |  |
+| [P1-01 Extension : enregistreur d'API](tasks/P1-01-extension-recorder.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'API Reveal a été … | 2026-11-27 |  |
+| [P6-01 Catalogue tarifé : index des scripts Reveal, de leurs étapes et de leurs b](tasks/P6-01-sales-catalog.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'index des scripts… | 2026-11-27 |  |
 | [Serveur MCP, lot 3 : lectures de l'Équipe (planning, rapports, commissions)](tasks/PROPOSED-mcp-team-tools.md) | superseded (repris dans `PROPOSED-mcp-read`, lot a, par l'ADR 0105 § 6) | 2026-11-19 |  |
-| [Coffre Reveal : importer les scripts existants et les relier aux médias du coffr](tasks/PROPOSED-vault-import-scripts.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'import des script… | 2026-11-19 |  |
+| [Coffre Reveal : importer les scripts existants et les relier aux médias du coffr](tasks/PROPOSED-vault-import-scripts.md) | superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'import des script… | 2026-11-27 |  |
 
 ## Finies (99)
 
