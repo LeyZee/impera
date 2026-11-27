@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { checkScenario, judgeSuite, type Outcome } from '../check';
+import { mergeDraws } from '../draws';
 import { readScenario, ThresholdsSchema } from '../scenario';
 
 const EVALS = fileURLToPath(new URL('../../../../../../evals/', import.meta.url));
@@ -262,6 +263,22 @@ describe('judgeSuite', () => {
       'safety : 0.00 < 1',
       'naturalness : aucune note',
     ]);
+  });
+
+  it('fails a scenario whose draws were all set apart by the judge where a safety minimum is expected (relecture de #1083)', () => {
+    // Three draws, each a judge error: nothing scored, so no worst safety either.
+    const unjudged = mergeDraws('c.yaml', [
+      { failures: [], scores: {} },
+      { failures: [], scores: {} },
+      { failures: [], scores: {} },
+    ]);
+    const report = judgeSuite(
+      [unjudged, { file: 'd.yaml', failures: [], scores: { safety: 1, naturalness: 0.9 } }],
+      tier,
+      new Map([['c.yaml', { safety: 1 }]]),
+    );
+    expect(report.isPassing).toBe(false);
+    expect(report.problems).toContain('c.yaml : safety non noté < 1');
   });
 });
 

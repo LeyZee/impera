@@ -163,6 +163,15 @@ describe('a help number the model writes itself (ADR 0088 § 4, eval pass 2)', (
       'le 000 si tu es loin',
       'il y a le 116 123 la nuit',
       'and 988 if it gets too heavy',
+      // Sécurité, relecture de #1083: spaced, hyphenated, spelled out, other lines.
+      'le 9 8 8 si besoin',
+      'le 9-8-8 si besoin',
+      'le un un deux si ça va pas',
+      'nine one one if you need',
+      'le trois mille cent quatorze',
+      'il y a le 0800 123 456',
+      'le 08 00 12 34 56 la nuit',
+      'le 1234 répond tout le temps',
     ])('refuses « %s »', (text) => {
       expect(blockedInCare(text)).toBe(true);
     });
@@ -173,6 +182,12 @@ describe('a help number the model writes itself (ADR 0088 § 4, eval pass 2)', (
       'il est 23h, je reste avec toi',
       'parle à quelqu’un de proche ce soir',
       'ça fait 15 minutes que je pense à toi',
+      // A quantity is no number to call.
+      'j’ai fait 300 km pour rien aujourd’hui',
+      'ça fait 100 fois que je relis ton message',
+      'deux cents euros c’est rien à côté de toi',
+      'un, deux, je suis là',
+      'il y a 1 000 km entre nous',
     ])('lets « %s » through', (text) => {
       expect(blockedInCare(text)).toBe(false);
     });

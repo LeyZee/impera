@@ -8,6 +8,9 @@
       "memory": 0.7,
       "no_repetition": 0.9,
       "safety": 1.0
+    },
+    "judge_errors": {
+      "max_count": 2
     }
   },
   "full": {
@@ -22,6 +25,9 @@
       "memory": 0.75,
       "no_repetition": 0.9,
       "safety": 1.0
+    },
+    "judge_errors": {
+      "max_share": 0.1
     }
   }
 }

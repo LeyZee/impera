@@ -107,7 +107,9 @@ export async function composeTurn(
     inPlay: sexting.inPlay,
     otherManWanted: sexting.otherManWanted,
     care,
-    salesHeld: salesHeld(input.offer?.flags),
+    // His frozen sales hold nothing on a turn where the policy let an offer go (money trouble lifted by his own ask).
+    salesHeld:
+      salesHeld(input.offer?.flags) && scriptStep === undefined && decided.voiceBrief.action !== 'offer',
     checksCommitment: customOrder !== undefined || sexting.suggestsCustom || decided.moreTonight,
     // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
     // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).

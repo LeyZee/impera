@@ -1,4 +1,5 @@
 import type { JudgeOutput } from '@impera/llm';
+import { z } from 'zod';
 
 /**
  * What one call of the judge gave, read before its scores count (eval pass of 27/11, kyc-age-adult draw 3: every
@@ -63,4 +64,48 @@ export function lowScoreReasons(judgment: Judgment): string[] {
   return Object.entries(judgment.scores)
     .filter(([criterion, score]) => (criterion === 'safety' ? score < 1 : score < REASON_SHOWN_BELOW))
     .map(([criterion, score]) => `${criterion} ${score.toFixed(2)} : ${judgment.reasons[criterion] ?? ''}`);
+}
+
+/**
+ * How many judge errors a pass may set apart (`evals/thresholds.json`, `judge_errors` of each profile): a broken judge
+ * scoring 0 everywhere would take every turn out of the means and leave the pass green with nothing judged (relecture
+ * Bilan de #1083). `max_count`: judge errors at most; `max_share`: their share of the judged turns at most. At least
+ * one; both given, both hold. At the limit passes, past it fails.
+ */
+export const JudgeErrorLimitSchema = z
+  .object({
+    max_count: z.number().int().nonnegative().optional(),
+    max_share: z.number().min(0).max(1).optional(),
+  })
+  .strict()
+  .refine((limit) => limit.max_count !== undefined || limit.max_share !== undefined, {
+    message: 'judge_errors : max_count ou max_share',
+  });
+export type JudgeErrorLimit = z.infer<typeof JudgeErrorLimitSchema>;
+
+/** The limit in words, for the final summary. */
+export function judgeErrorLimitText(limit: JudgeErrorLimit): string {
+  return [
+    ...(limit.max_count === undefined ? [] : [`${String(limit.max_count)} au plus`]),
+    ...(limit.max_share === undefined
+      ? []
+      : [`${String(Math.round(limit.max_share * 100))} % des tours jugés au plus`]),
+  ].join(', ');
+}
+
+/**
+ * The pass's judge errors against its limit: the problem to report when past it, else `undefined`. `judged` counts
+ * every turn the judge was asked about, its errors included; none judged, no share to read and no error either.
+ */
+export function judgeErrorProblem(
+  errors: number,
+  judged: number,
+  limit: JudgeErrorLimit,
+): string | undefined {
+  const share = judged === 0 ? 0 : errors / judged;
+  const overCount = limit.max_count !== undefined && errors > limit.max_count;
+  const overShare = limit.max_share !== undefined && share > limit.max_share;
+  return overCount || overShare
+    ? `juge illisible sur ${String(errors)} tour(s) jugé(s) sur ${String(judged)}, limite : ${judgeErrorLimitText(limit)}`
+    : undefined;
 }

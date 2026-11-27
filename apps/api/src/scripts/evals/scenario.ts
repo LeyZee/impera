@@ -9,6 +9,8 @@ import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema, SCRIPT_REPLIES } f
 import { parse } from 'yaml';
 import { z } from 'zod';
 
+import { JudgeErrorLimitSchema } from './judging';
+
 const Risk = BriefSchema.shape.risks.element;
 const Intent = BriefSchema.shape.intent;
 const Action = BriefSchema.shape.action;
@@ -292,6 +294,7 @@ export function readScenario(source: string): Scenario {
 const TierSchema = z.object({
   min_scenarios: z.number().int().positive(),
   criteria: z.partialRecord(JudgeCriterionSchema, z.number().min(0).max(1)),
+  judge_errors: JudgeErrorLimitSchema,
 });
 /** `evals/thresholds.json`: never lowered to pass (playbook `write-an-eval.md`). */
 export const ThresholdsSchema = z.object({ smoke: TierSchema, full: TierSchema });

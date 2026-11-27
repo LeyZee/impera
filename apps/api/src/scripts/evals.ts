@@ -60,7 +60,13 @@ import { createCostMeter } from './evals/cost-meter';
 import { afterTurn, beforeTurn, type DialogueState, type TurnLeft } from './evals/dialogue';
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
-import { judgeTwice, lowScoreReasons, type Judgment } from './evals/judging';
+import {
+  judgeErrorLimitText,
+  judgeErrorProblem,
+  judgeTwice,
+  lowScoreReasons,
+  type Judgment,
+} from './evals/judging';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { CONCURRENCY_HELP, concurrencyOf, createWorstCase, runScheduled } from './evals/schedule';
 import { scriptsInputOf } from './evals/scripts-input';
@@ -315,6 +321,8 @@ interface TurnRun {
   readonly outcome: Outcome;
   /** What the judge gave her answer; `none` too when nothing was written to judge. */
   readonly judgment: Judgment;
+  /** The judge was asked about her answer (something was written). */
+  readonly judged: boolean;
   readonly left: TurnLeft;
 }
 
@@ -490,6 +498,7 @@ async function runTurn(
   return {
     outcome,
     judgment,
+    judged: bubbles.length > 0,
     left: {
       heard: history,
       bubbles,
@@ -506,9 +515,15 @@ async function run(
   scenario: Scenario,
   lines: string[],
   prefix: string,
-): Promise<{ readonly draw: Draw; readonly turnsPlayed: number; readonly judgeErrors: number }> {
+): Promise<{
+  readonly draw: Draw;
+  readonly turnsPlayed: number;
+  readonly judgeErrors: number;
+  readonly judgedTurns: number;
+}> {
   let state = initialState(scenario);
   let judgeErrors = 0;
+  let judgedTurns = 0;
   const failures: string[] = [];
   const scores: Record<string, number[]> = {};
   const turns = [
@@ -520,7 +535,7 @@ async function run(
     if (index > 0) state = beforeTurn(state, turn.after_minutes, turn.event);
     turnsPlayed += 1;
     const tag = turns.length > 1 ? `${prefix}tour ${String(index + 1)} : ` : prefix;
-    const { outcome, judgment, left } = await runTurn(scenario, state, turn.inbound, index === 0);
+    const { outcome, judgment, judged, left } = await runTurn(scenario, state, turn.inbound, index === 0);
     const turnScores = judgment.kind === 'scored' ? judgment.scores : {};
     const turnFailures = checkScenario({ expect: turn.expect }, outcome);
     // A written answer nobody scored is not a pass; a judge unreadable twice is set apart and reported, not a 0.
@@ -528,6 +543,7 @@ async function run(
       turnFailures.push('le juge n’a pas répondu');
     }
     if (judgment.kind === 'judge_error') judgeErrors += 1;
+    if (judged) judgedTurns += 1;
     failures.push(...turnFailures.map((failure) => `${tag}${failure}`));
     for (const [criterion, score] of Object.entries(turnScores)) (scores[criterion] ??= []).push(score);
     if (turns.length > 1) {
@@ -555,6 +571,7 @@ async function run(
     },
     turnsPlayed,
     judgeErrors,
+    judgedTurns,
   };
 }
 
@@ -583,6 +600,8 @@ interface Played {
   readonly isCapReached: boolean;
   /** Her answers the judge could not read twice: set apart from the means, listed at the end. */
   readonly judgeErrors?: number;
+  /** Her answers the judge was asked about, its errors included. */
+  readonly judgedTurns?: number;
 }
 
 /** Read before any is played; a scenario of the full tier is left out of a smoke pass. */
@@ -629,6 +648,7 @@ async function playScenario(file: string, scenario: Scenario): Promise<Played> {
     const lines: string[] = [];
     let turnsPlayed = 0;
     let judgeErrors = 0;
+    let judgedTurns = 0;
     let isCapReached = false;
     for (let index = 0; index < draws; index += 1) {
       if (index > 0 && gateway.health().budget.state === 'reached') {
@@ -639,10 +659,11 @@ async function playScenario(file: string, scenario: Scenario): Promise<Played> {
       drawn.push(played.draw);
       turnsPlayed += played.turnsPlayed;
       judgeErrors += played.judgeErrors;
+      judgedTurns += played.judgedTurns;
     }
-    return { drawn, lines, turnsPlayed, judgeErrors, isCapReached };
+    return { drawn, lines, turnsPlayed, judgeErrors, judgedTurns, isCapReached };
   });
-  const { drawn, lines, turnsPlayed, judgeErrors, isCapReached } = value;
+  const { drawn, lines, turnsPlayed, judgeErrors, judgedTurns, isCapReached } = value;
   worstCase.observe(costEur, turnsPlayed);
   const result = mergeDraws(file, drawn);
   const passed = drawn.filter((draw) => draw.failures.length === 0).length;
@@ -659,6 +680,7 @@ async function playScenario(file: string, scenario: Scenario): Promise<Played> {
     minima: scenario.expect.voice?.judge ?? {},
     isCapReached,
     judgeErrors,
+    judgedTurns,
   };
 }
 
@@ -675,6 +697,8 @@ function play(job: Job): Promise<Played> {
 const results: ScenarioResult[] = [];
 const minima = new Map<string, Readonly<Record<string, number>>>();
 const unreadByJudge: string[] = [];
+let judgeErrorCount = 0;
+let judgedTurnCount = 0;
 let isDrawCut = false;
 const scheduled = await runScheduled<Job, Played>({
   jobs,
@@ -700,6 +724,8 @@ const scheduled = await runScheduled<Job, Played>({
     results.push(played.result);
     if (played.minima !== undefined) minima.set(played.result.file, played.minima);
     isDrawCut ||= played.isCapReached;
+    judgeErrorCount += played.judgeErrors ?? 0;
+    judgedTurnCount += played.judgedTurns ?? 0;
     if (played.judgeErrors !== undefined && played.judgeErrors > 0)
       unreadByJudge.push(`${played.result.file} (${String(played.judgeErrors)})`);
     for (const line of played.lines) console.log(line);
@@ -718,14 +744,23 @@ const report = judgeSuite(
   minima,
 );
 const means = Object.entries(report.means);
+// The answers set apart beside the means they are out of (Sécurité et Bilan, relecture de #1083).
 if (means.length > 0)
-  console.log(`\nMoyennes : ${means.map(([c, m]) => `${c} ${m.toFixed(2)}`).join(' · ')}`);
-// Reported, never hidden: an answer the judge could not read twice is out of the means, and named here.
-if (unreadByJudge.length > 0)
-  console.log(`\nJuge illisible, réponses écartées des moyennes : ${unreadByJudge.join(' · ')}`);
-if (!report.isPassing || isCapReached) {
+  console.log(
+    `\nMoyennes : ${means.map(([c, m]) => `${c} ${m.toFixed(2)}`).join(' · ')} ` +
+      `(réponses écartées, juge illisible : ${String(judgeErrorCount)})`,
+  );
+// Reported, never hidden: an answer the judge could not read twice is out of the means, and named here; past the
+// profile's limit the pass fails, so a broken judge never leaves it green with nothing judged.
+console.log(
+  `\nJuge illisible : ${String(judgeErrorCount)} tour(s) sur ${String(judgedTurnCount)} jugé(s), limite : ${judgeErrorLimitText(tier.judge_errors)}` +
+    (unreadByJudge.length > 0 ? ` (${unreadByJudge.join(' · ')})` : ''),
+);
+const judgeProblem = judgeErrorProblem(judgeErrorCount, judgedTurnCount, tier.judge_errors);
+const problems = [...report.problems, ...(judgeProblem === undefined ? [] : [judgeProblem])];
+if (problems.length > 0 || isCapReached) {
   console.error(`\nevals ${values.full ? 'full' : 'smoke'} : en échec`);
-  for (const problem of report.problems) console.error(`  - ${problem}`);
+  for (const problem of problems) console.error(`  - ${problem}`);
   process.exit(1);
 }
 console.log(`\nevals ${values.full ? 'full' : 'smoke'} : ${String(results.length)} scénarios, tout passe.`);

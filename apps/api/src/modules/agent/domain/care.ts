@@ -79,11 +79,7 @@ export function checkCare(bubbles: readonly string[]): GuardViolation[] {
   return violations;
 }
 
-/**
- * The crisis and emergency numbers of three digits or more, of any country (988, 911, 999, 112, 000, 111, 3114…), and
- * the shapes of a listening or toll-free line: in a care answer, any of them alone is a number given (eval pass of 27/11:
- * « et le 988 si c'est trop lourd », no word to call it).
- */
+/** The crisis and emergency numbers of three digits or more, of any country, and the shapes of a toll-free line. */
 const CRISIS_NUMBER =
   '988|112|911|999|000|111|114|115|119|3114|3919|116 ?\\d{3}|024\\d*|1[- .]?8\\d\\d[- .]?\\d{3}[- .]?\\d{4}';
 
@@ -94,8 +90,55 @@ const NOT_A_QUANTITY =
 /** A number a help line or an emergency service answers on (ADR 0088 § 4): never an hour, an age or a sum. */
 const HELP_NUMBER = `(?<![\\d.,:/€$])(?:${CRISIS_NUMBER}|15|17|18)${NOT_A_QUANTITY}`;
 
-/** In a care answer, a crisis number standing alone, without a word to call it (two-digit ones still need one). */
-const BARE_CRISIS_NUMBER = new RegExp(`(?<![\\d.,:/€$])\\b(?:${CRISIS_NUMBER})${NOT_A_QUANTITY}`, 'u');
+/**
+ * What follows a number that is a quantity, not a number to call: a unit, a sum, an age, a length of time, a count.
+ * Read on the normalised text right after the number.
+ */
+const QUANTITY_AFTER =
+  /^\s*(?:h\b|h\d|ans?\b|anni|anos|years?|yo\b|heures?|min\w*|sec\w*|€|euros?|\$|dollars?|%|pour ?cent|percent|ore\b|horas?|km\b|kg\b|g\b|m\b|cm\b|ml\b|cl\b|l\b|fois|times|jours?|days?|mois|months?|semaines?|weeks?|personnes?|people|calories|kcal|pages?|followers?|abonnes)/u;
+
+/** Digits, alone or in groups split by spaces, dots or hyphens (« 988 », « 9 8 8 », « 9-8-8 », « 0 800 00 00 »). */
+const DIGIT_GROUPS = /(?<![\d.,:/€$])\d+(?:[ .-]\d+)*/gu;
+
+/** A digit or number said in words, French or English (« un un deux », « nine one one », « trois mille cent quatorze »). */
+const NUMBER_WORD =
+  /^(?:zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)$/u;
+const BIG_NUMBER_WORD = /^(?:cent|cents|mille|hundred|thousand)$/u;
+
+/** Three digits or more written in figures, and not a quantity: the first such number of the text. */
+function numberInFigures(text: string): string | undefined {
+  for (const match of text.matchAll(DIGIT_GROUPS)) {
+    const digits = match[0].replace(/\D/gu, '').length;
+    const after = text.slice(match.index + match[0].length);
+    if (digits >= 3 && !QUANTITY_AFTER.test(after)) return match[0];
+  }
+  return undefined;
+}
+
+/**
+ * A number said in words: three number words in a row, or two with a hundred or a thousand, and not a quantity
+ * (« deux cents euros », « trois mille personnes »).
+ */
+function numberInWords(text: string): string | undefined {
+  const words = text.split(/[\s-]+/u).map((word) => word.replace(/[^\p{L}]/gu, ''));
+  let start = 0;
+  for (let index = 0; index <= words.length; index += 1) {
+    if (index < words.length && NUMBER_WORD.test(words[index] ?? '')) continue;
+    const run = words.slice(start, index);
+    const isNumber = run.length >= 3 || (run.length === 2 && run.some((word) => BIG_NUMBER_WORD.test(word)));
+    if (isNumber && !QUANTITY_AFTER.test(` ${words.slice(index).join(' ')}`)) return run.join(' ');
+    start = index + 1;
+  }
+  return undefined;
+}
+
+/**
+ * In a care answer, any number to call (Sécurité, relecture de #1083): three digits or more that are not a quantity,
+ * in figures, spaced or hyphenated, or spelled out in French or English. No country's line is allowed to the model.
+ */
+function careNumberIn(text: string): string | undefined {
+  return numberInFigures(text) ?? numberInWords(text);
+}
 
 /** The words around a number to call: call it, its line, listening, an emergency. */
 const CALL_WORD =
@@ -118,8 +161,9 @@ const HELP_NUMBER_NEAR = [
  * bubbles before the code adds its help bubble: a chatter may write a number on purpose, and the code's bubble is its
  * own (`helpBubble`). Blocking: the voice writes once more, told why, then a human answers.
  *
- * In the care mode (`care`), a crisis number of three digits or more blocks alone, near a call word or not: no
- * number of any country, the creator's included, since ADR 0088 § 4 gives the model none (eval pass of 27/11).
+ * In the care mode (`care`), any number of three digits or more that is not a quantity blocks alone, near a call word
+ * or not, in figures, spaced, hyphenated or spelled out (`careNumberIn`): no number of any country, the creator's
+ * included, since ADR 0088 § 4 gives the model none (eval pass of 27/11; Sécurité, relecture de #1083).
  */
 export function checkHelpNumber(bubbles: readonly string[], care = false): GuardViolation[] {
   const violations: GuardViolation[] = [];
@@ -128,7 +172,7 @@ export function checkHelpNumber(bubbles: readonly string[], care = false): Guard
     const match =
       HELP_LINE_NAME.exec(text)?.[0] ??
       HELP_NUMBER_NEAR.map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined) ??
-      (care ? BARE_CRISIS_NUMBER.exec(text)?.[0] : undefined);
+      (care ? careNumberIn(text) : undefined);
     if (match !== undefined)
       violations.push({ code: 'help_number_from_model', severity: 'blocking', bubbleIndex, match });
   });

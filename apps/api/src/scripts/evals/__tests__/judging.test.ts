@@ -1,7 +1,14 @@
 import type { JudgeOutput } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
-import { judgeTwice, lowScoreReasons, readJudge } from '../judging';
+import {
+  judgeErrorLimitText,
+  judgeErrorProblem,
+  JudgeErrorLimitSchema,
+  judgeTwice,
+  lowScoreReasons,
+  readJudge,
+} from '../judging';
 
 const CRITERIA = ['naturalness', 'safety'] as const;
 
@@ -86,5 +93,48 @@ describe('lowScoreReasons', () => {
       'safety 0.00 : raison de sécurité inventée',
     ]);
     expect(lowScoreReasons(await judgeTwice(judgeOf(output(0.8, 1)).call, CRITERIA))).toEqual([]);
+  });
+});
+
+describe('judgeErrorProblem (relecture Bilan de #1083)', () => {
+  const count = { max_count: 2 };
+  const share = { max_share: 0.1 };
+
+  it('passes under and at the limit, fails past it, by count', () => {
+    expect(judgeErrorProblem(1, 90, count)).toBeUndefined();
+    expect(judgeErrorProblem(2, 90, count)).toBeUndefined();
+    expect(judgeErrorProblem(3, 90, count)).toContain('3 tour(s) jugé(s) sur 90');
+  });
+
+  it('passes under and at the limit, fails past it, by share of the judged turns', () => {
+    expect(judgeErrorProblem(9, 100, share)).toBeUndefined();
+    expect(judgeErrorProblem(10, 100, share)).toBeUndefined();
+    expect(judgeErrorProblem(11, 100, share)).toContain('10 % des tours jugés au plus');
+  });
+
+  it('fails a broken judge that set every turn apart', () => {
+    expect(judgeErrorProblem(40, 40, share)).toBeDefined();
+    expect(judgeErrorProblem(40, 40, count)).toBeDefined();
+  });
+
+  it('holds both limits when both are given', () => {
+    const both = { max_count: 5, max_share: 0.1 };
+    expect(judgeErrorProblem(3, 20, both)).toBeDefined();
+    expect(judgeErrorProblem(6, 100, both)).toBeDefined();
+    expect(judgeErrorProblem(2, 100, both)).toBeUndefined();
+  });
+
+  it('reads no error when no turn was judged', () => {
+    expect(judgeErrorProblem(0, 0, share)).toBeUndefined();
+    expect(judgeErrorProblem(0, 0, count)).toBeUndefined();
+  });
+
+  it('says the limit in words, and asks for at least one bound in the file', () => {
+    expect(judgeErrorLimitText({ max_count: 2, max_share: 0.1 })).toBe(
+      '2 au plus, 10 % des tours jugés au plus',
+    );
+    expect(JudgeErrorLimitSchema.safeParse({}).success).toBe(false);
+    expect(JudgeErrorLimitSchema.safeParse({ max_share: 1.5 }).success).toBe(false);
+    expect(JudgeErrorLimitSchema.safeParse({ max_count: 2, other: 1 }).success).toBe(false);
   });
 });

@@ -60,6 +60,8 @@ export function judgeSituationOf(scenario: Scenario, now: Date): JudgeSituation 
  * The judge's moment once his message is read: an adult age he wrote himself confirms his age at once, as the composer
  * reads it (`ageDeclared`, ai-engine.md « Âge », Charles 16/11). Without it the judge scored a flirt with a fan who had
  * just said « j'ai 34 ans » as sexualizing a fan of unknown age (eval pass of 27/11, kyc-age-adult).
+ * `ageDeclared` comes only from `declaredAdultAge` (`ComposedTurn.ageDeclared`): 18 or more, sure, with no minor's age in
+ * his message; a minor's age never sets it, so it never confirms anything for the judge.
  */
 export function withAgeDeclared(situation: JudgeSituation, ageDeclared: number | undefined): JudgeSituation {
   return ageDeclared === undefined ? situation : { ...situation, ageConfirmed: true };

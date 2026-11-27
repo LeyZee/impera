@@ -3,27 +3,34 @@ import { normalise, type FanFlags } from '@impera/contracts';
 import type { GuardViolation } from './guards';
 
 /**
- * His sales frozen (`fans.flags.salesFrozen`, ADR 0088 § 2): nothing is offered, and nothing is promised for later
- * either, since no later sale is decided (eval pass of 27/11: « tu vas devoir patienter un peu avant que je te montre
- * ça »). A freeze for money trouble is his own, lifted when he comes back to paid content (`offerDecision`): it is not
- * read here.
+ * His sales frozen (`fans.flags.salesFrozen`, ADR 0088 § 2, ADR 0132): nothing is offered, and nothing is promised for
+ * later either, since no later sale is decided (eval pass of 27/11: « tu vas devoir patienter un peu avant que je te
+ * montre ça »). Money trouble included (Sécurité, relecture de #1083): to a fan short of money, « yes, later » dangles a
+ * sale (méthode : « ventes gelées, humain »). That freeze still lifts when he comes back to paid content himself
+ * (`offerDecision`): the composer then reads no hold on a turn where an offer goes.
  */
 export function salesHeld(flags: FanFlags | undefined): boolean {
-  const frozen = flags?.salesFrozen;
-  return frozen !== undefined && frozen.reason !== 'money_trouble';
+  return flags?.salesFrozen !== undefined;
 }
 
 /** A time to come: wait, later, another time (FR, EN, ES, IT), on the normalised text. */
 const LATER =
-  /\b(?:patiente\w*|patience|attendre|attends|attendras|plus tard|bientot|un de ces (?:jours|soirs)|une autre fois|la prochaine fois|un autre (?:jour|soir)|demain|un jour|later|soon|wait\w*|be patient|patience|another (?:time|day|night)|next time|tomorrow|someday|one day|despues|luego|pronto|esper\w*|paciencia|otro dia|la proxima|manana|algun dia|dopo|piu tardi|presto|aspett\w*|pazienza|un altro giorno|la prossima|domani)\b/u;
+  /\b(?:patiente\w*|patience|attendre|attends|attendras|plus tard|bientot|un de ces (?:jours|soirs)|une autre fois|la prochaine fois|un autre (?:jour|soir)|demain|un jour|later|soon|wait\w*|be patient|another (?:time|day|night)|next time|tomorrow|someday|one day|despues|luego|pronto|esper\w*|paciencia|otro dia|la proxima|manana|algun dia|dopo|piu tardi|presto|aspett\w*|pazienza|un altro giorno|la prossima|domani)\b/u;
 
-/** Something of hers to see, send or buy: her showing it to him, a media, a purchase (FR, EN, ES, IT). */
-const SHOWN =
-  /\b(?:(?:te|t') ?(?:le |la |les |l' ?)?(?:montr\w*|envo\w*|fais (?:voir|decouvrir)|ferai (?:voir|decouvrir))|je (?:te |t' ?)?(?:montr\w*|envo\w*)|tu (?:verras|vas voir|pourras voir|auras)|(?:show|send)(?:ing)? you|you'll see|(?:i'll|i will|gonna|going to) (?:show|send)|te (?:lo |la |los |las )?(?:muestr\w*|mostrar\w*|ensen\w*|mand\w*|envi[oae]\w*)|veras|vas a ver|ti (?:lo |la |li |le )?(?:mostr\w*|mand\w*|invi\w*|faccio vedere|faro vedere)|vedrai|videos?|photos?|pics?|pictures?|fotos?|contenus?|content|contenido|contenuto|pack|achet\w*|debloqu\w*|buy|unlock|compra\w*|sblocc\w*)\b/u;
+/**
+ * Her offering something of hers: she is the one who shows, sends or has him see or buy it (FR, EN, ES, IT). « tu vas
+ * voir » alone is an idiom (« attends tu vas voir, je te raconte »): only with what is hers after it.
+ */
+const SHE_OFFERS =
+  /\b(?:(?:te|t') ?(?:le |la |les |l' ?)?(?:montr\w*|envo\w*|fais (?:voir|decouvrir)|ferai (?:voir|decouvrir))|je (?:te |t' ?)?(?:montr\w*|envo\w*)|tu (?:verras|vas voir|pourras voir|auras) (?:ma |mes |mon |ce que je |ce que j' ?)|(?:show|send)(?:ing)? you|you'll see (?:my |what i )|(?:i'll|i will|gonna|going to) (?:show|send)|te (?:lo |la |los |las )?(?:muestr\w*|mostrar\w*|ensen\w*|mand\w*|envi[oae]\w*)|(?:veras|vas a ver) (?:mi |mis |lo que )|ti (?:lo |la |li |le )?(?:mostr\w*|mand\w*|invi\w*|faccio vedere|faro vedere)|vedrai (?:la mia |il mio |i miei |le mie |quello che )|achet\w*|debloqu\w*|buy|unlock|compra\w*|sblocc\w*)/u;
+
+/** A media named bare: counts only when his last message asked for her content (« envoie-moi une photo de ton chien »). */
+const MEDIA_NAMED =
+  /\b(?:videos?|photos?|pics?|pictures?|fotos?|contenus?|content|contenido|contenuto|pack)\b/u;
 
 /** Told to wait, alone: read as a promise when he just asked for her content. */
 const WAIT_FOR_IT =
-  /\b(?:patiente\w*|patience|devoir attendre|faudra attendre|il faut attendre|wait (?:a bit|a little|a while)|have to wait|be patient|patience|paciencia|tendras que esperar|hay que esperar|pazienza|dovrai aspettare)\b/u;
+  /\b(?:patiente\w*|patience|devoir attendre|faudra attendre|il faut attendre|wait (?:a bit|a little|a while)|have to wait|be patient|paciencia|tendras que esperar|hay que esperar|pazienza|dovrai aspettare)\b/u;
 
 /**
  * Asking him what he would like to see, after he asked for her content: the opening of a sale that cannot come (eval
@@ -46,19 +53,19 @@ function sentencesOf(bubble: string): string[] {
 
 /**
  * Her sales frozen, a sale promised for later (eval pass of 27/11): read in context, never on a word alone. A time to
- * come blocks with something to see, send or buy in the same sentence; « patiente un peu », or asking him what he
- * would like to see, blocks only when his last message asked for her content. Blocking: the voice writes once more, told why, then a human answers, as every
- * guard of a sale that must not happen (`care_breach`, `price_outside_offer`).
+ * come blocks in the same sentence as her offering something of hers (« je te montre », « tu verras mes… »), or as a
+ * media named bare when his last message asked for her content; « patiente un peu », or asking him what he would like
+ * to see, blocks only after such a message. Blocking: the voice writes once more, told why, then a human answers, as
+ * every guard of a sale that must not happen (`care_breach`, `price_outside_offer`).
  */
 export function checkDeferredSale(bubbles: readonly string[], fanLastMessage?: string): GuardViolation[] {
   const heAsks = fanLastMessage !== undefined && HE_ASKS.test(normalise(fanLastMessage));
   const violations: GuardViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
     for (const sentence of sentencesOf(bubble)) {
-      const later = LATER.exec(sentence);
-      const shown = SHOWN.exec(sentence);
+      const offered = SHE_OFFERS.test(sentence) || (heAsks && MEDIA_NAMED.test(sentence));
       const waited = heAsks ? (WAIT_FOR_IT.exec(sentence) ?? WHAT_HE_WANTS.exec(sentence)) : null;
-      const match = later !== null && shown !== null ? sentence : waited?.[0];
+      const match = LATER.test(sentence) && offered ? sentence : waited?.[0];
       if (match !== undefined) {
         violations.push({ code: 'deferred_sale', severity: 'blocking', bubbleIndex, match });
         return;
