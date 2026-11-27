@@ -18,7 +18,7 @@ import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { timedSuggestionsOf } from './grid';
 import {
-  BOOKED_CAM_TITLE,
+  camTitleOf,
   closedTickWords,
   firstOf,
   momentOf,
@@ -601,7 +601,7 @@ function Program({
                   📹
                 </span>
                 <div className="ag-task__body">
-                  <b>{BOOKED_CAM_TITLE}</b>
+                  <b>{camTitleOf(cam)}</b>
                   <span className="ag-meta">
                     <span>Sur Instagram, c’est toi qui l’appelles</span>
                     <span className="nv-num">{lengthOf((cam.end - cam.start) * MINUTE_MS)}</span>

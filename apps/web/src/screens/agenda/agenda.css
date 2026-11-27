@@ -1621,6 +1621,11 @@
   color: var(--nv-ink);
   pointer-events: none;
 }
+.ag-wk__cam > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ag-wk__cam b {
   font-weight: 600;
 }

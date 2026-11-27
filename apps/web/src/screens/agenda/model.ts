@@ -63,10 +63,12 @@ export interface DayWindow {
 export interface DayCam {
   readonly start: number;
   readonly end: number;
+  /** His pseudo: she must know with whom (Charles, 27/11). */
+  readonly fanName: string;
 }
 
-/** What her agenda calls a booked cam: never who, never a price. */
-export const BOOKED_CAM_TITLE = 'Cam avec un fan';
+/** What her agenda calls a booked cam: with whom, never a price. */
+export const camTitleOf = (cam: DayCam): string => `Cam avec ${cam.fanName}`;
 
 export interface DayPlan {
   readonly day: string;
@@ -218,7 +220,11 @@ export function planOf(agenda: CreatorAgenda, day: string): DayPlan {
     suggestions: agenda.suggestions.filter((suggestion) => suggestedOn(suggestion, day, zone, agenda.today)),
     cams: agenda.cams
       .filter((cam) => dayOf(cam.startsAt, zone) === day)
-      .map((cam) => ({ start: minuteOf(cam.startsAt, zone), end: minutesFrom(day, cam.endsAt, zone) }))
+      .map((cam) => ({
+        start: minuteOf(cam.startsAt, zone),
+        end: minutesFrom(day, cam.endsAt, zone),
+        fanName: cam.fanName,
+      }))
       .sort((a, b) => a.start - b.start),
   };
 }

@@ -281,7 +281,7 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     const at = (minutes: number): string => new Date(opens.getTime() + minutes * 60_000).toISOString();
     expect(await paidCam()).toEqual({ startsAt: at(0), endsAt: at(30) });
     expect(await paidCam()).toEqual({ startsAt: at(45), endsAt: at(75) });
-    // Her agenda shows both cams, the slot only (Charles, 27/11: « un suivi des cams »).
+    // Her agenda shows both cams, when and with whom, never the price (Charles, 27/11).
     const day = opens.toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
     const agenda = await server.inject({
       method: 'GET',
@@ -290,8 +290,8 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     });
     expect(agenda.statusCode).toBe(200);
     expect(CreatorAgendaSchema.parse(agenda.json()).cams).toEqual([
-      { startsAt: at(0), endsAt: at(30) },
-      { startsAt: at(45), endsAt: at(75) },
+      { startsAt: at(0), endsAt: at(30), fanName: 'Basile' },
+      { startsAt: at(45), endsAt: at(75), fanName: 'Basile' },
     ]);
   });
 

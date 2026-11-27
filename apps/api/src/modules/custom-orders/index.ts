@@ -43,12 +43,12 @@ export interface CustomOrdersModule {
    * suite ») or later, or null when none has room. Read only: the slot is booked with his full payment.
    */
   readonly camSlot: (creatorId: CreatorId, minutes: number, now: Date) => Promise<CamSlot | null>;
-  /** Her cams booked with fans that meet `[from, to)`, for her agenda: the slot only, under her tenant. */
+  /** Her cams booked with fans that meet `[from, to)`, for her agenda: when and the fan's pseudo, under her tenant. */
   readonly bookedCamsOf: (
     creatorId: string,
     from: Date,
     to: Date,
-  ) => Promise<readonly { readonly startsAt: Date; readonly endsAt: Date }[]>;
+  ) => Promise<readonly { readonly startsAt: Date; readonly endsAt: Date; readonly fanName: string }[]>;
 }
 
 export interface CustomOrdersDeps {

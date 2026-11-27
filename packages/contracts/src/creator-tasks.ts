@@ -349,7 +349,12 @@ export const CreatorAgendaQuerySchema = z
 export type CreatorAgendaQuery = z.infer<typeof CreatorAgendaQuerySchema>;
 
 /** A fan's cam booked with her, as her agenda shows it: its slot only. */
-export const BookedCamSchema = z.strictObject({ startsAt: z.iso.datetime(), endsAt: z.iso.datetime() });
+/** A fan's cam booked with her: when, and with whom by his pseudo, as she reads her fans (ADR 0042); never the price. */
+export const BookedCamSchema = z.strictObject({
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+  fanName: z.string(),
+});
 export type BookedCam = z.infer<typeof BookedCamSchema>;
 
 export const CreatorAgendaSchema = z.strictObject({
@@ -363,7 +368,7 @@ export const CreatorAgendaSchema = z.strictObject({
   /** Her suggestions still to decide, of the weeks the days read meet. */
   suggestions: z.array(CreatorSuggestionSchema),
   streak: CreatorStreakSchema,
-  /** The fans' cams booked in her dispos cam that meet the days read (ADR 0159 § 5): when, never who nor what price. */
+  /** The fans' cams booked in her dispos cam that meet the days read (ADR 0159 § 5): when and with which fan (Charles, 27/11), never what price. */
   cams: z.array(BookedCamSchema).default([]),
 });
 export type CreatorAgenda = z.infer<typeof CreatorAgendaSchema>;

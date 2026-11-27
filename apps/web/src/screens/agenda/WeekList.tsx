@@ -12,7 +12,7 @@ import { ShortReplies } from './ReplyLines';
 import { SuggestionCard, UndatedSuggestions } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
 import { CategoryMark } from './category';
-import { BOOKED_CAM_TITLE, DISPO_TITLES, planOf, proposedRoutinesOf, type DayWindow } from './model';
+import { camTitleOf, DISPO_TITLES, planOf, proposedRoutinesOf, type DayWindow } from './model';
 import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, weekOf } from '@/scheduling/time';
@@ -141,14 +141,14 @@ export function WeekList({
                 ))}
                 {cards(dated)}
                 {plan.cams.map((cam) => (
-                  // A fan's cam booked in her dispo cam: when only (ADR 0159 § 5).
+                  // A fan's cam booked in her dispo cam: when and with whom (ADR 0159 § 5).
                   <span
                     key={`cam-${String(cam.start)}`}
                     className="ag-dispo ag-dispo--booked"
                     data-opens-to="cam"
                   >
                     <span aria-hidden="true">📹</span>
-                    <b>{BOOKED_CAM_TITLE}</b>{' '}
+                    <b>{camTitleOf(cam)}</b>{' '}
                     <span className="nv-num">
                       {clockOf(cam.start)} – {clockOf(cam.end % 1440)}
                     </span>

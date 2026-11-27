@@ -21,7 +21,7 @@ import {
   timedSuggestionsOf,
   type Span,
 } from './grid';
-import { BOOKED_CAM_TITLE, planOf, type DayCam, type DayPlan, type TimedTask } from './model';
+import { camTitleOf, planOf, type DayCam, type DayPlan, type TimedTask } from './model';
 import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, minuteOf, weekOf } from '@/scheduling/time';
@@ -381,12 +381,12 @@ export function WeekGrid({
                 </div>
               ))}
               {plan.cams.map((cam) => (
-                // A fan's cam booked in her dispo cam (ADR 0159 § 5): above its dispo, below her tasks; when only.
+                // A fan's cam booked in her dispo cam (ADR 0159 § 5): above its dispo, below her tasks; when and with whom.
                 <div
                   key={`cam-${String(cam.start)}`}
                   className="ag-wk__cam"
                   data-opens-to="cam"
-                  aria-label={`${BOOKED_CAM_TITLE}, ${clockOf(cam.start)} – ${clockOf(cam.end % 1440)}`}
+                  aria-label={`${camTitleOf(cam)}, ${clockOf(cam.start)} – ${clockOf(cam.end % 1440)}`}
                   style={{
                     top: top(cam.start),
                     height: height(cam.start, Math.min(cam.end, hours.last * 60)),
@@ -394,7 +394,7 @@ export function WeekGrid({
                 >
                   {/* One line: a cam of 20 min is a thin block (Design, 27/11). */}
                   <span>
-                    <span aria-hidden="true">📹</span> <b>Cam</b>{' '}
+                    <span aria-hidden="true">📹</span> <b>{cam.fanName}</b>{' '}
                     <span className="nv-num">{clockOf(cam.start)}</span>
                   </span>
                 </div>

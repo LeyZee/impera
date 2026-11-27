@@ -31,14 +31,14 @@ const timedTask = (n: number, title: string, startsAt: string, endsAt: string) =
 describe('her day (CR-05)', () => {
   it('shows a fan’s cam booked on its day, in her time, as a row of her program (ADR 0159 § 5)', () => {
     const agenda = agendaOf({
-      cams: [{ startsAt: '2026-11-04T20:15:00.000Z', endsAt: '2026-11-04T20:45:00.000Z' }],
+      cams: [{ startsAt: '2026-11-04T20:15:00.000Z', endsAt: '2026-11-04T20:45:00.000Z', fanName: 'Nathan' }],
     });
     const plan = planOf(agenda, WEDNESDAY);
-    expect(plan.cams).toEqual([{ start: 21 * 60 + 15, end: 21 * 60 + 45 }]);
+    expect(plan.cams).toEqual([{ start: 21 * 60 + 15, end: 21 * 60 + 45, fanName: 'Nathan' }]);
     expect(planOf(agenda, MONDAY).cams).toEqual([]);
     expect(programOf(plan, null)).toContainEqual({
       kind: 'cam',
-      cam: { start: 21 * 60 + 15, end: 21 * 60 + 45 },
+      cam: { start: 21 * 60 + 15, end: 21 * 60 + 45, fanName: 'Nathan' },
     });
   });
 

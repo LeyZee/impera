@@ -146,10 +146,11 @@ export async function bookedCamsBetween(
   creatorId: string,
   from: Date,
   to: Date,
-): Promise<{ startsAt: Date; endsAt: Date }[]> {
+): Promise<{ startsAt: Date; endsAt: Date; fanName: string }[]> {
   const rows = await tx
-    .select({ startsAt: customOrders.camStartsAt, endsAt: customOrders.camEndsAt })
+    .select({ startsAt: customOrders.camStartsAt, endsAt: customOrders.camEndsAt, fanName: fans.displayName })
     .from(customOrders)
+    .innerJoin(fans, eq(fans.id, customOrders.fanId))
     .where(
       and(
         eq(customOrders.creatorId, creatorId),
@@ -159,7 +160,9 @@ export async function bookedCamsBetween(
     )
     .orderBy(customOrders.camStartsAt);
   return rows.flatMap((row) =>
-    row.startsAt === null || row.endsAt === null ? [] : [{ startsAt: row.startsAt, endsAt: row.endsAt }],
+    row.startsAt === null || row.endsAt === null
+      ? []
+      : [{ startsAt: row.startsAt, endsAt: row.endsAt, fanName: row.fanName }],
   );
 }
 
