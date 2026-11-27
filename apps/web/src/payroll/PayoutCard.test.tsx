@@ -10,7 +10,12 @@ import { MyPayoutCard, PayoutLine, PayoutTo } from './PayoutCard';
 const MEMBER = '0199f2a0-0000-7000-8000-000000000021';
 const MOMO = {
   method: 'mobile_money',
-  beneficiary: 'Basile Inventé',
+  country: 'BJ',
+  firstName: 'Basile',
+  lastName: 'Inventé',
+  city: 'Ville fictive',
+  contactPhone: '+22900000002',
+  email: null,
   phone: '+22900000001',
   operator: 'Opérateur fictif',
   note: null,
@@ -96,11 +101,22 @@ afterEach(() => {
 });
 
 describe('Moi › Dossier : « Où te verser » (ADR 0165)', () => {
-  it('says « À remplir » first, then sends the way he receives and its number as typed', async () => {
+  const fillWho = (): void => {
+    fireEvent.change(screen.getByLabelText('Prénom'), { target: { value: 'Basile' } });
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Inventé' } });
+    fireEvent.change(screen.getByLabelText('Ville'), { target: { value: 'Ville fictive' } });
+  };
+
+  it('asks what WorldRemit asks, the country’s code already in both phones, and sends them as typed', async () => {
     wrap(<MyPayoutCard memberId={MEMBER} zone="Europe/Paris" />);
     expect(await screen.findByText('À remplir')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mobile money' }).getAttribute('aria-pressed')).toBe('true');
-    fireEvent.change(screen.getByLabelText('Nom du bénéficiaire'), { target: { value: 'Basile Inventé' } });
+    expect(screen.getByRole('radio', { name: 'Mobile money' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByLabelText('Téléphone de contact')).toHaveProperty('value', '+229 ');
+    expect(screen.getByLabelText('Numéro mobile money')).toHaveProperty('value', '+229 ');
+    fillWho();
+    fireEvent.change(screen.getByLabelText('Téléphone de contact'), {
+      target: { value: '+229 00 00 00 02' },
+    });
     fireEvent.change(screen.getByLabelText('Numéro mobile money'), { target: { value: '+229 00 00 00 01' } });
     fireEvent.change(screen.getByLabelText('Opérateur'), { target: { value: 'Opérateur fictif' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
@@ -110,16 +126,48 @@ describe('Moi › Dossier : « Où te verser » (ADR 0165)', () => {
     expect(writes[0]).toEqual({
       method: 'PUT',
       path: `/v1/payroll/contractors/${MEMBER}/payout-destination`,
-      body: { ...MOMO, phone: '+229 00 00 00 01' },
+      body: { ...MOMO, phone: '+229 00 00 00 01', contactPhone: '+229 00 00 00 02' },
     });
     expect(await screen.findByText('+229 00 00 00 01')).toBeTruthy();
-    expect(screen.getByText('Basile Inventé')).toBeTruthy();
+    expect(screen.getByText('Inventé')).toBeTruthy();
+    // His own view copies nothing: the copy buttons are the owner's, for WorldRemit.
+    expect(screen.queryByRole('button', { name: /^Copier/u })).toBe(null);
+  });
+
+  it('asks nothing more for cash than who he is and where, and refuses an email in the wrong form', async () => {
+    wrap(<MyPayoutCard memberId={MEMBER} zone="Europe/Paris" />);
+    await screen.findByText('À remplir');
+    fireEvent.click(screen.getByRole('radio', { name: 'Retrait en espèces' }));
+    expect(screen.queryByLabelText('Numéro mobile money')).toBe(null);
+    expect(screen.queryByLabelText('IBAN ou RIB')).toBe(null);
+    fillWho();
+    fireEvent.change(screen.getByLabelText('Téléphone de contact'), { target: { value: '+22900000002' } });
+    fireEvent.change(screen.getByLabelText(/E-mail/u), { target: { value: 'pas une adresse' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(await screen.findByText('Une adresse e-mail, ou rien.')).toBeTruthy();
+    expect(writes).toEqual([]);
+    fireEvent.change(screen.getByLabelText(/E-mail/u), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(writes[0]?.body).toEqual({
+      method: 'cash_pickup',
+      country: 'BJ',
+      firstName: 'Basile',
+      lastName: 'Inventé',
+      city: 'Ville fictive',
+      contactPhone: '+22900000002',
+      email: null,
+      note: null,
+    });
   });
 
   it('refuses a number in the wrong form without sending, and asks the password again when the server says so', async () => {
     wrap(<MyPayoutCard memberId={MEMBER} zone="Europe/Paris" />);
     await screen.findByText('À remplir');
-    fireEvent.change(screen.getByLabelText('Nom du bénéficiaire'), { target: { value: 'Basile Inventé' } });
+    fillWho();
+    fireEvent.change(screen.getByLabelText('Téléphone de contact'), { target: { value: '+22900000002' } });
     fireEvent.change(screen.getByLabelText('Numéro mobile money'), { target: { value: '0102' } });
     fireEvent.change(screen.getByLabelText('Opérateur'), { target: { value: 'Opérateur fictif' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
@@ -134,7 +182,7 @@ describe('Moi › Dossier : « Où te verser » (ADR 0165)', () => {
 });
 
 describe('Paie › « Marquer payé » : où le verser (ADR 0165)', () => {
-  it('says a recent change in amber, and shows the number only on « Afficher »', async () => {
+  it('says a recent change in amber, shows the details only on « Afficher », each with its own copy', async () => {
     wrap(
       <PayoutTo
         memberId={MEMBER}
@@ -149,6 +197,10 @@ describe('Paie › « Marquer payé » : où le verser (ADR 0165)', () => {
     expect(screen.queryByText('+229 00 00 00 01')).toBe(null);
     fireEvent.click(screen.getByRole('button', { name: 'Afficher' }));
     expect(await screen.findByText('+229 00 00 00 01')).toBeTruthy();
+    expect(screen.getByText('+229 00 00 00 02')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copier numéro mobile money' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copier nom' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /tout/u })).toBe(null);
     expect(writes).toEqual([
       { method: 'POST', path: `/v1/payroll/contractors/${MEMBER}/payout-destination/reveal`, body: null },
     ]);
