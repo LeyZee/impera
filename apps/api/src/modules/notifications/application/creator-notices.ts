@@ -12,7 +12,7 @@ export interface CreatorNoticesDeps {
  * How far back each run looks: the job runs every five minutes, so a run missed or a worker restarted loses nothing,
  * and what is seen twice rings once (one notification per account, reason and object).
  */
-export const CREATOR_NOTICES_LOOKBACK_MS = 30 * 60_000;
+const CREATOR_NOTICES_LOOKBACK_MS = 30 * 60_000;
 
 /**
  * `notifications.creator_notices` (trou 9 du 21/11): each thing the agency asked of a creator in the last half hour is
