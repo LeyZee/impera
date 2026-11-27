@@ -365,12 +365,23 @@ export function WeekGrid({
                 <div
                   key={window.id}
                   className="ag-wk__dispo"
+                  data-opens-to={window.opensTo}
                   style={{
                     top: top(window.start),
                     height: height(window.start, Math.min(window.end, hours.last * 60)),
                   }}
                 >
-                  <span>Dispo</span>
+                  {window.opensTo === 'cam' ? (
+                    // An opening, not a cam booked: her words and its hours, as the tasks beside it (Design, 26/11).
+                    <span>
+                      <b>Dispo cam</b>
+                      <small className="nv-num">
+                        {clockOf(window.start)} – {clockOf(window.end % 1440)}
+                      </small>
+                    </span>
+                  ) : (
+                    <span>Dispo</span>
+                  )}
                 </div>
               ))}
               <Column

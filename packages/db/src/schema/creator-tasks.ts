@@ -1,4 +1,5 @@
 import {
+  AVAILABILITY_OPENS_TO,
   CREATOR_TASK_CATEGORIES,
   CREATOR_TASK_KINDS,
   DAY_ITEMS,
@@ -185,7 +186,10 @@ export const creatorTaskTicks = pgTable(
   ],
 );
 
-/** A dispo she opens to the agency: weekly in her wall-clock time (an end at or before its start is the next day's, as a créneau's), or once. */
+/**
+ * A dispo she opens to the agency, or to a fan's cam (`opens_to`, ADR 0159 § 5): weekly in her wall-clock time (an end
+ * at or before its start is the next day's, as a créneau's), or once.
+ */
 export const creatorAvailabilities = pgTable(
   'creator_availabilities',
   {
@@ -199,6 +203,7 @@ export const creatorAvailabilities = pgTable(
     endMinute: integer('end_minute'),
     startsAt: timestampTz('starts_at'),
     endsAt: timestampTz('ends_at'),
+    opensTo: enumText('opens_to').notNull().default('agency'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -207,6 +212,7 @@ export const creatorAvailabilities = pgTable(
   },
   (t) => [
     enumCheck('creator_availabilities', t.kind, ['weekly', 'once']),
+    enumCheck('creator_availabilities', t.opensTo, AVAILABILITY_OPENS_TO),
     check(
       'creator_availabilities_when_check',
       sql`(

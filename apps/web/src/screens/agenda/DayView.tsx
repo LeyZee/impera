@@ -558,7 +558,7 @@ function Program({
               <button
                 type="button"
                 className="ag-free"
-                data-open={row.open ? 'true' : undefined}
+                data-open={row.open ?? undefined}
                 aria-label={`Libre de ${clockOf(row.start)} à ${clockOf(row.end)} : ajouter une tâche`}
                 onClick={() => {
                   actions.onAdd({
@@ -573,7 +573,9 @@ function Program({
                   <span className="nv-num">
                     {clockOf(row.start)} – {clockOf(row.end)}
                   </span>
-                  {row.open ? <em>dispo pour l’agence</em> : null}
+                  {row.open === null ? null : (
+                    <em>{row.open === 'cam' ? 'dispo cam' : 'dispo pour l’agence'}</em>
+                  )}
                 </span>
                 <svg viewBox="0 0 16 16" aria-hidden="true" className="ag-icon">
                   <path d="M8 3v10M3 8h10" />

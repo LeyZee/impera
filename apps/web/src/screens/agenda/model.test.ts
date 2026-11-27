@@ -109,15 +109,15 @@ describe('her day (CR-05)', () => {
     });
     const rows = programOf(planOf(agendaOf({ tasks: [], availabilities: [thursdays] }), '2026-11-05'), null);
     expect(rows).toEqual([
-      { kind: 'free', start: 8 * 60, end: 14 * 60, open: false },
-      { kind: 'free', start: 14 * 60, end: 20 * 60, open: true },
-      { kind: 'free', start: 20 * 60, end: 24 * 60, open: false },
+      { kind: 'free', start: 8 * 60, end: 14 * 60, open: null },
+      { kind: 'free', start: 14 * 60, end: 20 * 60, open: 'agency' },
+      { kind: 'free', start: 20 * 60, end: 24 * 60, open: null },
     ]);
   });
 
   it('starts another day at 8 h, without a line for now', () => {
     const rows = programOf(planOf(agendaOf(), '2026-11-03'), null);
-    expect(rows).toEqual([{ kind: 'free', start: 8 * 60, end: 24 * 60, open: false }]);
+    expect(rows).toEqual([{ kind: 'free', start: 8 * 60, end: 24 * 60, open: null }]);
   });
 
   it('shows a task past midnight the day after too, from 0 h, ticked and counted on its day (CREA-02)', () => {
