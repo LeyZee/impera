@@ -31,8 +31,8 @@ export const STOCK_RULES: Readonly<Record<DropCategory, StockRule>> = {
   feed_shoot: { mode: 'days', unit: 'drop', perDay: 3 / WEEK, targetDays: 7 },
   reveal_story: { mode: 'days', unit: 'file', perDay: 1, targetDays: 7 },
   mass_dm: { mode: 'days', unit: 'file', perDay: 3 / WEEK, targetDays: 7 },
-  // Three playable scripts for the AI to speak (ADR 0145), and one ahead.
-  script: { mode: 'count', unit: 'drop', target: 4 },
+  // Three complete scripts, media and prices ready, for the AI to speak (ADR 0145; Charles, 27/11: three, not four).
+  script: { mode: 'count', unit: 'drop', target: 3 },
   whale_gift: { mode: 'count', unit: 'file', target: 3 },
   // What the AI answers with in her real voice (Charles, 21/11): one beep, two proofs.
   voice_beep: { mode: 'count', unit: 'file', target: 1 },
