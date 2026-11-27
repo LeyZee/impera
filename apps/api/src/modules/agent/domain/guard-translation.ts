@@ -95,12 +95,15 @@ export function textForNets(original: string, read: TranslationRead): string {
   return french === null ? original : `${original}\n${french}`;
 }
 
-const GRAVEST_FIRST: readonly SafetySign[] = ['minor_suspected', 'self_harm'];
+/**
+ * The rank of every sign, the gravest first. A `Record` over `SafetySign`: a sign added to the net (`minor_fantasy`,
+ * #1043) does not compile until it has its rank here, so it can never be dropped in silence.
+ */
+const SIGN_RANK: Readonly<Record<SafetySign, number>> = { minor_suspected: 0, self_harm: 1 };
 
-/** The signs of both readings, each once, the gravest first (`minor_suspected` before `self_harm`). */
+/** Every sign of both readings, each once, the gravest first; none is ever dropped. */
 export function mergeSigns(original: readonly SafetySign[], translated: readonly SafetySign[]): SafetySign[] {
-  const all = new Set([...original, ...translated]);
-  return GRAVEST_FIRST.filter((sign) => all.has(sign));
+  return [...new Set([...original, ...translated])].sort((a, b) => SIGN_RANK[a] - SIGN_RANK[b]);
 }
 
 /**

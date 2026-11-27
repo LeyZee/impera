@@ -12,7 +12,7 @@ import {
   type TranslationRead,
 } from '../guard-translation';
 import type { LanguageDecision } from '../language';
-import { safetySigns } from '../safety-net';
+import { safetySigns, type SafetySign } from '../safety-net';
 
 // Sober made-up messages (public repository): a fan who writes German, a language the nets do not read.
 const GERMAN = 'ich bin heute sehr müde und du, wie war dein tag';
@@ -75,6 +75,17 @@ describe('the nets read his original and the French', () => {
       'self_harm',
     ]);
     expect(mergeSigns(['self_harm'], [])).toEqual(['self_harm']);
+  });
+
+  it('drops no sign of either reading, whatever the sign (Sécurité, 27/11)', () => {
+    const every: readonly SafetySign[] = ['self_harm', 'minor_suspected'];
+    for (const sign of every) {
+      expect(mergeSigns([sign], [])).toEqual([sign]);
+      expect(mergeSigns([], [sign])).toEqual([sign]);
+    }
+    const merged = mergeSigns(every, every);
+    expect(merged).toHaveLength(every.length);
+    expect(new Set(merged)).toEqual(new Set(every));
   });
 
   it('gives the keyword nets both texts, his original alone when nothing came back', () => {
