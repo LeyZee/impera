@@ -1,36 +1,39 @@
 /* The welcome of a first sign-in (recette 27/11, P1): one plate, three steps, as the validated maquette. Its greeting
-   is a line said to her, in Instrument Serif like the reveal of a trophy. */
+   is a line said to her, in Instrument Serif like the reveal of a trophy. The steps are design-system tiles (nv-tile),
+   the info line a note (nv-note), the creators chips (nv-chip); only the grid of a step and its number stay here. The
+   eye reads the greeting, then the first step still to do (`data-next`), lifted above the others. */
 .fw {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 40px 16px;
+  padding: var(--nv-space-10) var(--nv-space-4);
 }
 .fw__card {
   width: 100%;
   max-width: 640px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--nv-space-6);
 }
 .fw__hello {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--nv-space-2);
 }
+/* 40px: no type token says it (large-title is 34px, hero 56px); the maquette's size for a greeting said once. */
 .fw__title {
   margin: 0;
   font-family: var(--nv-font-serif);
   font-weight: 400;
   font-size: 40px;
   line-height: 1.05;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--nv-text-title-1-tracking);
 }
 .fw__lead {
   margin: 0;
   color: var(--nv-ink-muted);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
 }
 .fw__steps {
   list-style: none;
@@ -38,26 +41,50 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--nv-space-2);
 }
-.fw__step {
+/* A tile laid out as a row: number, words, action. The button's hit area covers the whole tile, so the tile answers
+   the pointer and the finger, not only the button. */
+.fw__step.nv-tile {
+  position: relative;
   display: grid;
-  grid-template-columns: 36px 1fr auto;
-  gap: 14px;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: var(--nv-space-3);
   align-items: center;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: var(--nv-glass-fill);
-  box-shadow: inset 0 0 0 1px var(--nv-glass-edge, transparent);
+  padding: var(--nv-space-3) var(--nv-space-4);
+}
+.fw__step > .nv-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.fw__step:has(> .nv-btn):active {
+  transform: scale(0.99);
+  transition-duration: var(--nv-dur-instant);
+}
+.fw__step[data-done] {
+  background: var(--nv-fill-soft);
+}
+.fw__step[data-done]:hover {
+  transform: none;
+}
+.fw__step[data-next] {
+  background: var(--nv-tile-fill-strong);
+  box-shadow: inset 0 0 0 1px var(--nv-neon-soft);
 }
 .fw__num {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: var(--nv-radius-full);
   display: grid;
   place-items: center;
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--nv-text-body);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+}
+.fw__step[data-next] .fw__num {
   background: var(--nv-neon-soft);
   color: var(--nv-neon-ink);
 }
@@ -77,35 +104,33 @@
 .fw__what {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 .fw__what b {
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
 }
 .fw__what span {
   color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.fw__step:not([data-next]) .fw__what b {
+  color: var(--nv-ink-muted);
 }
 .fw__state {
-  font-size: 14px;
+  font-size: var(--nv-text-callout);
   font-weight: 550;
   color: var(--nv-success);
   white-space: nowrap;
 }
-.fw__info {
-  margin: 0;
-  padding: 12px 16px;
-  border-radius: 14px;
-  background: var(--nv-glass-fill);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--nv-ink-muted);
+/* One sentence that runs on: the note's grid would put its bold words on a line of their own. */
+.fw__info.nv-note {
+  display: block;
 }
 .fw__info b {
-  color: var(--nv-ink);
   font-weight: 600;
 }
 .fw__chips {
@@ -114,26 +139,23 @@
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--nv-space-2);
 }
-.fw__chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--nv-glass-fill);
-  font-size: 13px;
+/* A chip shown, not chosen: no pointer, no lift. */
+.fw__chips .nv-chip {
+  cursor: default;
+  pointer-events: none;
 }
 .fw__role {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: var(--nv-space-2);
 }
-.fw__col {
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: var(--nv-glass-fill);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.fw__col.nv-tile {
+  gap: var(--nv-space-2);
+}
+.fw__col.nv-tile:hover {
+  transform: none;
 }
 .fw__col h2 {
   margin: 0;
@@ -144,14 +166,14 @@
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 14px;
-  line-height: 1.4;
+  gap: var(--nv-space-1);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
 }
 .fw__foot {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--nv-space-2);
 }
 .fw__later {
   align-self: center;
@@ -159,20 +181,21 @@
 .fw__note {
   margin: 0;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
 }
 @media (max-width: 560px) {
   .fw {
-    padding: 28px 16px;
+    padding: var(--nv-space-8) var(--nv-space-4);
     align-items: start;
   }
   .fw__title {
-    font-size: 34px;
+    font-size: var(--nv-text-large-title);
   }
-  .fw__step {
-    grid-template-columns: 32px 1fr;
-    row-gap: 10px;
+  .fw__step.nv-tile {
+    grid-template-columns: 32px minmax(0, 1fr);
+    row-gap: var(--nv-space-2);
     align-items: start;
   }
   .fw__num {

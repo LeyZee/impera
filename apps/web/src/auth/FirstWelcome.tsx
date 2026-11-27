@@ -57,7 +57,7 @@ export function FirstWelcome({
 
 function Hello({ name, lead, children }: { name: string; lead: string; children?: ReactNode }): JSX.Element {
   return (
-    <div className="fw__hello">
+    <div className="fw__hello nv-enter" style={{ '--nv-i': 0 }}>
       <h1 id="fw-title" className="fw__title">
         {name === '' ? 'Bienvenue' : `Bienvenue, ${name}`}
       </h1>
@@ -75,6 +75,7 @@ const CHECK = (
 
 function Step({
   n,
+  next = false,
   title,
   text,
   action,
@@ -82,6 +83,8 @@ function Step({
   onClick,
 }: {
   n: number;
+  /** The first step still to do: the one the eye reads after the greeting. */
+  next?: boolean;
   title: string;
   text: string;
   action: string;
@@ -90,7 +93,12 @@ function Step({
   onClick: () => void;
 }): JSX.Element {
   return (
-    <li className="fw__step" data-done={done === null ? undefined : 'true'}>
+    <li
+      className="fw__step nv-tile nv-enter"
+      style={{ '--nv-i': n }}
+      data-done={done === null ? undefined : 'true'}
+      data-next={next && done === null ? 'true' : undefined}
+    >
       <span className="fw__num" aria-hidden="true">
         {done === null ? n : CHECK}
       </span>
@@ -99,7 +107,11 @@ function Step({
         <span>{text}</span>
       </span>
       {done === null ? (
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onClick}>
+        <button
+          type="button"
+          className={next ? 'nv-btn nv-btn--neon nv-btn--sm' : 'nv-btn nv-btn--soft nv-btn--sm'}
+          onClick={onClick}
+        >
           {action}
         </button>
       ) : (
@@ -122,6 +134,7 @@ function CreatorWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
       <ol className="fw__steps">
         <Step
           n={1}
+          next={!hasKey}
           title="Connexion avec Face ID"
           text="Un geste suffit pour entrer, sans mot de passe ni code."
           action="Activer"
@@ -132,6 +145,7 @@ function CreatorWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
         />
         <Step
           n={2}
+          next={hasKey}
           title="Active les notifications"
           text="Tu sais tout de suite quand l’agence te demande un contenu, ou qu’un fan achète."
           action="Activer"
@@ -149,14 +163,14 @@ function CreatorWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
           }}
         />
       </ol>
-      <p className="fw__info">
+      <p className="nv-note fw__info nv-enter" style={{ '--nv-i': 4 }}>
         Chaque jour, <b>« Ma journée »</b> te dit quoi déposer, trois choses au plus. Tu coches quand c’est
         fait.
       </p>
-      <div className="fw__foot">
+      <div className="fw__foot nv-enter" style={{ '--nv-i': 5 }}>
         <button
           type="button"
-          className="nv-btn nv-btn--neon"
+          className="nv-btn nv-btn--soft"
           onClick={() => {
             onGo('/aujourdhui');
           }}
@@ -181,6 +195,7 @@ function ChatterWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
       <ol className="fw__steps">
         <Step
           n={1}
+          next
           title="Installe l’extension Impera"
           text="Ton outil pendant le shift : dans Chrome, à côté de Reveal."
           action="Installer"
@@ -208,15 +223,15 @@ function ChatterWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
         />
       </ol>
       {first === null ? null : (
-        <p className="fw__info">
+        <p className="nv-note fw__info nv-enter" style={{ '--nv-i': 4 }}>
           Ton premier shift :{' '}
           <b>{swapShiftLine(first.startsAt, first.endsAt, first.creatorName, readerZone())}</b>
         </p>
       )}
-      <div className="fw__foot">
+      <div className="fw__foot nv-enter" style={{ '--nv-i': 5 }}>
         <button
           type="button"
-          className="nv-btn nv-btn--neon"
+          className="nv-btn nv-btn--soft"
           onClick={() => {
             onGo('/aide/extension');
           }}
@@ -255,7 +270,7 @@ function ManagerWelcome({
         {creators.length === 0 ? null : (
           <ul className="fw__chips" aria-label="Tes créatrices">
             {creators.map((creator) => (
-              <li key={creator.id} className="fw__chip">
+              <li key={creator.id} className="nv-chip">
                 {creator.displayName}
               </li>
             ))}
@@ -265,6 +280,7 @@ function ManagerWelcome({
       <ol className="fw__steps">
         <Step
           n={1}
+          next
           title="Dashboard, chaque matin"
           text="Ce qui attend : les fans sans réponse, les rapports à valider."
           action="Ouvrir"
@@ -291,8 +307,8 @@ function ManagerWelcome({
           }}
         />
       </ol>
-      <div className="fw__role">
-        <div className="fw__col">
+      <div className="fw__role nv-enter" style={{ '--nv-i': 4 }}>
+        <div className="fw__col nv-tile">
           <h2 className="nv-eyebrow">Toi</h2>
           <ul>
             <li>Valider les rapports</li>
@@ -300,7 +316,7 @@ function ManagerWelcome({
             <li>Rendre la main à l’IA</li>
           </ul>
         </div>
-        <div className="fw__col">
+        <div className="fw__col nv-tile">
           <h2 className="nv-eyebrow">Le propriétaire</h2>
           <ul>
             <li>Primes, prix, paie</li>
@@ -309,10 +325,10 @@ function ManagerWelcome({
           </ul>
         </div>
       </div>
-      <div className="fw__foot">
+      <div className="fw__foot nv-enter" style={{ '--nv-i': 5 }}>
         <button
           type="button"
-          className="nv-btn nv-btn--neon"
+          className="nv-btn nv-btn--soft"
           onClick={() => {
             onGo('/');
           }}
