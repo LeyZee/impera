@@ -203,6 +203,7 @@ Branche : task/<id>-<slug>
 | SEC-15 | Primes et ajustements réservés au propriétaire | exploitation | in_progress | EQ-04, EQ-05 |
 | SEC-16 | Le rôle de service cesse de grandir : test de plafond par module, puis réduction (ADR 0087, lots b et c) | exploitation | en cours | SEC-10, ADR 0087 |
 | SEC-17 | Durée d'une session selon le rôle : propriétaire 48 h sans activité et 7 jours, créatrice 7 jours et 30 jours, les autres 12 h et 7 jours | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
+| SEC-18 | Première connexion : même clé après un rechargement, étape reprise, codes de secours et accueil retenus par le serveur | exploitation | review | ADR 0046, recette du 27/11 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |

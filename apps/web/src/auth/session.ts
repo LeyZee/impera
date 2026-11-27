@@ -1,8 +1,10 @@
 import {
   ApiErrorSchema,
+  BackupCodesSchema,
   DashboardSessionSchema,
   SecondFactorSetupSchema,
   SignInAnswerSchema,
+  type FirstSteps,
   type Me,
   type SecondFactorSetup,
 } from '@impera/contracts';
@@ -38,7 +40,8 @@ export function markSandbox(response: Pick<Response, 'headers'>): void {
 }
 
 export type CurrentSession =
-  | { readonly kind: 'signed_in'; readonly user: Me }
+  /** `firstSteps`: what the account still has to see once (its backup codes said kept, its welcome). */
+  | { readonly kind: 'signed_in'; readonly user: Me; readonly firstSteps: FirstSteps }
   | { readonly kind: 'signed_out' }
   /** Signed in with the password, the second factor not active yet: the activation is the only screen (ADR 0046). */
   | { readonly kind: 'second_factor_required' };
@@ -70,7 +73,9 @@ export async function readSession(): Promise<CurrentSession> {
     throw new SessionServerError(response.status);
   if (!response.ok) throw new Error(`GET /v1/session: ${String(response.status)}`);
   const answer = DashboardSessionSchema.parse(await response.json());
-  return answer.state === 'signed_in' ? { kind: 'signed_in', user: answer.me } : { kind: answer.state };
+  return answer.state === 'signed_in'
+    ? { kind: 'signed_in', user: answer.me, firstSteps: answer.firstSteps }
+    : { kind: answer.state };
 }
 
 /** The signed-in user with his team role and scope (ADR 0024), or `null` when no session opens the dashboard. */
@@ -145,20 +150,50 @@ export async function verifySignInCode(
 
 export type ActivationStart =
   | { readonly kind: 'ok'; readonly setup: SecondFactorSetup }
-  | { readonly kind: 'wrong_password' | 'session_expired' | 'too_many_attempts' | 'unavailable' };
+  | {
+      readonly kind:
+        | 'wrong_password'
+        /** Asked without the password on a session that proved it too long ago: the page asks for it. */
+        | 'password_needed'
+        | 'session_expired'
+        | 'too_many_attempts'
+        | 'unavailable';
+    };
 
-/** The activation, first step: the password once more; answers the secret and the ten backup codes, shown once. */
-export async function startActivation(password: string): Promise<ActivationStart> {
-  const response = await post('/v1/auth/two-factor/enable', { password });
+/**
+ * The activation, first step: answers the secret and the ten backup codes, the same ones until a first code confirms
+ * them. The password is left out when none is at hand: the server takes a session that has just proven it, and says
+ * `password_needed` otherwise.
+ */
+export async function startActivation(password?: string): Promise<ActivationStart> {
+  const response = await post('/v1/auth/two-factor/enable', password === undefined ? {} : { password });
   if (response.ok) {
     const setup = SecondFactorSetupSchema.safeParse(await response.json().catch(() => null));
     return setup.success ? { kind: 'ok', setup: setup.data } : { kind: 'unavailable' };
   }
   const code = await errorCodeOf(response);
   if (code === 'password_unauthenticated') return { kind: 'wrong_password' };
+  if (code === 'password_missing_forbidden') return { kind: 'password_needed' };
   if (response.status === 401) return { kind: 'session_expired' };
   if (response.status === 429) return { kind: 'too_many_attempts' };
   return { kind: 'unavailable' };
+}
+
+/** Says a first step done (the backup codes kept, the welcome seen): kept on the account, whatever the device. */
+export async function markFirstStep(step: 'codes-kept' | 'welcomed'): Promise<boolean> {
+  const response = await post(`/v1/me/first-steps/${step}`, {}).catch(() => null);
+  return response?.ok === true;
+}
+
+/**
+ * The backup codes of the activation once more, after a reload closed their screen before they were said kept. `null`
+ * when the server no longer shows them (said kept, or the activation is more than a few minutes old).
+ */
+export async function unkeptBackupCodes(): Promise<readonly string[] | null> {
+  const response = await post('/v1/me/first-steps/backup-codes', {}).catch(() => null);
+  if (response?.ok !== true) return null;
+  const answer = BackupCodesSchema.safeParse(await response.json().catch(() => null));
+  return answer.success ? answer.data.backupCodes : null;
 }
 
 /** The activation, second step: the first code from the app. Right, the account's code is active. */

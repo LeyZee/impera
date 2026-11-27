@@ -1,4 +1,4 @@
-import type { Me } from '@impera/contracts';
+import type { FirstSteps, Me } from '@impera/contracts';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
@@ -6,13 +6,15 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { FirstWelcome, welcomeRoleOf } from './auth/FirstWelcome';
 import { ForgottenPasswordPage, PASSWORD_CHANGED_NOTICE } from './auth/ForgottenPasswordPage';
 import { NewPasswordPage } from './auth/NewPasswordPage';
-import { SecondFactorPage } from './auth/SecondFactorPage';
+import { PublicBrand } from './auth/PublicBrand';
+import { BackupCodes, SecondFactorPage } from './auth/SecondFactorPage';
 import { SignInPage } from './auth/SignInPage';
 import { Unreachable } from './auth/Unreachable';
 import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
 import { forgetChosenPassword } from './auth/chosen-password';
-import { readSession, SessionServerError, signOut } from './auth/session';
+import { markCodesUnconfirmed } from './auth/codes-pending';
+import { markFirstStep, readSession, SessionServerError, signOut, unkeptBackupCodes } from './auth/session';
 import { watchSessionEnd } from './auth/session-end';
 import { listenForErrors } from './lib/error-reports';
 import { createQueryClient } from './lib/query-client';
@@ -24,6 +26,9 @@ import { refreshPushSubscription, turnOffPush } from './pwa/push';
 import { createAppRouter, type RouterContext } from './router';
 import { railOf } from './shell/nav';
 
+/** An account with no first step left, and the one whose session was kept offline. */
+const NOTHING_LEFT: FirstSteps = { codesKept: true, welcomed: true };
+
 type Session =
   | { status: 'loading' }
   /** `attempt` counts the failed reads in a row, so the next one waits a little longer. */
@@ -31,7 +36,7 @@ type Session =
   | { status: 'signed_out' }
   /** Signed in with the password, the code not active yet: the activation is the only screen (ADR 0046). */
   | { status: 'second_factor_required' }
-  | { status: 'signed_in'; user: Me }
+  | { status: 'signed_in'; user: Me; firstSteps: FirstSteps }
   /** No network, and the creator's session kept on this device: her app opens on what it kept (CREA-04). */
   | { status: 'offline'; user: Me; attempt: number };
 
@@ -57,8 +62,6 @@ export function App(): JSX.Element {
   // A new password just chosen from the « mot de passe oublié » link: the sign-in page says so (SEC-05 lot 3).
   // Holds the account's address, so the sign-in page has it filled in.
   const [passwordChanged, setPasswordChanged] = useState<string | null>(null);
-  // The second factor just activated: this sign-in is the account's first, and the welcome comes before the app (P1).
-  const [isFirst, setIsFirst] = useState(false);
   const isRechecking = useRef(false);
   // A sign-out she asked for: a screen's 401 in flight meanwhile is not a session that ended (relecture #538).
   const isLeaving = useRef(false);
@@ -80,7 +83,7 @@ export function App(): JSX.Element {
         }
         setSession(
           current.kind === 'signed_in'
-            ? { status: 'signed_in', user: current.user }
+            ? { status: 'signed_in', user: current.user, firstSteps: current.firstSteps }
             : { status: current.kind },
         );
       },
@@ -220,20 +223,17 @@ export function App(): JSX.Element {
     );
   }
   if (session.status === 'second_factor_required') {
-    return (
-      <SecondFactorPage
-        onActivated={() => {
-          setIsFirst(true);
-          refresh();
-        }}
-        onSignOut={leave}
-      />
-    );
+    return <SecondFactorPage onActivated={refresh} onSignOut={leave} />;
   }
   return (
     <>
       {/* The same user kept offline then read again keeps the same app: only another user makes a new one. */}
-      <SignedIn key={JSON.stringify(session.user)} user={session.user} onSignOut={leave} isFirst={isFirst} />
+      <SignedIn
+        key={JSON.stringify(session.user)}
+        user={session.user}
+        onSignOut={leave}
+        firstSteps={session.status === 'signed_in' ? session.firstSteps : NOTHING_LEFT}
+      />
       {signOutFailed ? (
         <p className="nv-signout-failed nv-glass nv-glass--thick" role="alert">
           La déconnexion n’a pas abouti : réessaie.
@@ -244,10 +244,32 @@ export function App(): JSX.Element {
 }
 
 /** The dashboard itself: one router per signed-in user, so a new session starts on a clean state. */
-function SignedIn({ user, onSignOut, isFirst = false }: RouterContext & { isFirst?: boolean }): JSX.Element {
+function SignedIn({
+  user,
+  onSignOut,
+  firstSteps = NOTHING_LEFT,
+}: RouterContext & { firstSteps?: FirstSteps }): JSX.Element {
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
-  // Shown once, at the account's first sign-in; any step, or « plus tard », opens the app on its page.
-  const [welcome, setWelcome] = useState(() => (isFirst ? welcomeRoleOf(user) : null));
+  // The backup codes of the activation, left without being said kept (a reload on their screen): shown again while
+  // the server still gives them, before anything else. `checking` while it is asked.
+  const [unkept, setUnkept] = useState<readonly string[] | 'checking' | null>(
+    firstSteps.codesKept ? null : 'checking',
+  );
+  useEffect(() => {
+    if (firstSteps.codesKept) return undefined;
+    // Sécurité says so too, on any tab, until new ones are made (COUV-08).
+    markCodesUnconfirmed();
+    let isGone = false;
+    void unkeptBackupCodes().then((codes) => {
+      if (!isGone) setUnkept(codes);
+    });
+    return () => {
+      isGone = true;
+    };
+  }, [firstSteps.codesKept]);
+  // Shown until it was seen once, whatever the device or the reloads in between (recette 27/11, A8); any step, or
+  // « plus tard », opens the app on its page.
+  const [welcome, setWelcome] = useState(() => (firstSteps.welcomed ? null : welcomeRoleOf(user)));
   const [queryClient] = useState(createQueryClient);
   // The page's own errors go to the API while signed in (OPS-18), each with the template of the route it happened on.
   useEffect(() => listenForErrors(() => router.state.matches.at(-1)?.fullPath), [router]);
@@ -259,6 +281,29 @@ function SignedIn({ user, onSignOut, isFirst = false }: RouterContext & { isFirs
       }),
     [router],
   );
+  if (unkept === 'checking') {
+    return (
+      <main className="nv-aura grid min-h-dvh place-items-center" aria-busy="true">
+        <span className="nv-dot nv-dot--live" role="status" aria-label="Chargement d’Impera" />
+      </main>
+    );
+  }
+  if (unkept !== null) {
+    return (
+      <main className="nv-aura grid min-h-dvh place-items-center px-4 py-10">
+        <div className="nv-plate nv-plate--pad flex w-full max-w-md flex-col gap-5">
+          <PublicBrand page="Validation en deux étapes" />
+          <BackupCodes
+            codes={unkept}
+            onDone={() => {
+              void markFirstStep('codes-kept');
+              setUnkept(null);
+            }}
+          />
+        </div>
+      </main>
+    );
+  }
   return (
     <QueryClientProvider client={queryClient}>
       {welcome === null ? (
@@ -268,6 +313,7 @@ function SignedIn({ user, onSignOut, isFirst = false }: RouterContext & { isFirs
           user={user}
           role={welcome}
           onGo={(to) => {
+            void markFirstStep('welcomed');
             router.history.replace(to);
             setWelcome(null);
           }}

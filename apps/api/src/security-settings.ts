@@ -52,6 +52,7 @@ import {
 } from './auth';
 import { isOwnerAccount } from './owners';
 import { passkeysOf } from './passkeys';
+import { markFirstStep } from './second-factor-setup';
 import { recordRefusal } from './security-alerts';
 import { LONG_LIFETIMES, lifetimeOf, SHORT_LIFETIME, type SessionLifetime } from './session-lifetime';
 
@@ -301,6 +302,8 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
         await withAdmin(adminDb, (tx) =>
           audit(tx, { userId, action: 'auth.backup_codes_regenerated', entityId: userId, ip: request.ip }),
         );
+        // Shown on a screen that says them kept before it closes: the ones of the activation, if left, are replaced.
+        await markFirstStep(db, userId, 'codesKept');
         return BackupCodesSchema.parse(generated);
       },
     );
