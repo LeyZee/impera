@@ -222,7 +222,8 @@ describe('her channel’s week on Postgres', () => {
 
   it('validates, edits and removes a post by the owner’s name; a removed post is replaced at once', async () => {
     const week = await weekOf(nora, '2026-11-23');
-    const [first, second] = week.posts.filter((post) => post.kind !== 'poll');
+    // Never the evening's post: its replacement may find no visual left, and the send below needs it.
+    const [first, second] = week.posts.filter((post) => post.kind === 'text');
     if (first === undefined || second === undefined) throw new Error('no post');
     const gesture = (id: string, body: object) =>
       server.inject({

@@ -163,7 +163,7 @@ export function createChannelVisualsReader(
           select distinct on (f.media_asset_id) f.media_asset_id, f.drop_id, f.id as file_id
             from content_drop_files f join content_drops d on d.id = f.drop_id and d.creator_id = f.creator_id
            where f.creator_id = ${creatorId} and f.media_asset_id in ${list(mediaIds)}
-             and d.withdrawn_at is null and f.replaced_at is null
+             and d.withdrawn_at is null and f.replaced_at is null and f.state in ('kept', 'duplicate')
            order by f.media_asset_id, d.created_at desc, f.position`);
         return Object.fromEntries(
           result.rows.flatMap((raw) => {

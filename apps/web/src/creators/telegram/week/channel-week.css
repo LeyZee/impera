@@ -134,7 +134,7 @@
   background: color-mix(in srgb, var(--nv-ink) 10%, transparent);
 }
 .cw-day[data-today] {
-  border-color: color-mix(in srgb, var(--nv-series-1) 45%, transparent);
+  border-color: color-mix(in srgb, var(--nv-ink) 32%, transparent);
 }
 .cw-day__name {
   font-size: var(--nv-text-caption);
@@ -398,8 +398,19 @@
 
 @media (max-width: 640px) {
   .cw-legend {
+    flex: 1 1 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: var(--nv-space-3);
     font-size: var(--nv-text-callout);
+  }
+  .cw-legend {
+    --nv-breakdown-cols: max-content minmax(0, max-content) max-content;
+  }
+  .cw-legend .nv-breakdown__row {
+    min-width: 0;
+  }
+  .cw-legend .nv-breakdown__label {
+    white-space: normal;
   }
   .cw-answer {
     grid-template-columns: auto minmax(0, 1fr);
@@ -421,4 +432,14 @@
 .cw-head__arrow {
   width: 44px;
   padding: 0;
+}
+
+/* A narrow phone: the legend goes under the donut, still two by two. */
+@media (max-width: 400px) {
+  .nv-donut-row.cw-kinds {
+    flex-wrap: wrap;
+  }
+  .cw-legend {
+    flex: 1 1 100%;
+  }
 }
