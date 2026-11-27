@@ -53,7 +53,7 @@ describe('Créatrices › IA › Copilote dans l’extension (trous béants, 21/
     serve({ fanCard: true, drafts: false });
     show();
     const line = await screen.findByText(
-      'Brouillons éteints : les chatteurs de Lune écrivent seuls, avec la fiche du fan.',
+      'Dans l’extension, brouillons éteints : les chatteurs de Lune écrivent seuls, avec la fiche du fan.',
     );
     expect(line.dataset['tone']).toBe('off');
     expect(checked(screen.getByRole('switch', { name: 'Brouillons de l’IA : éteints' }))).toBe(false);
@@ -79,6 +79,6 @@ describe('Créatrices › IA › Copilote dans l’extension (trous béants, 21/
     await waitFor(() => {
       expect(checked(screen.getByRole('switch', { name: 'Fiche du fan : éteinte' }))).toBe(false);
     });
-    expect(screen.getByText(/Copilote éteint/u).dataset['tone']).toBe('off');
+    expect(screen.getByText(/rien d’allumé/u).dataset['tone']).toBe('off');
   });
 });

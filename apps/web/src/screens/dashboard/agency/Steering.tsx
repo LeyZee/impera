@@ -42,8 +42,10 @@ const FUNNEL_MIN_FIRST = 30;
  */
 function DayGauge({ daily }: { daily: SteeringDaily }): JSX.Element {
   const target = daily.targetMinor ?? Math.max(daily.averageMinor, daily.todayMinor, 1);
-  const done = Math.min(target, Math.max(0, daily.todayMinor));
-  const projected = Math.min(target, Math.max(done, daily.projectedMinor ?? done));
+  // Without an objective the ring stays an empty track: a full ring reads « objectif atteint » (audit 27/11).
+  const done = daily.targetMinor === null ? 0 : Math.min(target, Math.max(0, daily.todayMinor));
+  const projected =
+    daily.targetMinor === null ? 0 : Math.min(target, Math.max(done, daily.projectedMinor ?? done));
   const onTrack =
     daily.targetMinor !== null && (daily.projectedMinor ?? daily.todayMinor) >= daily.targetMinor;
   const colour =
@@ -87,7 +89,7 @@ function dayVerdict(daily: SteeringDaily): {
   if (daily.targetMinor === null)
     return {
       tag: null,
-      text: 'Pose l’objectif du mois (période « Mois ») : celui du jour en découle.',
+      text: 'Pas encore d’objectif ce mois-ci : fixe-le plus bas, dans « Objectifs du mois ». Celui du jour en découle.',
       tone: 'neutral',
     };
   if (daily.todayMinor >= daily.targetMinor)
