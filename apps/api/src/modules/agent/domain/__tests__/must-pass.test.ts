@@ -351,6 +351,7 @@ describe('permitted phrases that must always pass, input nets', () => {
     'première fois que je fais ça',
     'je passe le bac',
     'je passe en seconde équipe',
+    'je suis en seconde équipe au foot',
     'sono al liceo, sono un insegnante',
     'I’m at high school, I’m a teacher',
     'mets ta jupe d’écolière ce soir, j’ai envie de toi',

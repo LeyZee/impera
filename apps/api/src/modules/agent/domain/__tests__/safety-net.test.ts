@@ -201,6 +201,45 @@ describe('a school costume between adults, never a real minor (Sécurité, #1043
   });
 });
 
+describe('the doubt on his age, completed (Sécurité, #1054)', () => {
+  it('raises both signs when a role stands beside an age under 18 or his own child', () => {
+    for (const text of [
+      'joue la lycéenne, comme ma fille de 15 ans',
+      'mets ta jupe d’écolière, t’auras 15 ans',
+    ])
+      expect(safetySigns(text), text).toEqual(expect.arrayContaining(['minor_suspected', 'minor_fantasy']));
+    for (const text of [
+      'joue la lycéenne pour moi',
+      'mon fils a 15 ans',
+      'joue la lycéenne, marié depuis 15 ans',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_fantasy');
+  });
+
+  it('reads a birth year in four languages', () => {
+    const now = new Date('2026-11-27T12:00:00Z');
+    for (const text of ['nací en 2010', 'sono nato nel 2010', 'i was born in 2010', 'née en 2010'])
+      expect(safetySigns(text, now), text).toContain('minor_suspected');
+    for (const text of ['nací en 1990', 'i was born in 1995'])
+      expect(safetySigns(text, now), text).not.toContain('minor_suspected');
+  });
+
+  it('takes « je veux une mineure » in four languages, and leaves a miner’s trade', () => {
+    for (const text of ['je veux une mineure', 'I want a minor', 'voglio una minorenne', 'quiero una menor'])
+      expect(safetySigns(text), text).toContain('minor_fantasy');
+    expect(safetySigns('je veux un mineur de fond pour le reportage')).not.toContain('minor_fantasy');
+  });
+
+  it('never reads « seconde équipe » as a class', () => {
+    for (const text of [
+      'je suis en seconde équipe au foot',
+      'je suis en première équipe',
+      'je passe en seconde équipe',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+  });
+});
+
 describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23:45, Sécurité #1043)', () => {
   // One sober sentence per pattern, by language: a sexual verb onto a minor, a desire onto one in a sexual message, a
   // minor's role asked of her, « t'as 16 ans ? » in a sexual message.
