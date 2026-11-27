@@ -1,0 +1,22 @@
+/* Créatrices › Compte › Paliers de rencontre (guide 26/11): a number and its unit, side by side, wrapped when narrow. */
+.mt-duration {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.mt-amount {
+  flex: 1 1 5rem;
+  min-width: 5rem;
+}
+.mt-unset {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+/* Wider columns than the tiers of her fans: each holds a number and three units. */
+.mt-fields {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: end;
+}
