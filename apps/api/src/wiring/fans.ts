@@ -8,7 +8,8 @@ import type { Routes, Shared, TasksNamed } from './shared';
 type KycSlotsOf = NonNullable<Parameters<FansModule['routes']>[1]>;
 type FanAccess = NonNullable<Parameters<FansModule['routes']>[2]>;
 type UsdRateMicrosOf = NonNullable<Parameters<FansModule['routes']>[3]>;
-type LinkPerson = NonNullable<Parameters<FansModule['routes']>[4]>;
+type PersonaLanguagesOf = NonNullable<Parameters<FansModule['routes']>[4]>;
+type LinkPerson = NonNullable<Parameters<FansModule['routes']>[5]>;
 
 export interface WiredFans {
   readonly module: FansModule;
@@ -16,13 +17,14 @@ export interface WiredFans {
   readonly tasks: TasksNamed<'fans.purge_facts'>;
   /**
    * Her canvas lines come from the agent, and who holds a fan's conversation and the trace of a chatter's reading from
-   * `conversations`, and pay's dollar rate for the list of fans (ADR 0124) from `payroll`, all wired after: the routes
+   * `conversations`, and pay's dollar rate for the list of fans (ADR 0124) from `payroll`, her persona's languages (ADR 0168) from the agent, all wired after: the routes
    * are built once they exist.
    */
   routes(
     kycSlotsOf: KycSlotsOf,
     fanAccess: FanAccess,
     usdRateMicrosOf: UsdRateMicrosOf,
+    personaLanguagesOf: PersonaLanguagesOf,
     linkPerson: LinkPerson,
   ): Routes;
 }
@@ -45,7 +47,7 @@ export function wireFans(shared: Shared): WiredFans {
         },
       ),
     },
-    routes: (kycSlotsOf, fanAccess, usdRateMicrosOf, linkPerson) =>
-      module.routes(requireRole, kycSlotsOf, fanAccess, usdRateMicrosOf, linkPerson),
+    routes: (kycSlotsOf, fanAccess, usdRateMicrosOf, personaLanguagesOf, linkPerson) =>
+      module.routes(requireRole, kycSlotsOf, fanAccess, usdRateMicrosOf, personaLanguagesOf, linkPerson),
   };
 }

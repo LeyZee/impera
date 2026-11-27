@@ -1,4 +1,5 @@
 import {
+  normalise,
   BankedObjectionKindSchema,
   type BankedObjectionKind,
   type ObjectionKind,
@@ -28,4 +29,32 @@ export function pickObjectionReply(
   if (!banked.success) return undefined;
   const reply = (bank[banked.data] ?? []).find((r) => !usedReplyIds.has(r.id));
   return reply === undefined ? undefined : { objection: banked.data, replyId: reply.id, text: reply.text };
+}
+
+/**
+ * His own words ask for a lower price (« fais-moi un prix », « 10 et je prends », « l'autre fois c'était moins cher »):
+ * read by code as well as by the brain, which kept reading them as a plain question (passe 2 du 26/11, conversation
+ * 23). « C'est trop cher » is the brain's to read: too expensive, not a discount asked.
+ */
+const DISCOUNT_ASK =
+  /\b(fais[- ]moi (un |une )?(prix|geste|petit prix|tarif|effort|reduc|reduction|ristourne|promo|remise)|(une|un|ta|tes|ma) (petite )?(reduc|reduction|ristourne|promo|remise|rabais)\b|moins cher|prix d'ami|a moitie prix|\d+ ?(€|euros?|balles)? (et|pour) (je (prends|l'achete|le prends|la prends|les prends)|c'est (bon|ok))|tu (peux|pourrais|veux) (pas )?(me )?(baisser|descendre|faire moins|faire un prix)|c'est negociable|on (peut )?negoci)/u;
+
+/** The intents a discount asked never overrides: what they say leads (a distress, a complaint, his order). */
+const LEADING_INTENTS: readonly string[] = [
+  'price_objection',
+  'distress',
+  'complaint',
+  'asks_for_service',
+  'asks_to_meet',
+  'asks_personal_contact',
+  'off_topic_request',
+  'asks_if_bot',
+];
+
+/**
+ * His discount asked, read by code over the brain's intent (ADR 0090 § B): his words carry it and the brain read no
+ * price objection nor anything that leads before it. Then she answers it as `asks_discount`, the price never moves.
+ */
+export function discountAsked(intent: string, fanText: string): boolean {
+  return !LEADING_INTENTS.includes(intent) && DISCOUNT_ASK.test(normalise(fanText));
 }

@@ -14,6 +14,7 @@ import {
   type CreatorContent,
   type DropFileUpload,
   type FillScriptSlotBody,
+  type ReplaceDropFileBody,
   type ScriptDrop,
   type ScriptVariantLetter,
   type StartScriptDropBody,
@@ -124,6 +125,20 @@ export const completeFile = (
   stopping(async () =>
     ContentDropSchema.parse(await (await post(`/drops/${dropId}/files/${fileId}/complete`, body)).json()),
   );
+
+/**
+ * `POST /drops/:id/files/:fileId/replace` (trou 7 du 21/11): the file she sends in place of a medium her team asked
+ * again, or one the cleaning refused, declared before it goes up, at the same place (and the same step of a script);
+ * the drop received again. Its bytes then go up as any file's (`queueSend`). Replayed with the same id, it answers the
+ * same drop.
+ */
+export async function replaceDropFile(
+  dropId: ContentDropId,
+  fileId: ContentDropFileId,
+  body: ReplaceDropFileBody,
+): Promise<ContentDrop> {
+  return ContentDropSchema.parse(await (await post(`/drops/${dropId}/files/${fileId}/replace`, body)).json());
+}
 
 /* ---- Her script, card by card (SC-02 lot b2) ---- */
 

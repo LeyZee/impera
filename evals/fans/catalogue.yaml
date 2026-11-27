@@ -1,0 +1,173 @@
+# Catalogue inventé des fans simulés (ADR 0172) : chaque script a un thème, pour vérifier que l'IA choisit
+# celui qui colle au fantasme du fan, ou un sur-mesure quand aucun ne colle. Rien de réel : ni média, ni prix, ni texte
+# de l'agence. Thèmes volontairement absents : les pieds, l'anal, le jeu de rôle d'infirmière.
+scripts:
+  - ref: lingerie-noire
+    name: Lingerie noire et bas
+    moment: night
+    description: Elle essaie une lingerie noire avec porte-jarretelles et bas, de plus en plus près, au bord du lit.
+    steps:
+      - kind: free
+        instruction: Elle lui montre qu'elle vient de recevoir un colis de lingerie, sans en montrer plus.
+        text: Devine ce que je viens de déballer
+        media:
+          [{ kind: image, description: "Photo d'un carton ouvert sur le lit, du tissu noir qui dépasse." }]
+      - kind: paid
+        price_euros: 12
+        instruction: Elle lui propose de la voir porter la lingerie, en jouant sur l'attente.
+        text: Je l'ai mise. Tu veux voir ?
+        teaser: [{ kind: image, description: "Photo floutée d'elle de dos en lingerie noire." }]
+        media:
+          - { kind: image, description: "Photo d'elle en lingerie noire et bas, debout près du lit." }
+          - {
+              kind: image,
+              description: "Photo d'elle qui attache un bas au porte-jarretelles, gros plan sur la cuisse.",
+            }
+      - kind: bridge
+        instruction: Elle lui demande ce qui l'a le plus fait réagir et laisse monter.
+      - kind: paid
+        price_euros: 22
+        instruction: Elle lui propose la vidéo où elle enlève un bas, lentement.
+        text: La suite, tu la mérites
+        media:
+          [
+            {
+              kind: video,
+              description: "Vidéo d'elle allongée qui fait glisser un bas le long de sa jambe, regard vers l'objectif.",
+            },
+          ]
+
+  - ref: elle-commande
+    name: Elle prend les commandes
+    moment: night
+    description: Elle lui donne des ordres doux et fermes, regard dans l'objectif, elle mène le jeu du début à la fin.
+    steps:
+      - kind: free
+        instruction: Elle lui annonce que ce soir c'est elle qui décide.
+        text: Ce soir c'est moi qui décide. Compris ?
+        media:
+          [
+            {
+              kind: image,
+              description: "Photo d'elle assise dans un fauteuil, jambes croisées, regard autoritaire.",
+            },
+          ]
+      - kind: paid
+        price_euros: 14
+        instruction: Elle lui ordonne d'attendre puis lui montre la suite, en restant directive.
+        text: Tu as été sage, alors regarde
+        teaser: [{ kind: image, description: "Photo floutée d'elle debout, une main sur la hanche." }]
+        media:
+          - { kind: image, description: "Photo d'elle en body noir, debout, qui pointe l'objectif du doigt." }
+          - { kind: image, description: "Photo d'elle penchée vers l'objectif, sourire en coin." }
+      - kind: paid
+        price_euros: 25
+        instruction: Elle lui propose la vidéo où elle lui donne ses instructions à voix basse.
+        text: Maintenant tu fais exactement ce que je dis
+        media:
+          [
+            {
+              kind: video,
+              description: "Vidéo d'elle qui parle à l'objectif d'une voix basse et directive, en body noir.",
+            },
+          ]
+
+  - ref: douche
+    name: Sous la douche
+    moment: day
+    description: Elle sort de la douche, la buée, la serviette qui tient à peine.
+    steps:
+      - kind: free
+        instruction: Elle lui dit qu'elle file sous la douche.
+        text: Je file à la douche, pas de bêtises
+        media:
+          [{ kind: image, description: 'Photo de la porte de la salle de bain entrouverte, de la buée.' }]
+      - kind: paid
+        price_euros: 10
+        instruction: Elle lui propose de la voir en sortant, serviette autour du corps.
+        text: Je viens de sortir…
+        teaser: [{ kind: image, description: "Photo floutée d'elle en serviette devant un miroir embué." }]
+        media: [{ kind: image, description: "Photo d'elle en serviette, cheveux mouillés, épaule nue." }]
+      - kind: paid
+        price_euros: 20
+        instruction: Elle lui propose la vidéo où la serviette glisse.
+        text: Elle tient pas bien cette serviette
+        media:
+          [
+            {
+              kind: video,
+              description: "Vidéo d'elle qui rit pendant que la serviette glisse, cadrée au-dessus de la poitrine.",
+            },
+          ]
+
+  - ref: reveil
+    name: Le réveil
+    moment: day
+    description: Elle se réveille, nuisette en soie, encore sous la couette, câline et lente.
+    steps:
+      - kind: free
+        instruction: Elle lui dit bonjour encore endormie.
+        text: Coucou toi, je viens d'ouvrir un œil
+        media: [{ kind: image, description: "Photo d'elle sous la couette, cheveux en bataille, sourire." }]
+      - kind: paid
+        price_euros: 9
+        instruction: Elle lui propose de soulever un peu la couette.
+        text: Tu veux voir ce que je porte ?
+        teaser: [{ kind: image, description: "Photo floutée d'une bretelle de nuisette sur son épaule." }]
+        media:
+          [{ kind: image, description: "Photo d'elle en nuisette de soie, allongée, la couette repoussée." }]
+      - kind: paid
+        price_euros: 18
+        instruction: Elle lui propose la vidéo où elle s'étire.
+        text: J'ai pas envie de me lever
+        media:
+          [
+            {
+              kind: video,
+              description: "Vidéo d'elle qui s'étire dans le lit en nuisette, lumière du matin.",
+            },
+          ]
+
+  - ref: apres-sport
+    name: Après le sport
+    moment: day
+    description: Elle rentre du sport en legging et brassière, essoufflée, et se change.
+    steps:
+      - kind: free
+        instruction: Elle lui dit qu'elle rentre de la salle, épuisée.
+        text: La séance m'a tuée
+        media: [{ kind: image, description: "Photo d'elle en legging et brassière, gourde à la main." }]
+      - kind: paid
+        price_euros: 11
+        instruction: Elle lui propose de la voir enlever sa brassière, de dos.
+        text: J'enlève tout ça, tu restes ?
+        teaser: [{ kind: image, description: "Photo floutée d'elle de dos dans le vestiaire." }]
+        media: [{ kind: image, description: "Photo d'elle de dos, brassière à la main, legging." }]
+      - kind: paid
+        price_euros: 20
+        instruction: Elle lui propose la vidéo où elle se change.
+        text: Je te montre la suite
+        media: [{ kind: video, description: "Vidéo d'elle qui enlève son legging, cadrée de dos." }]
+
+  - ref: robe-soiree
+    name: La robe avant de sortir
+    moment: night
+    description: Elle se prépare pour sortir dans une robe moulante, puis décide de rester et de l'enlever pour lui.
+    steps:
+      - kind: free
+        instruction: Elle lui demande son avis sur sa robe.
+        text: Je sors avec ça ce soir, t'en penses quoi ?
+        media: [{ kind: image, description: "Photo d'elle dans une robe rouge moulante devant un miroir." }]
+      - kind: paid
+        price_euros: 13
+        instruction: Elle lui dit qu'elle n'a plus envie de sortir et lui propose de rester avec lui.
+        text: En fait je reste… avec toi
+        teaser:
+          [{ kind: image, description: 'Photo floutée de la fermeture éclair de la robe à moitié ouverte.' }]
+        media: [{ kind: image, description: "Photo d'elle qui fait glisser la robe d'une épaule." }]
+      - kind: paid
+        price_euros: 24
+        instruction: Elle lui propose la vidéo où la robe tombe.
+        text: Plus besoin de cette robe
+        media:
+          [{ kind: video, description: "Vidéo d'elle qui laisse tomber la robe au sol, en lingerie rouge." }]

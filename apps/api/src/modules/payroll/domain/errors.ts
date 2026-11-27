@@ -355,3 +355,49 @@ export class CollectiveGoalLate extends DomainError {
     });
   }
 }
+
+/** A claim the reader may not read, or none (ADR 0101 § 18). */
+export class SaleClaimNotFound extends DomainError {
+  constructor() {
+    super('sale_claim_not_found', 'Ce signalement n’existe pas, ou tu ne peux pas le lire');
+  }
+}
+
+/** The same claim `id` sent with other values. */
+export class SaleClaimConflict extends DomainError {
+  constructor() {
+    super('sale_claim_conflict', 'Cet identifiant est déjà pris par un autre signalement');
+  }
+}
+
+/**
+ * A shift he may not claim on (ADR 0101 §§ 18, 21): not his, not ended, begun more than 15 days ago, or claimed
+ * already. A shift in a closed fortnight is `pay_period_closed_conflict`.
+ */
+export class SaleClaimShiftConflict extends DomainError {
+  constructor() {
+    super(
+      'sale_claim_shift_conflict',
+      'Ce shift ne peut pas recevoir de signalement : il n’est pas fini, il date de plus de 15 jours, ou il en a déjà un',
+    );
+  }
+}
+
+/** A fourth claim waiting (ADR 0101 § 21). */
+export class SaleClaimsTooMany extends DomainError {
+  constructor(max: number) {
+    super('sale_claims_too_many_conflict', `Au plus ${String(max)} signalements en attente à la fois`, {
+      details: { max },
+    });
+  }
+}
+
+/** A claim answered already, otherwise; or an answer its reader may not give (ADR 0101 §§ 19, 20). */
+export class SaleClaimAnswered extends DomainError {
+  constructor() {
+    super(
+      'sale_claim_answered_conflict',
+      'Ce signalement a déjà sa réponse, ou ce n’est pas à toi de la donner',
+    );
+  }
+}

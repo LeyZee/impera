@@ -289,7 +289,7 @@ export const extensionLinks = pgTable(
     /**
      * What the link allows beyond what every link did before ADR 0109 (`ExtensionLinkScopeSchema`), fixed when it is
      * made: a link made before has none (§ 5). Revoked in the same transaction as the account's departure or a change
-     * of its role (triggers of migration 0265).
+     * of its role (triggers of migration 0286).
      */
     scopes: text('scopes')
       .array()

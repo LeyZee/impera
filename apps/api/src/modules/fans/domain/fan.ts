@@ -1,5 +1,7 @@
 import type {
   CreatorId,
+  FanLanguageSource,
+  Language,
   FanFlagName,
   FanFlags,
   FanCardField,
@@ -33,11 +35,46 @@ export interface FanSighting {
   readonly seenAt: Date;
 }
 
+/** His kept language (ADR 0168 § 3): read by code, or set by a person whom code never overwrites. */
+export interface KeptLanguage {
+  readonly value: Language;
+  readonly source: FanLanguageSource;
+  /** The person who set it; `null` when code read it. */
+  readonly setBy: UserId | null;
+  readonly setAt: Date;
+}
+
+/** Who sets his language by hand, for the audit log. */
+export interface LanguageActor {
+  readonly userId: UserId;
+  readonly ip: string;
+}
+
 /** Storage port, implemented in `infra/` with `withTenant`. */
 export interface FanStore {
   /** Creates the fan on first sight, otherwise refreshes its name and `last_seen_at`; idempotent. */
   upsert(sighting: FanSighting, newId: FanId): Promise<Fan>;
   get(creatorId: CreatorId, id: FanId): Promise<Fan | null>;
+  /** His kept language, `null` before any; `FanNotFound` for a fan unknown to this creator. */
+  language(creatorId: CreatorId, fanId: FanId): Promise<KeptLanguage | null>;
+  /**
+   * Code read his language (ADR 0168 § 3): written under the fan's lock unless a person set it or it is the same.
+   * Returns his kept language after it.
+   */
+  keepLanguage(
+    creatorId: CreatorId,
+    fanId: FanId,
+    language: Language,
+    at: Date,
+  ): Promise<KeptLanguage | null>;
+  /** A person sets his language, with its line in the audit log in the same transaction. */
+  setLanguage(
+    creatorId: CreatorId,
+    fanId: FanId,
+    language: Language,
+    actor: LanguageActor,
+    at: Date,
+  ): Promise<KeptLanguage>;
 }
 
 /** Storage of her facts about a fan, implemented in `infra/` with `withTenant`; append-only (data-model.md). */

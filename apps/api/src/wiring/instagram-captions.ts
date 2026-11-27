@@ -31,7 +31,7 @@ export function wireInstagramCaptions(
   shared: Shared,
   deps: {
     readonly gateway: Pick<LlmGateway, 'proposeCaptions'>;
-    readonly contentDrops: Pick<ContentDropsModule, 'describedDrops'>;
+    readonly contentDrops: Pick<ContentDropsModule, 'describedDrops' | 'describedDrop'>;
     readonly activePersona: ActiveVersion;
     readonly asking: CreatorDecisionsModule['asking'];
     readonly clock?: () => Date;
@@ -41,6 +41,7 @@ export function wireInstagramCaptions(
     db: shared.db,
     gateway: deps.gateway,
     drops: (creatorId, mediaAssetId) => deps.contentDrops.describedDrops(creatorId, mediaAssetId),
+    reel: (creatorId, dropId) => deps.contentDrops.describedDrop(creatorId, dropId),
     persona: async (creatorId) => {
       const stored = await deps.activePersona(creatorId);
       if (stored === null) return null;

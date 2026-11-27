@@ -60,6 +60,11 @@ const decisionAnswersSchema = (layout: DecisionLayout) =>
       message: 'a text on every row, none on a button',
     });
 
+/** These answers read as one decision of this layout holds them; throws when they do not fit it. */
+export function fittingAnswers(layout: DecisionLayout, answers: readonly DecisionAnswer[]): DecisionAnswer[] {
+  return decisionAnswersSchema(layout).parse(answers);
+}
+
 const QuestionSchema = z.string().trim().min(1).max(120);
 const ContextSchema = z.string().trim().min(1).max(200);
 
@@ -75,6 +80,8 @@ export const CreatorDecisionSchema = z.strictObject({
   answers: z.array(DecisionAnswerSchema).min(DECISION_ANSWERS_MIN).max(DECISION_ANSWERS_MAX),
   /** How many times she may still ask for other ideas; 0 hides the gesture. */
   otherIdeasLeft: z.number().int().min(0).max(DECISION_OTHER_IDEAS_MAX),
+  /** When the question ends, unanswered: the owner reads it as a tag when answering in her place. */
+  expiresAt: z.iso.datetime(),
 });
 export type CreatorDecision = z.infer<typeof CreatorDecisionSchema>;
 
@@ -89,6 +96,26 @@ export const CreatorDecisionParamsSchema = z.strictObject({ id: CreatorDecisionI
 /** `POST /v1/creator-space/decisions/:id/answer`. */
 export const AnswerDecisionBodySchema = z.strictObject({ answer: DecisionAnswerKeySchema });
 export type AnswerDecisionBody = z.infer<typeof AnswerDecisionBodySchema>;
+
+/** Her own words beside the hints: one line, read as a data by whoever proposes, never as an instruction. */
+export const DECISION_WISH_MAX = 140;
+
+/**
+ * `POST /v1/creator-space/decisions/:id/other-ideas`: what she would like instead, a hint touched or a few words. The
+ * hints are named by the code that proposes for this kind of decision, which reads them again.
+ */
+export const OtherIdeasBodySchema = z
+  .strictObject({
+    hints: z.array(z.string().regex(/^[a-z_]{1,24}$/u)).max(8),
+    note: z.string().trim().max(DECISION_WISH_MAX),
+  })
+  .refine((body) => new Set(body.hints).size === body.hints.length, { message: 'each hint once' })
+  .refine((body) => body.hints.length > 0 || body.note !== '', { message: 'a hint or a few words' });
+export type OtherIdeasBody = z.infer<typeof OtherIdeasBodySchema>;
+
+/** The decision with its other answers, and one request fewer left. */
+export const OtherIdeasSchema = z.strictObject({ decision: CreatorDecisionSchema });
+export type OtherIdeas = z.infer<typeof OtherIdeasSchema>;
 
 /** What a code that asks gives: the decision, how it is named for a replay, and when it stops making sense. */
 export const NewCreatorDecisionSchema = z

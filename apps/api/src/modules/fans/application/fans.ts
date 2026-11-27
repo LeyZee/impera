@@ -8,6 +8,7 @@ import {
   type FanFlags,
   type FanId,
   type KycSlot,
+  type Language,
   type TeamScope,
   type UserId,
 } from '@impera/contracts';
@@ -24,7 +25,16 @@ import {
   type FactProposal,
   type StoredFact,
 } from '../domain/facts';
-import type { Fan, FanSighting, FanStore, FactStore, FlagStore, WriteTrace } from '../domain/fan';
+import type {
+  Fan,
+  FanSighting,
+  FanStore,
+  FactStore,
+  FlagStore,
+  KeptLanguage,
+  LanguageActor,
+  WriteTrace,
+} from '../domain/fan';
 import {
   withAgeDisputed,
   withDeclaredAge,
@@ -58,6 +68,17 @@ const after = ({ flags, scope }: { flags: FanFlags; scope: TeamScope | null }): 
 
 export interface FansService {
   upsertFanByPlatformId(sighting: FanSighting): Promise<Fan>;
+  /** His kept language (ADR 0168 § 3), `null` before any; 404 unknown. */
+  language(creatorId: CreatorId, fanId: FanId): Promise<KeptLanguage | null>;
+  /** Code read his language on his message: kept unless a person set it. */
+  keepDetectedLanguage(creatorId: CreatorId, fanId: FanId, language: Language): Promise<KeptLanguage | null>;
+  /** A person sets his language (`PUT /v1/fans/:id/language`), audited. */
+  setLanguage(
+    creatorId: CreatorId,
+    fanId: FanId,
+    language: Language,
+    actor: LanguageActor,
+  ): Promise<KeptLanguage>;
   getFan(creatorId: CreatorId, id: FanId): Promise<Fan | null>;
   /** Writes what is new in these proposals (append-only, `planFacts`) and returns the facts written. */
   proposeFacts(creatorId: CreatorId, fanId: FanId, proposals: readonly FactProposal[]): Promise<StoredFact[]>;
@@ -173,6 +194,11 @@ export function createFansService(
   return {
     upsertFanByPlatformId: (sighting) => store.upsert(sighting, newId(FanIdSchema)),
     getFan: (creatorId, id) => store.get(creatorId, id),
+    language: (creatorId, fanId) => store.language(creatorId, fanId),
+    keepDetectedLanguage: (creatorId, fanId, language) =>
+      store.keepLanguage(creatorId, fanId, language, now()),
+    setLanguage: (creatorId, fanId, language, actor) =>
+      store.setLanguage(creatorId, fanId, language, actor, now()),
     proposeFacts: (creatorId, fanId, proposals) =>
       facts.write(creatorId, fanId, (current, pending) => planFacts(current, proposals, now(), pending)),
     cardLines: async (creatorId, fanId) => {

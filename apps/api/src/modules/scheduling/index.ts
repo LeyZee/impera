@@ -1,10 +1,13 @@
-import type {
-  CreatorId,
-  CreatorPlanned,
-  PayPeriod,
-  PlatformAccountId,
-  ShiftId,
-  UserId,
+import {
+  payPeriodAt,
+  type CreatorId,
+  type CreatorPlanned,
+  type PayPeriod,
+  type Platform,
+  type PlatformAccountId,
+  type ShiftFeedbackId,
+  type ShiftId,
+  type UserId,
 } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
@@ -22,6 +25,7 @@ import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
 import { createSchedulingReads, type SchedulingReads } from './application/team-reads';
+import { incidentNotices } from './domain/incident-notice';
 import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, Notify, OnShift } from './domain/ports';
 import type { ShiftFactsForPay } from './domain/reports';
 import { calendarDayIn } from './domain/time';
@@ -36,8 +40,9 @@ import {
   createDrizzleCreatorShiftsFeed,
   createDrizzleCreatorOnDuty,
 } from './infra/creator-on-duty';
-import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
+import { createDrizzleShiftFeedbackStore, type ShiftActivityReader } from './infra/feedback-store';
 import { ownValidatedShiftsForGame, type ValidatedShiftForGame } from './infra/game-reads';
+import { createDrizzleIncidentNoticeReads } from './infra/incident-notice-reads';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
   accessMarginMinutesForPay,
@@ -78,6 +83,19 @@ export { shiftsForGameUnscoped, validatedShiftsForGameUnscoped } from './infra/g
 export type { DetectedAccountForCheck } from './domain/sales-checks';
 /** @public What pay's estimate of a report reads of its shift (reco 19). */
 export type { ShiftFactsForPay } from './domain/reports';
+
+/** @public One of a member's ended shifts, as pay reads it for a claim on a sale (ADR 0101 § 18). */
+export interface EndedShiftForPay {
+  readonly shiftId: ShiftId;
+  readonly creatorId: CreatorId;
+  readonly creatorName: string;
+  readonly platformAccountId: PlatformAccountId;
+  readonly platform: Platform;
+  readonly handle: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly period: PayPeriod;
+}
 /** @public What another door (the MCP, ADR 0026 § 1) reads of the planning and the reports. */
 export type { SchedulingReads } from './application/team-reads';
 /** @public A shift as that door reads it. */
@@ -164,6 +182,12 @@ export interface SchedulingModule {
      * `shift_not_found`, 403 `shift_report_forbidden` to anyone else.
      */
     readonly shiftFacts: (actor: UserId, shiftId: ShiftId) => Promise<ShiftFactsForPay>;
+    /**
+     * For « J'ai été décisif sur une vente » (ADR 0101 § 18), in a transaction of its own as `actor`: his own shifts
+     * not cancelled, begun since `since` and ended by now (their stop when stopped), the newest first, with the account
+     * and the pay period each starts in. Empty for an account with no member row.
+     */
+    readonly endedShifts: (actor: UserId, since: Date) => Promise<EndedShiftForPay[]>;
   };
   readonly jobs: {
     /**
@@ -195,6 +219,13 @@ export interface SchedulingModule {
      * off: the agency's « Relancer » stays.
      */
     readonly remindReports: (() => Promise<ReportRemindersRun>) | null;
+    /**
+     * `scheduling.notify_incident` (trous béants n° 1), queued by a feedback with an incident: the owners and the
+     * active managers of its creator told on their phone, once each; how many rang. Null when push is off: the
+     * incident still leads Équipe › Rapports.
+     */
+    readonly notifyIncident:
+      ((shiftFeedbackId: ShiftFeedbackId, creatorId: CreatorId) => Promise<number>) | null;
   };
 }
 
@@ -233,6 +264,11 @@ export interface SchedulingDeps {
    * read in the reports' own transaction.
    */
   readonly shiftSalesOf: ShiftSalesReader;
+  /**
+   * What the conversations say of a shift (ADR 0170 § 1): the `conversations` module's
+   * `conversationReadsForShifts.activity`, read in the feedback's own transaction for its figures.
+   */
+  readonly shiftActivityOf: ShiftActivityReader;
   /** A creator's agenda in her calendar link's feed (CR-05 lot c2): the `creator-tasks` module's `feedOf`. */
   readonly creatorAgendaFeed: CreatorAgendaFeed;
   /**
@@ -250,6 +286,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const colleagues = createDrizzleColleagueReads(deps.adminDb);
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const calendarReads = createDrizzleCalendarReads(deps.db);
+  const incidentReads = createDrizzleIncidentNoticeReads(deps.adminDb);
   const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf, deps.notify);
   const reportStore = createDrizzleShiftReportStore(
     deps.db,
@@ -257,8 +294,14 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     deps.enqueuePayRecalculation,
     deps.shiftSalesOf,
   );
+  const feedbackStore = createDrizzleShiftFeedbackStore(deps.db, deps.adminDb, {
+    shiftSalesOf: deps.shiftSalesOf,
+    activityOf: deps.shiftActivityOf,
+  });
   const services = {
-    scheduling: createSchedulingService(planning, admin, deps.creators, now),
+    scheduling: createSchedulingService(planning, admin, deps.creators, now, (actor, at) =>
+      feedbackStore.owed(actor, at),
+    ),
     calendar: createCalendarService(calendarReads, deps.creators, now),
     calendarLinks: createCalendarLinkService(
       createDrizzleCalendarLinkStore(deps.adminDb),
@@ -280,7 +323,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       now,
     ),
     reports: createShiftReportService(reportStore, deps.creators, now),
-    feedback: createShiftFeedbackService(createDrizzleShiftFeedbackStore(deps.db, deps.adminDb), now),
+    feedback: createShiftFeedbackService(feedbackStore, deps.creators, now),
     payRules: createPayRulesService(
       createDrizzlePayRulesStore(deps.db, deps.adminDb, {
         switchFactsOf: deps.switchFactsOf,
@@ -325,6 +368,32 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
         const { shift, period, rules } = await reportStore.context(actor, shiftId, now());
         return { memberId: shift.memberId, period, rules };
       },
+      endedShifts: async (actor, since) => {
+        const at = now();
+        const { timeZone } = await admin.settingsUnscoped();
+        const creators = await deps.creators.list();
+        const mine = await planning.memberShifts(
+          actor,
+          creators.map((creator) => creator.id),
+          since,
+        );
+        if (mine === null) return [];
+        const names = new Map(creators.map((creator) => [creator.id, creator.displayName]));
+        return mine.shifts
+          .filter((shift) => shift.startsAt >= since && (shift.stoppedAt ?? shift.endsAt) <= at)
+          .toSorted((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
+          .map((shift) => ({
+            shiftId: shift.id,
+            creatorId: shift.creatorId,
+            creatorName: names.get(shift.creatorId) ?? '—',
+            platformAccountId: shift.platformAccountId,
+            platform: shift.platform,
+            handle: shift.handle,
+            startsAt: shift.startsAt,
+            endsAt: shift.stoppedAt ?? shift.endsAt,
+            period: payPeriodAt(shift.startsAt, timeZone),
+          }));
+      },
     },
     routes: (requireRole, recentLogin) => async (app, options) => {
       await createSchedulingRoutes(services, requireRole, recentLogin)(app, options);
@@ -345,6 +414,18 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
         notify === null
           ? null
           : () => remindReports({ source: createDrizzleReportReminderSource(deps.adminDb), notify }, now),
+      notifyIncident:
+        notify === null
+          ? null
+          : async (shiftFeedbackId, creatorId) => {
+              const read = await incidentReads.factsUnscoped(shiftFeedbackId, creatorId);
+              if (read === null) return 0;
+              let rang = 0;
+              for (const request of incidentNotices(read.facts, read.recipients)) {
+                if ((await notify(request, now())) === 'rang') rang += 1;
+              }
+              return rang;
+            },
     },
   };
 }

@@ -1,9 +1,16 @@
 import {
+  AdvanceCustomOrderBodySchema,
   CreatorIdSchema,
+  CustomOrderIdSchema,
+  CustomOrderListQuerySchema,
+  CustomOrderListSchema,
+  CustomOrderViewSchema,
+  DecideCustomOrderBodySchema,
   CustomPriceGridViewSchema,
   DomainError,
   SaveCustomPriceGridBodySchema,
   UserIdSchema,
+  type CustomOrderErrorCode,
   type CustomPriceErrorCode,
   type UserRole,
 } from '@impera/contracts';
@@ -12,6 +19,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { CustomPriceActor, CustomPriceGridStore } from '../../domain/ports';
+import type { CustomOrderAgencyStore, CustomOrderMove } from '../db/agency-store';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -30,6 +38,29 @@ class CustomPricesVersionConflict extends DomainError {
       { details: { current } },
     );
   }
+}
+
+class CustomOrderNotFound extends DomainError {
+  constructor() {
+    super('custom_order_not_found' satisfies CustomOrderErrorCode, 'Commande introuvable');
+  }
+}
+
+class CustomOrderMoveConflict extends DomainError {
+  constructor(state: string) {
+    super(
+      'custom_order_move_conflict' satisfies CustomOrderErrorCode,
+      'Cette commande a déjà changé d’état : recharge la liste',
+      { details: { state } },
+    );
+  }
+}
+
+/** The order after a move, or the refusal said plainly. */
+function movedOrThrow(result: CustomOrderMove | null) {
+  if (result === null || result.kind === 'not_found') throw new CustomOrderNotFound();
+  if (result.kind === 'refused') throw new CustomOrderMoveConflict(result.state);
+  return result.order;
 }
 
 function actorOf(request: FastifyRequest): CustomPriceActor {
@@ -81,6 +112,81 @@ export function createCustomPriceRoutes(
         if (saved.kind === 'conflict') throw new CustomPricesVersionConflict(saved.current);
         return saved.view;
       },
+    );
+    return Promise.resolve();
+  };
+}
+
+const OrderParams = z.object({ creatorId: CreatorIdSchema, orderId: CustomOrderIdSchema });
+
+/**
+ * `/v1/creators/:creatorId/custom-orders` (ADR 0159 § A.3): `GET` her orders (the owner, or an active manager who
+ * follows her), `POST …/:orderId/decision` her answer (yes at a price, or no) and `POST …/:orderId/advance` the next
+ * step (deposit received, delivered, cancelled), the owner's alone. A refusal reads the same for an order of another
+ * creator and for none.
+ */
+export function createCustomOrderRoutes(
+  store: CustomOrderAgencyStore,
+  requireRole: RequireRole,
+): FastifyPluginAsyncZod {
+  return (app) => {
+    app.get(
+      '/creators/:creatorId/custom-orders',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: CreatorParams,
+          querystring: CustomOrderListQuerySchema,
+          response: { 200: CustomOrderListSchema },
+        },
+      },
+      async (request) => {
+        const orders = await store.list(request.params.creatorId, request.query.scope, actorOf(request));
+        if (orders === null) throw new CustomPricesCreatorNotFound();
+        return { orders };
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/custom-orders/:orderId/decision',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: OrderParams,
+          body: DecideCustomOrderBodySchema,
+          response: { 200: CustomOrderViewSchema },
+        },
+      },
+      async (request) =>
+        movedOrThrow(
+          await store.decide(
+            request.params.creatorId,
+            request.params.orderId,
+            request.body,
+            actorOf(request),
+          ),
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/custom-orders/:orderId/advance',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: OrderParams,
+          body: AdvanceCustomOrderBodySchema,
+          response: { 200: CustomOrderViewSchema },
+        },
+      },
+      async (request) =>
+        movedOrThrow(
+          await store.advance(
+            request.params.creatorId,
+            request.params.orderId,
+            request.body,
+            actorOf(request),
+          ),
+        ),
     );
     return Promise.resolve();
   };

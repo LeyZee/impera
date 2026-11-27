@@ -75,17 +75,22 @@ export function UnitInput({
   );
 }
 
+const OFFERED_WORDS = { on: 'Elle le fait', off: 'Jamais', aria: 'elle le fait' };
+
 /** « Elle le fait » : the design system's switch, never a bare checkbox. */
 export function Offered({
   label,
   checked,
   disabled,
   onChange,
+  words = OFFERED_WORDS,
 }: {
   label: string;
   checked: boolean;
   disabled: boolean;
   onChange: (checked: boolean) => void;
+  /** What the switch says on and off, and what it reads aloud after the line's name. */
+  words?: { on: string; off: string; aria: string };
 }): JSX.Element {
   const id = useId();
   return (
@@ -97,13 +102,13 @@ export function Offered({
         className="nv-switch"
         checked={checked}
         disabled={disabled}
-        aria-label={`${label} : elle le fait`}
+        aria-label={`${label} : ${words.aria}`}
         onChange={(event) => {
           onChange(event.target.checked);
         }}
       />
       <label htmlFor={id} className="smp-offered__text" aria-hidden="true">
-        {checked ? 'Elle le fait' : 'Jamais'}
+        {checked ? words.on : words.off}
       </label>
     </div>
   );

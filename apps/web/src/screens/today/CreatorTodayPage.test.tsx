@@ -35,7 +35,7 @@ const shift = (displayName: string, startsAt: string, endsAt: string) => ({
 const nb = (text: string): string =>
   text.replace(/(\d) (h|min)/gu, '$1\u00a0$2').replace(/h (\d)/gu, 'h\u00a0$1');
 
-function serve(body: unknown, status = 200, agenda: unknown = null, content: unknown = null): void {
+function serve(body: unknown, status = 200, agenda: unknown = null, content: object | null = null): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
@@ -45,7 +45,7 @@ function serve(body: unknown, status = 200, agenda: unknown = null, content: unk
           : url.startsWith('/v1/creator-space/agenda?') && agenda !== null
             ? new Response(JSON.stringify(agenda), { status: 200 })
             : url === '/v1/creator-space/content' && content !== null
-              ? Response.json(content)
+              ? Response.json({ redone: [], ...content })
               : new Response('null', { status: 404 }),
       ),
     ),
@@ -117,6 +117,7 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
         { key: 'change', label: 'Changer l’heure', text: null, noted: 'On change l’heure.' },
       ],
       otherIdeasLeft: 0,
+      expiresAt: '2026-11-21T17:30:00.000Z',
     };
     const sent: string[] = [];
     vi.stubGlobal(
@@ -261,6 +262,21 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     expect(send?.compareDocumentPosition(day)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     // One request alone: the button needs no ordinal.
     expect(screen.getByRole('link', { name: 'Déposer' })).toBeDefined();
+  });
+
+  it('opens on « L’essentiel du jour », counting her tasks and what she owes, before anything else (Charles, 21/11)', async () => {
+    serve({ current: [], next: [] }, 200, agendaOf(), {
+      requests: [requestOf({ dueOn: '2026-11-01', reason: 'La séance promise' })],
+      drops: [],
+    });
+    show();
+    const hero = (await screen.findByRole('heading', { level: 2, name: 'Ce qu’on attend de toi' })).closest(
+      'section',
+    );
+    expect(await screen.findByText('1 envoi à faire')).toBeDefined();
+    expect(screen.getByRole('button', { name: /^Tâches\s*\d+\/\d+$/u })).toBeDefined();
+    const send = (await screen.findByRole('heading', { level: 2, name: 'À envoyer' })).closest('section');
+    expect(send === null ? null : hero?.compareDocumentPosition(send)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('counts what the agency waits on her for, and takes her to her week to answer', async () => {

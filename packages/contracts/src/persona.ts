@@ -68,6 +68,21 @@ export const MIN_CREATOR_AGE = 18;
 /** Past this age on the date of the version, a date of birth is a typo (1890), never a creator (recette, reco 22). */
 export const MAX_CREATOR_AGE = 100;
 
+/**
+ * The French name of each language (ADR 0168): the persona's choice list, his language on his card and the copilot say
+ * these, never their own copy. Typed by `LANGUAGES`: a language added there needs its name here.
+ */
+export const LANGUAGE_LABELS_FR: Readonly<Record<(typeof LANGUAGES)[number], string>> = {
+  french: 'Français',
+  english: 'Anglais',
+  italian: 'Italien',
+  spanish: 'Espagnol',
+  german: 'Allemand',
+  portuguese: 'Portugais',
+  dutch: 'Néerlandais',
+  arabic: 'Arabe',
+};
+
 /** French labels of every choice list: the dashboard renders these, never its own copy. */
 export const PERSONA_OPTIONS = {
   gender: labelled(GENDERS, { female: 'Femme', male: 'Homme', other: 'Autre' }),
@@ -80,16 +95,7 @@ export const PERSONA_OPTIONS = {
     arab: 'Moyen-orientale',
     other: 'Autre',
   }),
-  languages: labelled(LANGUAGES, {
-    french: 'Français',
-    english: 'Anglais',
-    italian: 'Italien',
-    spanish: 'Espagnol',
-    german: 'Allemand',
-    portuguese: 'Portugais',
-    dutch: 'Néerlandais',
-    arabic: 'Arabe',
-  }),
+  languages: labelled(LANGUAGES, LANGUAGE_LABELS_FR),
   hair: labelled(HAIR_COLORS, {
     brown: 'Bruns',
     black: 'Noirs',

@@ -74,6 +74,7 @@ import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
 import { parseSalesSearch } from './screens/sales/view';
 import {
   AiModelsPage,
+  AgentsPage,
   AiUsagePage,
   AlertsPage,
   BackupsPage,
@@ -112,6 +113,7 @@ import { scopesCreators } from './shell/CreatorScope';
 import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
 import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf, securityPathOf } from './shell/nav';
+import { MyStockPage } from './stock/MyStockPage';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -548,12 +550,22 @@ const content = createRoute({
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+          onOpenStock={() => void navigate({ to: '/contenu/coffre' })}
           asked={demande ?? null}
           onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
       </>
     );
+  },
+});
+/** Mon coffre (ADR 0162 § 5): what she dropped, by use, with what the AI understood of each medium. */
+const contentStock = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/contenu/coffre',
+  component: function ContentStock() {
+    const navigate = contentStock.useNavigate();
+    return <MyStockPage onDrop={() => void navigate({ to: '/contenu' })} />;
   },
 });
 /** Her script, card by card (SC-02 lot b2): a drop of hers, by its id; any other address goes back to Contenu. */
@@ -1113,6 +1125,18 @@ const aiUsage = createRoute({
   },
   component: AiUsagePage,
 });
+/** Réglages › Agents connectés: the owner's alone, like the routes it calls (ADR 0026 § 3). */
+const agents = createRoute({
+  getParentRoute: () => settings,
+  path: '/agents-connectes',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: AgentsPage,
+});
 const salesFeeds = createRoute({
   getParentRoute: () => settings,
   path: '/ventes',
@@ -1325,6 +1349,7 @@ const routeTree = rootRoute.addChildren([
   agenda,
   sales,
   content,
+  contentStock,
   contentScript,
   myPlanning,
   team.addChildren([
@@ -1357,6 +1382,7 @@ const routeTree = rootRoute.addChildren([
     aiModels,
     salesFeeds,
     aiUsage,
+    agents,
     alerts,
     telegram,
     payRules,

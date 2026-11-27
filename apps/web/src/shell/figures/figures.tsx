@@ -286,10 +286,19 @@ export function Steps({
 }
 
 /**
- * The small curve at a tile's foot: 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour.
+ * The small curve at a tile's foot: 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour, or in its
+ * series' `colour` when the curve belongs to a series of a chart beside it.
  * Decorative: the tile's figure and its change say it, so it is hidden from assistive technologies.
  */
-export function Spark({ values, tone }: { values: readonly number[]; tone: 'up' | 'down' }): JSX.Element {
+export function Spark({
+  values,
+  tone,
+  colour,
+}: {
+  values: readonly number[];
+  tone: 'up' | 'down';
+  colour?: string;
+}): JSX.Element {
   const fill = useId();
   const frame = { width: 200, height: 32, padTop: 3, padBottom: 2 };
   const low = Math.min(0, ...values);
@@ -306,6 +315,7 @@ export function Spark({ values, tone }: { values: readonly number[]; tone: 'up' 
       className={`nv-spark nv-spark--${tone}`}
       viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
       preserveAspectRatio="none"
+      style={colour === undefined ? undefined : { '--_c': colour }}
       aria-hidden="true"
     >
       <defs>

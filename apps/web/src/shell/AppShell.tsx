@@ -34,6 +34,7 @@ import {
 
 import { useCreatorScope } from '@/agent/scope';
 import { creatorsSearch, sheetsFor, useRememberedSheet, type CreatorSheet } from '@/creators/search';
+import { GuidesBesideProvider } from '@/help/beside';
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
 import { useFollowDeviceZone } from '@/pwa/device-zone';
@@ -166,7 +167,9 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
           >
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
-          <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
+          <GuidesBesideProvider user={user} pathname={pathname}>
+            <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
+          </GuidesBesideProvider>
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
           <div className="nv-offline-region" role="status">

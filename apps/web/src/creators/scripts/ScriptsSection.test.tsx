@@ -66,7 +66,7 @@ afterEach(() => {
 describe('Créatrices › Scripts (SC-03 c2b)', () => {
   it('shows a sent script by its number and moment, with its archive to download', async () => {
     serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT] } }),
+      [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT], redone: [] } }),
       [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
     });
     show();
@@ -89,7 +89,10 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
       state: 'received',
     };
     serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT, next, checking] } }),
+      [CONTENT]: () => ({
+        status: 200,
+        body: { requests: [REQUEST], drops: [SENT, next, checking], redone: [] },
+      }),
       [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
     });
     show();
@@ -103,7 +106,7 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
     const calls = serve({
       [CONTENT]: () => ({
         status: 200,
-        body: { requests: [REQUEST], drops: [copied ? COPIED : SENT] },
+        body: { requests: [REQUEST], drops: [copied ? COPIED : SENT], redone: [] },
       }),
       [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
       [CONFIRM]: () => {
@@ -129,7 +132,7 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
 
   it('says the server’s refusal in the dialog, and keeps it open', async () => {
     serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT] } }),
+      [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT], redone: [] } }),
       [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
       [CONFIRM]: () => ({
         status: 422,
@@ -154,7 +157,7 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
     const both = structureOf('0192f3a0-0000-7000-8000-000000000a02', 'Week-end inventé', 'both');
     const request = { ...REQUEST, structureId: both.id, moment: null };
     serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [request], drops: [SENT] } }),
+      [CONTENT]: () => ({ status: 200, body: { requests: [request], drops: [SENT], redone: [] } }),
       [STRUCTURES]: () => ({ status: 200, body: { structures: [both] } }),
     });
     show();
@@ -165,7 +168,7 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
 
   it('says when she has sent none yet, and when her content does not load', async () => {
     serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [] } }),
+      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [], redone: [] } }),
       [STRUCTURES]: () => ({ status: 200, body: { structures: [] } }),
     });
     show();
@@ -185,7 +188,7 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     '0192f3a0-0000-7000-8000-000000000b03',
   ] as const;
   const base = {
-    [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT] } }),
+    [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT], redone: [] } }),
     [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
   };
 

@@ -18,15 +18,40 @@ export interface DropOfMedium {
  * not replaced. Read in her creator under the app role, as the jobs on a medium she dropped are (`drop_media`,
  * ADR 0087 lot c): never the service role.
  */
-export function dropsOfMedium(
+export async function dropsOfMedium(
   db: Database,
   creatorId: string,
   mediaAssetId: string,
 ): Promise<DropOfMedium[]> {
+  const held = await liveDrops(db, creatorId, { mediaAssetId });
+  return held.map(({ dropId, category, sentence, durationS, dueOn }) => ({
+    dropId,
+    category,
+    sentence,
+    durationS,
+    dueOn,
+  }));
+}
+
+/** A live drop of a creator with each medium it holds now, by the same rules and under the same door; empty for none. */
+export function mediaOfDrop(
+  db: Database,
+  creatorId: string,
+  dropId: string,
+): Promise<(DropOfMedium & { readonly mediaAssetId: string })[]> {
+  return liveDrops(db, creatorId, { dropId });
+}
+
+function liveDrops(
+  db: Database,
+  creatorId: string,
+  by: { readonly mediaAssetId: string } | { readonly dropId: string },
+): Promise<(DropOfMedium & { readonly mediaAssetId: string })[]> {
   return withTenantJob(db, creatorId, 'drop_media', async (tx) => {
     const rows = await tx
       .selectDistinct({
         dropId: contentDrops.id,
+        mediaAssetId: mediaAssets.id,
         category: contentDrops.category,
         sentence: contentDrops.sentence,
         durationMs: mediaAssets.durationMs,
@@ -39,9 +64,13 @@ export function dropsOfMedium(
       .where(
         and(
           eq(contentDrops.creatorId, creatorId),
-          eq(contentDropFiles.mediaAssetId, mediaAssetId),
+          'dropId' in by
+            ? eq(contentDrops.id, by.dropId)
+            : eq(contentDropFiles.mediaAssetId, by.mediaAssetId),
           inArray(contentDropFiles.state, ['kept', 'duplicate']),
           sql`${contentDropFiles.replacedAt} is null`,
+          // A medium her team marked « À refaire » is no longer hers to caption: she replaces it where it is.
+          sql`${contentDropFiles.redoSentence} is null`,
           sql`${contentDrops.state} not in ('filling', 'blocked', 'withdrawn')`,
         ),
       );
