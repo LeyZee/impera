@@ -1,5 +1,5 @@
 # EQ-19 « Voir comme » : l'écran exact d'un chatteur, en lecture seule
-Statut : todo (ID validé par Charles le 27/10/2026, 15h11 : « travail sur tout ça aussi »)
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo (ID validé par Charles le 27/10/2026, 15h11 : « travail sur tout ça aussi »)
 Phase : équipe (ADR 0023, ADR 0024)
 Dépend de : EQ-10 (espace du chatteur), EQ-11 (shell par rôle), EQ-15 (code redemandé), EQ-18 (journal)
 Branche : task/eq-19-view-as

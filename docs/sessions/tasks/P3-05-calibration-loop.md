@@ -1,5 +1,5 @@
 # P3-05 Boucle de calibrage dans le playground
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : 3 (demande de Charles du 17/10, 18h33, spec validée à 18h37)
 Dépend de : P3-04
 Branche : claude/project-thread-e0j3ow

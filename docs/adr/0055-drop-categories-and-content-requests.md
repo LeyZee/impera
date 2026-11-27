@@ -1,5 +1,15 @@
 # 0055. Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0080 · Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM](0080-telegram-channel-posts-go-out-alone.md) : Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
+>
+> - [0136 · Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait](0136-feed-and-stories-published-on-their-own.md) : Amende : ADR 0044 § 3 (cadence, visibilité, acceptation humaine obligatoire), ADR 0044 § 4 (ce qu'on mesure), ADR 0055 § 5 (seuils du stock).
+>
+> Toutes les décisions du même sujet : [`docs/regles/creatrice-et-contenu.md`](../regles/creatrice-et-contenu.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 03/11/2026, 10 h 14, « ok 0055 », « ok 0056 », « ok 0057 » et « ok 0058 » ; phrases des relectures Bilan, Extension et Agent acceptées à 10 h 25 (« fais ce que tu me recommanderais ») ; durée de garde d'un média jamais programmé : « au bout d'un an, ça me paraît bien », 10 h 25 ; demande et décisions de Charles du 03/11/2026, 9 h 42, 9 h 53 et 9 h 58, fil « Repenser le workflow médias et scripts de la modèle » ; revue : `/mnt/project-files/espaces/medias-scripts/revue-medias-scripts-publication.md`, hors dépôt)
 Date : 2026-11-03
 Remplace : dans l'ADR 0044 § 1, l'usage à deux valeurs (`feed` | `mass_dm`) et la phrase « elle dépose depuis son téléphone, dans Contenu » en tant que seule description du dépôt ; dans l'ADR 0044 § 2, le point de départ des 30 jours (« jusqu'à leur publication ou leur envoi ») pour un média qui part sur plusieurs sorties.
