@@ -27,11 +27,17 @@ export interface ShiftSalesQuery {
  * - `off`: its feed is cut or paused; `model_unlinked`: the account's model is linked to no platform model;
  *   `chatter_unlinked`: the member to no platform chatter;
  * - `read`: the member's sales on the account over the window, gross including VAT, the refunds known so far taken
- *   off, and when a read last reached the end of the register (`null` before any did).
+ *   off, how many sales (a refunded one still counts, ADR 0170 § 1 shows it), and when a read last reached the end
+ *   of the register (`null` before any did).
  */
 export type ShiftSales =
   | { readonly feed: 'none' | 'off' | 'model_unlinked' | 'chatter_unlinked' }
-  | { readonly feed: 'read'; readonly grossInclVatMinor: number; readonly caughtUpAt: Date | null };
+  | {
+      readonly feed: 'read';
+      readonly grossInclVatMinor: number;
+      readonly saleCount: number;
+      readonly caughtUpAt: Date | null;
+    };
 
 const instant = z.union([z.date(), z.string()]).transform((value) => new Date(value));
 
@@ -72,7 +78,8 @@ export const salesFeedReadsForReports = {
        where platform = ${cursor.platform} and kind = 'member' and member_id = ${query.memberId}`);
     if (chatter.rows.length === 0) return { feed: 'chatter_unlinked' };
     const total = await tx.execute(sql`
-      select coalesce(sum(l.gross_incl_vat_minor - coalesce(r.refunded, 0)), 0)::bigint as gross
+      select coalesce(sum(l.gross_incl_vat_minor - coalesce(r.refunded, 0)), 0)::bigint as gross,
+             count(*)::int as sales
         from platform_sales l
         join sales_feed_chatters c
           on c.platform = l.platform and c.platform_chatter_id = l.platform_chatter_id
@@ -88,7 +95,9 @@ export const salesFeedReadsForReports = {
          and l.currency = ${query.currency}
          and l.occurred_at >= ${query.from}
          and l.occurred_at < ${query.to}`);
-    const { gross } = z.object({ gross: z.coerce.number().int() }).parse(total.rows[0]);
-    return { feed: 'read', grossInclVatMinor: gross, caughtUpAt: cursor.caught_up_at };
+    const { gross, sales } = z
+      .object({ gross: z.coerce.number().int(), sales: z.coerce.number().int().nonnegative() })
+      .parse(total.rows[0]);
+    return { feed: 'read', grossInclVatMinor: gross, saleCount: sales, caughtUpAt: cursor.caught_up_at };
   },
 };

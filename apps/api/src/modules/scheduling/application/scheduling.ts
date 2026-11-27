@@ -30,6 +30,7 @@ import {
   ShiftEnded,
   ShiftNotFound,
 } from '../domain/errors';
+import { assertNoFeedbackOwed, type LastOpenedShift } from '../domain/feedback-due';
 import { leaveCover } from '../domain/leaves';
 import type {
   Actor,
@@ -88,6 +89,8 @@ export function createSchedulingService(
   admin: PlanningAdmin,
   creators: CreatorDirectory,
   now: () => Date = () => new Date(),
+  /** The feedback the actor still owes (retour léger, 26/11), asked before « Je prends mon poste ». */
+  feedbackOwed: (actor: UserId, at: Date) => Promise<LastOpenedShift | null> = () => Promise.resolve(null),
 ): SchedulingService {
   const settingsOf = (actor: UserId, at: Date = now()): Promise<SchedulingSettings> =>
     store.settings(actor, { from: at, to: null });
@@ -275,6 +278,8 @@ export function createSchedulingService(
     cancelShift: async (actor, id) => store.cancelShift(actor, id, await clockOf(actor.userId)),
 
     checkIn: async (actor, id) => {
+      // The feedback of his last shift comes first (retour léger, 26/11): never two owed at once.
+      assertNoFeedbackOwed(id, await feedbackOwed(actor, now()));
       const answer = await store.checkIn(actor, id);
       switch (answer.kind) {
         case 'checked_in':
