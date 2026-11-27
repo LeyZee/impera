@@ -135,7 +135,11 @@ export interface AgentComposeInput {
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
     readonly firstMessageAt: Date | null;
-    /** His tier from her sales register (`fanTierOf`); absent or `null`, she is warm as with everyone (ADR 0132). */
+    /**
+     * His tier in « Fans » (`fanTierOf`, the owner's thresholds), when the caller reads it: good, very good or whale
+     * makes him eligible to a sexting without a sale (Charles 26/11); absent or `null`, she is warm as with everyone
+     * (ADR 0132) and his scripts alone decide.
+     */
     readonly tier?: FanTier | null;
     /** His last purchase in her sales register (ADR 0128 § 1); absent, not read. */
     readonly lastPurchaseAt?: Date | null;
@@ -338,6 +342,8 @@ export interface ComposerPersonaFields {
 
 export interface DraftComposerDeps {
   readonly gateway: LlmGateway;
+  /** The random source of the draw of a sexting without a sale (Charles 26/11); absent, `Math.random`. */
+  readonly random?: () => number;
   /**
    * A fixed persona, with the fields below, when nothing reads hers per creator (`personaOf`): tests and the terminal.
    * Absent beside `personaOf`: a composer that reads hers has no other persona to fall back on.
@@ -1212,19 +1218,25 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // His kept language (ADR 0168 § 4): a bare number in a short message of his is read by his covered language.
       const keptLanguage = await keptLanguageOf(deps.limits, input);
       const kept = keptLanguage?.value ?? null;
+      const herLastTurn = input.history[lastAnswer]?.text;
       // Once a human confirmed his age, a sign of a minor read before that decision is settled: only what he wrote
-      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress reads it all.
-      const signs = safetySigns(fanText, input.now, kept).filter(
+      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress and a fantasy of
+      // his on minors read it all.
+      const signs = safetySigns(fanText, input.now, herLastTurn, kept).filter(
         (sign) =>
           sign !== 'minor_suspected' ||
-          safetySigns(sinceAgeConfirmed(sinceAnswer, stop.flags), input.now, kept).includes(
+          safetySigns(sinceAgeConfirmed(sinceAnswer, stop.flags), input.now, herLastTurn, kept).includes(
             'minor_suspected',
           ),
       );
-      if (signs.includes('minor_suspected')) {
+      // A fantasy of his on minors: the same, the alert names the reason, never his words (Charles 26/11 at 23:45).
+      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
       }
+      // Asked to be like his own child (Sécurité, #1054): a human takes it, his limits untouched.
+      if (signs.includes('his_child_role'))
+        return { ...HANDOFF, cause: 'other', detail: ['safety_net', ...signs] };
       // His card gives an age under 18 (recette AGE-13): the same, until a human corrects it.
       if (input.fan.cardAge !== undefined && input.fan.cardAge < ADULT_AGE) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['card_age', 'minor_suspected'] };
@@ -1350,6 +1362,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
         ...(input.meeting !== undefined && { meeting: input.meeting }),
+        ...(deps.random !== undefined && { random: deps.random }),
+        ...(input.fan.tier !== undefined && { fanTier: input.fan.tier }),
         ...(input.herRecent !== undefined && { herRecent: input.herRecent }),
         saleTrouble: {
           seen: input.saleTrouble ?? NO_SALE_TROUBLE,

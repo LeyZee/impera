@@ -1,4 +1,7 @@
 import type {
+  MemberAvailability,
+  SetAvailabilityBody,
+  TeamAvailability,
   ConversationId,
   CreatorAgencyRateList,
   AccountPayRulesId,
@@ -17,6 +20,7 @@ import type {
   PayPeriod,
   Platform,
   PlatformAccountId,
+  NotTakenDelay,
   ReportGapThreshold,
   ReportSignal,
   SchedulingSettings,
@@ -617,6 +621,10 @@ export interface ShiftReportStore {
   reportGap(actor: UserId): Promise<ReportGapThreshold>;
   /** The owner's, `forbidden` to anyone else. */
   saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
+  /** « Chatteur pas là » (ADR 0094 § 1, lot b): the owner's delay, `null` while unset. */
+  notTakenDelay(actor: UserId): Promise<NotTakenDelay>;
+  /** The owner's, `forbidden` to anyone else. */
+  saveNotTakenDelay(actor: Actor, delay: NotTakenDelay): Promise<NotTakenDelay>;
 }
 
 /** An account's pay rules as stored (EQ-03): added only, never changed. */
@@ -916,4 +924,19 @@ export interface ReportReminderSource {
   candidatesUnscoped(now: Date): Promise<ShiftId[]>;
   /** One shift's facts, read again just before its reminder rings (§ 5); null when it no longer exists. */
   factsUnscoped(shiftId: ShiftId): Promise<ReportReminderFacts | null>;
+}
+
+/**
+ * A member's weeks of availability (ADR 0171, trou 16), under `withMember`: his own for any member, every active
+ * member's for the owner and an active manager. `set` writes a whole week, which replaces the one in force; the same
+ * `id` sent again is the same week.
+ */
+export interface AvailabilityStore {
+  mine(userId: string): Promise<MemberAvailability>;
+  team(userId: string): Promise<TeamAvailability>;
+  set(
+    actor: Actor,
+    memberId: TeamMemberId | 'self',
+    body: SetAvailabilityBody,
+  ): Promise<{ readonly value: MemberAvailability; readonly created: boolean }>;
 }

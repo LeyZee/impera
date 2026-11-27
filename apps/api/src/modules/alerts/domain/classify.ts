@@ -2,6 +2,7 @@ import {
   EVENT_PAYLOADS,
   type ConversationId,
   type CreatorAlertCode,
+  type Currency,
   type HandoffCause,
 } from '@impera/contracts';
 
@@ -13,6 +14,15 @@ export interface ClassifiedAlert {
   readonly code: CreatorAlertCode;
   /** The conversation the notification opens, when the event names one. */
   readonly conversationId: ConversationId | null;
+  /** A sale's amount and who made it, said in its notification: never the fan (recette 27/11, G19). */
+  readonly sale?: SaleSaid;
+}
+
+/** What a sale's notification says of it: what the fan paid, and whether the agent, a member or nobody known sold. */
+export interface SaleSaid {
+  readonly grossMinor: number;
+  readonly currency: Currency;
+  readonly by: 'agent' | 'member' | 'unknown';
 }
 
 /** The human relays for safety (ADR 0150 § 6): locked on « reçoit » for every role. */
@@ -45,6 +55,7 @@ export const ROUTED_EVENT_TYPES = [
   'scripts_exhausted',
   'offer_proposed',
   'account_uncovered',
+  'shift_not_taken',
 ] as const;
 
 /** The alert an event is, or null when it is none of the tab's (or its payload does not read). */
@@ -67,8 +78,13 @@ export function classifyEvent(type: string, payload: unknown): ClassifiedAlert |
       // A service the fan asks for (call, cam, voice, custom content): an offer outside the scripts (§ 12).
       return { code: 'offer_proposed', conversationId };
     }
-    case 'sale_detected':
-      return { code: 'sale', conversationId: null };
+    case 'sale_detected': {
+      const parsed = EVENT_PAYLOADS.sale_detected.safeParse(payload);
+      if (!parsed.success) return { code: 'sale', conversationId: null };
+      const { grossInclVatMinor, currency, seller } = parsed.data;
+      const by = seller.kind === 'agent' ? 'agent' : seller.kind === 'member' ? 'member' : 'unknown';
+      return { code: 'sale', conversationId: null, sale: { grossMinor: grossInclVatMinor, currency, by } };
+    }
     case 'budget_threshold_crossed':
     case 'ai_credits_low':
       return { code: 'ai_budget', conversationId: null };
@@ -91,6 +107,10 @@ export function classifyEvent(type: string, payload: unknown): ClassifiedAlert |
     case 'account_uncovered':
       return EVENT_PAYLOADS.account_uncovered.safeParse(payload).success
         ? { code: 'uncovered_account', conversationId: null }
+        : null;
+    case 'shift_not_taken':
+      return EVENT_PAYLOADS.shift_not_taken.safeParse(payload).success
+        ? { code: 'shift_not_taken', conversationId: null }
         : null;
     default:
       return null;

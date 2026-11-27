@@ -975,12 +975,13 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await refused({ statementId: statement(ama, '2026-08-01'), period: '2026-08-01' })).toMatch(
         KEPT,
       );
-      // A regime the accountant has not validated, or validated after the day of issue.
+      // A regime that is not his on the day of issue, validated or not: the accountant's validation is no gate
+      // since 0255 (Charles, 21/11/2026), the assignment is.
       expect(
         await refused({ invoice: { regimeId: unvalidated.id, regime: regimeCopy(unvalidated, null) } }),
-      ).toMatch(KEPT);
+      ).toMatch(/regime of its day of issue/u);
       expect(await refused({ invoice: { regimeId: later.id, regime: regimeCopy(later, tomorrow) } })).toMatch(
-        KEPT,
+        /regime of its day of issue/u,
       );
       // A validated regime that is not the contractor's on the day of issue: France is his from tomorrow.
       expect(

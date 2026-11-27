@@ -9,6 +9,7 @@ import {
 
 import { SUGGESTIVE_EMOJIS } from './desire';
 import type { GuardViolation } from './guards';
+import { INTIMATE_PARTS } from './intimate-words';
 import { detectLanguage } from './language';
 
 /**
@@ -49,7 +50,10 @@ const CARE_FORBIDDEN: readonly RegExp[] = [
   /\b(?:pics?|pictures?|video|content|foto|contenuto|contenido|esclusiv[oa]|exclusiv[oa])\b/u,
   /\b(?:meet|meet up|see each other|come over|vederci|incontrarci|ci vediamo|vernos|nos vemos)\b/u,
   /\b(?:sexy|horny|naked|nudes?|cock|dick|pussy|all yours|eccitat\w*|nuda|nudo|cazzo|figa|tutta tua|caliente|cachond\w*|desnud\w*|polla|toda tuya)\b/u,
-  /\b(?:sexe|sexy|sexuel\w*|bite|queue|chatte|seins?|nichons?|cul|fesses|sucer|suce|baiser|baise|jouir|orgasme|excite\w*|bander|bande dur|branle\w*|mouille\w*|coquin\w*|lingerie|nue?s?|a poil|chaud(?:e|es)? pour|envie de toi)\b/u,
+  new RegExp(
+    `\\b(?:${INTIMATE_PARTS}|sexy|sexuel\\w*|sucer|suce|baiser|baise|jouir|orgasme|excite\\w*|bander|bande dur|branle\\w*|mouille\\w*|coquin\\w*|lingerie|nue?s?|a poil|chaud(?:e|es)? pour|envie de toi)\\b`,
+    'u',
+  ),
 ];
 
 /**

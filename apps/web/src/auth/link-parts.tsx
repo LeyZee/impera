@@ -153,7 +153,7 @@ export function NewPasswordField({
         >
           {missing === 0
             ? 'C’est bon.'
-            : `${String(PASSWORD_MIN_LENGTH)} caractères au moins (encore ${String(missing)}). Une phrase que toi seul connais marche très bien.`}
+            : `${String(PASSWORD_MIN_LENGTH)} caractères au moins (encore ${String(missing)}). Une phrase que personne d’autre ne connaît marche très bien.`}
         </p>
       ) : (
         <p id={hint} role="alert" className="text-sm text-[var(--nv-warning)]">

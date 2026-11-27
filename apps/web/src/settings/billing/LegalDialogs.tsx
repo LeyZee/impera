@@ -2,7 +2,6 @@ import {
   CONTEST_DELAY_MAX_DAYS,
   CONTRACT_TEXT_MAX,
   JOURNAL_ACCOUNT_NAMES,
-  type BillingRegime,
   type ContractText,
   type ContractTextKind,
   type JournalAccountName,
@@ -11,13 +10,7 @@ import {
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { accountsBodyOf, accountsDraftOf, type AccountsDraft } from './accounts';
-import {
-  addContractText,
-  saveAccounts,
-  useKeepBillingSettings,
-  useRefreshPayroll,
-  validateRegime,
-} from './api';
+import { addContractText, saveAccounts, useKeepBillingSettings, useRefreshPayroll } from './api';
 import { textBodyOf, textDraftOf, type TextDraft } from './regimes';
 
 import { ACCOUNT_HINTS, ACCOUNT_LABELS } from '@/accounting/model';
@@ -25,8 +18,6 @@ import { TEXT_NAMES } from '@/contractors/model';
 import type { InvoiceRefusal } from '@/invoices/api';
 import { useConfirmedWrite } from '@/invoices/confirmed-write';
 import { invoiceRefusalText } from '@/invoices/model';
-import { DayField } from '@/scheduling/DayField';
-import { fullDay } from '@/scheduling/time';
 import { BILLING_LEAD } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 
@@ -251,84 +242,6 @@ export function TextDialog({
           ) : null}
           <Refusal refusal={refusal} />
           <Foot busy={busy} label="Écrire cette version" onClose={onClose} />
-        </form>
-      ) : (
-        <div className="tm-dialog__body nv-swap">{prompt}</div>
-      )}
-    </Dialog>
-  );
-}
-
-/**
- * The day the accountant validated a regime, noted once and never changed, today at the latest: the statements whose
- * invoice waited for it are tried again.
- */
-export function ValidateDialog({
-  regime,
-  today,
-  onClose,
-}: {
-  regime: BillingRegime;
-  today: string;
-  onClose: () => void;
-}): JSX.Element {
-  const id = useId();
-  const refresh = useRefreshPayroll();
-  const [day, setDay] = useState(today);
-  const [tried, setTried] = useState(false);
-  const { busy, refusal, prompt, send } = useConfirmedWrite(BILLING_LEAD);
-  const [dayUnreadable, setDayUnreadable] = useState(false);
-  const ok = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day <= today;
-
-  const submit = (event: SyntheticEvent): void => {
-    event.preventDefault();
-    setTried(true);
-    if (!ok || busy) return;
-    const validatedOn = day;
-    send(
-      () => validateRegime(regime.id, { validatedOn }),
-      async () => {
-        await refresh();
-        onClose();
-      },
-    );
-  };
-
-  return (
-    <Dialog
-      title={`Validation de « ${regime.name} »`}
-      lead="Le jour où ton comptable a validé ce régime. Il se note une fois et ne change plus ; les relevés dont la facture attendait ce régime sont repris."
-      busy={busy}
-      onClose={onClose}
-    >
-      {prompt === null ? (
-        <form className="tm-dialog__body" noValidate onSubmit={submit}>
-          <div className="nv-field tm-field" data-invalid={tried && !ok ? 'true' : undefined}>
-            <label className="nv-field__label" htmlFor={`${id}-day`}>
-              Validé le
-            </label>
-            <DayField
-              id={`${id}-day`}
-              value={day}
-              invalid={tried && !ok}
-              describedBy={`${id}-day-hint`}
-              onChange={(next) => {
-                setDay(next);
-              }}
-              today={today}
-              toward="past"
-              onUnreadable={setDayUnreadable}
-            />
-            <p id={`${id}-day-hint`} className={tried && !ok ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-              {tried && dayUnreadable
-                ? 'Un jour comme 28/10/2026, ou 28/10.'
-                : tried && !ok
-                  ? `Au plus tard aujourd’hui, le ${fullDay(today)}.`
-                  : 'Celui de son écrit ou de son courriel.'}
-            </p>
-          </div>
-          <Refusal refusal={refusal} />
-          <Foot busy={busy} label="Noter la validation" onClose={onClose} />
         </form>
       ) : (
         <div className="tm-dialog__body nv-swap">{prompt}</div>

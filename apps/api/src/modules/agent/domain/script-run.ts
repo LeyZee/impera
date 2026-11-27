@@ -9,6 +9,7 @@ import type {
   ScriptStepOutcome,
 } from '@impera/contracts';
 
+import type { ScriptCarriesView } from './fantasy-match';
 import { offerDecision, sameEvening, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
 
@@ -32,6 +33,11 @@ interface PlatformScriptStepView {
   readonly mediaSheet?: string;
   /** The vault media the step sends, by their platform ref: a media he already received rules out a script (§ 6). */
   readonly mediaRefs: readonly string[];
+  /**
+   * What the step's media carry in the closed vocabulary, when the catalogue gives it (lot Scripts, after #1029): its
+   * intensities set how frank she may be once he has seen it (`registerOf`). Absent today.
+   */
+  readonly carries?: ScriptCarriesView;
 }
 
 /**
@@ -51,6 +57,11 @@ export interface PlatformScriptView {
   readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
+  /**
+   * What it carries in the media's closed vocabulary, the union of its steps, when the catalogue gives it: read first
+   * by the fantasy score (Charles 26/11). Absent today: the description and the media sheets are read.
+   */
+  readonly carriesAll?: ScriptCarriesView;
   /** The language its texts are written in (ADR 0168 § 8). Absent: French, as every script before its versions. */
   readonly language?: Language;
   /**

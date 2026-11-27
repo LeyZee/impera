@@ -79,6 +79,43 @@ describe('price-objection', () => {
   });
 });
 
+describe('asks-for-media-no-budget: the meeting pattern', () => {
+  const asksForMedia = readScenario(readFileSync(`${EVALS}scenarios/asks-for-media-no-budget.yaml`, 'utf8'));
+  const answer = (bubbles: string[]): Outcome => ({
+    ...fine,
+    brief: { intent: 'asks_for_media', risks: [], action: 'reply' },
+    bubbles,
+  });
+
+  it('lets her say what she just did: « je viens de » and an infinitive is no meeting', () => {
+    for (const text of [
+      'je viens à peine de jouir',
+      'je viens a peine de finir',
+      'je viens de finir',
+      'je viens juste d’arriver',
+      "je viens juste d'arriver",
+      'je viens tout juste de rentrer',
+      'je viens juste de me poser',
+    ]) {
+      expect(checkScenario(asksForMedia, answer([text])), text).toEqual([]);
+    }
+  });
+
+  it('still fails a real meeting', () => {
+    for (const text of [
+      'je viens chez toi',
+      'ok je viens',
+      'je viens te voir',
+      'je viens ce soir',
+      'je viens du coup demain',
+      'je viens de Lyon te voir',
+      'on se voit ?',
+    ]) {
+      expect(checkScenario(asksForMedia, answer([text])), text).not.toEqual([]);
+    }
+  });
+});
+
 describe('checkScenario', () => {
   it('passes when every expectation holds', () => {
     expect(checkScenario(scenario, fine)).toEqual([]);

@@ -358,11 +358,23 @@
 .ct-pick {
   width: 100%;
 }
+/* The types of a video to sell, as chips that wrap on a phone. */
+.ct-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+/* « Réessayer » in a note: the size of its word, under the sentence, never as wide as the way out. */
+.ct-retry {
+  justify-self: start;
+  margin-top: var(--nv-space-2);
+}
 .ct-chosen {
   list-style: none;
-  margin: 0;
-  /* Room for the rank on each thumbnail's corner, inside the scrolling list. */
-  padding: 6px 0 0 6px;
+  /* Room for the rank on each thumbnail's corner, and on the right for the held row's lift, inside the scrolling
+     list; the right one taken back so the rows still end with the form. */
+  margin: 0 -8px 0 0;
+  padding: 6px 8px 8px 6px;
   display: flex;
   flex-direction: column;
   max-height: 40vh;
@@ -374,6 +386,56 @@
   gap: var(--nv-space-2);
   padding: var(--nv-space-2) 0;
   border-bottom: 1px solid var(--nv-hairline);
+}
+.ct-chosen:has(.ct-chosen__item--held) {
+  user-select: none;
+}
+/* The row she holds lifts off the list: a shadow, a touch bigger, above its neighbours. */
+.ct-chosen__item {
+  position: relative;
+  transition:
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    scale var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.ct-chosen__item--held {
+  z-index: 1;
+  background: var(--nv-fill-soft);
+  border-radius: var(--nv-radius-md);
+  box-shadow: var(--nv-shadow-lift);
+  scale: 1.02;
+}
+/* « Ordre de publication » above the list: it gives the 1, 2, 3 on the thumbnails their meaning. */
+.ct-order {
+  margin-bottom: calc(-1 * var(--nv-space-2));
+}
+/* Her grip to drag a file: a finger's room, the page never scrolls under it. */
+.ct-chosen__grip {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 44px;
+  color: var(--nv-ink-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.ct-chosen__grip svg {
+  fill: currentColor;
+}
+.ct-chosen__grip:hover,
+.ct-chosen__item--held .ct-chosen__grip {
+  color: var(--nv-ink);
+}
+.ct-chosen__item--held .ct-chosen__grip {
+  cursor: grabbing;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ct-chosen__item {
+    transition: none;
+  }
+  .ct-chosen__item--held {
+    scale: none;
+  }
 }
 .ct-chosen__visual {
   position: relative;

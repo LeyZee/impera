@@ -50,7 +50,8 @@ Lot e, sa voix calibrée sur ses vraies réponses (amendement du 26/11 de l'ADR 
 - [x] Corrections de la créatrice sur la feuille à l'aveugle : jamais d'intimité en public (prompt 1.2.0), « je t'aime » reçoit des emojis seulement (`declaresLove`, garde `words_in_emoji_reply`).
 - [x] Second calibrage (période des assistants écartée, relu sur le PC) : forme de sa réponse la plus proche dite par le code (`replyShapeOf`), compliment remercié simplement, marqueur « [pseudo] » retiré (prompt 1.3.0).
 - [x] Troisième calibrage : longueur de sa réponse la plus proche dite au modèle ; un merci court peut revenir (`repeated_reply` assoupli pour moins de trois mots).
-- [ ] Quatrième calibrage et comparaison.
+- [x] Quatrième calibrage : compliments réglés ; faits manquants renvoyés à la fiche 2.3.0.
+- [x] Style public de l'agence lu par le prompt des commentaires (prompt 1.4.0) et par le calibrage.
 
 ## Critères d'acceptation
 - Tout passe contre `FakeInstagram` ; aucun appel réel à Meta dans un test.

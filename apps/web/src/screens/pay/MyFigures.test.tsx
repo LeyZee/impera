@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { MyFiguresSchema, type MyFigures } from '@impera/contracts';
+import { MyFiguresSchema, ShiftReportSchema, type MyFigures, type ShiftReport } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -55,6 +55,34 @@ const figuresOf = (over: Record<string, unknown> = {}): MyFigures =>
 
 let figures: MyFigures;
 let period: unknown;
+let reports: ShiftReport[];
+
+/** One of his reports of 1-15 November, sent and not validated yet. */
+const waitingReport = (amountMinor: number): ShiftReport =>
+  ShiftReportSchema.parse({
+    id: '01a17ff2-0000-7000-8000-0000000000d1',
+    shiftId: '01a17ff2-0000-7000-8000-00000000000d',
+    creatorId: '01a17ff2-0000-7000-8000-000000000001',
+    platformAccountId: '01a17ff2-0000-7000-8000-000000000002',
+    memberId: '01a17ff2-0000-7000-8000-000000000003',
+    period: NOV1,
+    correctsId: null,
+    amount: { amountMinor, currency: 'EUR' },
+    comment: null,
+    incident: null,
+    status: 'submitted',
+    version: 1,
+    byAgency: false,
+    reviewKind: null,
+    earningsSource: 'declared',
+    explanation: null,
+    check: null,
+    canReview: false,
+    submittedAt: '2026-11-04T10:00:00.000Z',
+    reviewedAt: null,
+    reviewNote: null,
+    createdAt: '2026-11-04T10:00:00.000Z',
+  });
 
 function serve(): void {
   vi.stubGlobal(
@@ -65,6 +93,8 @@ function serve(): void {
         Promise.resolve(new Response(JSON.stringify(body), { status }));
       if (url.pathname === '/v1/payroll/my-figures') return json(figures);
       if (url.pathname === '/v1/scheduling/settings') return json(SCHEDULING_SETTINGS);
+      if (url.pathname === '/v1/scheduling/shift-reports')
+        return json({ reports, shifts: [], accounts: [], members: [] });
       if (url.pathname === `/v1/payroll/periods/${NOV1}`)
         return period === null ? json({ error: { code: 'not_found' } }, 404) : json(period);
       return json({ items: [], nextCursor: null });
@@ -101,6 +131,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-05T09:00:00Z'));
   figures = figuresOf();
   period = null;
+  reports = [];
   serve();
 });
 
@@ -277,6 +308,18 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
     expect(document.querySelector('.mf-figure__parts')?.textContent.replace(NBSP, ' ')).toBe(
       '0,00 € de net · prime +30,00 €',
     );
+  });
+
+  it('dit à côté du gain les ventes en attente de validation, sans comparaison sur une quinzaine à moitié comptée (recette 27/11, G8)', async () => {
+    period = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 4_648, totalMinor: 930 })]);
+    reports = [waitingReport(46_916)];
+    renderIn(() => <MyFortnightCard />);
+    await waitFor(() => {
+      expect(document.querySelector('.mf-figure__waiting')?.textContent.replaceAll(NBSP, ' ')).toBe(
+        '+ 469,16 € de ventes en attente de validation : ton gain montera avec elles.',
+      );
+    });
+    expect(document.querySelector('.mf-change')).toBeNull();
   });
 
   it('ne promet aucun palier à un manager : la paie ne lui en donne pas', async () => {

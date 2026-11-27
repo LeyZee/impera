@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
+import { NotTakenDelay } from './NotTakenDelay';
 import {
   ALERTS_ERRORS,
   ALERTS_QUERY_KEY,
@@ -207,6 +208,18 @@ export function AlertsSection(): JSX.Element {
             };
             return <SystemLine key={code} setting={setting} index={index} creators={all} />;
           })}
+        </ul>
+      </section>
+
+      <section className="al-group" aria-labelledby="al-steering-title">
+        <h3 id="al-steering-title" className="nv-eyebrow al-eyebrow">
+          Pilotage
+        </h3>
+        <p className="ps-muted al-group__lede">
+          Ce qui manque à l’équipe, pas aux fans. Le délai vaut pour toute l’agence.
+        </p>
+        <ul className="al-list">
+          <NotTakenDelay index={0} />
         </ul>
       </section>
     </section>
@@ -770,7 +783,7 @@ function SystemLine({
               <Link to="/creatrices" search={creatorsSearch('persona', creator.id)} className="al-link">
                 {creators.length === 1
                   ? 'Modifier les mots dans sa persona'
-                  : `Persona de ${creator.displayName}`}
+                  : `Mots surveillés de ${creator.displayName}`}
               </Link>
             </span>
           ))}

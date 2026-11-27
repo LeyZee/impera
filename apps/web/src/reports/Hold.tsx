@@ -56,7 +56,7 @@ type Phase =
 
 interface Held {
   readonly key: number;
-  readonly run: () => Promise<HoldResult>;
+  readonly run: (leaving: boolean) => Promise<HoldResult>;
   readonly onCancel: (() => void) | undefined;
   readonly timer: number;
 }
@@ -70,7 +70,12 @@ export interface Hold {
   /** Holds `run` for `HOLD_MS`, said by `title` (« Envoi du rapport », then « dans 5 s ») and `text` (what it sends). */
   readonly hold: (
     what: { readonly title: string; readonly text: string; readonly onCancel?: () => void },
-    run: () => Promise<HoldResult>,
+    /**
+     * `leaving`: the page goes away or to the background. Whatever must reach the server goes out at once, side by
+     * side (`keepalive`), never one after the other: a second request awaited after the first never leaves a closed
+     * tab (recette 27/11, C4).
+     */
+    run: (leaving: boolean) => Promise<HoldResult>,
   ) => void;
   readonly cancel: () => void;
   /** Closes what the server said for the write `key`. */
@@ -116,7 +121,7 @@ export function useHold(): Hold {
 
   /** Sends what is held now: its time is up, another comes, the app is hidden or the page goes away. */
   const flush = useCallback(
-    (quiet: boolean): void => {
+    (quiet: boolean, leaving = false): void => {
       const now = held.current;
       if (now === null) return;
       held.current = null;
@@ -126,7 +131,7 @@ export function useHold(): Hold {
           before.phase?.key === now.key ? { ...before, phase: { ...before.phase, kind: 'sending' } } : before,
         );
       }
-      void now.run().then(
+      void now.run(leaving).then(
         (result) => {
           settle(now.key, result);
         },
@@ -181,10 +186,10 @@ export function useHold(): Hold {
     live.current = true;
     // The phone's app goes to the background without `pagehide` (back to Reveal), and its timers sleep: send now.
     const hidden = (): void => {
-      if (document.visibilityState === 'hidden') flush(false);
+      if (document.visibilityState === 'hidden') flush(false, true);
     };
     const leave = (): void => {
-      flush(false);
+      flush(false, true);
     };
     // A reload or a full navigation during the hold may lose the write: the browser asks first (recette CHAT-02).
     const warn = (event: BeforeUnloadEvent): void => {

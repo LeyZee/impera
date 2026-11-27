@@ -1,4 +1,5 @@
 import {
+  AVAILABILITY_RANGES_MAX,
   CurrencySchema,
   DRAFT_REASONS,
   REPORT_GAP_THRESHOLD_DEFAULT,
@@ -83,6 +84,12 @@ export const schedulingSettings = pgTable(
     /** The threshold of a report against the platform (ADR 0073 § 3): 1 % (100) or 5 € (500) by default. */
     reportGapBps: integer('report_gap_bps').notNull().default(REPORT_GAP_THRESHOLD_DEFAULT.bps),
     reportGapMinor: integer('report_gap_minor').notNull().default(REPORT_GAP_THRESHOLD_DEFAULT.minor),
+    /**
+     * « Chatteur pas là » (ADR 0094 § 1, lot b): how long after a shift's start its member, not having taken it, is
+     * told to the owner and the managers. The agency's own setting, never written in the code: `null`, the signal is
+     * off until the owner sets it.
+     */
+    notTakenDelayMinutes: integer('not_taken_delay_minutes'),
     updatedBy: text('updated_by')
       .notNull()
       .references(() => user.id),
@@ -95,6 +102,10 @@ export const schedulingSettings = pgTable(
       sql`${t.slotLengthMinutes} in (60, 120, 180, 240, 360, 480, 720) and ${t.slotStartMinute} >= 0 and ${t.slotStartMinute} < ${t.slotLengthMinutes}`,
     ),
     check('scheduling_settings_margin_check', sql`${t.accessMarginMinutes} between 0 and 120`),
+    check(
+      'scheduling_settings_not_taken_delay_check',
+      sql`${t.notTakenDelayMinutes} is null or ${t.notTakenDelayMinutes} between 5 and 240`,
+    ),
     check(
       'scheduling_settings_report_gap_check',
       sql`${t.reportGapBps} between 0 and 10000 and ${t.reportGapMinor} between 0 and 100000`,
@@ -374,6 +385,41 @@ export const leaveRequests = pgTable(
       for: 'update',
       using: plans,
       withCheck: sql`${plans} and (${t.status} = 'cancelled' or ${isOwner} or not ${isMine(t.memberId)}) and ((${t.status} in ('approved', 'refused') and ${t.decidedBy} = ${currentUser}) or (${t.status} = 'cancelled' and ${t.cancelledBy} = ${currentUser}))`,
+    }),
+  ],
+);
+
+/**
+ * A member's week of availability (ADR 0171, trou 16): his plages, in the time zone he gave them in, as one list typed
+ * at the border (`AvailabilityRangesSchema`). The latest row of a member is his week in force; the older ones stay,
+ * added only (trigger `refuse_change`). Read by the member himself and the scope `owner` | `agency`; written by the
+ * member for himself, or by the owner or an active manager for him, always under the writer's own name.
+ */
+export const memberAvailabilityWeeks = pgTable(
+  'member_availability_weeks',
+  {
+    id: id(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    timeZone: text('time_zone').notNull(),
+    ranges: jsonb('ranges').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check(
+      'member_availability_weeks_ranges_check',
+      sql`jsonb_typeof(${t.ranges}) = 'array' and jsonb_array_length(${t.ranges}) <= ${sql.raw(String(AVAILABILITY_RANGES_MAX))}`,
+    ),
+    check('member_availability_weeks_zone_check', sql`char_length(${t.timeZone}) between 1 and 64`),
+    index('member_availability_weeks_member_idx').on(t.memberId, t.createdAt),
+    pgPolicy('member_read', { for: 'select', using: sql`${plans} or ${isMine(t.memberId)}` }),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${t.createdBy} = ${currentUser} and (${plans} or ${isMine(t.memberId)})`,
     }),
   ],
 );

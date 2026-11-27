@@ -495,14 +495,20 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     // Hers alone: neither the chatter, nor the owner, nor the other creator; the late sale and the refund told nothing.
     expect(new Set(rows.map((row) => row.user_id))).toEqual(new Set([creatorUser]));
     expect(
-      rows.map(({ object_key, decision, title, url }) => ({ object_key, decision, title, url })),
+      rows.map(({ object_key, decision, title, url }) => ({
+        object_key,
+        decision,
+        // Her part in the title: what her list keeps (recette 27/11, G4).
+        title: /^Nouvelle vente · .+ pour toi$/u.test(title) ? 'Nouvelle vente · sa part' : title,
+        url,
+      })),
     ).toEqual(
       [...jobs]
         .sort((a, b) => (a.line_id < b.line_id ? -1 : 1))
         .map((job) => ({
           object_key: job.line_id,
           decision: job.platform_sale_id === 'sale_unlinked' ? 'grouped' : 'rang',
-          title: 'Nouvelle vente',
+          title: 'Nouvelle vente · sa part',
           url: '/ventes',
         })),
     );

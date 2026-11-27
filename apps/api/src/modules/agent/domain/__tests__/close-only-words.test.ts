@@ -10,14 +10,14 @@ const settings: GuardSettings = {
     { words: ['mon trésor'], minTier: 5 },
   ],
 };
-const closeWords = (bubbles: string[], fanTier?: number) =>
-  checkVoiceOutput(bubbles, settings, fanTier === undefined ? {} : { fanTier }).filter(
+const closeWords = (bubbles: string[], meetingTier?: number) =>
+  checkVoiceOutput(bubbles, settings, meetingTier === undefined ? {} : { meetingTier }).filter(
     (v) => v.code === 'close_only_word',
   );
 
 describe('close-only words', () => {
   it('blocks a word kept for close fans written to a fan below its tier', () => {
-    const violations = checkVoiceOutput(['bonne nuit mon coeur'], settings, { fanTier: 3 });
+    const violations = checkVoiceOutput(['bonne nuit mon coeur'], settings, { meetingTier: 3 });
     expect(violations.filter((v) => v.code === 'close_only_word')).toEqual([
       { code: 'close_only_word', severity: 'blocking', match: 'mon cœur' },
     ]);

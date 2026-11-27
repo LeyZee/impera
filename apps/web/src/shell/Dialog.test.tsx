@@ -64,6 +64,40 @@ describe('Dialog', () => {
     expect(isClickThrough({ isTrusted: false }, 120)).toBe(false);
   });
 
+  it('leaves no timer behind once closed, so nothing fires after the page is gone', () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(
+        <Dialog title="Palier Or" onClose={vi.fn()}>
+          <p>Pas encore gagné</p>
+        </Dialog>,
+      );
+      const timers = vi.getTimerCount();
+      unmount();
+      // The page torn down within the 400 ms: no timer of the guard is left to run on it (a test's teardown).
+      expect(vi.getTimerCount()).toBe(timers);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops listening at the first click past the moment', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1_000);
+    const remove = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = render(
+      <Dialog title="Palier Or" onClose={vi.fn()}>
+        <p>Pas encore gagné</p>
+      </Dialog>,
+    );
+    unmount();
+    remove.mockClear();
+    now.mockReturnValue(1_000 + CLOSE_GUARD_MS);
+    fireEvent.click(document.body);
+    expect(remove).toHaveBeenCalledWith('click', expect.any(Function), true);
+    now.mockRestore();
+    remove.mockRestore();
+  });
+
   it('lets a click reach the page once it is closed when no person made it', () => {
     const { unmount } = render(
       <Dialog title="Palier Or" onClose={vi.fn()}>

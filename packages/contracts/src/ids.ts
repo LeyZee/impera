@@ -115,6 +115,8 @@ export type ShiftTemplateId = z.infer<typeof ShiftTemplateIdSchema>;
 /** A member's request to be away for whole days, decided by the agency (EQ-02, ADR 0031). */
 export const LeaveRequestIdSchema = uuid.brand<'LeaveRequestId'>();
 export type LeaveRequestId = z.infer<typeof LeaveRequestIdSchema>;
+export const AvailabilityWeekIdSchema = uuid.brand<'AvailabilityWeekId'>();
+export type AvailabilityWeekId = z.infer<typeof AvailabilityWeekIdSchema>;
 
 /** A chatter's offer to give or exchange a shift with a colleague, who accepts or declines it (EQ-02, ADR 0031). */
 export const ShiftSwapRequestIdSchema = uuid.brand<'ShiftSwapRequestId'>();
@@ -280,3 +282,7 @@ export type McpGrantId = z.infer<typeof McpGrantIdSchema>;
 /** His custom order (`custom_orders`, ADR 0159 § A). */
 export const CustomOrderIdSchema = uuid.brand<'CustomOrderId'>();
 export type CustomOrderId = z.infer<typeof CustomOrderIdSchema>;
+
+/** A member's departure (`team_member_departures`, ADR 0166). */
+export const MemberDepartureIdSchema = uuid.brand<'MemberDepartureId'>();
+export type MemberDepartureId = z.infer<typeof MemberDepartureIdSchema>;

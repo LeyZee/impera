@@ -114,7 +114,7 @@ describe('the fan’s card (GET /v1/fans/:id/card, PUT /v1/fans/:id/card/:field,
       (await server.inject({ method: 'GET', url: `/v1/fans/${fan}/card?creatorId=${anna}` })).statusCode,
     ).toBe(401);
     const empty = await read(operator);
-    expect(empty.fields).toHaveLength(20);
+    expect(empty.fields).toHaveLength(22);
     expect(empty.fields.every((one) => one.current === null && one.toCheck.length === 0)).toBe(true);
     // A fact the brief wrote before the card existed, under another category: it fills the field as it is.
     await app.modules.fans.proposeFacts(anna, fan, [

@@ -151,7 +151,7 @@ Date : AAAA-MM-JJ
 | 0133 | L'agent pose une réaction sur un message du fan, en plus de sa réponse, quand le message la justifie | accepted (précise 0018, 0019, 0021, 0086, 0088, 0079) |
 | 0134 | Navigation du CRM : une section Scripts, un sélecteur de créatrice, une fiche créatrice en quatre onglets, des icônes qui disent l'onglet | accepted (précise 0024, 0042 § 8, 0066 § 6 ; §§ 1, 3, 4 et 7 amendés par 0149) |
 | 0135 | Time waster : le fan qui parle sans jamais acheter reçoit une attention rare, jamais du mépris ; le premier achat la lui rend | accepted (précise 0132, 0128, 0131, 0088, 0085, 0086, 0091) |
-| 0136 | Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait | accepted (amende 0044 § 3 et § 4, 0055 § 5 ; précise 0044 § 6, 0083, 0126) |
+| 0136 | Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait | accepted, amendée le 27/11 (la story reprend la vidéo du feed vidéo) (amende 0044 § 3 et § 4, 0055 § 5 ; précise 0044 § 6, 0083, 0126) |
 | 0137 | Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle | accepted, amendée deux fois le 16/11 (amende 0044 § 5 ; précise 0110 § 5 et § 6, 0136, 0126) |
 | 0138 | Aperçu net du coffre : la petite image de Reveal lue à la demande, servie sans être gardée | accepted (précise 0099 § 7, 0030 § 4, 0018 ; amende 0099 : l'écran du coffre montre l'image à la demande) |
 | 0140 | La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit | accepted (précise 0042 §§ 3-5, 0055 §§ 4-5, 0056 § 2, 0126, 0136, 0137, 0120, 0082) |
@@ -176,8 +176,11 @@ Date : AAAA-MM-JJ
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
 | 0163 | Coffre Impera : le stock de ce qu'elle dépose, compté par usage, décrit et relu par les trois | accepted (précise 0055, 0044, 0159, 0161) |
 | 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
+| 0165 | « Où te verser » : le membre écrit où il est payé, scellé, et seul le propriétaire le lit | proposed |
+| 0166 | Le départ d'un membre : une heure de fin, la coche Reveal, un espace de départ fermé | proposed (précise 0023, 0025 ; amende le refus de connexion du 28/10) |
 | 0168 | La langue du fan décidée par le code, donnée à la voix comme une consigne fixe ; couverture des langues par les gardes, fermée par défaut | accepted |
-| 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025 ; amendée le 26/11 : le retour léger) |
+| 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025 ; amendée le 26/11 : le retour léger, la carte de faute et les niveaux) |
+| 0171 | Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre | proposed |
 | 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
 | 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |
 | 0176 | Telegram ne sert plus qu'aux canaux des créatrices ; les alertes passent par les notifications d'Impera | proposed (remplace 0020 ; amende 0046 § 8, 0059, 0068, 0080, 0088 § 5, 0150) |

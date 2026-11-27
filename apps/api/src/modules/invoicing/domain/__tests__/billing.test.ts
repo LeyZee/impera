@@ -213,7 +213,7 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     ).toMatchObject({ kind: 'none', reason: 'no_mandate' });
   });
 
-  it('issues nothing without a mandate, a regime validated and of his country, or the identity the mentions need', () => {
+  it('issues nothing without a mandate, a regime of his country, or the identity the mentions need', () => {
     expect(issueDecision(facts({ mandate: { acceptedVersion: null, currentVersion: 2 } }))).toMatchObject({
       kind: 'none',
       reason: 'no_mandate',
@@ -222,14 +222,13 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     expect(issueDecision(facts({ assignments: [{ regimeId: 'gone', from: '2026-10-01' }] }))).toMatchObject({
       reason: 'no_regime',
     });
+    // The accountant's validation no longer holds an invoice back (Charles, 21/11/2026): not noted, or noted later.
     expect(issueDecision(facts({ regimes: [{ ...ABROAD, validatedOn: null }, FRANCHISE] }))).toMatchObject({
-      kind: 'none',
-      reason: 'regime_not_validated',
+      kind: 'issue',
     });
-    // Validated after the day of the validation: not yet.
     expect(
       issueDecision(facts({ regimes: [{ ...ABROAD, validatedOn: '2026-11-03' }, FRANCHISE] })),
-    ).toMatchObject({ reason: 'regime_not_validated' });
+    ).toMatchObject({ kind: 'issue' });
     // His record now gives a country the regime was not written for (« ok pays »): its mentions would be another
     // country's. Said before his file, which a regime of his country may ask otherwise.
     expect(issueDecision(facts({ regimesOfCountry: new Set(['franchise']) }))).toMatchObject({
@@ -243,7 +242,7 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
       issueDecision(
         facts({ regimesOfCountry: new Set(['franchise']), regimes: [{ ...ABROAD, validatedOn: null }] }),
       ),
-    ).toMatchObject({ reason: 'regime_not_validated' });
+    ).toMatchObject({ reason: 'regime_country_mismatch' });
     expect(issueDecision(facts({ identity: null }))).toMatchObject({ reason: 'identity_incomplete' });
     // Complete but not checked by the owner as it stands (never checked, or a change of identity cleared it).
     expect(issueDecision(facts({ identityVerified: false }))).toMatchObject({

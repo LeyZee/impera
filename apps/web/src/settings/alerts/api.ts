@@ -4,6 +4,7 @@ import {
   AlertsViewSchema,
   ApiErrorSchema,
   CustomAlertGroupSchema,
+  NotTakenDelaySchema,
   SystemAlertSettingSchema,
   type AlertErrorCode,
   type AlertTestBody,
@@ -13,6 +14,7 @@ import {
   type CustomAlertBody,
   type CustomAlertGroup,
   type CustomAlertGroupId,
+  type NotTakenDelay,
   type SetSystemAlertBody,
   type SystemAlertCode,
   type SystemAlertSetting,
@@ -148,3 +150,20 @@ export const setSystemAlert = (
     (answer) => SystemAlertSettingSchema.safeParse(answer),
     { method: 'PUT', ...json(body) },
   );
+
+export const NOT_TAKEN_DELAY_QUERY_KEY = ['scheduling', 'not-taken-delay'] as const;
+
+/** « Chatteur pas là » (ADR 0094 § 1, lot b): the agency's delay after a shift's start; `null` means nothing is sent. */
+export function useNotTakenDelay(): UseQueryResult<NotTakenDelay> {
+  return useQuery({
+    queryKey: NOT_TAKEN_DELAY_QUERY_KEY,
+    queryFn: () => call('/v1/scheduling/not-taken-delay', (body) => NotTakenDelaySchema.safeParse(body)),
+  });
+}
+
+/** Writes the delay, or `null` to stop the signal; the same body sent again answers what is stored. */
+export const saveNotTakenDelay = (body: NotTakenDelay): Promise<NotTakenDelay> =>
+  call('/v1/scheduling/not-taken-delay', (answer) => NotTakenDelaySchema.safeParse(answer), {
+    method: 'PUT',
+    ...json(body),
+  });

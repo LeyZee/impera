@@ -132,19 +132,20 @@ export const isClickThrough = (click: { readonly isTrusted: boolean }, sinceClos
 
 /**
  * A double click on a panel's last button closes it on the first click: the second would land on what lies under it, a
- * link or a switch (recette CHAT-05, MOD-10). For a moment after the close, such a click is swallowed.
+ * link or a switch (recette CHAT-05, MOD-10). For a moment after the close, such a click is swallowed. No timer: the
+ * listener leaves at the first click past the moment, so nothing fires once the page is gone (a test's teardown).
  */
 function guardClicksAfterClose(): void {
   const closedAt = performance.now();
   const swallow = (event: MouseEvent): void => {
-    if (!isClickThrough(event, performance.now() - closedAt)) return;
+    const since = performance.now() - closedAt;
+    if (since >= CLOSE_GUARD_MS) {
+      window.removeEventListener('click', swallow, true);
+      return;
+    }
+    if (!isClickThrough(event, since)) return;
     event.preventDefault();
     event.stopPropagation();
   };
-  // The window it listens on, kept: the timer may fire after a test tore the page down.
-  const target = window;
-  target.addEventListener('click', swallow, true);
-  target.setTimeout(() => {
-    target.removeEventListener('click', swallow, true);
-  }, CLOSE_GUARD_MS);
+  window.addEventListener('click', swallow, true);
 }

@@ -492,6 +492,26 @@ describe('Paie › Quinzaine', () => {
     expect(said).toContain('Basile : Ce relevé a changé depuis que tu l’as ouvert.');
   });
 
+  it('sends every held validation at once when the tab closes, the count saying what is being validated (recette 27/11, C4)', async () => {
+    answer = () => ({ status: 200, body: statementOf(THEO, OCT2, { status: 'validated' }) });
+    renderPage(OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: 'Valider (4)' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clore et valider 4 relevés' }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    // Held: never « Tout sélectionner » checked beside « 0 sur 4 ».
+    const all = screen.getByRole('checkbox', { name: /Tout sélectionner/u });
+    expect(all).toHaveProperty('checked', false);
+    expect(text(all.closest('label'))).toContain('4 en validation');
+    expect(writes).toEqual([]);
+    // The tab closes during the countdown: the four leave together, before the page is gone.
+    window.dispatchEvent(new Event('pagehide'));
+    expect(writes).toHaveLength(4);
+  });
+
   it('says « Parti » beside a member who left the team, and of no one else (recette EQP-17)', async () => {
     team = MEMBERS.map((one): TeamMember => (one.id === LOU.id ? { ...one, status: 'left' } : one));
     renderPage(OWNER);

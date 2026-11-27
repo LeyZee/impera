@@ -187,7 +187,7 @@ describe('Créatrices › Persona, Desirali’s sheet (ADR 0079)', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     expect(await screen.findByLabelText('Surnom')).toHaveProperty('value', 'Elena');
     expect(moved.length).toBeGreaterThan(0);
-    const moves = screen.getByText('Passage à la nouvelle fiche').closest('details');
+    const moves = screen.getByText('Réponses à relire').closest('details');
     if (moves === null) throw new Error('what moved is a fold');
     expect(within(moves).getAllByRole('button')).toHaveLength(moved.length);
 

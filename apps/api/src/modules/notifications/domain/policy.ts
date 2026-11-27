@@ -123,6 +123,8 @@ const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set([
   'owner_change',
   // An urgent alert of the agency (27/11/2026): what the Telegram « Urgent » group used to ring, night included.
   'agency_urgent',
+  // A change of where a member is paid (ADR 0165 § 5): heard before the next transfer, or it protects nobody.
+  'payout_change',
 ]);
 
 /**

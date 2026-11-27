@@ -10,11 +10,13 @@ import {
   type ContentRequest,
   type DropCategory,
   type DropMime,
+  type ReadyVideoId,
 } from '@impera/contracts';
-import { useRef, useState, type JSX } from 'react';
+import { prefersReducedMotion } from '@impera/design-system';
+import { useLayoutEffect, useRef, useState, type JSX } from 'react';
 
 import { Thumb } from './Thumb';
-import { Refused, createDrop } from './api';
+import { Refused, createDrop, useReadyVideoTypes } from './api';
 import { factsOf } from './media-length';
 import {
   CATEGORY_HINTS,
@@ -25,6 +27,7 @@ import {
   mediaLabel,
   mimeOf,
   moved,
+  movedTo,
   pickedHeadRefusal,
   sameFile,
   weightOf,
@@ -74,18 +77,52 @@ export function DropSheet({
   onDropped: (drop: ContentDrop, files: ReadonlyMap<ContentDropFileId, File>) => void;
 }): JSX.Element {
   const picker = useRef<HTMLInputElement>(null);
+  const rows = useRef<HTMLUListElement>(null);
+  // The file she holds by its grip, while she drags it (Charles, 26/11: the order she sees is the order published).
+  const [held, setHeld] = useState<ContentDropFileId | null>(null);
+  // Where each row stood at the last paint, so a row that changes place slides there instead of jumping.
+  const tops = useRef(new Map<string, number>());
   const [chosen, setChosen] = useState<readonly Chosen[]>([]);
   const [sentence, setSentence] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   // The drop's id is drawn once: a tap replayed after a cut answers the same drop.
   const [dropId] = useState(() => ContentDropIdSchema.parse(crypto.randomUUID()));
+  // A video to sell carries its type, chosen among the owner's lines: the AI prices it in that line's range.
+  const typed = category === 'sale_video';
+  const readyTypes = useReadyVideoTypes(typed);
+  const [readyVideoId, setReadyVideoId] = useState<ReadyVideoId | null>(null);
+  // No type to give (none yet, or not read): nothing to pick, so no gallery to open.
+  const untypable = typed && (readyTypes.data?.types.length ?? 0) === 0;
+
+  useLayoutEffect(() => {
+    const lines = [...(rows.current?.querySelectorAll<HTMLElement>('.ct-chosen__item') ?? [])];
+    const calm = prefersReducedMotion();
+    const next = new Map<string, number>();
+    for (const line of lines) {
+      const id = line.dataset['id'] ?? '';
+      const top = line.getBoundingClientRect().top;
+      next.set(id, top);
+      const before = tops.current.get(id);
+      if (calm || before === undefined || before === top || typeof line.animate !== 'function') continue;
+      const style = getComputedStyle(line);
+      line.animate([{ translate: `0 ${String(before - top)}px` }, { translate: '0 0' }], {
+        duration: Number.parseFloat(style.getPropertyValue('--nv-dur-base')) || 0,
+        easing: style.getPropertyValue('--nv-ease-spring-smooth').trim() || 'ease-out',
+      });
+    }
+    tops.current = next;
+  }, [chosen]);
 
   const countRefusal = chosen.length === 0 ? null : dropCountRefusal(category, chosen.length);
   const total = chosen.reduce((sum, item) => sum + item.file.size, 0);
   const refused = chosen.filter((item) => item.refusal !== null).length;
   const ready =
-    chosen.length > 0 && countRefusal === null && refused === 0 && chosen.every((item) => item.checked);
+    chosen.length > 0 &&
+    countRefusal === null &&
+    refused === 0 &&
+    chosen.every((item) => item.checked) &&
+    (!typed || readyVideoId !== null);
 
   /** Her files added to the list, each video's and vocal's length read after, to say « Vidéo · 8 s ». */
   const add = (picked: readonly File[]): void => {
@@ -132,6 +169,7 @@ export function DropSheet({
       category,
       sentence: said === '' ? null : said,
       requestId: request?.id ?? null,
+      readyVideoId: typed ? readyVideoId : null,
       files,
     })
       .then((drop) => {
@@ -162,6 +200,52 @@ export function DropSheet({
       onClose={onClose}
     >
       <div className="ct-form">
+        {typed ? (
+          <div className="nv-field">
+            <span className="nv-field__label" id={`${dropId}-type`}>
+              Quel type de vidéo ?
+            </span>
+            {readyTypes.isPending ? (
+              <p className="ct-note">Un instant…</p>
+            ) : readyTypes.isError ? (
+              <div className="nv-note nv-note--warn">
+                <p className="nv-note__title">Les types ne se chargent pas</p>
+                <p className="ct-note">Vérifie ta connexion, puis réessaie.</p>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--soft nv-btn--sm ct-retry"
+                  onClick={() => {
+                    void readyTypes.refetch();
+                  }}
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : readyTypes.data.types.length === 0 ? (
+              <p className="nv-note">
+                L’agence n’a pas encore créé de types de vidéo : tu pourras déposer dès qu’elle l’aura fait.
+              </p>
+            ) : (
+              <div className="ct-types" role="radiogroup" aria-labelledby={`${dropId}-type`}>
+                {readyTypes.data.types.map((one) => (
+                  <button
+                    key={one.id}
+                    type="button"
+                    role="radio"
+                    className="nv-chip"
+                    aria-checked={readyVideoId === one.id}
+                    disabled={busy}
+                    onClick={() => {
+                      setReadyVideoId(one.id);
+                    }}
+                  >
+                    {one.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
         <input
           ref={picker}
           type="file"
@@ -174,86 +258,149 @@ export function DropSheet({
             add(picked);
           }}
         />
-        <button
-          type="button"
-          className={chosen.length === 0 ? 'nv-btn nv-btn--neon ct-pick' : 'nv-btn nv-btn--soft ct-pick'}
-          disabled={busy}
-          onClick={() => picker.current?.click()}
-        >
-          {chosen.length === 0 ? 'Choisir dans ma galerie' : 'Ajouter des fichiers'}
-        </button>
+        {untypable ? null : (
+          <button
+            type="button"
+            className={chosen.length === 0 ? 'nv-btn nv-btn--neon ct-pick' : 'nv-btn nv-btn--soft ct-pick'}
+            disabled={busy}
+            onClick={() => picker.current?.click()}
+          >
+            {chosen.length === 0 ? 'Choisir dans ma galerie' : 'Ajouter des fichiers'}
+          </button>
+        )}
 
         {chosen.length === 0 ? null : (
-          <ul className="ct-chosen">
-            {chosen.map((item, index) => {
-              const kind = item.mime === null ? null : kindOfMime(item.mime);
-              const label = mediaLabel(kind, item.ms);
-              const named = `${label.split(' · ')[0] ?? label} ${String(index + 1)}`;
-              return (
-                <li key={item.id} className="ct-chosen__item">
-                  <span className="ct-chosen__visual">
-                    <Thumb file={item.file} kind={kind} />
-                    <span className="ct-chosen__rank nv-num" aria-hidden="true">
-                      {index + 1}
-                    </span>
-                  </span>
-                  <div className="ct-chosen__text">
-                    <span className="ct-chosen__name nv-num">{label}</span>
-                    <span
-                      className={
-                        item.refusal === null
-                          ? 'ct-chosen__sub nv-num'
-                          : 'ct-chosen__sub ct-chosen__sub--warn'
-                      }
-                    >
-                      {item.refusal ?? weightOf(item.file.size)}
-                      {/* Its name only where there is room for it (a computer); on a phone it is noise. */}
-                      {item.refusal === null ? (
-                        <span className="ct-chosen__file"> · {item.file.name}</span>
-                      ) : null}
-                    </span>
-                  </div>
-                  {chosen.length > 1 ? (
-                    <span className="ct-chosen__move">
-                      <button
-                        type="button"
-                        className="nv-btn nv-btn--plain nv-btn--sm"
-                        aria-label={`Monter ${named}`}
-                        disabled={busy || index === 0}
-                        onClick={() => {
-                          setChosen((list) => moved(list, index, -1));
-                        }}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="nv-btn nv-btn--plain nv-btn--sm"
-                        aria-label={`Descendre ${named}`}
-                        disabled={busy || index === chosen.length - 1}
-                        onClick={() => {
-                          setChosen((list) => moved(list, index, 1));
-                        }}
-                      >
-                        ↓
-                      </button>
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm"
-                    aria-label={`Enlever ${named}`}
-                    disabled={busy}
-                    onClick={() => {
-                      setChosen((list) => list.filter((other) => other.id !== item.id));
-                    }}
+          <>
+            {chosen.length > 1 ? (
+              <span className="nv-field__label ct-order" id={`${dropId}-order`}>
+                Ordre de publication
+              </span>
+            ) : null}
+            <ul
+              className="ct-chosen"
+              ref={rows}
+              aria-labelledby={chosen.length > 1 ? `${dropId}-order` : undefined}
+            >
+              {chosen.map((item, index) => {
+                const kind = item.mime === null ? null : kindOfMime(item.mime);
+                const label = mediaLabel(kind, item.ms);
+                const named = `${label.split(' · ')[0] ?? label} ${String(index + 1)}`;
+                return (
+                  <li
+                    key={item.id}
+                    data-id={item.id}
+                    className={held === item.id ? 'ct-chosen__item ct-chosen__item--held' : 'ct-chosen__item'}
                   >
-                    ✕
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                    {chosen.length > 1 ? (
+                      <span
+                        className="ct-chosen__grip"
+                        aria-hidden="true"
+                        onPointerDown={(event) => {
+                          if (busy) return;
+                          // Held, never a text selected on the way.
+                          event.preventDefault();
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          setHeld(item.id);
+                        }}
+                        onPointerMove={(event) => {
+                          if (held !== item.id) return;
+                          // The row under her finger, or the last one past the end.
+                          const lines = [...(rows.current?.querySelectorAll('.ct-chosen__item') ?? [])];
+                          const under = lines.findIndex(
+                            (line) => event.clientY < line.getBoundingClientRect().bottom,
+                          );
+                          const to = under === -1 ? lines.length - 1 : under;
+                          setChosen((list) =>
+                            movedTo(
+                              list,
+                              list.findIndex((one) => one.id === item.id),
+                              to,
+                            ),
+                          );
+                        }}
+                        onPointerUp={() => {
+                          setHeld(null);
+                        }}
+                        onPointerCancel={() => {
+                          setHeld(null);
+                        }}
+                      >
+                        <svg viewBox="0 0 12 18" width="12" height="18">
+                          {[3, 9].flatMap((x) =>
+                            [3, 9, 15].map((y) => (
+                              <circle key={`${String(x)}-${String(y)}`} cx={x} cy={y} r="1.6" />
+                            )),
+                          )}
+                        </svg>
+                      </span>
+                    ) : null}
+                    <span className="ct-chosen__visual">
+                      <Thumb file={item.file} kind={kind} />
+                      <span className="ct-chosen__rank nv-num" aria-hidden="true">
+                        {index + 1}
+                      </span>
+                    </span>
+                    <div className="ct-chosen__text">
+                      <span className="ct-chosen__name nv-num">{label}</span>
+                      <span
+                        className={
+                          item.refusal === null
+                            ? 'ct-chosen__sub nv-num'
+                            : 'ct-chosen__sub ct-chosen__sub--warn'
+                        }
+                      >
+                        {item.refusal ?? weightOf(item.file.size)}
+                        {/* Its name only where there is room for it (a computer); on a phone it is noise. */}
+                        {item.refusal === null ? (
+                          <span className="ct-chosen__file"> · {item.file.name}</span>
+                        ) : null}
+                      </span>
+                    </div>
+                    {chosen.length > 1 ? (
+                      <span className="ct-chosen__move">
+                        <button
+                          type="button"
+                          className="nv-btn nv-btn--plain nv-btn--sm"
+                          aria-label={`Monter ${named}`}
+                          disabled={busy || index === 0}
+                          onClick={() => {
+                            setChosen((list) => moved(list, index, -1));
+                          }}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="nv-btn nv-btn--plain nv-btn--sm"
+                          aria-label={`Descendre ${named}`}
+                          disabled={busy || index === chosen.length - 1}
+                          onClick={() => {
+                            setChosen((list) => moved(list, index, 1));
+                          }}
+                        >
+                          ↓
+                        </button>
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--plain nv-btn--sm"
+                      aria-label={`Enlever ${named}`}
+                      disabled={busy}
+                      onClick={() => {
+                        setChosen((list) => list.filter((other) => other.id !== item.id));
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {chosen.length > 1 ? (
+              <p className="ct-note">Glisse une vignette par sa poignée pour la déplacer.</p>
+            ) : null}
+          </>
         )}
         {countRefusal === null ? null : <p className="ct-warn">{countRefusal}</p>}
         {total > HEAVY_BYTES ? (
@@ -263,18 +410,20 @@ export function DropSheet({
           </p>
         ) : null}
 
-        <label className="nv-field">
-          <span className="nv-field__label">Un mot sur ce que tu as fait (facultatif)</span>
-          <input
-            className="nv-field__control"
-            maxLength={200}
-            value={sentence}
-            disabled={busy}
-            onChange={(event) => {
-              setSentence(event.target.value);
-            }}
-          />
-        </label>
+        {untypable ? null : (
+          <label className="nv-field">
+            <span className="nv-field__label">Un mot sur ce que tu as fait (facultatif)</span>
+            <input
+              className="nv-field__control"
+              maxLength={200}
+              value={sentence}
+              disabled={busy}
+              onChange={(event) => {
+                setSentence(event.target.value);
+              }}
+            />
+          </label>
+        )}
 
         {failed === null ? null : (
           <p className="ct-warn" role="alert">
@@ -282,14 +431,26 @@ export function DropSheet({
           </p>
         )}
         <div className="ct-form__actions">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="button" className="nv-btn nv-btn--neon" disabled={!ready || busy} onClick={send}>
-            {busy ? 'Un instant…' : 'Envoyer'}
-          </button>
+          {/* No type to give: nothing to send, one way out (relecture Design, 26/11). */}
+          {untypable && !readyTypes.isPending ? (
+            <button type="button" className="nv-btn nv-btn--soft" onClick={onClose}>
+              Fermer
+            </button>
+          ) : (
+            <>
+              <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+                Annuler
+              </button>
+              <button type="button" className="nv-btn nv-btn--neon" disabled={!ready || busy} onClick={send}>
+                {busy ? 'Un instant…' : 'Envoyer'}
+              </button>
+            </>
+          )}
         </div>
         {/* Why « Envoyer » stays grey, beside it: the refused line may be out of sight in a long list (CRE-16). */}
+        {typed && readyVideoId === null && chosen.length > 0 && refused === 0 ? (
+          <p className="ct-warn ct-form__why">Choisis le type de la vidéo pour envoyer.</p>
+        ) : null}
         {refused === 0 ? null : (
           <p className="ct-warn ct-form__why">
             {refused === 1

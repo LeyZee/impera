@@ -52,8 +52,9 @@ describe('content-drops › Coffre Impera, her stock against the rhythm (ADR 016
     expect(stockCategory('script', counts({ stockDrops: 2, stockFiles: 30 }))).toMatchObject({
       mode: 'count',
       daysAhead: null,
-      target: 4,
-      lacking: 2,
+      // Three complete scripts (Charles, 27/11).
+      target: 3,
+      lacking: 1,
       status: 'short',
     });
     expect(stockCategory('whale_gift', counts({ stockFiles: 0 }))).toMatchObject({
@@ -66,6 +67,15 @@ describe('content-drops › Coffre Impera, her stock against the rhythm (ADR 016
     expect(stockCategory('telegram_post', counts())).toMatchObject({
       mode: 'bonus',
       target: null,
+      status: 'ok',
+    });
+  });
+
+  it('asks no story of her: her Reveal story is the feed video with its own caption (Charles, 27/11)', () => {
+    expect(stockCategory('reveal_story', counts())).toMatchObject({
+      mode: 'bonus',
+      target: null,
+      lacking: 0,
       status: 'ok',
     });
   });

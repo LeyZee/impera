@@ -175,7 +175,7 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
             reason,
             objectKey: event.id,
             timeZone: recipient.timeZone,
-            message: alertMessage(alert.code, creatorName, alert.conversationId, silent),
+            message: alertMessage(alert.code, creatorName, alert.conversationId, silent, alert.sale),
           },
           now,
         );

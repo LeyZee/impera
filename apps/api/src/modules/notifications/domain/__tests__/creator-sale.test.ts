@@ -10,11 +10,11 @@ const AT = new Date('2026-11-03T12:00:00Z');
 describe('creatorSaleMessage (CRM-04 lot d2)', () => {
   it('says her part with its cents and its currency, opens her Ventes screen, and carries no tag', () => {
     expect(creatorSaleMessage(1240, 'EUR')).toEqual({
-      title: 'Nouvelle vente',
-      body: '12,40 € pour toi',
+      title: 'Nouvelle vente · 12,40 € pour toi',
+      body: 'Le détail est dans tes ventes.',
       url: '/ventes',
     });
-    expect(creatorSaleMessage(500, 'USD').body).toBe('5,00 $US pour toi');
+    expect(creatorSaleMessage(500, 'USD').title).toBe('Nouvelle vente · 5,00 $US pour toi');
   });
 });
 

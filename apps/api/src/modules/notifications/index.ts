@@ -3,8 +3,10 @@ import type { NotificationOutcome, NotificationRequest } from '@impera/contracts
 import type { Database, EncryptionKey } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { notifyCreatorNotices } from './application/creator-notices';
 import { notifyCreatorSale } from './application/creator-sale';
 import { notify, recap, type NotifyDeps } from './application/notify';
+import { createCreatorNoticeSource } from './infra/db/creator-notices';
 import { createCreatorSaleSource } from './infra/db/creator-sales';
 import { createDeliveryRegistry, createInboxReader } from './infra/db/deliveries';
 import { createPreferencesStore, createServerKeyStore, createSubscriptionStore } from './infra/db/stores';
@@ -40,6 +42,11 @@ export interface NotificationsModule {
    * null when push is off.
    */
   readonly creatorSale: ((eventId: string, at: Date) => Promise<readonly NotificationOutcome[]>) | null;
+  /**
+   * The task of `notifications.creator_notices` (trou 9 du 21/11): her own accounts told of what the agency asked of
+   * her (a request, a script, a proposition, her week ready); null when push is off.
+   */
+  readonly creatorNotices: ((at: Date) => Promise<readonly NotificationOutcome[]>) | null;
 }
 
 export function createNotificationsModule(deps: NotificationsDeps): NotificationsModule {
@@ -54,6 +61,7 @@ export function createNotificationsModule(deps: NotificationsDeps): Notification
           registry: createDeliveryRegistry(deps.db),
         };
   const sales = createCreatorSaleSource(deps.adminDb);
+  const notices = createCreatorNoticeSource(deps.adminDb);
   return {
     name: 'notifications',
     routes: createNotificationRoutes(devices, deps.requireRole, createInboxReader(deps.db)),
@@ -68,5 +76,10 @@ export function createNotificationsModule(deps: NotificationsDeps): Notification
               eventId,
               at,
             ),
+    creatorNotices:
+      devices === null
+        ? null
+        : (at) =>
+            notifyCreatorNotices({ notices, notify: (request, when) => notify(devices, request, when) }, at),
   };
 }

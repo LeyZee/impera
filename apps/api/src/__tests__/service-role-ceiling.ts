@@ -19,6 +19,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/content-drops': 14,
   'modules/contractors': 6,
   'modules/conversations': 1,
+  // +1 for « Écrire à l'agence » (recette 27/11, G4 and G13): who hears of her message and of its answer, her owners,
+  // the active managers who work on her and her own accounts, names of accounts only (one door for these reads).
+  'modules/creator-messages': 1,
   'modules/creator-tasks': 1,
   'modules/creator-week': 2,
   // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.
@@ -27,7 +30,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/invoicing': 12,
   'modules/mcp': 1,
   'modules/media': 10,
-  'modules/notifications': 3,
+  // +1 (trou 9 du 21/11): what the agency asked of each creator (requests, propositions, weeks validated) and her own
+  // accounts, across creators, a half-hour window, read only.
+  'modules/notifications': 4,
   'modules/payroll': 10,
   // The agent reads the agency's active base style (ADR 0173) out of any session: one row, read only, no creator's data.
   'modules/persona': 1,
@@ -39,17 +44,22 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // across creators, bounded to the members named; read only.
   // +1 for « compte sans personne » (ADR 0094 § 1): its job reads every creator's planning, agent and last fan
   // message to publish one event per account and créneau.
-  'modules/scheduling': 31,
+  // +1 for « chatteur pas là » (ADR 0094 § 1, lot b): its job reads the agency's delay and every creator's shifts begun
+  // that long ago, never taken, to publish one event per shift; it writes nothing but the outbox.
+  'modules/scheduling': 32,
   'modules/scripts': 16,
   'modules/supervision': 2,
-  'modules/team': 1,
+  // +1 for a departure at its hour (ADR 0166 § 2): the owners in office, read only, so that a departure never depends
+  // on the owner who set it still being one.
+  'modules/team': 2,
   // -4 on 27/11/2026 (ADR 0176): Telegram keeps the creators' channels only.
   'modules/telegram': 6,
   'modules/trends': 8,
   // +2 for a live worker freeing its own locks on jobs whose completion was lost (recette COUV-14): Graphile's tables,
-  // closed to the app role, as the release of dead workers' locks.
-  // -1 on 27/11/2026 (ADR 0176): no « mot de passe oublié » asked from the sign-in page.
-  root: 53,
+  // closed to the app role, as the release of dead workers' locks; −1: the agency's time zone read through one door
+  // for every reader (recette 27/11); -1 on 27/11/2026 (ADR 0176): no « mot de passe oublié » asked from the sign-in
+  // page.
+  root: 52,
   scripts: 1,
   // -2 on 27/11/2026 (ADR 0176): no sales nor alerts wired to Telegram.
   wiring: 5,
