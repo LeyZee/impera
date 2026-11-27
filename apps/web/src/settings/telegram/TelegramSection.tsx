@@ -106,7 +106,7 @@ export function TelegramSection(): JSX.Element {
   const lede = (
     <p className="tg-lede">
       Les bots qui publient dans le canal Telegram de chaque modèle. Les alertes de l’agence arrivent en
-      notification Impera, plus ici.
+      notification Impera.
     </p>
   );
   const sheetView =

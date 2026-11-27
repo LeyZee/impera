@@ -173,9 +173,15 @@ describe('her own alerts', () => {
   it('says when an alert tells nobody', async () => {
     serve({ ...BASE, 'GET /v1/alerts': ok({ custom: [{ ...ALERT, notify: false }], system: SYSTEM }) });
     renderSection();
+    const item = await line('Vidéo perso');
+    // Opened, one line says it once, and never « prévient » (Design, 27/11).
     expect(
-      within(await line('Vidéo perso')).getByText('Gardée dans l’historique du Suivi, sans notification'),
+      within(item).getByText(
+        'Met l’agent en pause sur ce fan, sans prévenir personne. Gardée dans l’historique du Suivi.',
+      ),
     ).toBeTruthy();
+    expect(within(item).queryByText(/sans notification/)).toBeNull();
+    expect(within(item).queryByText(/Prévient/)).toBeNull();
   });
 
   it('invites her to write one when she has none', async () => {

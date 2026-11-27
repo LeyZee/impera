@@ -162,11 +162,20 @@ export function creatorsLine(
   return `${first}, ${second} et ${rest === 1 ? '1 autre' : `${String(rest)} autres`}`;
 }
 
-/** What a trigger does to the conversation, said the same way on the line and in the editor. */
-export const pauseLine = (pausesAgent: boolean): string =>
-  pausesAgent
-    ? 'Met l’agent en pause sur ce fan et passe la main à un humain'
-    : 'Prévient sans mettre l’agent en pause';
+/**
+ * What a trigger does, said the same way on the line and in the editor. One sentence for both switches: an alert that
+ * rings nobody never says « prévient » (Design, 27/11).
+ */
+export function pauseLine(pausesAgent: boolean, notify = true): string {
+  if (notify) {
+    return pausesAgent
+      ? 'Met l’agent en pause sur ce fan et passe la main à un humain'
+      : 'Prévient sans mettre l’agent en pause';
+  }
+  return pausesAgent
+    ? 'Met l’agent en pause sur ce fan, sans prévenir personne. Gardée dans l’historique du Suivi.'
+    : 'Ne prévient personne, l’agent continue. Gardée dans l’historique du Suivi.';
+}
 
 /**
  * The keywords as the owner typed them, trimmed, each once as the agent reads it (`alertKeywordKey`: case, accents
@@ -334,5 +343,5 @@ export function testVerdict(sent: AlertTestBody, result: AlertTestResult, pauses
 
 /** What a line says of an alert that rings nobody (`notify` off); `null` when it tells the team. */
 export function quietLine(notify: boolean): string | null {
-  return notify ? null : 'Gardée dans l’historique du Suivi, sans notification';
+  return notify ? null : 'Ne prévient personne. Gardée dans l’historique du Suivi.';
 }

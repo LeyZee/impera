@@ -51,7 +51,8 @@ export function BotSheet({
   return (
     <Scrim onClose={onClose}>
       <div className="tg-sheet__top">
-        {mode.kind === 'replace' ? (
+        {/* One step alone (« Ajouter à un canal », « Remplacer le jeton ») is not numbered: its title says it (Design, 27/11). */}
+        {mode.kind !== 'add' ? (
           <span />
         ) : (
           <ol className="tg-steps" aria-label="Étapes">

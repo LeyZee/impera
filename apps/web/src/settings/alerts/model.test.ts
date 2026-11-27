@@ -166,6 +166,12 @@ describe('an alert on its line', () => {
   it('says whether it pauses the agent, and what its test costs', () => {
     expect(pauseLine(true)).toBe('Met l’agent en pause sur ce fan et passe la main à un humain');
     expect(pauseLine(false)).toBe('Prévient sans mettre l’agent en pause');
+    expect(pauseLine(false, false)).toBe(
+      'Ne prévient personne, l’agent continue. Gardée dans l’historique du Suivi.',
+    );
+    expect(pauseLine(true, false)).toBe(
+      'Met l’agent en pause sur ce fan, sans prévenir personne. Gardée dans l’historique du Suivi.',
+    );
     expect(testCostLine({ phrase: '' })).toBe('Les mots-clés se testent sans IA.');
     expect(testCostLine({ phrase: 'Le fan demande un appel' })).toContain('un appel au modèle');
   });
@@ -174,7 +180,7 @@ describe('an alert on its line', () => {
 describe('whom it tells (27/11/2026, Telegram back to the channels only)', () => {
   it('says only that it stays in the history when it tells no one', () => {
     expect(quietLine(true)).toBeNull();
-    expect(quietLine(false)).toBe('Gardée dans l’historique du Suivi, sans notification');
+    expect(quietLine(false)).toBe('Ne prévient personne. Gardée dans l’historique du Suivi.');
   });
 });
 

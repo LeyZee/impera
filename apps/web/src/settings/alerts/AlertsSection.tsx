@@ -113,8 +113,8 @@ export function AlertsSection(): JSX.Element {
           <div className="al-head__text">
             {/* The page's title says « Alertes » already (recette visuelle 16/11, GES-03): no second one here. */}
             <p className="ps-lead">
-              Une alerte surveille ce que les fans écrivent. Quand elle sonne, l’équipe est prévenue ; si tu
-              le choisis, l’agent se met en pause sur ce fan et passe la main.
+              Une alerte surveille ce que les fans écrivent. Quand elle sonne, l’équipe est prévenue si tu le
+              choisis, et l’agent peut se mettre en pause sur ce fan pour passer la main.
             </p>
           </div>
           {/* One editor at a time: opening another would drop the changes of the open one (recette du 28/10). */}
@@ -257,7 +257,8 @@ function AlertLine({
     }
   };
 
-  const quiet = active ? quietLine(alert.notify) : null;
+  // Closed, the quiet line says it rings nobody; open, the line of what it does says it once (Design, 27/11).
+  const quiet = active && !open ? quietLine(alert.notify) : null;
 
   return (
     <li
@@ -326,7 +327,7 @@ function AlertLine({
         )}
         <p className="al-line__does" data-pauses={alert.pausesAgent ? 'true' : undefined}>
           {active
-            ? pauseLine(alert.pausesAgent)
+            ? pauseLine(alert.pausesAgent, alert.notify)
             : 'Coupée : elle ne surveille rien tant que tu ne la rallumes pas'}
         </p>
         {confirming ? (
@@ -550,7 +551,7 @@ function AlertEditor({
         <div className="ps-switches">
           <SwitchRow
             label="Mettre l’agent en pause"
-            detail={pauseLine(draft.pausesAgent)}
+            detail={pauseLine(draft.pausesAgent, draft.notify)}
             checked={draft.pausesAgent}
             onChange={(pausesAgent) => {
               edit({ pausesAgent });
