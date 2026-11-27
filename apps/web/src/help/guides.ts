@@ -1150,8 +1150,11 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
   creator: {
     lead: 'Ton espace se lit en quelques secondes : ce qu’on te demande aujourd’hui, et ce que tu envoies.',
     day: [
-      { title: 'Ouvre Aujourd’hui', text: 'Une seule chose en gros : ce qu’il reste à faire.' },
-      { title: 'Dépose ton contenu', text: 'Contenu, « Déposer » : l’agence s’occupe du reste.' },
+      { title: 'Ouvre Aujourd’hui', text: 'En haut, ce qu’on attend de toi aujourd’hui, puis ta journée.' },
+      {
+        title: 'Dépose ton contenu',
+        text: 'Contenu : « Déposer » sur une demande, ou « Envoyer un contenu ». L’agence s’occupe du reste.',
+      },
       { title: 'C’est tout', text: 'Le reste, l’agence s’en occupe.' },
     ],
     guides: [

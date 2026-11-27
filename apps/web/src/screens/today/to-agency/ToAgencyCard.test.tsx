@@ -7,6 +7,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ToAgencyCard } from './ToAgencyCard';
 import { answerRefusal, messageLines } from './model';
 
+/* The address's anchor, as TanStack Router hands it (without its « # »). */
+const at = vi.hoisted(() => ({ hash: '' }));
+vi.mock('@tanstack/react-router', () => ({
+  useLocation: <T,>({ select }: { select: (location: { hash: string }) => T }): T =>
+    select({ hash: at.hash }),
+}));
+
 /* An invented creator (ADR 0010). */
 const message = (n: number, answer: string | null) => ({
   id: `0199f2a0-0000-4000-8000-00000000090${String(n)}`,
@@ -45,6 +52,7 @@ function show(messages: object[]) {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  at.hash = '';
 });
 
 describe('« Écrire à l’agence » (trous béants n° 13)', () => {
@@ -55,6 +63,24 @@ describe('« Écrire à l’agence » (trous béants n° 13)', () => {
     expect(screen.getByText('Un souci')).toBeTruthy();
     expect(screen.getByText('Oui, samedi')).toBeTruthy();
     expect(screen.getByText('En attente de réponse')).toBeTruthy();
+  });
+
+  it('comes into view once loaded when the answer’s notification opens it (MOD-05)', async () => {
+    const seen = vi.fn();
+    Element.prototype.scrollIntoView = seen;
+    at.hash = 'agence';
+    show([message(1, 'Oui, samedi')]);
+    expect(await screen.findByText('Oui, samedi')).toBeTruthy();
+    expect(document.getElementById('agence')?.tagName).toBe('SECTION');
+    expect(seen).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays where it is on a plain visit to Aujourd’hui', async () => {
+    const seen = vi.fn();
+    Element.prototype.scrollIntoView = seen;
+    show([message(1, 'Oui, samedi')]);
+    expect(await screen.findByText('Oui, samedi')).toBeTruthy();
+    expect(seen).not.toHaveBeenCalled();
   });
 
   it('sends her kind and her words once, with an id chosen once', async () => {
