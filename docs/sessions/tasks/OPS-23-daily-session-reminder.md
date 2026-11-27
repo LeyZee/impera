@@ -11,7 +11,7 @@ Le jeton Reveal de l'IA meurt 24 h après la connexion et rien ne le renouvelle.
 ADR 0147 et son avenant du 27/11, ADR 0176 § 3, `docs/runbooks/session-expired.md`, `apps/api/src/modules/connectors/domain/session-life.ts`, `apps/api/src/modules/alerts/application/agency.ts`.
 
 ## À faire
-- [x] Réglage `scheduling_settings.session_reminder_minute` (migration 0288) : 18 h par défaut, jamais éteint ; `GET/PUT /v1/scheduling/session-reminder` (lu par l'agence, écrit par le propriétaire, audité).
+- [x] Réglage `scheduling_settings.session_reminder_minute` (migration 0290, numéro donné par Bilan) : 18 h par défaut, jamais éteint ; `GET/PUT /v1/scheduling/session-reminder` (lu par l'agence, écrit par le propriétaire, audité).
 - [x] `connectors.sessions.clocks()` : chaque compte qui tient une session, avec l'échéance lue dans le jeton, jamais la session.
 - [x] Règle pure `sessionRemindersDue` : à l'heure, pour un jeton à moins de 20 h, expiré ou sans échéance lisible ; une fois de plus une heure après ; 2 h avant la fin d'un jeton, sauf si l'heure du rappel tombe dans ces 2 h.
 - [x] Job `alerts.remind_sessions` toutes les 5 minutes, à chaque propriétaire, motif `agency_alert` (hors plafond, retenu en heures calmes), clé par compte et jour ou par jeton.
@@ -24,3 +24,6 @@ ADR 0147 et son avenant du 27/11, ADR 0176 § 3, `docs/runbooks/session-expired.
 
 ## Hors périmètre
 Réveiller la nuit pour une session qui expire (question posée à Charles, sans réponse) ; la connexion automatique à Reveal par le serveur (à reparler après une à deux semaines réelles, sur son mot écrit).
+
+## Notes de session
+- Plafond du rôle de service : `modules/scheduling` passe à 33 (+1), la lecture de l'heure et du fuseau de l'agence par le job.
