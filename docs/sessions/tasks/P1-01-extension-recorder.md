@@ -1,6 +1,6 @@
 # P1-01 Extension : enregistreur d'API
 
-Statut : todo
+Statut : superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'API Reveal a été relevée par la capture de l'extension et l'API CRM officielle, voir « Reveal à deux voies ») ; statut précédent : todo
 Phase : 1
 Dépend de : P0-01
 Branche : task/p1-01-extension-recorder

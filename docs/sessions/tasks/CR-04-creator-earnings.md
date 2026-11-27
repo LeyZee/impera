@@ -1,5 +1,5 @@
 # CR-04 Gains et ventes de la créatrice, au jour le jour
-Statut : in_progress, réglage du pourcentage fait, « Ta part » sur Reveal faite le 20/11/2026 (ADR 0042 § 6 et § 7, acceptée par Charles le 02/11/2026 ; ADR 0054 pour la source sur Reveal, acceptée le 03/11/2026)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress, réglage du pourcentage fait, « Ta part » sur Reveal faite le 20/11/2026 (ADR 0042 § 6 et § 7, acceptée par Charles le 02/11/2026 ; ADR 0054 pour la source sur Reveal, acceptée le 03/11/2026)
 Phase : espaces (ADR 0042)
 Dépend de : CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme)
 Branche : task/cr-04-creator-earnings

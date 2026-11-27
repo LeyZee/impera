@@ -1,6 +1,6 @@
 # EQ-22 Donner ou partager une vente avec le chatteur qui a été décisif
 
-Statut : in_progress (ADR 0101 acceptée par « ok 0101 » le 13/11/2026, amendement « partager » par « ok phrases 0101 » le même jour)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress (ADR 0101 acceptée par « ok 0101 » le 13/11/2026, amendement « partager » par « ok phrases 0101 » le même jour)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-03 (ventes en attente et décision du valideur), CRM-05 PR 1
 Branche : task/eq-22-sale-give
