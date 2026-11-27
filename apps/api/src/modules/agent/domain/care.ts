@@ -105,12 +105,32 @@ const NUMBER_WORD =
   /^(?:zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)$/u;
 const BIG_NUMBER_WORD = /^(?:cent|cents|mille|hundred|thousand)$/u;
 
-/** Three digits or more written in figures, and not a quantity: the first such number of the text. */
+/** A month's name (FR, EN, ES, IT), on the normalised text. */
+const MONTH =
+  '(?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|gennaio|febbraio|aprile|maggio|giugno|luglio|settembre|ottobre|dicembre)';
+
+/** A word of time right before a year (« depuis 2019 », « l'été 2023 », « since 2020 », « desde 2018 », « dal 2021 »). */
+const TIME_BEFORE = new RegExp(
+  `\\b(?:en|depuis|des|avant|apres|jusqu'? ?en|l'? ?ete|l'? ?hiver|l'? ?automne|printemps|ete|hiver|automne|annee|annees|rentree|since|in|from|until|till|by|before|after|summer|winter|spring|fall|autumn|year|desde|hasta|verano|invierno|ano|dal|nel|del|fino al|estate|inverno|anno|${MONTH})\\s*$`,
+  'u',
+);
+const MONTH_AFTER = new RegExp(`^\\s*${MONTH}\\b`, 'u');
+
+/**
+ * A year, not a number to call (Charles, 27/11 : pas de blocage bête) : four digits from 1900 to 2099, after a word of
+ * time or next to a month. 3114 and 3919 stay out of the range.
+ */
+function isYear(digits: string, before: string, after: string): boolean {
+  return /^(?:19|20)\d\d$/u.test(digits) && (TIME_BEFORE.test(before) || MONTH_AFTER.test(after));
+}
+
+/** Three digits or more written in figures, and not a quantity nor a year: the first such number of the text. */
 function numberInFigures(text: string): string | undefined {
   for (const match of text.matchAll(DIGIT_GROUPS)) {
     const digits = match[0].replace(/\D/gu, '').length;
+    const before = text.slice(0, match.index);
     const after = text.slice(match.index + match[0].length);
-    if (digits >= 3 && !QUANTITY_AFTER.test(after)) return match[0];
+    if (digits >= 3 && !QUANTITY_AFTER.test(after) && !isYear(match[0], before, after)) return match[0];
   }
   return undefined;
 }

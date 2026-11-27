@@ -172,6 +172,10 @@ describe('a help number the model writes itself (ADR 0088 § 4, eval pass 2)', (
       'il y a le 0800 123 456',
       'le 08 00 12 34 56 la nuit',
       'le 1234 répond tout le temps',
+      // Out of the years' range, or no word of time: still a number to call.
+      'depuis le 3114 ils répondent',
+      'en appelant le 3919 la nuit',
+      'le 2019 répond la nuit',
     ])('refuses « %s »', (text) => {
       expect(blockedInCare(text)).toBe(true);
     });
@@ -188,6 +192,14 @@ describe('a help number the model writes itself (ADR 0088 § 4, eval pass 2)', (
       'deux cents euros c’est rien à côté de toi',
       'un, deux, je suis là',
       'il y a 1 000 km entre nous',
+      // A year is no number to call (Charles, 27/11).
+      'je pense à toi depuis 2019',
+      'en 2024 j’ai vécu pareil',
+      'since 2020 it has been hard for me too',
+      'l’été 2023 a été dur pour moi aussi',
+      'en mars 2022 j’étais au plus bas',
+      'desde 2018 lo entiendo',
+      'dal 2021 ti capisco',
     ])('lets « %s » through', (text) => {
       expect(blockedInCare(text)).toBe(false);
     });
