@@ -415,7 +415,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const creatorLimits = wireCreatorLimits(shared);
-  const creatorMessages = wireCreatorMessages(shared, { allCreatorIds: persona.allCreatorIds });
+  const creatorMessages = wireCreatorMessages(shared, {
+    allCreatorIds: persona.allCreatorIds,
+    notify: notifications.module.notify,
+    // Read when a message is written, long after the planning is wired below.
+    agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+  });
   const creatorDecisions = createCreatorDecisionsModule({
     db: shared.db,
     requireRole: shared.requireRole,

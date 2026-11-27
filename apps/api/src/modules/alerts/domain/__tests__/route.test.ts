@@ -43,4 +43,13 @@ describe('who an alert reaches (ADR 0150 § A)', () => {
     expect(alertMessage('ai_budget', null, null, false)).toMatchObject({ title: 'Budget IA', url: '/suivi' });
     expect(alertMessage('sale', 'N'.repeat(200), null, false).title.length).toBeLessThanOrEqual(80);
   });
+
+  it('says a sale’s amount and who sold it, never the fan (recette 27/11, G19)', () => {
+    const said = (by: 'agent' | 'member' | 'unknown') =>
+      alertMessage('sale', 'Nora', null, true, { grossMinor: 2_500, currency: 'EUR', by });
+    expect(said('agent')).toMatchObject({ title: 'Nora · Vente de 25,00\u00a0€', body: 'Vendue par l’IA.' });
+    expect(said('member').body).toBe('Vendue par le chatteur en poste.');
+    expect(said('unknown').body).toBe('Lue sur la plateforme, sans vendeur relié.');
+    expect(alertMessage('sale', 'Nora', null, false).title).toBe('Nora · Vente détectée');
+  });
 });
