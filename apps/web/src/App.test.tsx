@@ -299,7 +299,7 @@ describe('App and a forgotten password (SEC-05 lot 3)', () => {
     expect(window.location.pathname).toBe('/');
   });
 
-  it('opens the request form without a link, and goes back to the sign-in page without a word', async () => {
+  it('says where a link comes from without one, and goes back to the sign-in page without a word', async () => {
     serveMe(SIGNED_OUT);
     window.history.replaceState(null, '', '/mot-de-passe-oublie');
     render(<App />);

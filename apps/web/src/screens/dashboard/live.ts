@@ -15,7 +15,6 @@ import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queu
 import { frenchSpaces } from '@/lib/utils';
 import { platformName } from '@/scheduling/model';
 import { cityOf, clockAt, lengthOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
-import { telegramNightOf } from '@/settings/telegram/NightBanner';
 
 /*
  * `GET /v1/dashboard` in the screen's words. The server measured everything; this file only writes it in French,
@@ -243,20 +242,12 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       tone: relays > 0 ? 'warn' : 'ok',
       title: 'Passages à l’humain',
       value: relays === 0 ? 'aucun aujourd’hui' : `${String(relays)} aujourd’hui`,
-      sub:
-        guards.telegramAlertsTonight === null
-          ? 'Telegram éteint'
-          : `${plural(guards.telegramAlertsTonight, 'alerte', 'alertes')} Telegram cette nuit`,
-      rows: [
-        ...GUARD_CAUSES.filter((cause) => guards.today[cause] > 0).map((cause): [string, string] => [
-          KIND_LABEL[cause],
-          String(guards.today[cause]),
-        ]),
-        [
-          'Alertes Telegram cette nuit',
-          guards.telegramAlertsTonight === null ? 'Telegram éteint' : String(guards.telegramAlertsTonight),
-        ],
-      ],
+      // 27/11/2026: the team is told by an Impera notification, no longer by a Telegram group.
+      sub: relays === 0 ? 'rien à reprendre' : 'l’équipe est prévenue par notification',
+      rows: GUARD_CAUSES.filter((cause) => guards.today[cause] > 0).map((cause): [string, string] => [
+        KIND_LABEL[cause],
+        String(guards.today[cause]),
+      ]),
     },
     {
       id: 'live-rate',
@@ -574,7 +565,6 @@ export function fromApi(
     ),
     sales: null,
     revealSales: api.revealSales === null ? null : revealSalesOf(api.revealSales),
-    telegram: telegramNightOf(api),
     fans: api.fans.map((fan) => fanOf(fan, now)),
     agency: agencyOf(api),
     ...(dollars === undefined ? {} : { usdNote: dollars }),

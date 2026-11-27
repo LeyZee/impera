@@ -8,7 +8,7 @@ const { exchangeRates } = schema;
 /**
  * The newest rate written for a currency (ADR 0033), `null` before the first, in the caller's transaction; with
  * `onOrBefore`, the newest of that day or before it (a sale's day, as the creator's screen and the Dashboard convert).
- * Another module's job reads it this way on its own connection (Telegram's minimum price, CRM-04 lot b).
+ * The payroll's own estimate reads it this way, in its transaction.
  */
 export async function latestRateOf(
   tx: Transaction,

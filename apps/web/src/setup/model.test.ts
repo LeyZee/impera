@@ -36,13 +36,19 @@ describe('« Mise en route » words', () => {
     expect(extension?.verb).toBe('Le guide');
   });
 
-  it('says the mode in force, and Telegram off', () => {
-    const [mode, telegram] = creatorLines(ANNA, [
+  it('says the mode in force, and the notifications off', () => {
+    const [mode, night, none] = creatorLines(ANNA, [
       { key: 'agent_mode', state: 'done', note: { kind: 'agent_mode', mode: 'copilot' } },
-      { key: 'telegram', state: 'todo', note: { kind: 'telegram_off' } },
+      { key: 'night_alerts', state: 'todo', note: { kind: 'push_off' } },
+      { key: 'night_alerts', state: 'todo', note: null },
     ]);
     expect(mode?.hint).toBe('Copilote');
-    expect(telegram?.hint).toBe('Telegram n’est pas branché : personne n’est prévenu la nuit.');
+    expect(night?.hint).toBe(
+      'Les notifications ne sont pas branchées sur ce serveur : personne n’est prévenu la nuit.',
+    );
+    expect(none?.hint).toBe(
+      'Aucun propriétaire n’a activé les notifications sur un appareil : personne n’est prévenu la nuit.',
+    );
   });
 
   it('takes the agency’s share read at Reveal for the percentage, or asks for one of the two (ADR 0054 § 7)', () => {

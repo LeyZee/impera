@@ -685,7 +685,7 @@ describe('Créatrices, her « Mise en route » (pilotage plan W1)', () => {
     'agency_rate',
     'access',
     'pay_rules',
-    'telegram',
+    'night_alerts',
     'agent_hours',
     'shifts',
     'agent_mode',

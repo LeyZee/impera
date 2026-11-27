@@ -63,6 +63,8 @@ export const JOB_NAMES = [
   'ai_usage.check_credits',
   'notifications.recap',
   'alerts.route',
+  'alerts.agency',
+  'alerts.remind_safety',
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
@@ -110,14 +112,8 @@ export const JOB_NAMES = [
   'connector.copy_avatar',
   'connector.read_daily_stats',
   'connector.read_link_hours',
-  'telegram.scan',
-  'telegram.flush_chat',
   'telegram.dispatch_polls',
   'telegram.poll_updates',
-  'telegram.morning_digest',
-  'telegram.evening_digest',
-  'telegram.connection_reminders',
-  'telegram.purge',
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -150,6 +146,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
   'alerts.route': 'Alertes de l’équipe',
+  'alerts.agency': 'Alertes de l’agence',
+  'alerts.remind_safety': 'Relance des relais de sécurité',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
@@ -197,14 +195,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.read_daily_stats': 'Statistiques quotidiennes Reveal',
   'connector.read_link_hours': 'Vues et clics des liens de redirection',
   'connector.copy_avatar': 'Copie de la photo d’une créatrice',
-  'telegram.scan': 'Alertes Telegram',
-  'telegram.flush_chat': 'Envoi des messages Telegram',
   'telegram.dispatch_polls': 'Lecture de Telegram',
   'telegram.poll_updates': 'Réponses reçues sur Telegram',
-  'telegram.morning_digest': 'Résumé Telegram du matin',
-  'telegram.evening_digest': 'Résumé Telegram du soir',
-  'telegram.connection_reminders': 'Rappels de connexion Telegram',
-  'telegram.purge': 'Nettoyage de Telegram',
 };
 
 /**
@@ -326,6 +318,13 @@ export const JOB_PAYLOADS = {
    * chooses. Re-reading the window is harmless: a notification is once per account, reason and event.
    */
   'alerts.route': z.object({}),
+  /**
+   * The agency's alerts to its owners (27/11/2026, Telegram back to the channels only): each minute re-reads the last
+   * half hour of the outbox; a notification is once per account, reason and event.
+   */
+  'alerts.agency': z.object({}),
+  /** A safety relay nobody took rings again every 5 minutes for an hour; once per account and reminder. */
+  'alerts.remind_safety': z.object({}),
   /**
    * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
    * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
@@ -668,6 +667,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.recap': 3,
   // The next minute re-reads the window: one try is enough.
   'alerts.route': 1,
+  'alerts.agency': 1,
+  'alerts.remind_safety': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
   // Replayable: told once per task and start (`notification_deliveries`).
@@ -757,19 +758,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.read_daily_stats': 1,
   // Each hour as well: the next run is the retry, and an open hour is written over.
   'connector.read_link_hours': 1,
-  // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
-  // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
-  'telegram.scan': 25,
-  'telegram.flush_chat': 10,
   'telegram.dispatch_polls': 1,
   'telegram.poll_updates': 1,
-  // Its hour is 8 o'clock only: a failed run is retried within it, the key of her day keeps it once.
-  'telegram.morning_digest': 3,
-  // Its hour is 23 o'clock only: a failed run is retried within it, the key of her day keeps it once.
-  'telegram.evening_digest': 3,
-  // Every 10 minutes: the next run is the retry, the reminder's key keeps it once (P3-12).
-  'telegram.connection_reminders': 1,
-  'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 
 /**

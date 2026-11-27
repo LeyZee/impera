@@ -41,11 +41,14 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,
-  'modules/telegram': 10,
+  // -4 on 27/11/2026 (ADR 0176): Telegram keeps the creators' channels only.
+  'modules/telegram': 6,
   'modules/trends': 8,
-  root: 52,
+  // -1 on 27/11/2026 (ADR 0176): no « mot de passe oublié » asked from the sign-in page.
+  root: 51,
   scripts: 1,
-  wiring: 7,
+  // -2 on 27/11/2026 (ADR 0176): no sales nor alerts wired to Telegram.
+  wiring: 5,
 };
 
 /**

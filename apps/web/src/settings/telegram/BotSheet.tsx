@@ -1,4 +1,4 @@
-import type { TelegramBot, TelegramChat, TelegramTopic } from '@impera/contracts';
+import type { TelegramBot, TelegramChat } from '@impera/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -7,39 +7,20 @@ import '../services/services.css';
 import { ReauthRequired } from '../services/api';
 
 import { Reauth } from './Reauth';
-import { addBot, fetchOverview, listen, replaceToken, saveRoutes, sendTest } from './api';
-import {
-  initials,
-  knownChatIds,
-  looksLikeToken,
-  newChats,
-  setTopicsOfChat,
-  suggestedUsername,
-  topicsOfChat,
-  TOPICS,
-} from './model';
+import { addBot, fetchOverview, listen, replaceToken } from './api';
+import { initials, knownChatIds, looksLikeToken, newChats, suggestedUsername } from './model';
 
 import { Empty } from '@/shell/states';
 
-/** `add`: the four steps. `listen`: put a known bot in one more group (steps 3 and 4). `replace`: a new token. */
+/** `add`: the three steps. `listen`: make a known bot admin of one more channel (step 3). `replace`: a new token. */
 export type SheetMode =
   { kind: 'add' } | { kind: 'listen'; bot: TelegramBot } | { kind: 'replace'; bot: TelegramBot };
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3;
 
 /** The steps as the sheet's progress names them, as Sauvegardes names its own. */
-const STEP_TITLES: Record<Step, string> = { 1: 'Créer', 2: 'Jeton', 3: 'Groupe', 4: 'Messages' };
+const STEP_TITLES: Record<Step, string> = { 1: 'Créer', 2: 'Jeton', 3: 'Canal' };
 
-const SHEET_TOPICS: readonly TelegramTopic[] = [
-  'urgent',
-  'important',
-  'info',
-  'sale',
-  'validation',
-  'keyword',
-];
-/** What a new group gets unless the person changes it: the alerts that need a human. */
-const DEFAULT_TOPICS: readonly TelegramTopic[] = ['urgent', 'important'];
 const POLL_MS = 2000;
 /** The server listens 20 s per call (`LISTEN_SECONDS`); asked again a little before it stops. */
 const RELISTEN_MS = 18_000;
@@ -60,11 +41,11 @@ export function BotSheet({
   const [step, setStep] = useState<Step>(mode.kind === 'add' ? 1 : mode.kind === 'listen' ? 3 : 2);
   const [bot, setBot] = useState<TelegramBot | null>(mode.kind === 'add' ? null : mode.bot);
   const [found, setFound] = useState<TelegramChat[]>([]);
-  /** The groups the bot sat in before step 3: only a new one counts as found. */
+  /** The channels the bot sat in before step 3: only a new one counts as found. */
   const [known] = useState<ReadonlySet<string>>(() =>
     mode.kind === 'add' ? new Set() : knownChatIds(mode.bot),
   );
-  const lastStep: Step = mode.kind === 'replace' ? 2 : 4;
+  const lastStep: Step = mode.kind === 'replace' ? 2 : 3;
   const firstStep: Step = mode.kind === 'add' ? 1 : mode.kind === 'listen' ? 3 : 2;
 
   return (
@@ -74,7 +55,7 @@ export function BotSheet({
           <span />
         ) : (
           <ol className="tg-steps" aria-label="Étapes">
-            {([1, 2, 3, 4] as const)
+            {([1, 2, 3] as const)
               .filter((n) => n >= firstStep && n <= lastStep)
               .map((n) => (
                 <li
@@ -120,7 +101,7 @@ export function BotSheet({
             else setStep(3);
           }}
         />
-      ) : step === 3 && bot !== null ? (
+      ) : bot !== null ? (
         <ListenStep
           bot={bot}
           known={known}
@@ -129,12 +110,8 @@ export function BotSheet({
             setFound(chats);
             onChanged();
           }}
-          onNext={() => {
-            setStep(4);
-          }}
+          onDone={onClose}
         />
-      ) : bot !== null ? (
-        <TopicsStep bot={bot} chats={found} onDone={onClose} onChanged={onChanged} />
       ) : null}
     </Scrim>
   );
@@ -160,7 +137,7 @@ function CreateStep({ onNext }: { onNext: () => void }): JSX.Element {
         </li>
         <li>
           <div>
-            <span>Donne-lui un nom, celui que verra le groupe :</span>
+            <span>Donne-lui un nom, celui que verront les abonnés du canal :</span>
             <input
               className="nv-field__control nv-glass tg-name"
               value={name}
@@ -268,7 +245,7 @@ function TokenStep({
       <p>
         {bot === null
           ? 'Impera le vérifie auprès de Telegram, puis le garde chiffré. Personne ne pourra le relire, même toi.'
-          : 'Demande-le à @BotFather avec /token. Les groupes et les réglages du bot restent tels quels.'}
+          : 'Demande-le à @BotFather avec /token. Les canaux et les réglages du bot restent tels quels.'}
       </p>
       {check.kind === 'reauth' ? (
         <Reauth
@@ -365,13 +342,13 @@ function ListenStep({
   known,
   found,
   onFound,
-  onNext,
+  onDone,
 }: {
   bot: TelegramBot;
   known: ReadonlySet<string>;
   found: readonly TelegramChat[];
   onFound: (chats: TelegramChat[]) => void;
-  onNext: () => void;
+  onDone: () => void;
 }): JSX.Element {
   const [isOffline, setIsOffline] = useState(false);
   const count = useRef(found.length);
@@ -413,9 +390,12 @@ function ListenStep({
   return (
     <>
       <h2 className="nv-h2" id="tg-sheet-title">
-        Ajoute {bot.displayName} à ton groupe
+        Ajoute {bot.displayName} au canal de la modèle
       </h2>
-      <p>Choisis le groupe dans Telegram. Impera le verra arriver tout seul, rien à recopier.</p>
+      <p>
+        Dans Telegram, fais-le administrateur du canal, avec le droit de publier. Impera le verra arriver tout
+        seul, rien à recopier.
+      </p>
       {found.length === 0 ? (
         <div className="tg-listen" aria-live="polite">
           <div className="tg-radar" aria-hidden="true">
@@ -424,7 +404,7 @@ function ListenStep({
               <path d="M3.5 19c.9-3 3-4.6 5.5-4.6s4.6 1.6 5.5 4.6M16 5.2a3 3 0 0 1 0 5.6M18 14.6c1.3.7 2.1 2.2 2.5 4.4" />
             </svg>
           </div>
-          <Empty title="J’attends le groupe…">
+          <Empty title="J’attends le canal…">
             {isOffline
               ? 'Le serveur ne répond pas pour l’instant. La page réessaie toute seule.'
               : 'Garde cette fenêtre ouverte pendant que tu l’ajoutes.'}
@@ -441,203 +421,31 @@ function ListenStep({
                 <span className="tg-hint">
                   {chat.canPost
                     ? `${bot.displayName} peut y écrire`
-                    : 'Le bot ne peut pas y écrire : donne-lui le droit d’envoyer des messages'}
+                    : 'Le bot ne peut pas y publier : donne-lui le droit de publier des messages'}
                 </span>
               </div>
             </div>
           ))}
-          <span className="tg-hint">Un autre groupe ? Ajoute le bot là-bas aussi, il apparaîtra ici.</span>
+          <span className="tg-hint">
+            Un autre canal ? Ajoute le bot là-bas aussi, il apparaîtra ici. Le canal se relie ensuite à la
+            modèle depuis sa fiche.
+          </span>
         </div>
       )}
       <div className="tg-sheet__actions">
         <a
           className="nv-btn nv-btn--soft"
-          href={`https://t.me/${encodeURIComponent(bot.username)}?startgroup=impera`}
+          href={`https://t.me/${encodeURIComponent(bot.username)}?startchannel=true&admin=post_messages`}
           target="_blank"
           rel="noreferrer"
         >
           Ouvrir dans Telegram ↗
         </a>
         <span className="tg-grow" />
-        <button type="button" className="nv-btn nv-btn--neon" disabled={found.length === 0} onClick={onNext}>
-          Continuer
-        </button>
-      </div>
-    </>
-  );
-}
-
-type Save = { kind: 'idle' } | { kind: 'busy' } | { kind: 'error'; message: string };
-type Test = { kind: 'idle' } | { kind: 'busy' } | { kind: 'ok' } | { kind: 'error'; message: string };
-
-function TopicsStep({
-  bot,
-  chats,
-  onDone,
-  onChanged,
-}: {
-  bot: TelegramBot;
-  chats: readonly TelegramChat[];
-  onDone: () => void;
-  onChanged: () => void;
-}): JSX.Element {
-  const [current, setCurrent] = useState(0);
-  const [topics, setTopics] = useState<Record<string, readonly TelegramTopic[]>>(() =>
-    Object.fromEntries(chats.map((chat) => [chat.id, DEFAULT_TOPICS])),
-  );
-  const [save, setSave] = useState<Save>({ kind: 'idle' });
-  const [test, setTest] = useState<Test>({ kind: 'idle' });
-  const chat = chats[current];
-
-  /** A group that already had routes (put back in after a removal) keeps them. */
-  useEffect(() => {
-    let live = true;
-    fetchOverview().then(
-      (overview) => {
-        if (!live) return;
-        setTopics((before) =>
-          Object.fromEntries(
-            chats.map((c) => {
-              const saved = topicsOfChat(overview.routes, c.id);
-              return [c.id, saved.length > 0 ? saved : (before[c.id] ?? DEFAULT_TOPICS)];
-            }),
-          ),
-        );
-      },
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-  }, [chats]);
-
-  if (chat === undefined) return <p>Aucun groupe trouvé.</p>;
-  const chosen = topics[chat.id] ?? DEFAULT_TOPICS;
-
-  async function finish(): Promise<void> {
-    setSave({ kind: 'busy' });
-    try {
-      // Read just before writing: another tab may have changed the routing in the meantime.
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const overview = await fetchOverview();
-        const routes = chats.reduce(
-          (all, c) => setTopicsOfChat(all, c.id, topics[c.id] ?? DEFAULT_TOPICS),
-          overview.routes,
-        );
-        const result = await saveRoutes(overview.version, routes);
-        if (result.ok) {
-          onChanged();
-          onDone();
-          return;
-        }
-        if (result.refusal.kind !== 'routes_version_conflict') {
-          setSave({ kind: 'error', message: result.refusal.message });
-          return;
-        }
-      }
-      setSave({ kind: 'error', message: 'Les réglages bougent en ce moment. Réessaie dans un instant.' });
-    } catch {
-      setSave({ kind: 'error', message: OFFLINE });
-    }
-  }
-
-  return (
-    <>
-      <h2 className="nv-h2" id="tg-sheet-title">
-        Que doit recevoir « {chat.title} » ?
-      </h2>
-      <p>Pour toutes les créatrices. Tu affineras ensuite dans chaque onglet.</p>
-      {chats.length > 1 ? (
-        <div className="tg-scope" role="radiogroup" aria-label="Groupe">
-          {chats.map((c, index) => (
-            <button
-              key={c.id}
-              type="button"
-              role="radio"
-              className="nv-chip"
-              aria-checked={index === current}
-              onClick={() => {
-                setCurrent(index);
-                setTest({ kind: 'idle' });
-              }}
-            >
-              {c.title}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <div>
-        {SHEET_TOPICS.map((topic) => (
-          <label className="tg-sw" key={topic}>
-            <span className="tg-lvl">
-              <b>
-                <span className="tg-dot" data-topic={topic} />
-                {TOPICS[topic].label}
-              </b>
-              <small>{TOPICS[topic].sub}</small>
-            </span>
-            <input
-              type="checkbox"
-              className="nv-switch"
-              checked={chosen.includes(topic)}
-              onChange={(event) => {
-                const on = event.target.checked;
-                setTopics({
-                  ...topics,
-                  [chat.id]: on ? [...chosen, topic] : chosen.filter((t) => t !== topic),
-                });
-              }}
-            />
-          </label>
-        ))}
-      </div>
-      {save.kind === 'error' ? (
-        <p className="tg-hint" data-error="true" role="alert">
-          {save.message}
-        </p>
-      ) : null}
-      <div className="tg-sheet__actions">
-        {test.kind === 'ok' ? (
-          <span className="tg-sent">✓ Reçu dans « {chat.title} »</span>
-        ) : (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft"
-            disabled={test.kind === 'busy' || !chat.canPost}
-            onClick={() => {
-              setTest({ kind: 'busy' });
-              sendTest(chat.id).then(
-                (result) => {
-                  setTest(result.ok ? { kind: 'ok' } : { kind: 'error', message: result.refusal.message });
-                  onChanged();
-                },
-                () => {
-                  setTest({ kind: 'error', message: OFFLINE });
-                },
-              );
-            }}
-          >
-            {test.kind === 'busy' ? 'Envoi…' : 'Envoyer un test'}
-          </button>
-        )}
-        <span className="tg-grow" />
-        <button
-          type="button"
-          className="nv-btn nv-btn--neon"
-          disabled={save.kind === 'busy'}
-          onClick={() => void finish()}
-        >
+        <button type="button" className="nv-btn nv-btn--neon" disabled={found.length === 0} onClick={onDone}>
           Terminer
         </button>
       </div>
-      {test.kind === 'error' ? (
-        <p className="tg-hint" data-error="true" role="alert">
-          {test.message}
-        </p>
-      ) : null}
-      <p className="tg-hint">
-        Les messages viennent de {bot.displayName}. Rien du texte des fans n’y part jamais.
-      </p>
     </>
   );
 }

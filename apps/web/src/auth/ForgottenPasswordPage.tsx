@@ -2,29 +2,22 @@ import type { PasswordResetPreview } from '@impera/contracts';
 import { useCallback, useEffect, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';
-import { inspectPasswordReset, redeemPasswordReset, requestPasswordReset, takeLink } from './api';
+import { inspectPasswordReset, redeemPasswordReset, takeLink } from './api';
 import { NewPasswordField, REFUSED_PASSWORD, Refused, missingOf, useNoReferrer } from './link-parts';
 
 /** What the sign-in page says once the password is changed (SEC-05 lot 3). */
 export const PASSWORD_CHANGED_NOTICE =
   'Mot de passe changé, connecte-toi. Ton code à 6\u00a0chiffres reste demandé.';
 
-/**
- * For whoever has no Telegram linked, a creator or a chatter (recette CRE-05, CHT-16): the way back is the link the
- * owner makes from their sheet (EQ-10, CR-02). Shown to everyone, so it says nothing about the address typed.
- */
-export const NO_TELEGRAM_HINT = 'Pas de Telegram lié\u00a0? Demande un nouveau lien à ton agence.';
-
 type Step =
   | { readonly kind: 'ask' }
-  | { readonly kind: 'requested'; readonly message: string }
   | { readonly kind: 'reading' }
   | { readonly kind: 'gone' | 'used_by_this_page' | 'too_many_attempts' | 'unavailable' }
   | { readonly kind: 'ready'; readonly preview: PasswordResetPreview };
 
 const two = (n: number): string => String(n).padStart(2, '0');
 
-/** A number and its unit stay on one line (« 15 minutes », « 6 chiffres »), in the server's sentence too. */
+/** A number and its unit stay on one line (« 15 minutes », « 6 chiffres »). */
 export function keepUnits(text: string): string {
   return text.replace(/(\d) (?=\p{L})/gu, '$1\u00a0');
 }
@@ -36,8 +29,9 @@ function hourOf(iso: string): string {
 }
 
 /**
- * `/mot-de-passe-oublie` (SEC-05 lot 3, ADR 0068): without a link, an address and one button; the link goes to the
- * account's private Telegram chat, never to this page, and the answer is the same whoever asks. With the link
+ * `/mot-de-passe-oublie` (SEC-05 lot 3, ADR 0068, amended 27/11/2026): without a link, where to get one, since the page
+ * no longer sends any (Telegram serves the creators' channels only): a member from the agency (Équipe, EQ-10), an
+ * owner from the server. With the link
  * (`#t=…`, taken out of the address at once), the new password, then the sign-in page: every session has ended and
  * the code is still asked.
  */
@@ -54,9 +48,6 @@ export function ForgottenPasswordPage({
   const [step, setStep] = useState<Step>(() =>
     link.token !== null ? { kind: 'reading' } : { kind: link.present ? 'gone' : 'ask' },
   );
-  /** Kept between the request and « Corriger l’adresse ». */
-  const [email, setEmail] = useState('');
-
   useNoReferrer();
 
   const read = useCallback(() => {
@@ -86,45 +77,7 @@ export function ForgottenPasswordPage({
   function renderStep(): ReactNode {
     switch (step.kind) {
       case 'ask':
-        return (
-          <RequestForm
-            email={email}
-            onEmail={setEmail}
-            onRequested={(message) => {
-              setStep({ kind: 'requested', message });
-            }}
-            onLeave={onLeave}
-          />
-        );
-      case 'requested':
-        return (
-          <section className="flex flex-col gap-5" role="status">
-            <div className="nv-enter flex items-start gap-4" style={{ '--nv-i': 1 }}>
-              <span className="nv-orb nv-tone--ok mt-1 shrink-0" aria-hidden="true" />
-              <div className="flex flex-col gap-1">
-                <h1 className="text-xl font-semibold">Demande reçue</h1>
-                <p className="text-sm text-[var(--nv-ink-muted)]">{keepUnits(step.message)}</p>
-                <p className="text-sm text-[var(--nv-ink-muted)]">{NO_TELEGRAM_HINT}</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-enter"
-              style={{ '--nv-i': 2 }}
-              onClick={onLeave}
-            >
-              Retour à la connexion
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm nv-enter self-center"
-              style={{ '--nv-i': 3 }}
-              onClick={askAgain}
-            >
-              Corriger l’adresse
-            </button>
-          </section>
-        );
+        return <NoLink onLeave={onLeave} />;
       case 'reading':
         return (
           <p className="nv-enter flex items-center gap-3 text-[var(--nv-ink-muted)]" role="status">
@@ -136,7 +89,7 @@ export function ForgottenPasswordPage({
         return (
           <Refused
             title="Ce lien ne marche plus"
-            action={{ label: 'Demander un nouveau lien', onClick: askAgain }}
+            action={{ label: 'Avoir un nouveau lien', onClick: askAgain }}
             secondary={{ label: 'Retour à la connexion', onClick: onLeave }}
           >
             Il a déjà servi, un plus récent l’a remplacé, ou ses 15&nbsp;minutes sont passées.
@@ -176,87 +129,31 @@ export function ForgottenPasswordPage({
   }
 }
 
-/** One address, one button; nothing here checks the address, so nothing says whether an account has it. */
-function RequestForm({
-  email,
-  onEmail,
-  onRequested,
-  onLeave,
-}: {
-  email: string;
-  onEmail: (email: string) => void;
-  onRequested: (message: string) => void;
-  onLeave: () => void;
-}): JSX.Element {
-  const [error, setError] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
-  const isEmpty = email.trim() === '';
-
-  async function send(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (isEmpty || isSending) return;
-    setIsSending(true);
-    setError(null);
-    const result = await requestPasswordReset(email.trim());
-    setIsSending(false);
-    if (result.kind === 'requested') onRequested(result.message);
-    else if (result.kind === 'too_many_attempts') {
-      setError('Trop de demandes d’un coup : réessaie dans quelques minutes.');
-    } else setError('Le serveur ne répond pas. Réessaie dans un instant.');
-  }
-
+/**
+ * No link: where one comes from. Nothing to type here, so nothing here says whether an account has an address.
+ */
+function NoLink({ onLeave }: { onLeave: () => void }): JSX.Element {
   return (
-    // No check of the browser's either: its bubble would say more than the server's one sentence.
-    <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void send(event)}>
+    <section className="flex flex-col gap-5">
       <header className="nv-enter flex flex-col gap-2" style={{ '--nv-i': 1 }}>
         <h1 className="text-title-1 font-bold text-balance">Mot de passe oublié</h1>
         <p className="text-[var(--nv-ink-muted)]">
-          Donne l’adresse e-mail de ton compte. Le lien pour en choisir un nouveau part dans ton chat Telegram
-          privé, celui que tu as relié dans Sécurité.
+          Un nouveau mot de passe se choisit avec un lien, valable {keepUnits('15 minutes')}.
         </p>
       </header>
-      <label className="nv-field nv-enter" style={{ '--nv-i': 2 }}>
-        <span className="nv-field__label">E-mail</span>
-        <input
-          className="nv-field__control"
-          name="email"
-          type="email"
-          autoComplete="username"
-          autoFocus
-          value={email}
-          onChange={(event) => {
-            onEmail(event.target.value);
-            setError(null);
-          }}
-        />
-      </label>
-      {error === null ? null : (
-        <p role="alert" className="text-sm text-[var(--nv-warning)]">
-          {error}
-        </p>
-      )}
-      <button
-        className="nv-btn nv-btn--neon nv-enter"
-        style={{ '--nv-i': 3 }}
-        type="submit"
-        disabled={isSending || isEmpty}
-        aria-busy={isSending}
-      >
-        {isSending ? 'Un instant…' : 'Envoyer le lien'}
-      </button>
-      {/* A help, not a warning (Design, #829): muted, under the button, with nothing to click. */}
-      <p className="nv-enter -mt-3 text-sm text-[var(--nv-ink-muted)]" style={{ '--nv-i': 3 }}>
-        {NO_TELEGRAM_HINT}
-      </p>
+      <ul className="nv-enter flex flex-col gap-3 text-sm text-[var(--nv-ink-muted)]" style={{ '--nv-i': 2 }}>
+        <li>Tu fais partie de l’équipe ou tu es créatrice&nbsp;: demande-le à ton agence.</li>
+        <li>Tu es propriétaire&nbsp;: il se fait sur le serveur, par qui le gère.</li>
+      </ul>
       <button
         type="button"
-        className="nv-btn nv-btn--plain nv-btn--sm nv-enter self-center"
-        style={{ '--nv-i': 4 }}
+        className="nv-btn nv-btn--soft nv-enter"
+        style={{ '--nv-i': 3 }}
         onClick={onLeave}
       >
         Retour à la connexion
       </button>
-    </form>
+    </section>
   );
 }
 

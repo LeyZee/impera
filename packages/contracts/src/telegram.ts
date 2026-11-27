@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 import { refusalBodySchema } from './errors';
-import { CreatorIdSchema } from './ids';
 import { pastedSecret } from './pasted-secret';
 
 /**
- * Telegram notifications managed from Réglages › Telegram (ADR 0020, task P3-07). A bot token never crosses the
- * API outwards: only what Telegram says about the bot and the groups it sits in.
+ * The bots that post in the creators' channels, managed from Réglages › Telegram (ADR 0020, ADR 0080). Since
+ * 27/11/2026 Telegram serves the channels only: no alert group, no routing. A bot token never crosses the API outwards:
+ * only what Telegram says about the bot and the chats it sits in.
  */
 
 const uuid = z.uuid();
@@ -16,18 +16,6 @@ export type TelegramBotId = z.infer<typeof TelegramBotIdSchema>;
 
 export const TelegramChatIdSchema = uuid.brand<'TelegramChatId'>();
 export type TelegramChatId = z.infer<typeof TelegramChatIdSchema>;
-
-/** One per tab topic; the three alert levels first (ADR 0020 §2). `custom`: her own alerts, one topic for all (P4-01). */
-export const TelegramTopicSchema = z.enum([
-  'urgent',
-  'important',
-  'info',
-  'sale',
-  'keyword',
-  'validation',
-  'custom',
-]);
-export type TelegramTopic = z.infer<typeof TelegramTopicSchema>;
 
 /** `refused`: Telegram turned the token down (revoked). `conflict`: another program reads the same token. */
 export const TelegramBotStateSchema = z.enum(['active', 'refused', 'conflict']);
@@ -55,9 +43,6 @@ export const TelegramErrorKindSchema = z.enum([
   'chat_unreachable',
   'rate_limited',
   'unreachable',
-  'routes_version_conflict',
-  /** A message still waiting when its group was removed from the list (REG-28): it never left. */
-  'chat_removed',
 ]);
 export type TelegramErrorKind = z.infer<typeof TelegramErrorKindSchema>;
 
@@ -83,165 +68,27 @@ export const TelegramBotSchema = z.object({
 });
 export type TelegramBot = z.infer<typeof TelegramBotSchema>;
 
-/** `creatorId: null` sends the topic of every creator to the group. */
-export const TelegramRouteSchema = z.object({
-  creatorId: CreatorIdSchema.nullable(),
-  topic: TelegramTopicSchema,
-  chatId: TelegramChatIdSchema,
-});
-export type TelegramRoute = z.infer<typeof TelegramRouteSchema>;
-
-/** Per active creator: can an urgent alert reach a group right now (ADR 0020 §12). */
-export const TelegramCoverageSchema = z.array(
-  z.object({
-    creatorId: CreatorIdSchema,
-    displayName: z.string().min(1),
-    urgentReachable: z.boolean(),
-    topicsWithoutGroup: z.array(TelegramTopicSchema),
-  }),
-);
-export type TelegramCoverage = z.infer<typeof TelegramCoverageSchema>;
-
-export const TelegramOverviewSchema = z.object({
-  bots: z.array(TelegramBotSchema),
-  routes: z.array(TelegramRouteSchema),
-  coverage: TelegramCoverageSchema,
-  /** Optimistic concurrency of the routing table: sent back with `PUT /routes`. */
-  version: z.number().int().min(0),
-});
+/** `GET /v1/settings/telegram`: the bots and the chats each sits in. */
+export const TelegramOverviewSchema = z.object({ bots: z.array(TelegramBotSchema) });
 export type TelegramOverview = z.infer<typeof TelegramOverviewSchema>;
 
 /** A bot token is `<digits>:<35 characters>`; 128 leaves room and stops abuse of the route. */
 export const SaveTelegramTokenBodySchema = z.object({ token: pastedSecret(128) });
 export type SaveTelegramTokenBody = z.infer<typeof SaveTelegramTokenBodySchema>;
 
-export const SaveTelegramRoutesBodySchema = z.object({
-  version: z.number().int().min(0),
-  routes: z.array(TelegramRouteSchema).max(500),
-});
-export type SaveTelegramRoutesBody = z.infer<typeof SaveTelegramRoutesBodySchema>;
-
-export const TelegramRoutesSchema = z.object({
-  routes: z.array(TelegramRouteSchema),
-  version: z.number().int(),
-});
-
 export const TelegramRefusalSchema = z.object({ kind: TelegramErrorKindSchema, message: z.string().min(1) });
 export type TelegramRefusal = z.infer<typeof TelegramRefusalSchema>;
 
 /** A token Telegram or the shape check refused (422: adding a bot, replacing its token), in the common body (MOT-13). */
 export const TELEGRAM_TOKEN_UNPROCESSABLE = 'telegram_token_unprocessable';
-/** The test message did not reach the group (422). */
-export const TELEGRAM_TEST_UNPROCESSABLE = 'telegram_test_unprocessable';
-/** The routes changed since the page read them (409, `routes_version_conflict`). */
-export const TELEGRAM_ROUTES_CONFLICT = 'telegram_routes_conflict';
 export const TelegramRefusalBodySchema = refusalBodySchema(TelegramErrorKindSchema);
-
-export const TelegramTestResultSchema = z.object({ sentAt: z.iso.datetime() });
-
-export const TelegramDeliveryStatusSchema = z.enum(['pending', 'sending', 'sent', 'failed', 'unknown']);
-export type TelegramDeliveryStatus = z.infer<typeof TelegramDeliveryStatusSchema>;
-
-/** A line of the « Dernières alertes » journal. The text is written by the code, never a fan's words. */
-export const TelegramDeliverySchema = z.object({
-  id: z.uuid(),
-  topic: TelegramTopicSchema,
-  creatorId: CreatorIdSchema.nullable(),
-  chatTitle: z.string().min(1),
-  summary: z.string().min(1),
-  status: TelegramDeliveryStatusSchema,
-  createdAt: z.iso.datetime(),
-  sentAt: z.iso.datetime().nullable(),
-  /** « Pris en main par Théo », once someone took the conversation. */
-  closedBy: z.string().min(1).nullable(),
-});
-export type TelegramDelivery = z.infer<typeof TelegramDeliverySchema>;
-
-export const TelegramDeliveriesSchema = z.object({ deliveries: z.array(TelegramDeliverySchema) });
-
-/** Alert counts of one night, for the Dashboard's guards card. */
-export const TelegramNightCountsSchema = z.object({
-  urgent: z.number().int().min(0),
-  important: z.number().int().min(0),
-  info: z.number().int().min(0),
-});
-export type TelegramNightCounts = z.infer<typeof TelegramNightCountsSchema>;
-
-/**
- * The sales topic's settings (CRM-04 lot b, ADR 0020 §6), for every creator (`creatorId: null`) or one of them, hers
- * winning. `minimumMinor`: a sale under this price (VAT included, what the fan paid, in the sale's currency's cents)
- * does not ring; `agentOnly`: only the agent's sales ring; `eveningDigest`: the 23 h digest goes to the sales groups.
- * A refund never rings live, whatever the settings: it is in the digest.
- */
-export const TelegramSaleSettingsSchema = z.object({
-  minimumMinor: z.number().int().min(0).max(1_000_000),
-  agentOnly: z.boolean(),
-  eveningDigest: z.boolean(),
-});
-export type TelegramSaleSettings = z.infer<typeof TelegramSaleSettingsSchema>;
-
-/** Every sale rings, and the digest goes, until the owner says otherwise. */
-export const DEFAULT_TELEGRAM_SALE_SETTINGS: TelegramSaleSettings = {
-  minimumMinor: 0,
-  agentOnly: false,
-  eveningDigest: true,
-};
-
-export const TelegramSaleSettingsEntrySchema = TelegramSaleSettingsSchema.extend({
-  creatorId: CreatorIdSchema.nullable(),
-});
-export type TelegramSaleSettingsEntry = z.infer<typeof TelegramSaleSettingsEntrySchema>;
-
-/**
- * `GET` and `PUT /settings/telegram/sales`: the whole list, at most one entry per creator and one for all; the entry for
- * all always comes back (the defaults when none was saved). `PUT` replaces the list.
- */
-export const TelegramSalesSettingsSchema = z.object({
-  settings: z
-    .array(TelegramSaleSettingsEntrySchema)
-    .max(500)
-    .refine(
-      (entries) => new Set(entries.map((entry) => entry.creatorId)).size === entries.length,
-      'Une seule ligne par créatrice',
-    ),
-});
-export type TelegramSalesSettings = z.infer<typeof TelegramSalesSettingsSchema>;
 
 /** Jobs of the module (ADR 0006), part of `JOB_NAMES` and `JOB_PAYLOADS` (jobs.ts). */
 export const TELEGRAM_JOB_PAYLOADS = {
-  'telegram.scan': z.object({}),
-  'telegram.flush_chat': z.object({ chatId: TelegramChatIdSchema }),
   'telegram.dispatch_polls': z.object({}),
   'telegram.poll_updates': z.object({
     botId: TelegramBotIdSchema,
-    /** Long poll while the screen waits for a group; 0 for the minute round. */
+    /** Long poll while the screen waits for a channel; 0 for the minute round. */
     waitSeconds: z.number().int().min(0).max(25),
   }),
-  'telegram.morning_digest': z.object({}),
-  'telegram.evening_digest': z.object({}),
-  'telegram.connection_reminders': z.object({}),
-  'telegram.purge': z.object({}),
 } as const;
-
-/**
- * `/v1/auth/telegram-link` (SEC-05 lot 2, ADR 0068 § 4): the account's own private chat with the agency's bot, where
- * its reset link will go. Never the chat's id, only whether it is linked and by which bot.
- */
-export const TelegramPrivateLinkSchema = z.object({
-  linked: z.boolean(),
-  botUsername: z.string().nullable(),
-  linkedAt: z.iso.datetime().nullable(),
-});
-export type TelegramPrivateLink = z.infer<typeof TelegramPrivateLinkSchema>;
-
-/** The one-time code to send the bot (`/start <code>`), ten minutes; `url` opens the bot with the code already in. */
-export const TelegramLinkCodeSchema = z.object({
-  code: z.string().regex(/^[A-Z2-9]{10}$/),
-  botUsername: z.string().min(1),
-  url: z.url(),
-  expiresAt: z.iso.datetime(),
-});
-export type TelegramLinkCode = z.infer<typeof TelegramLinkCodeSchema>;
-
-/** No active bot can take the code yet (422): one is added first in Réglages › Telegram. */
-export const TELEGRAM_LINK_NO_BOT_UNPROCESSABLE = 'telegram_link_no_bot_unprocessable';

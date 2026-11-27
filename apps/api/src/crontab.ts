@@ -7,9 +7,6 @@ export interface CronJob extends CronItem {
   readonly task: JobName;
 }
 
-/** `telegram.scan` from the cron: a safety net retried by the next minute, never by its own attempts. */
-export const SCAN_SAFETY_NET_ATTEMPTS = 1;
-
 /**
  * Periodic jobs (ADR 0006). Each takes its attempts from the contract (`JOB_MAX_ATTEMPTS`), so a retry a job promises
  * happens (`crontab.test.ts`). In code rather than in a Graphile `crontab` file: the text format refuses dots in
@@ -85,37 +82,21 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.route'] },
   },
+  // The agency's alerts to the owners (27/11/2026), and the safety relays nobody took, rung again every 5 minutes.
   {
-    task: 'telegram.scan',
+    task: 'alerts.agency',
     match: '* * * * *',
-    options: { backfillPeriod: 0, maxAttempts: SCAN_SAFETY_NET_ATTEMPTS },
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.agency'] },
+  },
+  {
+    task: 'alerts.remind_safety',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.remind_safety'] },
   },
   {
     task: 'telegram.dispatch_polls',
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.dispatch_polls'] },
-  },
-  {
-    task: 'telegram.morning_digest',
-    match: '0 * * * *',
-    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.morning_digest'] },
-  },
-  // Each hour, acting only in a creator's 23 o'clock hour (CRM-04 lot b); the key of her day makes it once.
-  {
-    task: 'telegram.evening_digest',
-    match: '0 * * * *',
-    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.evening_digest'] },
-  },
-  // An outage still open 2 hours after its alert gets its single reminder in red (P3-12).
-  {
-    task: 'telegram.connection_reminders',
-    match: '*/10 * * * *',
-    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.connection_reminders'] },
-  },
-  {
-    task: 'telegram.purge',
-    match: '30 3 * * *',
-    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.purge'] },
   },
   // Her drops' originals (CR-06 c, ADR 0044 § 2): unfinished sends refused after 24 h, the agency told 7 days before an
   // original goes, the originals due erased, a withdrawn drop's within the hour. No backfill: the next run finds them.

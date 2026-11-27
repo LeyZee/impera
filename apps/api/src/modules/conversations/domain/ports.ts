@@ -876,7 +876,7 @@ export type ComposeResult =
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */
 interface ComposedAlert {
   readonly trigger: AlertTrigger;
-  /** Sent to Telegram, as her alert says when it went off. */
+  /** Rung to the team, as her alert says when it went off. */
   readonly notify: boolean;
 }
 

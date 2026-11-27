@@ -144,6 +144,13 @@ export const NOTIFICATION_REASONS = [
    * within the daily cap like a reminder.
    */
   'decision',
+  /**
+   * An alert of the agency to its owners (decision « Telegram pour les canaux seulement », 27/11/2026): a service down,
+   * a backup or an invoice late, a security act… Held in the quiet hours, outside the daily cap.
+   */
+  'agency_alert',
+  /** The same, urgent (a provider refusing calls, an invoice overdue, a security act): it rings even at night. */
+  'agency_urgent',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;

@@ -13,13 +13,11 @@ import {
   type CustomAlertGroup,
   type SystemAlertCode,
   type SystemAlertSetting,
-  type TelegramCoverage,
-  type TelegramTopic,
 } from '@impera/contracts';
 
 /*
  * Réglages › Alertes (P4-01) in words: what an alert of her own watches, on which creators, whether it pauses the
- * agent, where it goes on Telegram, and what still keeps it from being saved. Pure functions: the page lays them
+ * agent, whether it tells the team, and what still keeps it from being saved. Pure functions: the page lays them
  * out. The server checks again with the contract; these say it first, on the field it belongs to.
  */
 
@@ -33,7 +31,7 @@ export interface AlertDraft {
   readonly creatorIds: readonly CreatorId[];
 }
 
-/** A new alert lets one know on Telegram and leaves the agent running: pausing is a choice she makes. */
+/** A new alert tells the team and leaves the agent running: pausing is a choice she makes. */
 export const EMPTY_DRAFT: AlertDraft = {
   name: '',
   phrase: '',
@@ -334,54 +332,7 @@ export function testVerdict(sent: AlertTestBody, result: AlertTestResult, pauses
   return { rings, headline, lines, warning: unread ? (result.reason ?? 'Réessaie dans un instant.') : null };
 }
 
-/**
- * The routing of Réglages › Bots Telegram as this page reads it: who has no group for which topic, `'off'` when the
- * server runs without Telegram, `'none'` while no group gets anything yet. The last two are said once, in the head
- * of the page, never on every line.
- */
-export type TelegramRouting = TelegramCoverage | 'off' | 'none';
-
-/** One sentence for the head when Telegram carries nothing; `null` when it routes something, or is not known. */
-export function telegramHeadLine(routing: TelegramRouting | null): string | null {
-  if (routing === 'off')
-    return 'Telegram n’est pas branché sur ce serveur : les alertes restent dans l’historique du Suivi.';
-  if (routing === 'none')
-    return 'Aucun groupe Telegram ne reçoit encore rien : les alertes restent dans l’historique du Suivi.';
-  return null;
-}
-
-/** Where an alert goes on Telegram, read from the routing of Réglages › Bots Telegram (never set here). */
-export type TelegramLine =
-  | { readonly kind: 'silent'; readonly text: string }
-  | { readonly kind: 'sent'; readonly text: string }
-  | { readonly kind: 'missing'; readonly text: string; readonly topic: TelegramTopic };
-
-/**
- * `routing`: `null` while it is not known, and then the line says nothing rather than guess; `'off'` and `'none'`
- * are said by the head. `topicLabel`: the topic's name, as Réglages › Bots Telegram says it.
- */
-export function telegramLine(input: {
-  readonly notify: boolean;
-  readonly topic: TelegramTopic;
-  readonly topicLabel: string;
-  readonly creatorIds: readonly CreatorId[];
-  readonly routing: TelegramRouting | null;
-}): TelegramLine | null {
-  if (!input.notify) return { kind: 'silent', text: 'Gardée dans l’historique, sans Telegram' };
-  const { routing } = input;
-  if (routing === null || routing === 'off' || routing === 'none') return null;
-  const without = routing.filter(
-    (line) => input.creatorIds.includes(line.creatorId) && line.topicsWithoutGroup.includes(input.topic),
-  );
-  if (without.length === 0) return { kind: 'sent', text: `Part sur Telegram, dans « ${input.topicLabel} »` };
-  const names = without.map((line) => line.displayName);
-  const who =
-    names.length === 1
-      ? (names[0] ?? '')
-      : `${names.slice(0, -1).join(', ')} et ${names[names.length - 1] ?? ''}`;
-  return {
-    kind: 'missing',
-    text: `Aucun groupe Telegram ne reçoit « ${input.topicLabel} » pour ${who}`,
-    topic: input.topic,
-  };
+/** What a line says of an alert that rings nobody (`notify` off); `null` when it tells the team. */
+export function quietLine(notify: boolean): string | null {
+  return notify ? null : 'Gardée dans l’historique du Suivi, sans notification';
 }

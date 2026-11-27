@@ -91,13 +91,10 @@ describe('fromApi', () => {
     expect(card('reveal')?.rows[0]).toEqual(['Dernière lecture', 'il y a 14 s']);
   });
 
-  it('lists only the handoffs that happened, and says when Telegram is off (DASH-16)', () => {
+  it('lists only the handoffs that happened, and says the team is told by notification (DASH-16)', () => {
     expect(card('relays')?.title).toBe('Passages à l’humain');
-    expect(card('relays')?.sub).toBe('Telegram éteint');
-    expect(card('relays')?.rows).toEqual([
-      ['Mineur possible', '1'],
-      ['Alertes Telegram cette nuit', 'Telegram éteint'],
-    ]);
+    expect(card('relays')?.sub).toBe('l’équipe est prévenue par notification');
+    expect(card('relays')?.rows).toEqual([['Mineur possible', '1']]);
   });
 
   it('counts only the guards, never a relay for the AI budget, a voice down, no active persona or no named reason', () => {
@@ -122,7 +119,6 @@ describe('fromApi', () => {
     expect(card('relays', data)?.rows.map(([label]) => label)).toEqual([
       'Mineur possible',
       'Alerte personnalisée',
-      'Alertes Telegram cette nuit',
     ]);
     expect(data.agent.foldSummary).toContain('2 passages à l’humain');
     expect(flat(data.agent.foldSummary)).toContain('64,5 % validés sans retouche, objectif 80 %');
@@ -162,12 +158,6 @@ describe('fromApi', () => {
       'Europe/Paris',
     ).creator.now.replace(/\s/gu, ' ');
     expect(now).toBe('dimanche 1er novembre, 14 h');
-  });
-
-  it('hands Telegram’s night coverage to the banner, off included', () => {
-    expect(fromApi(apiDashboard()).telegram).toEqual({ coverage: null });
-    const uncovered = apiDashboard({ telegramCoverage: { urgentReachable: false } });
-    expect(fromApi(uncovered).telegram).toEqual({ coverage: { urgentReachable: false } });
   });
 
   it('makes no sale up', () => {

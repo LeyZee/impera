@@ -1,6 +1,5 @@
 import {
   CreatorIdSchema,
-  type CreatorId,
   CustomAlertGroupSchema,
   SystemAlertSettingSchema,
   type CustomAlertGroup,
@@ -18,11 +17,10 @@ import {
   hasChanges,
   newDraft,
   pauseLine,
+  quietLine,
   sameTest,
   switchedBody,
   systemLine,
-  telegramHeadLine,
-  telegramLine,
   testBodyOf,
   testCreatorOf,
   testHint,
@@ -173,62 +171,10 @@ describe('an alert on its line', () => {
   });
 });
 
-describe('where it goes on Telegram', () => {
-  const coverage = [
-    { creatorId: NORA.id, displayName: 'Nora Vidal', urgentReachable: true, topicsWithoutGroup: [] },
-    { creatorId: LEA.id, displayName: 'Léa', urgentReachable: true, topicsWithoutGroup: ['custom' as const] },
-    {
-      creatorId: IRIS.id,
-      displayName: 'Iris',
-      urgentReachable: false,
-      topicsWithoutGroup: ['custom' as const],
-    },
-  ];
-  const line = (creatorIds: CreatorId[], notify = true) =>
-    telegramLine({
-      notify,
-      topic: 'custom',
-      topicLabel: 'Alertes personnalisées',
-      creatorIds,
-      routing: coverage,
-    });
-
-  it('reads the routing of Réglages › Bots Telegram, creator by creator', () => {
-    expect(line([NORA.id])).toEqual({
-      kind: 'sent',
-      text: 'Part sur Telegram, dans « Alertes personnalisées »',
-    });
-    expect(line([NORA.id, LEA.id])).toEqual({
-      kind: 'missing',
-      text: 'Aucun groupe Telegram ne reçoit « Alertes personnalisées » pour Léa',
-      topic: 'custom',
-    });
-    expect(line([LEA.id, IRIS.id])?.text).toBe(
-      'Aucun groupe Telegram ne reçoit « Alertes personnalisées » pour Léa et Iris',
-    );
-  });
-
-  it('says it stays in the history when it is not sent, and nothing while the routing is unknown', () => {
-    expect(line([LEA.id], false)).toEqual({
-      kind: 'silent',
-      text: 'Gardée dans l’historique, sans Telegram',
-    });
-    for (const routing of ['off', 'none', null] as const) {
-      expect(
-        telegramLine({ notify: true, topic: 'custom', topicLabel: 'x', creatorIds: [NORA.id], routing }),
-      ).toBeNull();
-    }
-  });
-
-  it('says once, in the head, when Telegram carries nothing', () => {
-    expect(telegramHeadLine('off')).toBe(
-      'Telegram n’est pas branché sur ce serveur : les alertes restent dans l’historique du Suivi.',
-    );
-    expect(telegramHeadLine('none')).toBe(
-      'Aucun groupe Telegram ne reçoit encore rien : les alertes restent dans l’historique du Suivi.',
-    );
-    expect(telegramHeadLine([])).toBeNull();
-    expect(telegramHeadLine(null)).toBeNull();
+describe('whom it tells (27/11/2026, Telegram back to the channels only)', () => {
+  it('says only that it stays in the history when it tells no one', () => {
+    expect(quietLine(true)).toBeNull();
+    expect(quietLine(false)).toBe('Gardée dans l’historique du Suivi, sans notification');
   });
 });
 

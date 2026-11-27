@@ -7,12 +7,9 @@ import {
   PASSWORD_RESET_LINK_MINUTES,
   PASSWORD_RESET_PAGE,
   PASSWORD_RESET_REQUEST_MINUTES,
-  PASSWORD_RESET_REQUESTED_MESSAGE,
   PasswordResetPreviewSchema,
-  PasswordResetRequestedSchema,
   PasswordResetTokenBodySchema,
   RedeemPasswordResetBodySchema,
-  RequestPasswordResetBodySchema,
   type PasswordResetPreview,
 } from '@impera/contracts';
 import {
@@ -26,29 +23,23 @@ import {
   type Database,
   type Transaction,
 } from '@impera/db';
-import type { FastifyBaseLogger } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { Auth } from './auth';
-import type { Config } from './config';
 import { PasswordInvalid, passwordProblem } from './invitation-links';
 import type { PasswordBreachCheck } from './password-breaches';
 
 /**
- * « Mot de passe oublié » (SEC-05 lot 3, ADR 0068 §§ 2–5). An account of the agency (owner, or an operator still in
- * the team) asks a new password from the sign-in page; the link goes to its private Telegram chat (lot 2) and nowhere
- * else. The page always gets the same answer, at once: the work runs after it, so neither the body nor the time says
- * whether the account exists or has a chat. The link replaces the password, never the second factor.
+ * « Mot de passe oublié » (SEC-05 lot 3, ADR 0068 §§ 2–5, amended 27/11/2026). The private Telegram chats are gone
+ * (Telegram serves the creators' channels only), so nothing is asked from the sign-in page any more: a member gets a
+ * reset link from Équipe (EQ-10), an owner from `pnpm ops:password-reset-link` on the server, where whoever runs it
+ * already holds everything. The link replaces the password, never the second factor.
  */
 
 /** 256 random bits, base64url: 43 characters. */
 const TOKEN_BYTES = 32;
-/**
- * Per IP, fail closed (security.md): the request can only send a link to a chat the account linked itself, but a
- * refusal beats a burst while the counters are out of reach. The per-account pace is the 5 minutes below.
- */
-const REQUEST_LIMIT = { max: 5, timeWindow: '15 minutes', skipOnError: false };
+/** Per IP, fail closed (security.md): a refusal beats a burst while the counters are out of reach. */
 const INSPECT_LIMIT = { max: 30, timeWindow: '15 minutes', skipOnError: false };
 const REDEEM_LIMIT = { max: 10, timeWindow: '15 minutes', skipOnError: false };
 
@@ -59,21 +50,10 @@ class PasswordResetLinkNotFound extends DomainError {
   }
 }
 
-/** The private chat of an account (the `telegram` module's), as this file needs it. */
-interface PrivateChatPort {
-  has(userId: string): Promise<boolean>;
-  send(userId: string, text: string): Promise<'sent' | 'no_link' | 'failed'>;
-}
-
 export interface PasswordResetDeps {
   readonly auth: Auth;
   readonly adminDb: Database;
-  readonly config: Pick<Config, 'WEB_ORIGIN'>;
   readonly passwordBreaches: PasswordBreachCheck;
-  /** Null when Telegram is off (no encryption key): every request then ends with nothing sent. */
-  readonly privateChat: PrivateChatPort | null;
-  /** Runs the request's work after the answer has left; tests pass one they can wait for. */
-  readonly later?: (work: () => Promise<void>) => void;
 }
 
 /** Only the SHA-256 of a token is stored or compared. */
@@ -94,7 +74,8 @@ async function audit(
     userId: string | null;
     action: string;
     linkId?: string;
-    ip: string;
+    /** Null from the server's command line. */
+    ip: string | null;
     details: Record<string, unknown>;
   },
 ): Promise<void> {
@@ -128,7 +109,7 @@ type Made = { readonly userId: string; readonly linkId: string; readonly token: 
  * In one transaction, the account's row locked: a new link replacing a live one, unless one was made in the last
  * 5 minutes. Null, audited with its reason, when nothing is made.
  */
-async function makeLink(adminDb: Database, userId: string, ip: string): Promise<Made> {
+async function makeLink(adminDb: Database, userId: string, ip: string | null): Promise<Made> {
   const token = randomBytes(TOKEN_BYTES).toString('base64url');
   return withAdmin(adminDb, async (tx) => {
     await tx.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.id, userId)).for('update');
@@ -167,39 +148,35 @@ async function makeLink(adminDb: Database, userId: string, ip: string): Promise<
   });
 }
 
-/** The message of the private chat: what was asked and the link, never an amount, a creator's name or a key. */
-function resetMessage(url: string): string {
-  return [
-    'Un nouveau mot de passe a été demandé pour ton compte Impera.',
-    `Si c’est toi, ce lien vaut ${String(PASSWORD_RESET_LINK_MINUTES)} minutes : ${url}`,
-    'Sinon, ignore ce message : ton mot de passe ne change pas.',
-  ].join('\n\n');
-}
-
-/** What runs after the answer: never throws, every outcome is audited, nothing of it reaches the page. */
-async function handleRequest(deps: PasswordResetDeps, email: string, ip: string): Promise<void> {
-  const userId = await withAdmin(deps.adminDb, (tx) => accountOf(tx, email));
+/**
+ * `pnpm ops:password-reset-link` (27/11/2026): a link for an account of the agency, owner included, made on the server
+ * and printed there, never sent anywhere. Audited like the page's requests were, with no IP.
+ */
+export async function issuePasswordResetLink(
+  adminDb: Database,
+  email: string,
+  webOrigin: string,
+): Promise<
+  | { readonly kind: 'made'; readonly url: string; readonly minutes: number }
+  | { readonly kind: 'unknown' | 'too_soon' }
+> {
+  const userId = await withAdmin(adminDb, (tx) => accountOf(tx, email));
   if (userId === null) {
-    // Nobody to name: the typed address is not kept.
-    await withAdmin(deps.adminDb, (tx) =>
-      audit(tx, { userId: null, action: 'password_reset.request', ip, details: { outcome: 'unknown' } }),
+    await withAdmin(adminDb, (tx) =>
+      audit(tx, {
+        userId: null,
+        action: 'password_reset.request',
+        ip: null,
+        details: { outcome: 'unknown' },
+      }),
     );
-    return;
+    return { kind: 'unknown' };
   }
-  if (deps.privateChat === null || !(await deps.privateChat.has(userId))) {
-    await withAdmin(deps.adminDb, (tx) =>
-      audit(tx, { userId, action: 'password_reset.request', ip, details: { outcome: 'no_channel' } }),
-    );
-    return;
-  }
-  const made = await makeLink(deps.adminDb, userId, ip);
-  if (made === null) return;
-  const url = new URL(PASSWORD_RESET_PAGE, deps.config.WEB_ORIGIN);
+  const made = await makeLink(adminDb, userId, null);
+  if (made === null) return { kind: 'too_soon' };
+  const url = new URL(PASSWORD_RESET_PAGE, webOrigin);
   url.hash = `t=${made.token}`;
-  const outcome = await deps.privateChat.send(userId, resetMessage(url.toString()));
-  await withAdmin(deps.adminDb, (tx) =>
-    audit(tx, { userId, action: 'password_reset.send', linkId: made.linkId, ip, details: { outcome } }),
-  );
+  return { kind: 'made', url: url.toString(), minutes: PASSWORD_RESET_LINK_MINUTES };
 }
 
 async function inspect(adminDb: Database, token: string): Promise<PasswordResetPreview> {
@@ -249,40 +226,9 @@ async function redeem(
   });
 }
 
-/** `/v1/auth/password-reset`, open without a session; the table is reached through `withAdmin` only. */
+/** `/v1/auth/password-reset/*`, open without a session; the table is reached through `withAdmin` only. */
 export function createPasswordResetRoutes(deps: PasswordResetDeps): FastifyPluginAsyncZod {
   return (app) => {
-    const later =
-      deps.later ??
-      ((work: () => Promise<void>) => {
-        setImmediate(() => void work());
-      });
-    const guarded = (log: FastifyBaseLogger, work: () => Promise<void>) => {
-      later(async () => {
-        try {
-          await work();
-        } catch (error) {
-          log.error({ err: error }, 'password reset: the request could not be handled');
-        }
-      });
-    };
-
-    app.post(
-      '/auth/password-reset',
-      {
-        config: { rateLimit: REQUEST_LIMIT },
-        schema: { body: RequestPasswordResetBodySchema, response: { 202: PasswordResetRequestedSchema } },
-      },
-      async (request, reply) => {
-        const { email } = request.body;
-        const ip = request.ip;
-        if (z.email().safeParse(email.trim()).success) {
-          guarded(request.log, () => handleRequest(deps, email, ip));
-        }
-        return reply.code(202).send({ message: PASSWORD_RESET_REQUESTED_MESSAGE });
-      },
-    );
-
     app.post(
       '/auth/password-reset/inspect',
       {

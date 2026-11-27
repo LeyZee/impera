@@ -39,6 +39,8 @@ export const FAMILY_OF: Readonly<Record<NotificationReason, InboxFamily>> = {
   safety_alert: 'safety',
   owner_change: 'safety',
   decision: 'day',
+  agency_alert: 'alert',
+  agency_urgent: 'alert',
 };
 
 export const FAMILY_WORDS: Readonly<Record<InboxFamily, string>> = {

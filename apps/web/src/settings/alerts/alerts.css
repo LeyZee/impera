@@ -1,7 +1,7 @@
 /*
  * Réglages › Alertes (P4-01). The head, fields, switches and errors are the persona's (`ps-*`); only the lines of
- * alerts live here, prefixed `al-`. An alert is a setting, not an alarm: no red here. A creator without a Telegram
- * group for its topic is amber, like every warning; an alert switched off stays in place, in pale ink.
+ * alerts live here, prefixed `al-`. An alert is a setting, not an alarm: no red here; an alert switched off stays in
+ * place, in pale ink.
  */
 
 .al-page {
@@ -211,9 +211,9 @@
   margin-top: 2px;
 }
 
-/* ── Where it goes on Telegram: read from Réglages › Bots Telegram ── */
+/* ── An alert that tells nobody: said once, muted ── */
 /* The dot stays on the first line when the sentence wraps. */
-.al-telegram {
+.al-quiet {
   margin: 0;
   display: grid;
   grid-template-columns: 6px minmax(0, 1fr);
@@ -223,23 +223,13 @@
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.al-telegram__dot {
+.al-quiet__dot {
   width: 6px;
   height: 6px;
   align-self: start;
   margin-top: calc((var(--nv-text-footnote-leading) - 6px) / 2);
   border-radius: var(--nv-radius-full);
   background: var(--nv-ink-faint);
-}
-.al-telegram[data-kind='sent'] .al-telegram__dot {
-  background: var(--nv-data-1);
-}
-.al-telegram[data-kind='missing'] {
-  color: var(--nv-warning);
-  font-weight: 600;
-}
-.al-telegram[data-kind='missing'] .al-telegram__dot {
-  background: var(--nv-warning);
 }
 .al-link {
   color: inherit;

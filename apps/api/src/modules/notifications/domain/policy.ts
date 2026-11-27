@@ -119,10 +119,15 @@ const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set([
   'safety_alert',
   // A change among the owners (ADR 0096 § 2): the 72 hours of notice only help an owner who hears of it.
   'owner_change',
+  // An urgent alert of the agency (27/11/2026): what the Telegram « Urgent » group used to ring, night included.
+  'agency_urgent',
 ]);
 
-/** The alerts of a creator's tab ring all day outside the cap, and wait for the recap at night (Charles, 19/11). */
-const OUTSIDE_THE_CAP: ReadonlySet<NotificationReason> = new Set(['sale', 'creator_alert']);
+/**
+ * The alerts of a creator's tab ring all day outside the cap, and wait for the recap at night (Charles, 19/11); the
+ * agency's alerts the same (27/11).
+ */
+const OUTSIDE_THE_CAP: ReadonlySet<NotificationReason> = new Set(['sale', 'creator_alert', 'agency_alert']);
 
 export function isCapped(kind: NotificationReason): boolean {
   return !OUTSIDE_THE_CAP.has(kind) && !PASSES_QUIET_HOURS.has(kind);

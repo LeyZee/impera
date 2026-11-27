@@ -2,12 +2,11 @@ import { z } from 'zod';
 
 import { CreatorIdSchema } from './ids';
 import { normaliseWords } from './normalise';
-import type { TelegramTopic } from './telegram';
 
 /**
  * Alerts (P4-01): her own alerts, written by the owner, and the system's. A custom alert is stored as one row per
  * creator (RLS); the rows made together share a `groupId`, and the screen shows them as one alert. What a trigger
- * records names the alert and how it matched, never the fan's text: nothing he wrote leaves for Telegram (ADR 0020).
+ * records names the alert and how it matched, never the fan's text: nothing he wrote leaves in a notification.
  */
 
 export const CustomAlertIdSchema = z.uuid().brand<'CustomAlertId'>();
@@ -135,20 +134,6 @@ export type SystemAlertCode = z.infer<typeof SystemAlertCodeSchema>;
 
 /** Always on: her words are her persona's, removed there, never switched off here. */
 export const LOCKED_SYSTEM_ALERTS: readonly SystemAlertCode[] = ['keyword'];
-
-/** The Telegram topic her own alerts go to, all of them (one `notify` per alert decides whether it is sent). */
-export const CUSTOM_ALERT_TOPIC = 'custom' satisfies TelegramTopic;
-
-/**
- * The Telegram topic each system alert goes to, read by the classifier and shown by Réglages › Alertes: her words in
- * their own topic, a service asked for and a doubt on who she is as important (an action for a human, at night too).
- */
-export const SYSTEM_ALERT_TOPICS: Readonly<Record<SystemAlertCode, TelegramTopic>> = {
-  keyword: 'keyword',
-  service_request: 'important',
-  identity_doubt: 'important',
-  script_price: 'important',
-};
 
 /** A system alert on each creator; on unless switched off. */
 export const SystemAlertSettingSchema = z.object({

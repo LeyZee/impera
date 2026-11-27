@@ -1,6 +1,6 @@
 # Module `alerts`
 
-**Rôle.** Les alertes personnalisées de chaque créatrice (P4-01) : ce que le propriétaire écrit dans Réglages › Alertes (une phrase, des mots-clés, ou les deux ; « met en pause » ; diffusion Telegram), et ce que l'agent lira pour savoir quelles alertes surveiller.
+**Rôle.** Les alertes personnalisées de chaque créatrice (P4-01) : ce que le propriétaire écrit dans Réglages › Alertes (une phrase, des mots-clés, ou les deux ; « met en pause » ; « Prévenir l'équipe »), et ce que l'agent lira pour savoir quelles alertes surveiller.
 
 **Peut dépendre de.** aucun module métier (feuille).
 
@@ -17,14 +17,18 @@
 - `PUT /creators/:creatorId/alerts/:code` : les trois rôles entiers, une ligne par rôle dans `creator_alert_routes` (migration 0224, RLS forcée par `creator_id`, fermée à la créatrice), une ligne `creator_alert_route.update` dans `audit_log`. Le même choix rejoue sans rien changer. Une alerte verrouillée (`safety_handoff`) mise autrement qu'en `deliver` donne 422 `creator_alert_locked_unprocessable`, et la base le refuse aussi ;
 - `PUT /alerts/system/:code` : active ou désactive une alerte système pour les créatrices nommées, sans toucher les autres. Pour `keyword`, la réponse est 422 `system_alert_locked_unprocessable`.
 
-Les codes d'erreur sont dans `ALERT_ERROR_CODES`, le sujet Telegram de chaque alerte dans `CUSTOM_ALERT_TOPIC` et `SYSTEM_ALERT_TOPICS`, et deux mots-clés sont « le même » selon `alertKeywordKey`, la lecture du moteur (`normalise`, partagé dans le contrat). Une créatrice qui n'existe pas donne 400 `alert_creator_invalid`, sans rien écrire. Un groupe sans ligne active donne 404 `custom_alert_not_found`. Chaque écriture ajoute une ligne `custom_alert.create`, `.update`, `.archive` ou `system_alert.update` dans `audit_log`.
+Les codes d'erreur sont dans `ALERT_ERROR_CODES`, et deux mots-clés sont « le même » selon `alertKeywordKey`, la lecture du moteur (`normalise`, partagé dans le contrat). Une créatrice qui n'existe pas donne 400 `alert_creator_invalid`, sans rien écrire. Un groupe sans ligne active donne 404 `custom_alert_not_found`. Chaque écriture ajoute une ligne `custom_alert.create`, `.update`, `.archive` ou `system_alert.update` dans `audit_log`.
 
-**Pour l'agent.** `store.activeFor(creatorId)` rend ses alertes personnalisées allumées et non archivées ; `store.systemOn(creatorId)` rend ses alertes système actives. Les mots-clés se lisent en code, la phrase par le cerveau, qui rend des identifiants (fiche P4-01). Un déclenchement s'écrit `alert_triggered` quand l'alerte prévient seulement, ou `handoff_requested` avec son `trigger` quand elle met en pause, jamais les deux. Aucun des deux ne porte le texte du fan (ADR 0020).
+**Pour l'agent.** `store.activeFor(creatorId)` rend ses alertes personnalisées allumées et non archivées ; `store.systemOn(creatorId)` rend ses alertes système actives. Les mots-clés se lisent en code, la phrase par le cerveau, qui rend des identifiants (fiche P4-01). Un déclenchement s'écrit `alert_triggered` quand l'alerte prévient seulement, ou `handoff_requested` avec son `trigger` quand elle met en pause, jamais les deux. Aucun des deux ne porte le texte du fan.
 
 **Routeur** (`alerts.route`, ADR 0150 lot 2, chaque minute) : `application/route.ts` relit la dernière demi-heure de `domain_events` par le rôle de service (`infra/db/router-reads.ts`), classe chaque événement (`domain/classify.ts`), lit les choix de la créatrice par `creatorAlertLines` et le verrou (`domain/route.ts`), puis appelle `notify` (raison `creator_alert`, clé = l'événement) pour le propriétaire, les managers actifs et les chatteurs en shift sur elle (`scheduling.onShift`). Sourdine = notification sans son (`silent`). Une créatrice archivée ne prévient personne ; une alerte de l'agence (budget IA) prend le mode le plus fort de ses créatrices, jamais les chatteurs. Le message dit son nom et l'alerte, ouvre la conversation, jamais rien du fan. Lu, jamais écrit : `domain_events`, `creators`, `user`, `team_members`, `creator_alert_routes`.
 
+**Alertes de l'agence** (`alerts.agency`, ADR 0176 § 3, chaque minute) : `application/agency.ts` relit la dernière demi-heure de `domain_events`, lit chaque événement de façon tolérante (`domain/agency/events.ts`, une ligne illisible est sautée), le classe (`domain/agency/classify.ts`, une table du domaine, jamais un prompt) et l'écrit (`domain/agency/message.ts`), puis appelle `notify` pour chaque propriétaire : `agency_urgent` (passe les heures calmes et le plafond) pour une alerte de sécurité ou un quota IA épuisé, `agency_alert` (hors plafond, après les heures calmes) pour le reste. Un fait dit en plusieurs événements (une devise chacun) sonne une fois : la clé est son fil (`thread:<clé>`). Les relais de sécurité d'une créatrice n'y passent pas : son onglet les sonne (`alerts.route`). Jamais le fan, ce qu'il a écrit, un montant de la paie ni le nom d'un prestataire.
+
+**Relance de sécurité** (`alerts.remind_safety`, chaque minute) : un relais de sécurité que personne n'a pris (ni `takeover_started` ni `takeover_ended` après lui) sonne de nouveau toutes les 5 minutes pendant une heure (`safetyReminderDue`, 12 fois au plus), chez les propriétaires, les managers de la créatrice et les chatteurs en shift sur elle, motif `safety_alert`, clé `<relais>:relance:<n>`.
+
 ## Structure
 
-- `domain/` : le port `AlertStore`. Zéro I/O.
+- `domain/` : le port `AlertStore`, le routeur et `agency/` (lecture, classement et textes des alertes de l'agence). Zéro I/O.
 - `infra/db/` : les tables sous RLS, chaque ligne relue par le contrat.
 - `infra/http/` : les routes.

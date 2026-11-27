@@ -1,10 +1,6 @@
 import {
   payPeriodLastDay,
-  CUSTOM_ALERT_TOPIC,
   OWNER_REMOVAL_NOTICE_HOURS,
-  SYSTEM_ALERT_LABELS,
-  SYSTEM_ALERT_TOPICS,
-  type AlertRef,
   type AutomaticMissing,
   type ConnectionDownReason,
   type ConnectionService,
@@ -15,40 +11,30 @@ import {
   type PayoutBlock,
   type PayPeriod,
   type Platform,
-  type SaleSeller,
-  type SaleType,
   type SecurityAlertPayload,
-  type SystemAlertCode,
   type UserRole,
-  type TelegramTopic,
 } from '@impera/contracts';
 
-import { saleAmount } from './sales';
-import type { Notice, Outcome, Signal } from './signals';
+import { SAFETY_HANDOFF_CAUSES } from '../classify';
+
+import type { Notice, Signal } from './signals';
 
 /**
- * The classification table (ADR 0020 §2, CLAUDE.md rule 3): which event becomes which message, in code. An event
- * missing from here produces nothing.
+ * The agency's alerts (ADR 0020 §2, kept for the owners when Telegram went back to the channels, CLAUDE.md rule 3): which event becomes which
+ * notification for the owners, in code. An event missing from here produces nothing. What her tab tells (ADR 0150:
+ * a safety relay, her alerts, a sale, the AI budget, an expired session) is never told here a second time.
  */
 
 /**
- * The event types the module reads. Mirrored by the trigger `domain_events_telegram_scan`, recreated by each
- * migration that changes the list (a test compares them); types that do not exist yet in the contract are listed so
- * that their producers light their tab up without a new migration.
+ * The event types the agency's alerts read. A takeover closed a Telegram thread and has nothing to ring; an expired
+ * session rings by her tab (`session_expired`, `alerts.route`).
  */
-export const SCANNED_EVENT_TYPES = [
+export const AGENCY_EVENT_TYPES = [
   'handoff_requested',
   'budget_threshold_crossed',
   'ai_credits_low',
   'ai_quota_exhausted',
-  'session_state_changed',
   'kill_switch_toggled',
-  'takeover_started',
-  'takeover_ended',
-  'sale_detected',
-  'alert_triggered',
-  'validation_requested',
-  'validation_resolved',
   'automatic_closed',
   'send_failed',
   'backup_overdue',
@@ -68,14 +54,6 @@ export const SCANNED_EVENT_TYPES = [
   'sales_feed_signal',
 ] as const;
 
-const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
-  'minor',
-  'non_consent',
-  'distress',
-  'meeting',
-  'manipulation',
-]);
-
 const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
   minor: 'Possible mineur dans la conversation.',
   non_consent: 'Possible contenu sans consentement.',
@@ -93,77 +71,6 @@ const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
   custom_order: 'Le fan demande quelque chose fait pour lui : un humain prend la commande.',
   sale_trouble: 'Une vente coince encore (paiement ou plainte après achat) : un humain doit répondre.',
 };
-
-/**
- * A handoff one of her alerts caused goes to that alert's topic (P4-01), the one Réglages › Alertes shows: the
- * contract's table, read here and by the screen. Any other cause goes to the important groups.
- */
-const ALERT_CAUSE_TOPIC: Readonly<Partial<Record<HandoffCause, TelegramTopic>>> = {
-  keyword: SYSTEM_ALERT_TOPICS.keyword,
-  identity_doubt: SYSTEM_ALERT_TOPICS.identity_doubt,
-  custom_alert: CUSTOM_ALERT_TOPIC,
-};
-
-/** What an alert that does not pause the agent says: the alert, never the fan's words. */
-const SYSTEM_ALERT_TEXT: Readonly<Record<SystemAlertCode, string>> = {
-  keyword: CAUSE_TEXT.keyword,
-  service_request:
-    'Le fan demande un service (contenu sur mesure, appel, cam, vocal) : un humain peut le lui vendre.',
-  identity_doubt: CAUSE_TEXT.identity_doubt,
-  script_price:
-    'Le prix d’une étape de script a changé sur la plateforme : l’étape n’est pas partie, vérifiez le catalogue.',
-};
-
-/** An alert of hers is named, as Suivi › Historique des alertes names it; the system's by their label there. */
-export type AlertNameOf = (alert: AlertRef & { kind: 'custom' }) => string | null;
-
-const noNames: AlertNameOf = () => null;
-
-const alertTitle = (alert: AlertRef, nameOf: AlertNameOf): string =>
-  alert.kind === 'system' ? SYSTEM_ALERT_LABELS[alert.code] : (nameOf(alert) ?? 'Alerte personnalisée');
-
-/** Her alert by its name, written by the agency, never the fan's words; without a name read, the generic line. */
-function customAlertText(alert: AlertRef & { kind: 'custom' }, nameOf: AlertNameOf): string {
-  const name = nameOf(alert);
-  return name === null ? CAUSE_TEXT.custom_alert : `Le message du fan correspond à l’alerte « ${name} ».`;
-}
-
-/** A seller who is a member is named by the name the team shows (CRM-04 lot b); `null` when it was not read. */
-export type MemberNameOf = (memberId: string) => string | null;
-
-const noMembers: MemberNameOf = () => null;
-
-/** The kinds of sales as the team reads them; the platform's own words stay out. */
-const SALE_TYPE_TEXT: Readonly<Record<SaleType, string>> = {
-  subscription: 'Abonnement',
-  renewal: 'Renouvellement',
-  ppv: 'PPV',
-  mass_dm: 'Mass DM',
-  tip: 'Pourboire',
-  payment_link: 'Lien de paiement',
-  boudoir: 'Boudoir',
-  paid_message: 'Message payant',
-  other: 'Autre vente',
-};
-
-/** Who sold, in four cases (ADR 0050 § 5): a member by name, the agent, a chatter nobody linked yet, nobody. */
-function sellerText(seller: SaleSeller, memberNameOf: MemberNameOf): string {
-  switch (seller.kind) {
-    case 'member': {
-      const name = memberNameOf(seller.memberId);
-      return name === null ? 'vendue par un chatteur' : `vendue par ${name}`;
-    }
-    case 'agent':
-      return 'vendue par l’agent';
-    case 'unlinked':
-      return 'chatteur non relié';
-    case 'none':
-      return 'sans chatteur';
-  }
-}
-
-const alertTopic = (alert: AlertRef): TelegramTopic =>
-  alert.kind === 'custom' ? CUSTOM_ALERT_TOPIC : SYSTEM_ALERT_TOPICS[alert.code];
 
 const KILL_REASON_MAX = 200;
 
@@ -230,7 +137,7 @@ const periodText = (period: PayPeriod): string => {
 const countText = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
 
-/** Why a document was not issued, as the owner settles it; the contractor is never named in Telegram. */
+/** Why a document was not issued, as the owner settles it; the contractor is never named in a notification. */
 const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
   mandate_unpublished: 'aucun mandat de facturation n’est publié dans Réglages › Facturation',
   no_mandate: 'le prestataire n’a pas accepté de mandat de facturation',
@@ -298,7 +205,7 @@ const payoutBlockText = (block: PayoutBlock): string => {
 /**
  * An invoice's due date (EQ-06 lot 8): its number and due date, worded to stay true whatever day it is read; when the
  * transfer is blocked, why, and what passing the due date costs (L441-10: late-payment penalties and the 40 €
- * indemnity, mentions printed on every invoice). Never its amount: no figure of pay goes to Telegram.
+ * indemnity, mentions printed on every invoice). Never its amount: no figure of pay is notified.
  */
 const invoiceDueText = (signal: Extract<Signal, { kind: 'invoice_due' }>): string => {
   const day = longDay(signal.dueOn);
@@ -317,7 +224,7 @@ const invoiceDueText = (signal: Extract<Signal, { kind: 'invoice_due' }>): strin
  * What a contractor's document expiring means (EQ-06 lot 5c-2, glossary « Pièce du prestataire »): without the tax
  * residence certificate of the next year, no transfer of that year is recorded under a treaty regime (ADR 0041 § 5),
  * the invoices leaving all the same; without a valid URSSAF certificate, an invoice leaves with a warning. Worded to
- * stay true after the last day: the reminder can come late. The contractor is never named in Telegram: the link opens
+ * stay true after the last day: the reminder can come late. The contractor is never named in a notification: the link opens
  * their file.
  */
 const contractorDocumentText = (document: ContractorDocumentKind, lastDay: string): string => {
@@ -470,64 +377,34 @@ const connectionLink = (service: ConnectionService): { label: string; path: stri
     ? { label: 'Ouvrir les ventes', path: '/reglages/ventes' }
     : { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' };
 
-/** One thread per service: its outage, its single reminder and « Rétabli » (P3-12). */
-export const connectionThreadKey = (service: ConnectionService): string => `connection:${service}`;
+/** One thread per service (P3-12). */
+const connectionThreadKey = (service: ConnectionService): string => `connection:${service}`;
 
 /**
- * The single reminder of an outage still open 2 hours after its alert (P3-12): urgent, the important groups for a
- * fallback. It names no reason: the outage may have changed its cause since, the gesture stays the same.
+ * The handoffs her tab tells (ADR 0150 § B): a safety relay, her alerts, a doubt on who she is, a custom order. The
+ * others (a guard, the model down, no active persona, a sale that sticks…) only the owners hear of, here.
  */
-export function connectionReminder(service: ConnectionService): Notice {
-  return {
-    kind: 'notice',
-    topic: 'urgent',
-    fallbackTopic: 'important',
-    threadKey: connectionThreadKey(service),
-    title: 'URGENT',
-    body: `${capitalized(CONNECTION_NAMES[service])} est toujours en panne après 2 h. ${CONNECTION_EFFECT[service]}`,
-    link: connectionLink(service),
-  };
-}
+const TOLD_BY_HER_TAB: ReadonlySet<HandoffCause> = new Set([
+  ...SAFETY_HANDOFF_CAUSES,
+  'identity_doubt',
+  'keyword',
+  'custom_alert',
+  'custom_order',
+]);
 
-export function classify(
-  signal: Signal,
-  nameOf: AlertNameOf = noNames,
-  memberNameOf: MemberNameOf = noMembers,
-): Outcome | null {
+export function classify(signal: Signal): Notice | null {
   switch (signal.kind) {
     case 'handoff': {
-      const isUrgent = signal.cause !== null && URGENT_CAUSES.has(signal.cause);
-      const causeTopic = signal.cause === null || isUrgent ? undefined : ALERT_CAUSE_TOPIC[signal.cause];
-      const cause =
-        signal.cause === null
-          ? 'L’agent passe la main.'
-          : signal.cause === 'custom_alert' && signal.alert?.kind === 'custom'
-            ? customAlertText(signal.alert, nameOf)
-            : CAUSE_TEXT[signal.cause];
+      if (signal.cause !== null && TOLD_BY_HER_TAB.has(signal.cause)) return null;
       return {
         kind: 'notice',
-        topic: isUrgent ? 'urgent' : (causeTopic ?? 'important'),
-        // A fan paused by one of her alerts waits for a human: without a group for its topic, the important ones.
-        ...(causeTopic !== undefined && causeTopic !== 'important' && { fallbackTopic: 'important' }),
+        topic: 'important',
         threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
-        title: isUrgent ? 'URGENT' : 'Important',
-        body: `${cause} Il n’écrit plus à ce fan et attend un humain.`,
+        title: 'Important',
+        body: `${signal.cause === null ? 'L’agent passe la main.' : CAUSE_TEXT[signal.cause]} Il n’écrit plus à ce fan et attend un humain.`,
         link: conversationLink(signal.conversationId),
       };
     }
-    // The agent goes on: nothing to close, and no fallback, it only lets a human know.
-    case 'alert': {
-      const topic = alertTopic(signal.alert);
-      return {
-        kind: 'notice',
-        topic,
-        threadKey: null,
-        title: alertTitle(signal.alert, nameOf),
-        body: `${signal.alert.kind === 'custom' ? customAlertText(signal.alert, nameOf) : SYSTEM_ALERT_TEXT[signal.alert.code]} L’agent continue de lui répondre.`,
-        link: conversationLink(signal.conversationId),
-      };
-    }
-    // Same thread as a handoff: a takeover or a hand-back closes it.
     case 'send_failed':
       return {
         kind: 'notice',
@@ -537,34 +414,11 @@ export function classify(
         body: 'Un message de l’agent n’a pas pu partir. Il n’écrit plus à ce fan et attend un humain.',
         link: conversationLink(signal.conversationId),
       };
-    case 'takeover':
-      return signal.conversationId === null
-        ? null
-        : {
-            kind: 'closure',
-            threadKey: `conversation:${signal.conversationId}`,
-            mode: 'edit',
-            text: 'Pris en main',
-            userId: signal.userId,
-          };
-    // After a handoff the conversation is already the humans': giving it back is how the alert gets closed.
-    case 'release':
-      return signal.conversationId === null
-        ? null
-        : {
-            kind: 'closure',
-            threadKey: `conversation:${signal.conversationId}`,
-            mode: 'edit',
-            text: 'Rendu à l’agent',
-            userId: signal.userId,
-          };
     // The cap reached stops every generation until midnight: red (Charles, 03/11/2026); the 80 % warning stays amber.
     case 'budget':
       return {
         kind: 'notice',
         topic: signal.threshold === 'reached' ? 'urgent' : 'important',
-        // An agency with no Urgent group yet still hears it, in Important, as the overdue invoice does.
-        ...(signal.threshold === 'reached' && { fallbackTopic: 'important' }),
         threadKey: null,
         title: signal.threshold === 'reached' ? 'URGENT' : 'Important',
         body:
@@ -573,34 +427,10 @@ export function classify(
             : `Plafond IA : ${euros(signal.spentMinor)} sur ${euros(signal.capMinor)} aujourd’hui.`,
         link: { label: 'Voir les modèles IA', path: '/reglages/modeles-ia' },
       };
-    case 'session_expired':
-      return {
-        kind: 'notice',
-        topic: 'important',
-        threadKey: `session:${signal.platformAccountId}`,
-        title: 'Important',
-        body: 'La session Reveal a expiré : l’agent ne lit plus les messages.',
-        link: { label: 'Reconnecter la session', path: '/reglages' },
-      };
-    case 'session_back':
-      return {
-        kind: 'closure',
-        threadKey: `session:${signal.platformAccountId}`,
-        mode: 'reply',
-        text: 'Résolu : la session est revenue.',
-        userId: null,
-      };
     case 'kill_switch': {
       const threadKey = `kill:${signal.scope}:${signal.scopeId ?? 'global'}`;
-      if (!signal.active) {
-        return {
-          kind: 'closure',
-          threadKey,
-          mode: 'reply',
-          text: 'Résolu : l’agent est relancé.',
-          userId: null,
-        };
-      }
+      // Lifted: nothing rings, the Dashboard says it.
+      if (!signal.active) return null;
       const reason = signal.reason.trim().slice(0, KILL_REASON_MAX);
       return {
         kind: 'notice',
@@ -634,7 +464,6 @@ export function classify(
       return {
         kind: 'notice',
         topic: urgent ? 'urgent' : 'important',
-        ...(urgent && { fallbackTopic: 'important' }),
         threadKey: null,
         title: urgent ? 'URGENT' : 'Important',
         body:
@@ -652,7 +481,6 @@ export function classify(
       return {
         kind: 'notice',
         topic: 'urgent',
-        fallbackTopic: 'important',
         threadKey: null,
         title: 'URGENT',
         body:
@@ -717,13 +545,11 @@ export function classify(
         body: `${signal.document === 'invoice' ? `La facture ${signal.number} est contestée` : `L’avoir ${signal.number} est contesté`} par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.`,
         link: PAY_LINK,
       };
-    // Coming due, important; overdue, urgent (ADR 0020 §2, « rouge facture » of Charles, 02/11): the penalties run. Without
-    // a group for the urgent, the important ones still hear of it.
+    // Coming due, important; overdue, urgent (ADR 0020 §2, « rouge facture » of Charles, 02/11): the penalties run.
     case 'invoice_due':
       return {
         kind: 'notice',
         topic: signal.overdue ? 'urgent' : 'important',
-        ...(signal.overdue && { fallbackTopic: 'important' }),
         threadKey: null,
         title: signal.overdue ? 'URGENT' : 'Important',
         body: invoiceDueText(signal),
@@ -752,16 +578,6 @@ export function classify(
         link: { label: 'Ouvrir le Dashboard', path: '/' },
       };
     }
-    case 'sale':
-      // Silent, in its own topic (ADR 0020 §2); a refund never rings live, it is in the evening digest (CRM-04).
-      return {
-        kind: 'notice',
-        topic: 'sale',
-        threadKey: null,
-        title: 'Vente',
-        body: `${SALE_TYPE_TEXT[signal.saleType]} · ${saleAmount(signal.grossInclVatMinor, signal.currency)} · ${sellerText(signal.seller, memberNameOf)}`,
-        link: null,
-      };
     // Important (question 6 of CRM-04, Charles 03/11/2026): pay still reads the platform's net, the owner checks before
     // closing. No amount: the check of Réglages › Ventes has them.
     case 'sales_feed_mismatch':
@@ -773,7 +589,7 @@ export function classify(
         body: `Ventes ${PLATFORM_NAMES[signal.platform]} : la vérification de ${periodText(signal.from)} ne concorde plus avec les statistiques de ${PLATFORM_NAMES[signal.platform]}, sur ${countText(signal.days, 'jour', 'jours')} et ${countText(signal.accounts, 'compte', 'comptes')}. La paie lit toujours le net de ${PLATFORM_NAMES[signal.platform]} : vérifie avant de clôturer.`,
         link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
       };
-    // Important (ADR 0069 § 5): nothing is deleted, the owner looks. No name, no id: a group may hold managers.
+    // Important (ADR 0069 § 5): nothing is deleted, the owner looks. No name, no id.
     case 'sales_feed_model':
       return {
         kind: 'notice',
@@ -786,14 +602,13 @@ export function classify(
             : `Ventes ${PLATFORM_NAMES[signal.platform]} : une créatrice reliée est marquée bannie par ${PLATFORM_NAMES[signal.platform]}. Rien n’est supprimé : regarde sa fiche et ses ventes.`,
         link: { label: 'Ouvrir Ventes', path: '/reglages/ventes' },
       };
-    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
-    // Important to the groups for all (CRM-04 d3, ADR 0054 § 2): a group may hold managers, so no amount, no
+    // Urgent (ADR 0046 § 8).
+    // Important (CRM-04 d3, ADR 0054 § 2): no amount, no
     // percentage; one message per account and fortnight, whatever its currencies.
     case 'agency_share_mismatch':
       return {
         kind: 'notice',
         topic: 'important',
-        allCreatorsOnly: true,
         oncePerThread: true,
         threadKey: `agency_share:${signal.platformAccountId}:${signal.from}`,
         title: 'Important',
@@ -803,13 +618,12 @@ export function classify(
           path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
         },
       };
-    // Important to the groups for all (ADR 0054 § 5), as the gap above: no amount, no share, once per account and
+    // Important (ADR 0054 § 5), as the gap above: no amount, no share, once per account and
     // fortnight.
     case 'agency_share_changed':
       return {
         kind: 'notice',
         topic: 'important',
-        allCreatorsOnly: true,
         oncePerThread: true,
         threadKey: `agency_share_changed:${signal.platformAccountId}:${signal.from}`,
         title: 'Important',
@@ -828,19 +642,13 @@ export function classify(
         body: `${capitalized(CONNECTION_NAMES[signal.service])} est en panne : ${CONNECTION_REASON[signal.reason]} ${CONNECTION_EFFECT[signal.service]}`,
         link: connectionLink(signal.service),
       };
+    // Back: nothing rings, the Dashboard says it.
     case 'connection_back':
-      return {
-        kind: 'closure',
-        threadKey: connectionThreadKey(signal.service),
-        mode: 'reply',
-        text: `Rétabli : ${CONNECTION_NAMES[signal.service]} fonctionne de nouveau.`,
-        userId: null,
-      };
+      return null;
     case 'security_alert':
       return {
         kind: 'notice',
         topic: 'urgent',
-        fallbackTopic: 'important',
         threadKey: null,
         title: 'URGENT',
         ...securityNotice(signal.alert),

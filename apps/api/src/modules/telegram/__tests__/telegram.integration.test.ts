@@ -1,59 +1,33 @@
 import { randomBytes } from 'node:crypto';
 
-import {
-  ConversationIdSchema,
-  CreatorIdSchema,
-  CustomAlertIdSchema,
-  DraftIdSchema,
-  EventIdSchema,
-  PlatformAccountIdSchema,
-  SalesLineIdSchema,
-  TeamMemberIdSchema,
-  newId,
-  type CreatorId,
-  type SalesTotals,
-  type TelegramBot,
-  type TelegramChatId,
-} from '@impera/contracts';
-import { eq, parseEncryptionKeys, schema, sql, withTenant } from '@impera/db';
+import { EventIdSchema, newId, type TelegramBot, type TelegramChatId } from '@impera/contracts';
+import { eq, parseEncryptionKeys, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
-import { createTelegramModule, SCANNED_EVENT_TYPES, type TelegramModule } from '..';
+import { createTelegramModule, type TelegramModule } from '..';
 import { testConfig } from '../../../__tests__/support/config';
 import { createJobQueue, type JobQueue } from '../../../jobs';
 import { createLogger } from '../../../logger';
 import { buildServer } from '../../../server';
-import { nightOf } from '../domain/schedule';
 import { createPostgresTelegramStore, type ResealReport } from '../infra/postgres.store';
 
 import { FAKE_TOKEN, FakeTelegram, OTHER_TOKEN, SAME_BOT_NEW_TOKEN, joined } from './support/fake-telegram';
 
 const keyOf = (version: string) => `${version}:${randomBytes(32).toString('base64')}`;
-const WEB_ORIGIN = 'https://crm.example.test';
 
-/** The module on the real migrations, with Telegram played by FakeTelegram (ADR 0020, task P3-07). */
+/**
+ * The module on the real migrations, with Telegram played by FakeTelegram (ADR 0080). Since the 27/11/2026 it keeps the
+ * bots and the channels they find, nothing of the agency's alerts.
+ */
 describe('telegram module on Postgres', () => {
   let test: TestDb;
   let queue: JobQueue;
-  let creatorId: CreatorId;
-  let offsetMs = 0;
-  let sliceStart = Date.now();
-  let eventSeq = 0;
-  const clock = { now: () => new Date(Date.now() + offsetMs) };
   const keys = keyOf('v1');
   let telegram: FakeTelegram;
   let module: TelegramModule;
-  let uncovered: string[];
-  /** Her alerts' names, as the `alerts` module gives them. */
-  const names = new Map<string, ReadonlyMap<string, string>>();
-  /** Her day's sales totals, as `salesFeedTotals` gives them; the days asked, to check the digest's day. */
-  let salesTotals: SalesTotals = { from: '', to: '', rows: [], refundsWithoutSale: 0 };
-  const totalsAsked: string[] = [];
-  let registerLinked = true;
-  let usdRateMicros: number | null = null;
 
   function build(encryptionKeys = keys): {
     module: TelegramModule;
@@ -64,29 +38,7 @@ describe('telegram module on Postgres', () => {
       keys: parseEncryptionKeys(encryptionKeys),
     });
     return {
-      module: createTelegramModule({
-        bots: store.bots,
-        deliveries: store.deliveries,
-        channel: telegram,
-        clock,
-        webOrigin: WEB_ORIGIN,
-        onUncovered: (event) => uncovered.push(event.id),
-        resealTokens: store.resealTokens,
-        alertNames: { ofCreator: (creatorId) => Promise.resolve(names.get(creatorId) ?? new Map()) },
-        salesDay: {
-          dayOf: (_creatorId, day) => {
-            totalsAsked.push(day);
-            // Read a minute ago, as the clock of the test says, unless the register is unlinked.
-            const readAt = new Date(clock.now().getTime() - 60_000).toISOString();
-            return Promise.resolve({
-              totals: { ...salesTotals, from: day, to: day },
-              refunds: { day, rows: [] },
-              readings: registerLinked ? [{ platform: 'reveal' as const, readAt, pausedUntil: null }] : [],
-            });
-          },
-        },
-        usdRate: { onDayOf: () => Promise.resolve(usdRateMicros) },
-      }),
+      module: createTelegramModule({ bots: store.bots, channel: telegram, resealTokens: store.resealTokens }),
       resealTokens: store.resealTokens,
     };
   }
@@ -102,37 +54,8 @@ describe('telegram module on Postgres', () => {
       .parse(result.rows);
   }
 
-  /** Writes an outbox row as the application does: as `nirvana_app`, inside the creator's tenant. */
-  async function publish(
-    type: string,
-    payload: unknown,
-    creator: CreatorId | null = creatorId,
-  ): Promise<string> {
-    const id = newId(EventIdSchema);
-    const row = {
-      id,
-      creatorId: creator,
-      type,
-      payload,
-      actor: 'system',
-      correlationId: 'test',
-      createdAt: new Date(sliceStart + (eventSeq += 1) * 1000),
-    };
-    if (creator === null) await test.admin.db.insert(schema.domainEvents).values(row);
-    else await withTenant(test.app.db, creator, (tx) => tx.insert(schema.domainEvents).values(row));
-    return id;
-  }
-
-  async function deliveryRows(chatId?: TelegramChatId) {
-    const rows = await test.admin.db
-      .select()
-      .from(schema.telegramDeliveries)
-      .orderBy(schema.telegramDeliveries.createdAt);
-    return chatId === undefined ? rows : rows.filter((row) => row.chatId === chatId);
-  }
-
-  /** A bot in one group that receives every alert of every creator. */
-  async function botInGroup(
+  /** A bot that was made admin of one channel. */
+  async function botInChannel(
     token: string,
     username: string,
     telegramChatId: string,
@@ -140,32 +63,18 @@ describe('telegram module on Postgres', () => {
     telegram.addBot(token, username);
     const added = await module.addBot(token);
     if (!added.ok) throw new Error(added.error.message);
-    telegram.updates.push(joined(telegram.updates.length + 1, telegramChatId, `Groupe ${username}`));
+    telegram.updates.push(joined(telegram.updates.length + 1, telegramChatId, `Canal ${username}`));
     await module.jobs.pollUpdates(added.value.id, 0);
     const view = (await module.overview()).bots.find((bot) => bot.id === added.value.id);
-    const chat = view?.chats.find((row) => row.title === `Groupe ${username}`);
-    if (view === undefined || chat === undefined) throw new Error('group not found');
-    const { routes, version } = await module.overview();
-    const saved = await module.saveRoutes(version, [
-      ...routes,
-      ...(['urgent', 'important', 'info'] as const).map((topic) => ({
-        creatorId: null,
-        topic,
-        chatId: chat.id,
-      })),
-    ]);
-    if (!saved.ok) throw new Error('routes not saved');
+    const chat = view?.chats.find((row) => row.title === `Canal ${username}`);
+    if (view === undefined || chat === undefined) throw new Error('channel not found');
     return { bot: view, chatId: chat.id };
   }
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    // Creates Graphile's schema, which the trigger and `public.enqueue_job` write to.
+    // Creates Graphile's schema, which `public.enqueue_job` writes to.
     queue = await createJobQueue(test.admin.pool);
-    creatorId = newId(CreatorIdSchema);
-    await test.admin.db
-      .insert(schema.creators)
-      .values({ id: creatorId, nameKey: creatorId, displayName: 'Démo', timezone: 'Europe/Paris' });
   });
 
   afterAll(async () => {
@@ -174,60 +83,21 @@ describe('telegram module on Postgres', () => {
   });
 
   beforeEach(async () => {
-    offsetMs = 0;
-    uncovered = [];
     telegram = new FakeTelegram();
     module = build().module;
     await test.admin.db.delete(schema.telegramBots);
-    // A removed group leaves its deliveries behind (REG-28): each test starts from an empty log.
-    await test.admin.db.delete(schema.telegramDeliveries);
     await test.admin.db.execute(sql`delete from graphile_worker._private_jobs`);
-    // The outbox is append-only: each test writes its events in a time slice of its own, past the previous one's
-    // scan window.
-    sliceStart += 10 * 60_000;
-    await test.admin.db.update(schema.telegramState).set({ scanCursor: new Date(sliceStart) });
-  });
-
-  it('mirrors the event list of the trigger in the code', async () => {
-    const result = await test.admin.db.execute(
-      sql`select pg_get_triggerdef(oid) as def from pg_trigger where tgname = 'domain_events_telegram_scan'`,
-    );
-    const def = z.object({ def: z.string() }).parse(result.rows[0]).def;
-    const listed = [...def.matchAll(/'([a-z_]+)'::text/g)].map((match) => match[1]);
-    expect(listed.sort()).toEqual([...SCANNED_EVENT_TYPES].sort());
-  });
-
-  it('enqueues one scan when a consumed event commits, and never fails the outbox write', async () => {
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'minor' });
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'other' });
-    await publish('mode_changed', {});
-    expect(await jobs('telegram.scan')).toMatchObject([{ queue_name: 'telegram', key: 'telegram.scan' }]);
-
-    await test.admin.db.execute(sql`revoke execute on function public.enqueue_job from nirvana_app`);
-    try {
-      const id = await publish('handoff_requested', {
-        conversationId: newId(ConversationIdSchema),
-        cause: 'distress',
-      });
-      const [row] = await test.admin.db
-        .select()
-        .from(schema.domainEvents)
-        .where(eq(schema.domainEvents.id, id));
-      expect(row?.type).toBe('handoff_requested');
-    } finally {
-      await test.admin.db.execute(sql`grant execute on function public.enqueue_job to nirvana_app`);
-    }
   });
 
   it('adds a bot from its token, sealed at rest, and never shows the token', async () => {
     expect(await module.addBot('pas un jeton')).toMatchObject({ ok: false, error: { kind: 'token_shape' } });
     expect(await module.addBot(FAKE_TOKEN)).toMatchObject({ ok: false, error: { kind: 'token_refused' } });
 
-    telegram.addBot(FAKE_TOKEN, 'demo_alertes_bot');
+    telegram.addBot(FAKE_TOKEN, 'demo_canal_bot');
     const added = await module.addBot(FAKE_TOKEN);
     expect(added).toMatchObject({
       ok: true,
-      value: { username: 'demo_alertes_bot', state: 'active', chats: [] },
+      value: { username: 'demo_canal_bot', state: 'active', chats: [] },
     });
     expect(await module.addBot(FAKE_TOKEN)).toMatchObject({ ok: false, error: { kind: 'bot_exists' } });
 
@@ -244,13 +114,13 @@ describe('telegram module on Postgres', () => {
       ok: false,
       error: { kind: 'bot_mismatch' },
     });
-    telegram.addBot(SAME_BOT_NEW_TOKEN, 'demo_alertes_bot');
+    telegram.addBot(SAME_BOT_NEW_TOKEN, 'demo_canal_bot');
     expect(await module.replaceToken(added.value.id, SAME_BOT_NEW_TOKEN)).toMatchObject({ ok: true });
   });
 
-  it('discovers the groups a bot enters, follows a supergroup migration and a 409 or 401', async () => {
-    const { bot, chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    expect(bot.chats).toMatchObject([{ title: 'Groupe demo_bot', membership: 'member', canPost: true }]);
+  it('discovers the channels a bot enters, follows a supergroup migration and a 409 or 401', async () => {
+    const { bot, chatId } = await botInChannel(FAKE_TOKEN, 'demo_bot', '-100');
+    expect(bot.chats).toMatchObject([{ title: 'Canal demo_bot', membership: 'member', canPost: true }]);
 
     telegram.updates.push({ kind: 'migration', updateId: 10, fromChatId: '-100', toChatId: '-1001' });
     await module.jobs.pollUpdates(bot.id, 0);
@@ -271,632 +141,24 @@ describe('telegram module on Postgres', () => {
     expect((await module.overview()).bots[0]?.state).toBe('refused');
   });
 
-  it('saves the routing with its version and refuses a stale one', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const { routes, version } = await module.overview();
-    expect(routes).toHaveLength(3);
-    expect(await module.saveRoutes(version - 1, [])).toMatchObject({
-      ok: false,
-      error: { kind: 'routes_version_conflict' },
-    });
-    expect(
-      await module.saveRoutes(version, [
-        { creatorId, topic: 'sale', chatId: newId(z.uuid().brand<'TelegramChatId'>()) },
-      ]),
-    ).toEqual({
-      ok: false,
-      error: 'unknown_chat',
-    });
-    const saved = await module.saveRoutes(version, [{ creatorId, topic: 'urgent', chatId }]);
-    expect(saved).toMatchObject({
-      ok: true,
-      value: { version: version + 1, routes: [{ creatorId, topic: 'urgent', chatId }] },
-    });
-    expect((await module.overview()).coverage).toMatchObject([{ creatorId, urgentReachable: true }]);
-  });
-
-  it('turns an urgent handoff into one delivery per group, once, and sends it', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const conversationId = newId(ConversationIdSchema);
-    await publish('handoff_requested', {
-      conversationId,
-      cause: 'minor',
-      reason: 'texte que personne ne doit lire',
-    });
-
-    expect(await module.jobs.scan()).toBe(1);
-    expect(await module.jobs.scan()).toBe(1); // the window re-reads it: nothing new
-    const rows = await deliveryRows(chatId);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      topic: 'urgent',
-      status: 'pending',
-      isSilent: false,
-      threadKey: `conversation:${conversationId}`,
-    });
-    expect(rows[0]?.text).not.toContain('personne ne doit lire');
-    expect(await jobs('telegram.flush_chat')).toMatchObject([{ queue_name: `telegram-chat:${chatId}` }]);
-
-    await module.jobs.flushChat(chatId);
-    expect(telegram.sent).toMatchObject([{ chatId: '-100', isSilent: false }]);
-    expect(telegram.sent[0]?.text).toContain('🔴 <b>URGENT · Démo</b>');
-    expect(telegram.sent[0]?.text).toContain(`${WEB_ORIGIN}/suivi?conversation=${conversationId}`);
-    expect((await deliveryRows(chatId))[0]).toMatchObject({
-      status: 'sent',
-      telegramMessageId: telegram.sent[0]?.messageId,
-    });
-
-    expect(Object.keys(await module.nightCounts(creatorId)).sort()).toEqual(['important', 'info', 'urgent']);
-  });
-
-  it('tells the groups once that Automatique closed, as important, without the voice', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    await publish('automatic_closed', {
-      voicePrompt: 'sha256:voix-qui-ne-sort-pas',
-      voiceModel: 'modele-qui-ne-sort-pas',
-      missing: [{ kind: 'live_rate', value: 74.5, target: 80 }],
-      conversations: 3,
-    });
-    // The trigger knows the new type (0009).
-    expect(await jobs('telegram.scan')).toMatchObject([{ key: 'telegram.scan' }]);
-
-    expect(await module.jobs.scan()).toBe(1);
-    expect(await module.jobs.scan()).toBe(1); // the window re-reads it: nothing new
-    const rows = await deliveryRows(chatId);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ topic: 'important', isSilent: false, threadKey: null });
-
-    await module.jobs.flushChat(chatId);
-    const text = telegram.sent[0]?.text ?? '';
-    expect(text).toContain('🟠 <b>Important · Démo</b>');
-    expect(text).toContain('repassé en copilote sur 3 conversations');
-    expect(text).toContain('74,5 %');
-    expect(text).not.toContain('qui-ne-sort-pas');
-  });
-
-  /** A member who sells, named « Théo » by the team (invented). */
-  async function seller(): Promise<string> {
-    const userId = `user-seller-${String((eventSeq += 1))}`;
-    await test.admin.db
-      .insert(schema.user)
-      .values({ id: userId, name: 'Prénom Inventé', email: `${userId}@example.test` });
-    const memberId = newId(TeamMemberIdSchema);
-    await test.admin.db.insert(schema.teamMembers).values({
-      id: memberId,
-      userId,
-      teamRole: 'chatter',
-      firstName: 'Prénom',
-      lastName: 'Inventé',
-      displayName: 'Théo',
-      country: 'BJ',
-      timeZone: 'Africa/Porto-Novo',
-      joinedOn: '2026-10-01',
-    });
-    return memberId;
-  }
-
-  const salePayload = (seller: object, grossInclVatMinor = 4500, currency = 'EUR') => ({
-    saleId: newId(SalesLineIdSchema),
-    platform: 'reveal',
-    platformAccountId: newId(PlatformAccountIdSchema),
-    saleType: 'ppv',
-    occurredAt: new Date(sliceStart).toISOString(),
-    currency,
-    grossInclVatMinor,
-    netMinor: 3000,
-    agencyMinor: 1500,
-    creatorMinor: 1500,
-    seller,
-  });
-
-  async function salesGroup(): Promise<TelegramChatId> {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const { routes, version } = await module.overview();
-    const saved = await module.saveRoutes(version, [...routes, { creatorId, topic: 'sale', chatId }]);
-    expect(saved.ok).toBe(true);
-    return chatId;
-  }
-
-  it('sends the AI cap reached to Important while no Urgent group is chosen', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const { routes, version } = await module.overview();
-    const saved = await module.saveRoutes(version, [
-      ...routes.filter((route) => route.topic !== 'urgent'),
-      { creatorId: null, topic: 'important', chatId },
-    ]);
-    expect(saved.ok).toBe(true);
-    await publish(
-      'budget_threshold_crossed',
-      { kind: 'reached', spentMinor: 2000, capMinor: 2000, currency: 'EUR', day: '2026-11-03' },
-      null,
-    );
-    await module.jobs.scan();
-    const rows = (await deliveryRows(chatId)).filter((row) => row.summary.includes('Plafond IA atteint'));
-    expect(rows.map((row) => row.topic)).toEqual(['important']);
-  });
-
-  it('tells the Important groups for all of a fortnight whose check no longer matches, once, no amount (CRM-04 b3)', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const { routes, version } = await module.overview();
-    expect(
-      (await module.saveRoutes(version, [...routes, { creatorId: null, topic: 'important', chatId }])).ok,
-    ).toBe(true);
-    await publish(
-      'sales_feed_mismatch',
-      {
-        platform: 'reveal',
-        from: '2026-10-16',
-        to: '2026-10-31',
-        days: [
-          {
-            day: '2026-10-20',
-            platformAccountId: newId(PlatformAccountIdSchema),
-            currency: 'EUR',
-            registerNetMinor: 12_345,
-            platformNetMinor: 12_000,
-            differenceMinor: 345,
-          },
-        ],
-      },
-      null,
-    );
-    await module.jobs.scan();
-    const rows = (await deliveryRows(chatId)).filter((row) => row.threadKey === 'mismatch:reveal:2026-10-16');
-    expect(rows.map((row) => [row.topic, row.isSilent])).toEqual([['important', false]]);
-    expect(rows[0]?.text).toContain('la quinzaine du 16 au 31 oct.');
-    expect(rows[0]?.text).not.toMatch(/123,45|120,00|3,45/);
-  });
-
-  it('tells the groups for all of her share straying from the percentage, once per account and fortnight, no amount (CRM-04 d3)', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const platformAccountId = newId(PlatformAccountIdSchema);
-    const share = (currency: 'EUR' | 'USD', account = platformAccountId) => ({
-      creatorId,
-      platform: 'reveal',
-      platformAccountId: account,
-      from: '2026-10-16',
-      to: '2026-10-31',
-      currency,
-      sales: 12,
-      refunds: 1,
-      creatorMinor: 54_321,
-      expectedCreatorMinor: 50_000,
-      differenceMinor: 4_321,
-    });
-    const thread = async () =>
-      (await deliveryRows(chatId)).filter(
-        (row) => row.threadKey === `agency_share:${platformAccountId}:2026-10-16`,
-      );
-
-    // Her own Important group does not get it: only the groups for all.
-    const { routes, version } = await module.overview();
-    const own = await module.saveRoutes(version, [
-      ...routes.filter((route) => route.topic !== 'important'),
-      { creatorId, topic: 'important', chatId },
-    ]);
-    expect(own.ok).toBe(true);
-    const otherAccount = newId(PlatformAccountIdSchema);
-    await publish('agency_share_mismatch', share('EUR', otherAccount));
-    await module.jobs.scan();
-    expect((await deliveryRows(chatId)).filter((row) => row.threadKey?.startsWith('agency_share:'))).toEqual(
-      [],
-    );
-
-    const back = await module.overview();
-    const forAll = await module.saveRoutes(back.version, [
-      ...back.routes.filter((route) => route.topic !== 'important'),
-      { creatorId: null, topic: 'important', chatId },
-    ]);
-    expect(forAll.ok).toBe(true);
-    // One account selling in two currencies gives two events: one message.
-    await publish('agency_share_mismatch', share('USD'));
-    await publish('agency_share_mismatch', share('EUR'));
-    await module.jobs.scan();
-    const rows = await thread();
-    expect(rows.map((row) => row.topic)).toEqual(['important']);
-    expect(rows[0]?.text).toContain('la quinzaine du 16 au 31 oct.');
-    expect(rows[0]?.text).toContain(`onglet=pourcentage&amp;creatrice=${creatorId}`);
-    expect(rows[0]?.text).not.toMatch(/543,21|500,00|43,21|\b12\b/);
-  });
-
-  it('tells an outage once, reminds it once in red after 2 h, then answers « Rétabli » in its thread (P3-12)', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const since = new Date(sliceStart).toISOString();
-    await publish(
-      'connection_state_changed',
-      { service: 'xai', state: 'down', reason: 'refused', since },
-      null,
-    );
-    await module.jobs.scan();
-    const thread = async () =>
-      (await deliveryRows(chatId)).filter((row) => row.threadKey === 'connection:xai');
-    expect((await thread()).map((row) => [row.topic, row.action])).toEqual([['important', 'send']]);
-    expect((await thread())[0]?.summary).toContain('la clé est refusée');
-
-    expect(await module.jobs.connectionReminders()).toBe(0); // not 2 hours yet
-    offsetMs = 2 * 60 * 60_000 + 60_000;
-    expect(await module.jobs.connectionReminders()).toBe(1);
-    expect(await module.jobs.connectionReminders()).toBe(0); // a single reminder, whatever the cron does
-    offsetMs = 6 * 60 * 60_000;
-    expect(await module.jobs.connectionReminders()).toBe(0);
-    const reminder = (await thread()).find((row) => row.topic === 'urgent');
-    expect(reminder?.summary).toContain('toujours en panne après 2 h');
-
-    await publish('connection_state_changed', { service: 'xai', state: 'back', since }, null);
-    await module.jobs.scan();
-    // The test's clock runs ahead of Postgres' own: the rows are compared by kind, not by their order.
-    const rows = await thread();
-    expect(rows.map((row) => `${row.topic}:${row.action}`).sort()).toEqual([
-      'important:send',
-      'info:reply',
-      'urgent:send',
-    ]);
-    const back = rows.find((row) => row.action === 'reply');
-    expect(back?.parentId).toBe(reminder?.id);
-    expect(back?.summary).toBe('Rétabli : la connexion xAI fonctionne de nouveau.');
-    expect(await module.jobs.connectionReminders()).toBe(0);
-  });
-
-  it('sends no reminder when the service came back before 2 h (P3-12)', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const since = new Date(sliceStart).toISOString();
-    await publish(
-      'connection_state_changed',
-      { service: 'reveal_crm', state: 'down', reason: 'unreachable', since },
-      null,
-    );
-    await publish('connection_state_changed', { service: 'reveal_crm', state: 'back', since }, null);
-    await module.jobs.scan();
-    offsetMs = 3 * 60 * 60_000;
-    expect(await module.jobs.connectionReminders()).toBe(0);
-    const rows = (await deliveryRows(chatId)).filter((row) => row.threadKey === 'connection:reveal_crm');
-    expect(rows.map((row) => row.action)).toEqual(['send', 'reply']);
-  });
-
-  it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
-    await module.saveSaleSettings([], 'owner-telegram');
-    const chatId = await salesGroup();
-    const memberId = await seller();
-    const sale = salePayload({ kind: 'member', memberId });
-    await publish('sale_detected', sale);
-    await publish('sale_detected', salePayload({ kind: 'agent' }));
-
-    expect(await module.jobs.scan()).toBe(2);
-    expect(await module.jobs.scan()).toBe(2); // the window re-reads them: nothing new
-    const rows = await deliveryRows(chatId);
-    expect(rows.map((row) => [row.topic, row.isSilent, row.summary])).toEqual([
-      ['sale', true, 'PPV · 45,00\u00a0€ · vendue par Théo'],
-      ['sale', true, 'PPV · 45,00\u00a0€ · vendue par l’agent'],
-    ]);
-    await module.jobs.flushChat(chatId);
-    const text = telegram.sent.map((sent) => sent.text).join('\n');
-    expect(text).toContain('💰 <b>Vente · Démo</b>');
-    expect(text).not.toContain(sale.saleId);
-    expect(text).not.toContain('30,00');
-  });
-
-  it('weighs a dollar sale against the minimum in euros at its day’s rate, and rings it with no rate (CRM-04)', async () => {
-    const chatId = await salesGroup();
-    await module.saveSaleSettings(
-      [{ creatorId: null, minimumMinor: 2000, agentOnly: false, eveningDigest: true }],
-      'owner-telegram',
-    );
-    usdRateMicros = null;
-    await publish('sale_detected', salePayload({ kind: 'agent' }, 1000, 'USD')); // no rate: rings
-    await module.jobs.scan();
-    usdRateMicros = 920_000;
-    await publish('sale_detected', salePayload({ kind: 'agent' }, 2000, 'USD')); // 18,40 €: under
-    await publish('sale_detected', salePayload({ kind: 'agent' }, 2200, 'USD')); // 20,24 €: rings
-    await module.jobs.scan();
-    expect((await deliveryRows(chatId)).map((row) => row.summary)).toEqual([
-      'PPV · 10,00\u00a0$US · vendue par l’agent',
-      'PPV · 22,00\u00a0$US · vendue par l’agent',
-    ]);
-  });
-
-  it('rings only what the sales settings let through: her minimum, the agent’s only (CRM-04)', async () => {
-    const chatId = await salesGroup();
-    const memberId = await seller();
-    const saved = await module.saveSaleSettings(
-      [
-        { creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: true },
-        { creatorId, minimumMinor: 2000, agentOnly: false, eveningDigest: true },
-      ],
-      'owner-telegram',
-    );
-    expect(saved.ok && saved.value.settings.map((entry) => entry.creatorId)).toEqual([null, creatorId]);
-    await publish('sale_detected', salePayload({ kind: 'member', memberId }, 1999));
-    await publish('sale_detected', salePayload({ kind: 'member', memberId }, 2000));
-    expect(await module.jobs.scan()).toBe(2);
-    expect((await deliveryRows(chatId)).map((row) => row.summary)).toEqual([
-      'PPV · 20,00\u00a0€ · vendue par Théo',
-    ]);
-    // Her own line gone, the one for all applies: the agent's sales only.
-    await module.saveSaleSettings(
-      [{ creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: true }],
-      'owner-telegram',
-    );
-    await publish('sale_detected', salePayload({ kind: 'member', memberId }));
-    await publish('sale_detected', salePayload({ kind: 'agent' }));
-    await module.jobs.scan();
-    expect((await deliveryRows(chatId)).map((row) => row.summary)).toEqual([
-      'PPV · 20,00\u00a0€ · vendue par Théo',
-      'PPV · 45,00\u00a0€ · vendue par l’agent',
-    ]);
-    const audit = await test.admin.db
-      .select()
-      .from(schema.auditLog)
-      .where(eq(schema.auditLog.action, 'telegram_settings.save'));
-    expect(audit.length).toBeGreaterThanOrEqual(2);
-    const unknown = await module.saveSaleSettings(
-      [{ creatorId: newId(CreatorIdSchema), minimumMinor: 0, agentOnly: false, eveningDigest: true }],
-      'owner-telegram',
-    );
-    expect(unknown).toEqual({ ok: false, error: 'unknown_creator' });
-    await module.saveSaleSettings([], 'owner-telegram');
-  });
-
-  it('sends her day’s sales at 23 h in her zone to the sales groups, once, unless turned off (CRM-04)', async () => {
-    const chatId = await salesGroup();
-    const memberId = await seller();
-    salesTotals = {
-      from: '',
-      to: '',
-      refundsWithoutSale: 0,
-      rows: [
-        {
-          day: '2026-11-03',
-          platform: 'reveal',
-          platformAccountId: newId(PlatformAccountIdSchema),
-          currency: 'EUR',
-          saleType: 'ppv',
-          seller: { kind: 'member', memberId: TeamMemberIdSchema.parse(memberId) },
-          sales: 2,
-          refunds: 0,
-          grossInclVatMinor: 9000,
-          grossExclVatMinor: 7500,
-          netMinor: 6000,
-          agencyMinor: 3000,
-          creatorMinor: 3000,
-        },
-      ],
-    };
-    // 22:30 UTC on 3 November is 23:30 in Paris, her zone.
-    offsetMs = Date.parse('2026-11-03T22:30:00Z') - Date.now();
-    totalsAsked.length = 0;
-    expect(await module.jobs.eveningDigest()).toBe(1);
-    expect(await module.jobs.eveningDigest()).toBe(0); // the key of her day: once
-    expect(totalsAsked[0]).toBe('2026-11-03');
-    const [row] = (await deliveryRows(chatId)).filter((delivery) =>
-      delivery.sourceKey.startsWith('evening:'),
-    );
-    expect(row).toMatchObject({
-      topic: 'sale',
-      isSilent: true,
-      sourceKey: `evening:${creatorId}:2026-11-03`,
-    });
-    expect(row?.text).toContain('💰 <b>Bilan du soir · Démo · jusqu’à 23 h</b>');
-    expect(row?.text).toContain('Théo : 90,00\u00a0€ (2 ventes)');
-
-    // No register linked: nothing to say, nothing sent (ADR 0054).
-    registerLinked = false;
-    offsetMs = Date.parse('2026-11-05T22:30:00Z') - Date.now();
-    expect(await module.jobs.eveningDigest()).toBe(0);
-    registerLinked = true;
-
-    // An hour earlier is not her 23 h; turned off, nothing goes the next day.
-    offsetMs = Date.parse('2026-11-04T21:30:00Z') - Date.now();
-    expect(await module.jobs.eveningDigest()).toBe(0);
-    await module.saveSaleSettings(
-      [{ creatorId, minimumMinor: 0, agentOnly: false, eveningDigest: false }],
-      'owner-telegram',
-    );
-    offsetMs = Date.parse('2026-11-04T22:30:00Z') - Date.now();
-    expect(await module.jobs.eveningDigest()).toBe(0);
-    await module.saveSaleSettings([], 'owner-telegram');
-  });
-
-  it('keeps the settings out of reach of the application role', async () => {
-    // 42501: insufficient_privilege (REVOKE ALL in 0083, like the other telegram tables).
-    await expect(test.app.db.select().from(schema.telegramSettings)).rejects.toMatchObject({
-      cause: { code: '42501' },
-    });
-  });
-
-  it('moves its cursor past rows it cannot read, so they never stall the scan', async () => {
-    for (let i = 0; i < 3; i += 1) await publish('sale_detected', { saleId: 'pas-une-vente' });
-    expect(await module.jobs.scan()).toBe(0);
-    const [state] = await test.admin.db.select().from(schema.telegramState);
-    expect(state?.scanCursor.getTime()).toBe(sliceStart + eventSeq * 1000);
-  });
-
-  it('tells the groups once that a message of the agent could not leave, and closes it on a takeover', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const conversationId = newId(ConversationIdSchema);
-    const attempt = {
-      draftId: newId(DraftIdSchema),
-      idempotencyKey: 'k',
-      error: 'send_error',
-      conversationId,
-    };
-    await publish('send_failed', { ...attempt, attempt: 1, isFinal: false });
-    await publish('send_failed', { ...attempt, attempt: 3, isFinal: true });
-    // The trigger knows the new type.
-    expect(await jobs('telegram.scan')).toMatchObject([{ key: 'telegram.scan' }]);
-    await module.jobs.scan();
-    const rows = await deliveryRows(chatId);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ topic: 'important', threadKey: `conversation:${conversationId}` });
-    await module.jobs.flushChat(chatId);
-    expect(telegram.sent[0]?.text).toContain('n’a pas pu partir');
-    expect(telegram.sent[0]?.text).not.toContain('send_error');
-
-    await publish('takeover_started', { conversationId });
-    await module.jobs.scan();
-    offsetMs = 4000;
-    await module.jobs.flushChat(chatId);
-    expect(telegram.edits[0]?.text).toMatch(/✓ Pris en main$/);
-  });
-
-  it('sends her alerts to their topic, a paused fan to the important groups when none has it (P4-01)', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    // A second creator whose own alerts have a group; « Démo »'s have none.
-    const other = newId(CreatorIdSchema);
-    await test.admin.db
-      .insert(schema.creators)
-      .values({ id: other, nameKey: other, displayName: 'Autre', timezone: 'Europe/Paris' });
-    const { routes, version } = await module.overview();
-    const saved = await module.saveRoutes(version, [
-      ...routes,
-      { creatorId: other, topic: 'custom', chatId },
-    ]);
-    if (!saved.ok) throw new Error('routes not saved');
-
-    const custom = { kind: 'custom', id: newId(CustomAlertIdSchema) } as const;
-    names.set(other, new Map([[custom.id, 'Appel vidéo']]));
-    const trigger = { alert: custom, matchedBy: 'keyword', keyword: 'mot-déclaré' } as const;
-    const paused = newId(ConversationIdSchema);
-    const told = newId(ConversationIdSchema);
-    const pausedOther = newId(ConversationIdSchema);
-    await publish('handoff_requested', { conversationId: paused, cause: 'custom_alert', trigger });
-    await publish('alert_triggered', { conversationId: newId(ConversationIdSchema), trigger, notify: true });
-    await publish('alert_triggered', { conversationId: told, trigger, notify: true }, other);
-    await publish('alert_triggered', { conversationId: told, trigger, notify: false }, other);
-    await publish(
-      'handoff_requested',
-      { conversationId: pausedOther, cause: 'custom_alert', trigger },
-      other,
-    );
-    // The trigger knows the new type (0027).
-    expect(await jobs('telegram.scan')).toMatchObject([{ key: 'telegram.scan' }]);
-    await module.jobs.scan();
-
-    const rows = await deliveryRows(chatId);
-    expect(rows).toHaveLength(3);
-    expect(rows).toEqual(
-      expect.arrayContaining([
-        // « Démo »: no group for her alerts, the paused fan goes to important; the alert that only tells, nowhere.
-        expect.objectContaining({ creatorId, topic: 'important', threadKey: `conversation:${paused}` }),
-        // « Autre »: in her alerts' group, the paused fan in its thread; once, `notify: false` is not sent.
-        expect.objectContaining({ creatorId: other, topic: 'custom', threadKey: null }),
-        expect.objectContaining({
-          creatorId: other,
-          topic: 'custom',
-          threadKey: `conversation:${pausedOther}`,
-        }),
-      ]),
-    );
-    expect(rows.map((row) => row.text).join()).not.toContain('mot-déclaré');
-    await module.jobs.flushChat(chatId);
-    const sent = telegram.sent.map((m) => m.text).join();
-    // Named as the history names it: her alert's name, written by the agency, never the word.
-    expect(sent).toContain('🔔 <b>Appel vidéo · Autre</b>');
-    expect(sent).toContain('Le message du fan correspond à l’alerte « Appel vidéo ». Il n’écrit plus');
-    expect(sent).not.toContain('mot-déclaré');
-  });
-
-  it('logs an urgent alert that no group can receive', async () => {
-    const id = await publish('handoff_requested', {
-      conversationId: newId(ConversationIdSchema),
-      cause: 'meeting',
-    });
-    await module.jobs.scan();
-    expect(uncovered).toEqual([id]);
-  });
-
-  it('waits on a 429, marks a group left on a 403, follows a migration, and stops on a 401', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'guard' });
-    await module.jobs.scan();
-
-    telegram.failNext('send', { kind: 'rate_limited', retryAfterSeconds: 30 });
-    await module.jobs.flushChat(chatId);
-    const [waiting] = await deliveryRows(chatId);
-    expect(waiting).toMatchObject({ status: 'pending', errorKind: 'rate_limited', attempts: 1 });
-    expect(waiting?.runAfter.getTime()).toBeGreaterThan(Date.now() + 25_000);
-
-    offsetMs = 31_000;
-    telegram.failNext('send', { kind: 'migrated', toChatId: '-1009' });
-    await module.jobs.flushChat(chatId);
-    await module.jobs.flushChat(chatId);
-    expect(telegram.sent).toMatchObject([{ chatId: '-1009' }]);
-
-    offsetMs = 40_000;
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'other' });
-    await module.jobs.scan();
-    telegram.failNext('send', { kind: 'forbidden' });
-    await module.jobs.flushChat(chatId);
-    const [chat] = await test.admin.db
-      .select()
-      .from(schema.telegramChats)
-      .where(eq(schema.telegramChats.id, chatId));
-    expect(chat).toMatchObject({ membership: 'left', canPost: false, lastErrorKind: 'chat_unreachable' });
-    expect((await deliveryRows(chatId)).at(-1)).toMatchObject({
-      status: 'failed',
-      errorKind: 'chat_unreachable',
-    });
-    expect((await module.overview()).coverage[0]).toMatchObject({ urgentReachable: false });
-  });
-
-  it('keeps a group the bot was banned from in the list, and removes it with its routes on request (REG-28)', async () => {
-    const { bot, chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+  it('keeps a channel the bot was banned from in the list, and removes it on request (REG-28)', async () => {
+    const { bot, chatId } = await botInChannel(FAKE_TOKEN, 'demo_bot', '-100');
     expect(await module.removeChat(chatId, 'owner-telegram')).toBe('refused');
-    // Last night, one alert went out to the group, one was cut off mid-call and one still waits when it is
-    // removed in the morning.
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'minor' });
-    await module.jobs.scan();
-    await module.jobs.flushChat(chatId);
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'distress' });
-    await module.jobs.scan();
-    await test.admin.db
-      .update(schema.telegramDeliveries)
-      .set({ status: 'sending' })
-      .where(eq(schema.telegramDeliveries.status, 'pending'));
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'non_consent' });
-    await module.jobs.scan();
-    const { from, to } = nightOf('Europe/Paris', new Date());
-    await test.admin.db
-      .update(schema.telegramDeliveries)
-      .set({ createdAt: new Date((from.getTime() + to.getTime()) / 2) })
-      .where(eq(schema.telegramDeliveries.chatId, chatId));
-    const night = await module.nightCounts(creatorId);
-    expect(night.urgent).toBe(3);
-
     telegram.updates.push({
       kind: 'membership',
       updateId: telegram.updates.length + 1,
       telegramChatId: '-100',
-      title: 'Groupe demo_bot',
-      chatKind: 'group',
+      title: 'Canal demo_bot',
+      chatKind: 'channel',
       membership: 'kicked',
       canPost: false,
     });
     await module.jobs.pollUpdates(bot.id, 0);
     const before = await module.overview();
     expect(before.bots[0]?.chats).toMatchObject([{ id: chatId, membership: 'kicked', canPost: false }]);
-    expect(before.routes.filter((route) => route.chatId === chatId)).toHaveLength(3);
 
     expect(await module.removeChat(chatId, 'owner-telegram')).toBe('removed');
-    const after = await module.overview();
-    expect(after.bots[0]?.chats).toEqual([]);
-    expect(after.routes).toEqual([]);
-    expect(after.version).toBeGreaterThan(before.version);
-    // Its alerts stay, without a group and with its name: the night still counts them, the log still names it.
-    expect(await module.nightCounts(creatorId)).toEqual(night);
-    // All were moved to the same instant of the night: read by status, not by date.
-    const kept = (await deliveryRows())
-      .map(({ chatId: chat, chatTitle, status, errorKind }) => ({ chat, chatTitle, status, errorKind }))
-      .sort((a, b) => a.status.localeCompare(b.status));
-    expect(kept).toEqual([
-      { chat: null, chatTitle: 'Groupe demo_bot', status: 'failed', errorKind: 'chat_removed' },
-      { chat: null, chatTitle: 'Groupe demo_bot', status: 'sent', errorKind: null },
-      { chat: null, chatTitle: 'Groupe demo_bot', status: 'unknown', errorKind: 'chat_removed' },
-    ]);
-    expect((await module.listDeliveries('urgent', 10)).map((row) => row.chatTitle)).toEqual([
-      'Groupe demo_bot',
-      'Groupe demo_bot',
-      'Groupe demo_bot',
-    ]);
+    expect((await module.overview()).bots[0]?.chats).toEqual([]);
     const audit = await test.admin.db
       .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
       .from(schema.auditLog)
@@ -905,113 +167,16 @@ describe('telegram module on Postgres', () => {
     expect(await module.removeChat(chatId, 'owner-telegram')).toBe('missing');
   });
 
-  it('marks the bot to reconnect on a 401 and keeps its messages for the retry window', async () => {
-    const { bot, chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    await publish(
-      'kill_switch_toggled',
-      { scope: 'global', scopeId: null, active: true, reason: 'test' },
-      null,
-    );
-    await module.jobs.scan();
-    telegram.revoke(FAKE_TOKEN);
-    await module.jobs.flushChat(chatId);
-    expect((await module.overview()).bots.find((row) => row.id === bot.id)?.state).toBe('refused');
-    expect((await deliveryRows(chatId))[0]).toMatchObject({ status: 'pending', errorKind: 'token_refused' });
-  });
-
-  it('sends again an urgent message cut off mid-call, marked, and not an info one', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'minor' });
-    await publish('session_state_changed', { platformAccountId: 'acc', from: 'expired', to: 'valid' });
-    await module.jobs.scan();
-    const [urgent] = await deliveryRows(chatId);
-    // A worker died between the call and the write: the delivery is left `sending`.
-    await test.admin.db
-      .update(schema.telegramDeliveries)
-      .set({ status: 'sending', runAfter: new Date(Date.now() - 120_000) })
-      .where(eq(schema.telegramDeliveries.chatId, chatId));
-    await test.admin.db.insert(schema.telegramDeliveries).values({
-      id: newId(z.uuid()),
-      sourceKey: 'digest:test',
-      chatId,
-      chatTitle: 'Groupe demo_bot',
-      creatorId,
-      topic: 'info',
-      action: 'send',
-      text: 'bilan',
-      summary: 'bilan',
-      isSilent: true,
-      status: 'sending',
-      runAfter: new Date(Date.now() - 120_000),
+  it('no longer enqueues a scan when an event commits: the trigger of the agency’s alerts is gone', async () => {
+    await test.admin.db.insert(schema.domainEvents).values({
+      id: newId(EventIdSchema),
+      creatorId: null,
+      type: 'kill_switch_toggled',
+      payload: { scope: 'global', scopeId: null, active: true, reason: 'test' },
+      actor: 'system',
+      correlationId: 'test',
     });
-    await module.jobs.flushChat(chatId);
-    expect(telegram.sent).toHaveLength(1);
-    expect(telegram.sent[0]?.text).toContain('<i>(renvoi)</i>');
-    const rows = await deliveryRows(chatId);
-    expect(rows.find((row) => row.id === urgent?.id)).toMatchObject({ status: 'sent' });
-    expect(rows.find((row) => row.sourceKey === 'digest:test')).toMatchObject({ status: 'unknown' });
-  });
-
-  it('rewrites the alert « Pris en main par … » when someone takes the conversation', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const userId = 'user-takeover-test';
-    await test.admin.db
-      .insert(schema.user)
-      .values({ id: userId, name: 'Théo Brun', email: 'theo@example.test' })
-      .onConflictDoNothing();
-    const conversationId = newId(ConversationIdSchema);
-    await publish('handoff_requested', { conversationId, cause: 'distress' });
-    await module.jobs.scan();
-    await module.jobs.flushChat(chatId);
-    await publish('takeover_started', { conversationId, userId });
-    await module.jobs.scan();
-    offsetMs = 4000;
-    await module.jobs.flushChat(chatId);
-    expect(telegram.edits).toMatchObject([{ chatId: '-100', messageId: telegram.sent[0]?.messageId }]);
-    expect(telegram.edits[0]?.text).toMatch(/✓ Pris en main par Théo$/);
-    expect(await module.listDeliveries('urgent', 10)).toMatchObject([{ closedBy: 'Théo', status: 'sent' }]);
-  });
-
-  it('closes a handoff alert when the conversation goes back to the agent, and only once', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const userId = 'user-release-test';
-    await test.admin.db
-      .insert(schema.user)
-      .values({ id: userId, name: 'Nora Vidal', email: 'nora@example.test' })
-      .onConflictDoNothing();
-    const conversationId = newId(ConversationIdSchema);
-    await publish('handoff_requested', { conversationId, cause: 'llm_unavailable' });
-    await module.jobs.scan();
-    await module.jobs.flushChat(chatId);
-    await publish('takeover_ended', { conversationId, userId });
-    await module.jobs.scan();
-    offsetMs = 4000;
-    await module.jobs.flushChat(chatId);
-    expect(telegram.edits).toMatchObject([{ chatId: '-100', messageId: telegram.sent[0]?.messageId }]);
-    expect(telegram.edits[0]?.text).toMatch(/✓ Rendu à l’agent par Nora$/);
-    // A second hand-back (taken, given back again) leaves the closed alert as it is.
-    await publish('takeover_ended', { conversationId, userId });
-    await module.jobs.scan();
-    offsetMs = 8000;
-    await module.jobs.flushChat(chatId);
-    expect(telegram.edits).toHaveLength(1);
-    expect(await module.listDeliveries('important', 10)).toMatchObject([
-      { closedBy: 'Nora', status: 'sent' },
-    ]);
-  });
-
-  it('answers the original message when the trouble ends', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    await publish('session_state_changed', { platformAccountId: 'acc-1', from: 'valid', to: 'expired' });
-    await module.jobs.scan();
-    await module.jobs.flushChat(chatId);
-    await publish('session_state_changed', { platformAccountId: 'acc-1', from: 'expired', to: 'valid' });
-    await module.jobs.scan();
-    offsetMs = 4000;
-    await module.jobs.flushChat(chatId);
-    expect(telegram.sent).toHaveLength(2);
-    expect(telegram.sent[1]).toMatchObject({ isSilent: true, replyToMessageId: telegram.sent[0]?.messageId });
-    expect(telegram.sent[1]?.text).toBe('✓ Résolu : la session est revenue.');
+    expect(await jobs('telegram.scan')).toEqual([]);
   });
 
   it('re-seals the tokens with the newest key, so the old key can be dropped', async () => {
@@ -1093,26 +258,24 @@ describe('telegram module on Postgres', () => {
         },
       });
       const overview = await server.inject({ method: 'GET', url: '/v1/settings/telegram', headers });
-      expect(overview.json()).toMatchObject({ bots: [{ username: 'demo_bot' }], routes: [] });
-      const conflict = await server.inject({
-        method: 'PUT',
-        url: '/v1/settings/telegram/routes',
-        headers,
-        payload: { version: 999, routes: [] },
-      });
-      expect(conflict.statusCode).toBe(409);
-      expect(conflict.json()).toMatchObject({
-        error: { code: 'telegram_routes_conflict', details: { kind: 'routes_version_conflict' } },
-      });
-      // Refusals in the common error body (recette 28/10): an invalid body was a 500 against the route's own schema.
+      expect(overview.json()).toMatchObject({ bots: [{ username: 'demo_bot' }] });
+      // Refusals in the common error body (recette 28/10): an invalid body is a 400, never a 500.
       const invalid = await server.inject({
-        method: 'PUT',
-        url: '/v1/settings/telegram/routes',
+        method: 'POST',
+        url: '/v1/settings/telegram/bots',
         headers,
-        payload: { version: 1, routes: [{ creatorId: null, topic: 'x', chatId: 'y' }] },
+        payload: {},
       });
       expect(invalid.statusCode).toBe(400);
       expect(invalid.json()).toMatchObject({ error: { code: 'request_invalid' } });
+      // The agency's alerts left Telegram (27/11/2026): no routing, no journal, no test message any more.
+      for (const [method, url] of [
+        ['PUT', '/v1/settings/telegram/routes'],
+        ['GET', '/v1/settings/telegram/deliveries'],
+        ['GET', '/v1/settings/telegram/sales'],
+      ] as const) {
+        expect((await server.inject({ method, url, headers })).statusCode, url).toBe(404);
+      }
       const missing = await server.inject({
         method: 'POST',
         url: `/v1/settings/telegram/bots/${newId(z.uuid().brand<'TelegramBotId'>())}/listen`,
@@ -1127,13 +290,6 @@ describe('telegram module on Postgres', () => {
       });
       expect(gone.statusCode).toBe(404);
       expect(gone.json()).toMatchObject({ error: { code: 'telegram_bot_not_found' } });
-      const noChat = await server.inject({
-        method: 'POST',
-        url: `/v1/settings/telegram/chats/${newId(z.uuid().brand<'TelegramChatId'>())}/test`,
-        headers,
-      });
-      expect(noChat.statusCode).toBe(404);
-      expect(noChat.json()).toMatchObject({ error: { code: 'telegram_chat_not_found' } });
       const noGroup = await server.inject({
         method: 'DELETE',
         url: `/v1/settings/telegram/chats/${newId(z.uuid().brand<'TelegramChatId'>())}`,
@@ -1144,7 +300,7 @@ describe('telegram module on Postgres', () => {
         { error: { code: 'telegram_chat_not_found' } },
       ]);
       const { id: botId } = created.json<{ id: string }>();
-      telegram.updates.push(joined(telegram.updates.length + 1, '-300', 'Groupe vivant'));
+      telegram.updates.push(joined(telegram.updates.length + 1, '-300', 'Canal vivant'));
       await module.jobs.pollUpdates(z.uuid().brand<'TelegramBotId'>().parse(botId), 0);
       const living = (await module.overview()).bots[0]?.chats[0];
       if (living === undefined) throw new Error('group not found');
@@ -1157,34 +313,6 @@ describe('telegram module on Postgres', () => {
         409,
         { error: { code: 'telegram_chat_member_conflict' } },
       ]);
-      const { version } = (
-        await server.inject({ method: 'GET', url: '/v1/settings/telegram', headers })
-      ).json<{
-        version: number;
-      }>();
-      const unknownChat = await server.inject({
-        method: 'PUT',
-        url: '/v1/settings/telegram/routes',
-        headers,
-        payload: {
-          version,
-          routes: [
-            {
-              creatorId: newId(CreatorIdSchema),
-              topic: 'urgent',
-              chatId: newId(z.uuid().brand<'TelegramChatId'>()),
-            },
-          ],
-        },
-      });
-      expect(unknownChat.statusCode).toBe(400);
-      expect(unknownChat.json()).toMatchObject({ error: { code: 'telegram_chat_invalid' } });
-      const journal = await server.inject({
-        method: 'GET',
-        url: '/v1/settings/telegram/deliveries?topic=urgent',
-        headers,
-      });
-      expect(journal.json()).toEqual({ deliveries: [] });
     } finally {
       await server.close();
     }

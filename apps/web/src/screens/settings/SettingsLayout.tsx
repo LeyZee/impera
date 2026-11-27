@@ -17,7 +17,6 @@ import { newModelsQuery } from '@/settings/sales-feed/api';
 import { newModelsLabel } from '@/settings/sales-feed/importing';
 import { ServicesSection } from '@/settings/services/ServicesSection';
 import { TelegramSection } from '@/settings/telegram/TelegramSection';
-import type { TelegramTab } from '@/settings/telegram/search';
 import { Page, PageHeader } from '@/shell/layout';
 import { screenLabel, type ScreenPath } from '@/shell/nav';
 
@@ -231,15 +230,9 @@ export function AlertsPage(): JSX.Element {
   return <AlertsSection />;
 }
 
-/** Réglages › Bots Telegram: bots, groups and who gets which alert (fiche P3-07), the tab in the address. */
-export function TelegramPage({
-  tab,
-  onTab,
-}: {
-  tab: TelegramTab;
-  onTab: (tab: TelegramTab) => void;
-}): JSX.Element {
-  return <TelegramSection tab={tab} onTab={onTab} />;
+/** Réglages › Bots Telegram: the bots of the creators' channels (ADR 0080, 27/11/2026). */
+export function TelegramPage(): JSX.Element {
+  return <TelegramSection />;
 }
 
 /** Réglages › Règles de paie: each account's currency, VAT, platform commission and source of sales (EQ-03). */

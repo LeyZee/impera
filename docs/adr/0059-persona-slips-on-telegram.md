@@ -2,6 +2,7 @@
 
 Statut : accepted (Charles, 03/11/2026 11h32, « je te donne mon OK aux deux ADR qui attendent » ; demande du même jour à 11h14, sur l'alerte Telegram quand un chatteur part en rouge : « fais ce qu'il y a de plus de sens et qui est cohérent au niveau métier »)
 Date : 2026-11-03
+Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.
 Remplace : dans l'ADR 0052 § 5, la phrase « Un aveu d'IA, des coordonnées ou une promesse de rencontre partent aussi sur Telegram, en `important`, sans le nom du fan. »
 Précise : l'ADR 0020 (deux sujets d'alerte et un bilan du soir de plus, un événement nouveau) et l'ADR 0052 § 5 (qui d'autre voit le rouge).
 L'ADR 0052 reste telle quelle pour tout le reste ; l'index des ADR renvoie d'elle à celle-ci.
@@ -62,3 +63,7 @@ Négatives, à surveiller :
 - **Rien sur Telegram, tout au Suivi** : un explicite avant l'âge confirmé attendrait le matin.
 - **Nommer le chatteur dans le groupe** : le groupe peut compter des chatteurs. Le nom reste dans le Suivi, réservé à ceux qui en ont la charge.
 - **Mettre l'ambre au bilan** : la voix et les faits relèvent du coaching de fin de shift, pas du groupe d'alertes.
+
+## Amendement du 27/11/2026 : plus rien sur Telegram (ADR 0176)
+
+Les interdits graves du § 1 partent en notification Impera aux propriétaires : `agency_urgent` pour `explicit_before_age` et `meeting_promise`, `agency_alert` pour les autres. Une seule alerte par conversation, par règle et par shift, comme avant. Le bilan du soir des écarts du § 2 devient une lecture que l'agent IA de Charles vient chercher (ADR 0176 § 7). Aucun des deux n'était codé au 27/11 : le lot qui les code suit cet amendement.
