@@ -1,4 +1,4 @@
-import type { FirstSteps, Me } from '@impera/contracts';
+import type { FirstSteps, Me, UnkeptBackupCodes } from '@impera/contracts';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
@@ -252,7 +252,7 @@ function SignedIn({
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
   // The backup codes of the activation, left without being said kept (a reload on their screen): shown again while
   // the server still gives them, before anything else. `checking` while it is asked.
-  const [unkept, setUnkept] = useState<readonly string[] | 'checking' | null>(
+  const [unkept, setUnkept] = useState<UnkeptBackupCodes | 'checking' | null>(
     firstSteps.codesKept ? null : 'checking',
   );
   useEffect(() => {
@@ -294,7 +294,8 @@ function SignedIn({
         <div className="nv-plate nv-plate--pad flex w-full max-w-md flex-col gap-5">
           <PublicBrand page="Validation en deux étapes" />
           <BackupCodes
-            codes={unkept}
+            codes={unkept.backupCodes}
+            shownUntil={new Date(unkept.shownUntil)}
             onDone={() => {
               void markFirstStep('codes-kept');
               setUnkept(null);

@@ -296,12 +296,18 @@ export function SecondFactorPage({
 }
 
 /** Ten backup codes, shown once (the shared list), and the person says they are kept before going on. */
+/** The hour the codes stop being shown again, as the reader's clock says it. */
+const HOUR = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
 export function BackupCodes({
   codes,
   onDone,
+  shownUntil,
 }: {
   codes: readonly string[];
   onDone: () => void;
+  /** Shown again after a reload (recette 27/11, A8): until when the server still gives them. */
+  shownUntil?: Date;
 }): JSX.Element {
   const [kept, setKept] = useState(false);
   const leaving = useRef(false);
@@ -327,6 +333,12 @@ export function BackupCodes({
           plus affichés : garde-les dans ton gestionnaire de mots de passe ou sur papier, jamais en photo.
         </p>
       </div>
+      {shownUntil === undefined ? null : (
+        <p className="text-sm text-[var(--nv-warning)]" role="status">
+          Tu avais quitté cette page avant de dire que tu les avais notés. Ils restent affichés jusqu’à{' '}
+          {HOUR.format(shownUntil)}&nbsp;; ensuite, il faudra en créer de nouveaux dans Sécurité.
+        </p>
+      )}
       <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
         <input

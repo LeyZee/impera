@@ -5,3 +5,5 @@ Décisions : Charles, 27/11/2026, sur les codes de secours réaffichés après u
 Découvertes : une activation en attente n'expire jamais (pas de date sur `two_factor`) ; l'avis de Sécurité « codes non notés » repose encore sur une marque du navigateur, posée désormais d'après le serveur.
 Candidats à suppression : aucun.
 Vérifié : tests web des écrans touchés ✓ ; intégration du deuxième facteur et des premiers pas ✓ ; pnpm check au pre-push.
+
+Ajout après la demande de Design : les codes réaffichés disent pourquoi ils sont encore là et jusqu'à quelle heure (phrase en ambre ; le serveur rend `shownUntil`).

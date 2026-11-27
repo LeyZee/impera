@@ -136,7 +136,7 @@ describe('the first steps of an account survive a reload (recette 27/11, A8)', (
       firstSteps: { codesKept: false, welcomed: false },
     });
     const shown = await post('/v1/me/first-steps/backup-codes', {}, session);
-    expect(shown.json()).toEqual({ backupCodes: setup.backupCodes });
+    expect(shown.json()).toMatchObject({ backupCodes: setup.backupCodes });
     // Active: no key is given any more.
     expect(codeOf(await post('/v1/auth/two-factor/enable', {}, session))).toBe('second_factor_conflict');
   });
@@ -157,7 +157,15 @@ describe('the first steps of an account survive a reload (recette 27/11, A8)', (
     expect((await post('/v1/me/first-steps/anything-else', {}, cookie)).statusCode).toBe(400);
 
     // A reload on the codes: they are shown again, and the audit says so.
-    expect((await post('/v1/me/first-steps/backup-codes', {}, cookie)).json()).toEqual({ backupCodes });
+    const again = (await post('/v1/me/first-steps/backup-codes', {}, cookie)).json<{
+      backupCodes: string[];
+      shownUntil: string;
+    }>();
+    expect(again.backupCodes).toEqual(backupCodes);
+    // Until when: ten minutes after the code was given, never more.
+    const left = new Date(again.shownUntil).getTime() - Date.now();
+    expect(left).toBeGreaterThan(9 * 60_000);
+    expect(left).toBeLessThanOrEqual(10 * 60_000);
     expect(
       await test.admin.db
         .select({ action: schema.auditLog.action })

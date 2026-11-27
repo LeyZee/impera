@@ -1,6 +1,7 @@
 import {
   ApiErrorSchema,
-  BackupCodesSchema,
+  UnkeptBackupCodesSchema,
+  type UnkeptBackupCodes,
   DashboardSessionSchema,
   SecondFactorSetupSchema,
   SignInAnswerSchema,
@@ -189,11 +190,11 @@ export async function markFirstStep(step: 'codes-kept' | 'welcomed'): Promise<bo
  * The backup codes of the activation once more, after a reload closed their screen before they were said kept. `null`
  * when the server no longer shows them (said kept, or the activation is more than a few minutes old).
  */
-export async function unkeptBackupCodes(): Promise<readonly string[] | null> {
+export async function unkeptBackupCodes(): Promise<UnkeptBackupCodes | null> {
   const response = await post('/v1/me/first-steps/backup-codes', {}).catch(() => null);
   if (response?.ok !== true) return null;
-  const answer = BackupCodesSchema.safeParse(await response.json().catch(() => null));
-  return answer.success ? answer.data.backupCodes : null;
+  const answer = UnkeptBackupCodesSchema.safeParse(await response.json().catch(() => null));
+  return answer.success ? answer.data : null;
 }
 
 /** The activation, second step: the first code from the app. Right, the account's code is active. */

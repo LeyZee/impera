@@ -112,6 +112,15 @@ export const SecondFactorVerifyBodySchema = z.object({
 export const BackupCodesSchema = z.object({ backupCodes: z.array(z.string()).length(10) });
 
 /**
+ * `POST /v1/me/first-steps/backup-codes`: the activation's codes shown again after a reload, and until when the server
+ * still shows them, so that the screen says it (recette 27/11, A8).
+ */
+export const UnkeptBackupCodesSchema = BackupCodesSchema.extend({
+  shownUntil: z.iso.datetime({ offset: true }),
+});
+export type UnkeptBackupCodes = z.infer<typeof UnkeptBackupCodesSchema>;
+
+/**
  * `POST /v1/auth/reauthenticate`: the password and a code, before a sensitive action (ADR 0046 § 3). Valid 10 minutes
  * on this session, trusted device or not.
  */

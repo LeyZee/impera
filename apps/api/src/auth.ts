@@ -20,7 +20,7 @@ import {
   REAUTHENTICATION_ERROR_CODE,
   ReauthenticateBodySchema,
   SECOND_FACTOR_ERROR_CODE,
-  BackupCodesSchema,
+  UnkeptBackupCodesSchema,
   SecondFactorEnableBodySchema,
   SecondFactorSetupSchema,
   SecondFactorVerifyBodySchema,
@@ -1677,23 +1677,21 @@ export function createAuthRoutes(
       {
         config: perIp,
         preValidation: requireRole(...UserRoleSchema.options),
-        schema: { response: { 200: BackupCodesSchema } },
+        schema: { response: { 200: UnkeptBackupCodesSchema } },
       },
       async (request) => {
         if (request.user === null) throw new SessionUnauthenticated();
         const current = await sessionOf(auth, db, request);
         if (current === null) throw new SessionUnauthenticated();
         const confirmedAt = current.session.codeConfirmedAt;
-        const isRecent =
-          confirmedAt !== null &&
-          confirmedAt !== undefined &&
-          Date.now() - confirmedAt.getTime() <= RECENT_LOGIN_MS;
-        if (!isRecent || (await firstStepsOf(db, request.user.id)).codesKept)
+        if (confirmedAt === null || confirmedAt === undefined) throw new BackupCodesNoLongerShown();
+        const shownUntil = confirmedAt.getTime() + RECENT_LOGIN_MS;
+        if (Date.now() > shownUntil || (await firstStepsOf(db, request.user.id)).codesKept)
           throw new BackupCodesNoLongerShown();
         const backupCodes = await backupCodesOf(db, config.AUTH_SECRET, request.user.id);
         if (backupCodes === null) throw new BackupCodesNoLongerShown();
         await audit(request, request.user.id, 'auth.backup_codes_shown_again');
-        return { backupCodes };
+        return { backupCodes, shownUntil: new Date(shownUntil).toISOString() };
       },
     );
     // The dashboard's first read (recette 05/11, SEC-13): 200 with or without a session, so that every public page

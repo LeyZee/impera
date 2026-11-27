@@ -53,7 +53,9 @@ function serve(firstSteps: FirstSteps | undefined, codes: readonly string[] | nu
         calls.push(input);
         if (!input.endsWith('/backup-codes')) return Promise.resolve(new Response(null, { status: 204 }));
         return Promise.resolve(
-          codes === null ? new Response('{}', { status: 410 }) : Response.json({ backupCodes: codes }),
+          codes === null
+            ? new Response('{}', { status: 410 })
+            : Response.json({ backupCodes: codes, shownUntil: '2026-11-27T10:09:00.000Z' }),
         );
       }
       // The screens stay on their loading state: only what comes before them is under test.
@@ -102,6 +104,8 @@ describe('App at an account’s first steps (recette 27/11, A8)', () => {
     render(<App />);
     const list = await screen.findByLabelText('Codes de secours');
     expect(list.querySelectorAll('li')).toHaveLength(10);
+    // Why they are back, and until when (in amber, a warning).
+    expect(screen.getByRole('status').textContent).toMatch(/Ils restent affichés jusqu’à \d\d:\d\d/u);
     expect(screen.queryByText('Bienvenue, Théo')).toBeNull();
     const enter = screen.getByRole('button', { name: 'Ouvrir Impera' });
     expect(enter).toHaveProperty('disabled', true);
