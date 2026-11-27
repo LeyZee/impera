@@ -1,3 +1,5 @@
+import type { StepPriceTrace } from '@impera/contracts';
+
 import {
   applyScriptRunEvent,
   nextScriptStep,
@@ -85,6 +87,8 @@ export interface ScriptTurn {
    * step waiting for him is checked too: he would buy at the catalogue's price, not the one she said.
    */
   readonly priceMismatch: { readonly scriptRef: string; readonly stepIndex: number } | null;
+  /** The staircase's decision on a paid step at this message (ADR 0098, avenant du 27/11/2026), for the copilot. */
+  readonly stepPrice?: StepPriceTrace;
 }
 
 /** A script no longer in her catalogue: its run keeps its state, and nothing of it can go out. */
@@ -227,5 +231,14 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
     stored === null || after === null || stamp(stored) === stamp(after)
       ? null
       : { run: after, events: journalOf(stored, after) };
-  return { decision: final, script, moved: changed(current), followed: changed(run), opened, priceMismatch };
+  const stepPrice = 'stepPrice' in final ? final.stepPrice : undefined;
+  return {
+    decision: final,
+    script,
+    moved: changed(current),
+    followed: changed(run),
+    opened,
+    priceMismatch,
+    ...(stepPrice !== undefined && { stepPrice }),
+  };
 }

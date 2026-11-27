@@ -48,6 +48,9 @@ const SwitchStateRowsSchema = z.array(
 );
 
 /** The repositories of one tenant transaction (`withTenant`: RLS scopes every statement to the creator). */
+/** His biggest single paid message (ADR 0098, avenant du 27/11/2026); none, or nothing paid: `null`. */
+const biggestOf = (minor: number | null): number | null => (minor === null || minor <= 0 ? null : minor);
+
 function bind(tx: DbTransaction, creatorId: string): Transaction {
   // Her active persona, read inside the statement that needs it: part of the version Automatique is proved on (ADR 0022).
   const activePersona = sql`(select id from persona_versions where creator_id = ${creatorId} and is_active)`;
@@ -213,6 +216,9 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .select({
             spentMinor: sql<number>`coalesce(sum(${schema.messages.priceMinor}) filter (where ${schema.messages.isPaid}), 0)::int`,
             firstMessageAt: sql<string | null>`min(${schema.messages.platformCreatedAt})`,
+            biggestMinor: sql<
+              number | null
+            >`(max(${schema.messages.priceMinor}) filter (where ${schema.messages.isPaid}))::int`,
           })
           .from(schema.messages)
           .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
@@ -224,6 +230,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         return {
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
+          biggestPurchaseMinor: biggestOf(totals?.biggestMinor ?? null),
           ...(standing !== null && {
             tier: standing.tier,
             lastPurchaseAt: standing.lastPurchaseAt === null ? null : new Date(standing.lastPurchaseAt),

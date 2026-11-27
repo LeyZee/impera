@@ -119,6 +119,11 @@ export const PREPARED_SCRIPT_GAP_CODES = [
   'disgust',
   /** A condition in text that is empty. */
   'condition_text_missing',
+  /**
+   * A paid branch that costs no more than the paid step before it (ADR 0098 and ADR 0112 § 14, avenant du 27/11/2026):
+   * each paid step costs strictly more than the one before, never the same.
+   */
+  'price_not_above_previous',
 ] as const;
 export const PreparedScriptGapCodeSchema = z.enum(PREPARED_SCRIPT_GAP_CODES);
 export type PreparedScriptGapCode = z.infer<typeof PreparedScriptGapCodeSchema>;

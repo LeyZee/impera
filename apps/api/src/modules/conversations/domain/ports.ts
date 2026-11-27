@@ -660,6 +660,8 @@ interface FanStats {
   readonly tier?: FanTier | null;
   /** His last purchase in her sales register (ADR 0128 § 1); `null` never; absent, not read. */
   readonly lastPurchaseAt?: Date | null;
+  /** His biggest single paid message, in cents (ADR 0098, avenant du 27/11/2026); `null` never; absent, not read. */
+  readonly biggestPurchaseMinor?: number | null;
   /** What he spent in her sales register, refunds out (ADR 0132 § 1); absent, not read. */
   readonly registerSpentMinor?: number;
   /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */

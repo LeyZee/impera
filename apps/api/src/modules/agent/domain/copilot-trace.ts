@@ -179,5 +179,6 @@ export function copilotTrace(input: CopilotTraceInput): CopilotTrace {
         humanOnly: input.language.humanOnly,
       },
     }),
+    ...(input.scripts?.stepPrice !== undefined && { stepPrice: input.scripts.stepPrice }),
   };
 }

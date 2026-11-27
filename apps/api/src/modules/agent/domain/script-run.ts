@@ -1,17 +1,20 @@
 import type {
   FanAvailabilityState,
   FanFlags,
+  FanTier,
   Language,
   ScriptRunStatus,
   ScriptStart,
   ScriptStartBlock,
   ScriptStepKind,
   ScriptStepOutcome,
+  StepPriceTrace,
 } from '@impera/contracts';
 
 import type { ScriptCarriesView } from './fantasy-match';
 import { offerDecision, sameEvening, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
+import { stepPriceChoice, type StepPriceChoice } from './step-price';
 
 /**
  * The run of a script with one fan (ADR 0098): the code keeps where he is, chooses the next step and its price, and
@@ -371,6 +374,11 @@ export function permittedScripts(
      * not read: no script opens.
      */
     readonly language?: Language | null;
+    /**
+     * His biggest single purchase before (ADR 0098, avenant du 27/11/2026): a script whose first paid step costs more
+     * than one and a half times it does not open. `null` or absent: no cap.
+     */
+    readonly biggestPurchaseMinor?: number | null;
   },
 ): PlatformScriptView[] {
   if (options.language === null) return [];
@@ -389,7 +397,27 @@ export function permittedScripts(
       script.mediaValidated &&
       script.descriptionValidated &&
       !script.touchesLimits &&
-      platformScriptFaults(script).length === 0,
+      platformScriptFaults(script).length === 0 &&
+      firstPaidStepFits(script, options.biggestPurchaseMinor ?? null),
+  );
+}
+
+/** The index of a script's first paid step; `-1` when it has none. */
+const firstPaidIndex = (script: PlatformScriptView): number =>
+  script.steps.findIndex((step) => step.kind === 'paid');
+
+/** The staircase at a script's start: its first paid step under the cap of his biggest purchase before (§ 5 ter). */
+function firstPaidStepFits(script: PlatformScriptView, biggestPurchaseMinor: number | null): boolean {
+  const price = script.steps[firstPaidIndex(script)]?.priceMinor ?? null;
+  if (price === null) return true;
+  return (
+    stepPriceChoice({
+      branchesMinor: [price],
+      lastBoughtMinor: null,
+      biggestPurchaseMinor,
+      fanTier: null,
+      desire: 0,
+    }).kind === 'offer'
   );
 }
 
@@ -472,6 +500,14 @@ export interface NextScriptStepInput {
    * kept in the tension. Absent, not counted: no wait (the evals and tests that predate it).
    */
   readonly hisMessagesSinceBought?: number;
+  /**
+   * What the staircase of paid steps reads of him (ADR 0098, avenant du 27/11/2026): his biggest single purchase before
+   * (`null` never), and his tier in « Fans ». Absent: no cap, not a whale (the evals and tests that predate it).
+   */
+  readonly pricing?: {
+    readonly biggestPurchaseMinor: number | null;
+    readonly fanTier?: FanTier | null;
+  };
 }
 
 /**
@@ -491,12 +527,20 @@ type NoScriptReason =
   | 'cold_session'
   /** He just bought a paid step: a few messages in the tension before the next one (passe 04). */
   | 'in_tension'
-  | 'price_mismatch';
+  | 'price_mismatch'
+  /** The staircase (avenant du 27/11/2026): nothing strictly above his last paid step, or over the start's cap. */
+  | 'limit_reached'
+  | 'capped_by_biggest_purchase';
 
 export type ScriptStepDecision =
-  | { readonly kind: 'none'; readonly reason: NoScriptReason }
-  | { readonly kind: 'start'; readonly script: PlatformScriptView; readonly step: ScriptStepToSend }
-  | { readonly kind: 'send_step'; readonly step: ScriptStepToSend }
+  | { readonly kind: 'none'; readonly reason: NoScriptReason; readonly stepPrice?: StepPriceTrace }
+  | {
+      readonly kind: 'start';
+      readonly script: PlatformScriptView;
+      readonly step: ScriptStepToSend;
+      readonly stepPrice?: StepPriceTrace;
+    }
+  | { readonly kind: 'send_step'; readonly step: ScriptStepToSend; readonly stepPrice?: StepPriceTrace }
   | { readonly kind: 'wait'; readonly step: StepRecord }
   /** No script may start yet, or an open one pauses (ADR 0103 § 11-12): the first condition missing. */
   | { readonly kind: 'wait'; readonly reason: ScriptStartBlock }
@@ -593,8 +637,32 @@ function nextInOpenRun(
     // So is the pause after a purchase (ADR 0128 § 1): it stops a new script, never the next step of his.
     const decision = offerDecision({ ...input.offer, lastOfferAt: null, lastPurchaseAt: null });
     if (!decision.allowed) return { kind: 'none', reason: decision.reason };
+    // The staircase (avenant du 27/11/2026): strictly above the last paid step he bought, else no paid step tonight.
+    const lastBoughtMinor =
+      run.steps.findLast((one) => one.kind === 'paid' && one.outcome === 'bought')?.priceMinor ?? null;
+    const choice = stepPriceChoice({
+      branchesMinor: step.priceMinor === null ? [] : [step.priceMinor],
+      lastBoughtMinor,
+      biggestPurchaseMinor: input.pricing?.biggestPurchaseMinor ?? null,
+      fanTier: input.pricing?.fanTier,
+      desire: input.offer.desire,
+    });
+    const stepPrice = traceOf(step.stepIndex, choice, lastBoughtMinor);
+    if (choice.kind === 'stop') return { kind: 'none', reason: choice.reason, stepPrice };
+    return { kind: 'send_step', step, stepPrice };
   }
   return { kind: 'send_step', step };
+}
+
+/** The staircase's decision as the copilot keeps it with the draft. */
+function traceOf(stepIndex: number, choice: StepPriceChoice, lastBoughtMinor: number | null): StepPriceTrace {
+  return {
+    stepIndex,
+    priceMinor: choice.kind === 'offer' ? choice.priceMinor : null,
+    reason: choice.reason,
+    previousPaidMinor: lastBoughtMinor,
+    capMinor: choice.capMinor,
+  };
 }
 
 function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): ScriptStepDecision {
@@ -612,12 +680,17 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
     return { kind: 'wait', reason: gate.missing[0] ?? 'availability_unconfirmed' };
   }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
-  const permitted = permittedScripts(input.catalogue, {
+  const options = {
     moment: input.moment,
     history,
     ...(input.language !== undefined && { language: input.language }),
-  });
+  };
+  const biggestPurchaseMinor = input.pricing?.biggestPurchaseMinor ?? null;
+  const permitted = permittedScripts(input.catalogue, { ...options, biggestPurchaseMinor });
   if (permitted.length === 0) {
+    // Her scripts are there but all start above his means (avenant du 27/11/2026): none opens, said as such.
+    if (biggestPurchaseMinor !== null && permittedScripts(input.catalogue, options).length > 0)
+      return { kind: 'none', reason: 'capped_by_biggest_purchase' };
     // Only where a script would open now (gate open, desire at the threshold, no pause): ADR 0150 § 9.
     return { kind: 'none', reason: input.catalogue.length === 0 ? 'no_script' : 'scripts_exhausted' };
   }
@@ -626,5 +699,14 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
   if (script === undefined) return { kind: 'none', reason: 'no_pick' };
   const step = toSend(input.conversationRef, script, 0);
   if (step === null) return { kind: 'none', reason: 'no_script' };
-  return { kind: 'start', script, step };
+  if (step.kind !== 'paid' || step.priceMinor === null) return { kind: 'start', script, step };
+  // A script that opens on a paid step: the start's cap is already checked (`permittedScripts`), said for the copilot.
+  const choice = stepPriceChoice({
+    branchesMinor: [step.priceMinor],
+    lastBoughtMinor: null,
+    biggestPurchaseMinor,
+    fanTier: input.pricing?.fanTier,
+    desire: input.offer.desire,
+  });
+  return { kind: 'start', script, step, stepPrice: traceOf(0, choice, null) };
 }

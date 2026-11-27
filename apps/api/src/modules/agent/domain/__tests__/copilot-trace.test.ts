@@ -192,3 +192,39 @@ describe('what the code decided with a draft, for the copilot (ADR 0141 lot a)',
     expect(name.length).toBeLessThanOrEqual(61);
   });
 });
+
+describe('the staircase in the trace (ADR 0098, avenant du 27/11/2026)', () => {
+  it('keeps the paid step decided, its price and why', () => {
+    const scripts = scriptTurn({ ...turnInput, latest: teased, history: history([0]) });
+    const trace = copilotTrace({ ...plain, scripts, latest: teased });
+    expect(trace.stepPrice).toEqual({
+      stepIndex: 1,
+      priceMinor: 1_500,
+      reason: 'next_step',
+      previousPaidMinor: null,
+      capMinor: null,
+    });
+    expect(CopilotTraceSchema.parse(trace)).toEqual(trace);
+  });
+
+  it('says the cap of his biggest purchase when the first paid step is above it', () => {
+    const scripts = scriptTurn({
+      ...turnInput,
+      latest: teased,
+      history: history([0]),
+      pricing: { biggestPurchaseMinor: 800 },
+    });
+    const trace = copilotTrace({ ...plain, scripts, latest: teased });
+    expect(trace.stepPrice).toEqual({
+      stepIndex: 1,
+      priceMinor: null,
+      reason: 'capped_by_biggest_purchase',
+      previousPaidMinor: null,
+      capMinor: 1_200,
+    });
+  });
+
+  it('carries nothing when no paid step is decided', () => {
+    expect(copilotTrace(plain).stepPrice).toBeUndefined();
+  });
+});

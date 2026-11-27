@@ -157,6 +157,7 @@ const GAP_TEXTS: Readonly<Record<PreparedScriptGap['code'], string>> = {
   media_twice: 'le même média est vendu deux fois',
   disgust: 'un texte touche une de ses limites',
   condition_text_missing: 'la phrase que l’IA vérifie est vide',
+  price_not_above_previous: 'le prix doit être plus haut que celui de l’étape payante d’avant',
 };
 
 /** « Étape 2, branche 1 : aucun média », and for a limit, the entry of her persona touched, as she wrote it. */
@@ -168,6 +169,7 @@ export function gapText(content: PreparedScriptContent, gap: PreparedScriptGap):
 
 const WARNING_TEXTS: Readonly<Record<PreparedScriptWarning['code'], string>> = {
   price_more_than_double: 'plus du double de l’étape payante d’avant',
+  price_more_than_triple: 'branche selon la dépense : plus du triple de l’étape payante d’avant',
   price_above_ceiling: 'au-dessus du prix le plus haut conseillé',
   step_without_default: 'aucune branche par défaut : un fan sans condition remplie ne reçoit rien',
 };
