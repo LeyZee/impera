@@ -125,6 +125,17 @@ function Contest({ card, creatorId }: { card: ReviewCard; creatorId: MyShift['cr
       />
       {failed ? <p className="rv-faint">Pas envoyé : réessaie dans un instant.</p> : null}
       <div className="rv-row rv-row--end">
+        <button
+          type="button"
+          className="nv-btn nv-btn--plain nv-btn--sm"
+          onClick={() => {
+            setOpen(false);
+            setReason('');
+            setFailed(false);
+          }}
+        >
+          Annuler
+        </button>
         <button type="submit" className="nv-btn nv-btn--neon nv-btn--sm" disabled={reason.trim() === ''}>
           Envoyer
         </button>
@@ -147,13 +158,20 @@ function Fault({
   const tone = card.tone ?? 'advice';
   const level = TONE[tone];
   return (
-    <article className="rv-tile rv-fault nv-enter" data-tone={tone} style={{ '--rv-tone': level.colour }}>
+    <article
+      className="nv-tile rv-tile rv-fault nv-enter"
+      data-tone={tone}
+      style={{ '--rv-tone': level.colour }}
+    >
       <div className="rv-top">
-        <div className="rv-row">
-          <span className="nv-tag nv-tag--tint" style={{ '--_c': level.colour }}>
-            {level.label}
-          </span>
-          <span className="rv-faint">{REPEAT[tone](card.counted)}</span>
+        <div className="rv-head">
+          <div className="rv-row">
+            <span className="nv-tag nv-tag--tint" style={{ '--_c': level.colour }}>
+              {level.label}
+            </span>
+            <span className="rv-faint">{REPEAT[tone](card.counted)}</span>
+          </div>
+          <h4 className="rv-title">{card.label ?? 'Un point à revoir'}</h4>
         </div>
         <div className="rv-cost" data-tone={tone}>
           {card.missed === null ? (
@@ -173,7 +191,6 @@ function Fault({
           )}
         </div>
       </div>
-      <h4 className="rv-title">{card.label ?? 'Un point à revoir'}</h4>
       <p className="rv-faint">{timeOf(card.occurredAt, zone)} · ce que tu as écrit</p>
       <Excerpt lines={card.excerpt} zone={zone} us="Toi" />
       <div className="rv-why">
@@ -230,14 +247,14 @@ export function MyReviewCard({ shift, zone }: { shift: MyShift | null; zone: str
       title={verdict(data.faults, missed)}
     >
       <PanelSection>
-        <div className="rv-totals">
-          <div className="rv-total" data-tone="miss">
-            <span>Manqué, à peu près</span>
-            <b className="nv-num">{missed === null ? '0 €' : `≈ ${missed}`}</b>
+        <div className="nv-tiles rv-totals">
+          <div className="nv-tile rv-total" data-tone="miss">
+            <span className="nv-tile__label">Manqué, à peu près</span>
+            <b className="nv-tile__value">{missed === null ? '0 €' : `≈ ${missed}`}</b>
           </div>
-          <div className="rv-total" data-tone="win">
-            <span>Rapporté par ce qui est bien fait</span>
-            <b className="nv-num">{earned ?? '0 €'}</b>
+          <div className="nv-tile rv-total" data-tone="win">
+            <span className="nv-tile__label">Rapporté, bien fait</span>
+            <b className="nv-tile__value">{earned ?? '0 €'}</b>
           </div>
         </div>
         <p className="rv-faint">Le manqué est compté au prix de l’étape suivante du script, pas au hasard.</p>
@@ -258,7 +275,7 @@ export function MyReviewCard({ shift, zone }: { shift: MyShift | null; zone: str
       {data.wellDone.length === 0 ? null : (
         <PanelSection label="Bien fait" className="rv-section">
           {data.wellDone.map((card) => (
-            <article key={card.remarkId} className="rv-tile nv-enter">
+            <article key={card.remarkId} className="nv-tile rv-tile nv-enter">
               <div className="rv-top">
                 <p className="rv-text">{card.fanFeeling}</p>
                 {card.earned === null ? null : (

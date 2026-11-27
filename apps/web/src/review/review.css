@@ -2,53 +2,32 @@
 .rv-section {
   gap: var(--nv-space-3);
 }
-.rv-totals {
-  display: grid;
+/* The two figures stay side by side on a phone too, each at the foot of its tile whatever its label's lines. */
+.nv-tiles.rv-totals {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--nv-space-3);
 }
 .rv-total {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--nv-space-4);
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-tile-fill);
-  min-width: 0;
+  justify-content: space-between;
 }
-.rv-total span {
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-}
-.rv-total b {
+.rv-total .nv-tile__value {
   font-size: var(--nv-text-large-title);
   line-height: 1.1;
   font-weight: 700;
   color: var(--nv-ink);
 }
-.rv-total b {
-  white-space: nowrap;
-}
-@media (max-width: 480px) {
-  .rv-total b {
-    font-size: var(--nv-text-title-2);
-  }
-}
-.rv-total[data-tone='miss'] b {
+.rv-total[data-tone='miss'] .nv-tile__value {
   color: var(--nv-warning);
 }
-.rv-total[data-tone='win'] b {
+.rv-total[data-tone='win'] .nv-tile__value {
   color: var(--nv-success);
 }
+/* A fault or a well-done point is read, not pointed at: the brick's lift on hover stays off. */
 .rv-tile {
-  display: flex;
-  flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-4);
-  border-radius: var(--nv-radius-lg);
+}
+.rv-tile:hover {
   background: var(--nv-tile-fill);
-  min-width: 0;
+  transform: none;
 }
 .rv-fault[data-tone='grave'] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 45%, transparent);
@@ -59,6 +38,13 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--nv-space-3);
+}
+.rv-head {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
 }
 .rv-row {
   display: flex;
@@ -194,7 +180,7 @@
     text-align: left;
     max-width: none;
   }
-  .rv-total b {
+  .rv-total .nv-tile__value {
     font-size: var(--nv-text-title-1);
   }
   .rv-said {

@@ -142,6 +142,23 @@ describe('« Mon bilan » (ADR 0170 §§ 26 to 30)', () => {
     });
   });
 
+  it('closes the contest without sending anything', async () => {
+    const fetcher = serve({
+      shiftId: SHIFT,
+      creatorId: CREATOR,
+      faults: [card()],
+      wellDone: [],
+      missedTotals: [],
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Je conteste' }));
+    fireEvent.change(screen.getByLabelText('Pourquoi, en une ligne'), { target: { value: 'Pas sûr' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByLabelText('Pourquoi, en une ligne')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Je conteste' })).toBeTruthy();
+    expect(fetcher.mock.calls.some(([url]) => url.includes('/contest'))).toBe(false);
+  });
+
   it('shows nothing for a shift without remarks', async () => {
     const fetcher = serve({ shiftId: SHIFT, creatorId: CREATOR, faults: [], wellDone: [], missedTotals: [] });
     show();
