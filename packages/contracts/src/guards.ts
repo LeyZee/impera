@@ -73,6 +73,11 @@ export const GUARD_CODES = [
   // ADR 0088 § 4 (eval pass 2, 26/11): a help or emergency number, or a listening line, the model wrote itself. The
   // help bubble is the code's, never the model's.
   'help_number_from_model',
+  // ADR 0158 § 48, avenant du 27/11: she speaks of a refund he did not ask for. Soft: rewritten once; still there after
+  // the rewrite, blocked.
+  'refund_unasked',
+  // ADR 0158 § 48, avenant du 27/11: she refunds him or decides he will be (« je te rembourse »): money outside policy.
+  'refund_promise',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

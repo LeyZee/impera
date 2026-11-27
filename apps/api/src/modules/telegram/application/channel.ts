@@ -46,17 +46,13 @@ export async function channelConfigOf(
 }
 
 async function contextFor(deps: ChannelDeps, creatorId: CreatorId): Promise<ChannelContext> {
-  const [chats, { routes }, all] = await Promise.all([
-    deps.bots.listChats(),
-    deps.bots.listRoutes(),
-    deps.channels.listChannels(),
-  ]);
+  const [chats, all] = await Promise.all([deps.bots.listChats(), deps.channels.listChannels()]);
   const takenByOthers = new Set<TelegramChatId>();
   for (const record of all) {
     if (record.creatorId !== creatorId && !record.archived && record.chatId !== null)
       takenByOthers.add(record.chatId);
   }
-  return { chats, takenByOthers, routed: new Set(routes.map((route) => route.chatId)) };
+  return { chats, takenByOthers };
 }
 
 /** Her setting as the screen shows it, the defaults until the owner saved one; null when she is not (or archived). */
@@ -104,10 +100,4 @@ export async function saveChannel(
   }
   const view = await channelView(deps, creatorId);
   return view === null ? null : ok(view);
-}
-
-/** The chats chosen as some creator's channel: alerts never go there (ADR 0080 § 6.1). */
-export async function creatorChannelChats(channels: ChannelsStore): Promise<ReadonlySet<TelegramChatId>> {
-  const all = await channels.listChannels();
-  return new Set(all.flatMap((record) => (record.chatId === null ? [] : [record.chatId])));
 }

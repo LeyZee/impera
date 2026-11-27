@@ -4,6 +4,7 @@ import { gapNotes, timingLines } from './elapsed';
 import { asksPrice, previousTurnsOf, sumsMinorOf, type GuardContext } from './guards';
 import type { Relationship } from './meeting';
 import { isOpener } from './origin';
+import { askedRefundLately } from './refund';
 import { describeSituation, type Situation } from './situation';
 
 /** A turn of the conversation as a turn reads it (`ConversationTurn` of the models' gateway, structurally). */
@@ -64,6 +65,10 @@ export function guardContextOf(
     fanAskedPrice: hisSinceHer.some((turn) => asksPrice(turn.text)),
     // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
     ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
+    // He asked for a refund lately: she may say it is done on Reveal (ADR 0158 § 48, avenant du 27/11).
+    fanAskedRefund: askedRefundLately(
+      history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
+    ),
     // His desire map holds humiliation: « petit garçon » said to him is his game (Charles 27/11).
     ...(about.humiliationWanted === true && { humiliationWanted: true }),
   };

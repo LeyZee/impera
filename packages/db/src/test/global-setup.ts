@@ -21,7 +21,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
   let container: StartedPostgreSqlContainer | undefined;
   let url = process.env['IMPERA_TEST_PG_URL'];
   if (url === undefined || url === '') {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
+    container = await new PostgreSqlContainer('postgres:17-alpine')
       .withUsername('postgres')
       .withPassword('postgres')
       .start();

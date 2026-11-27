@@ -2,7 +2,7 @@ import {
   ContentDropIdSchema,
   CreatorIdSchema,
   type CreatorId,
-  type CreatorSummary,
+  type DropCategory,
   type Me,
 } from '@impera/contracts';
 import {
@@ -42,6 +42,7 @@ import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { ContentPage } from './screens/content/ContentPage';
 import { ScriptPage } from './screens/content/ScriptPage';
+import { DROP_TILES } from './screens/content/model';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { AgencyPage } from './screens/dashboard/agency/AgencyPage';
 import {
@@ -108,7 +109,6 @@ import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
-import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
 import { scopesCreators } from './shell/CreatorScope';
 import { ErrorPage } from './shell/ErrorPage';
@@ -157,8 +157,6 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
  * While the creators are read, the stored choice is trusted, so that her screen does not open on the agency's first;
  * once read, a creator no longer listed counts as « Toutes ».
  */
-/** The same empty list at every render, while the creators are read. */
-const NO_CREATORS: readonly CreatorSummary[] = [];
 
 function useScopedCreator(enabled: boolean): string | null {
   const { chosen } = useCreatorScope();
@@ -177,20 +175,13 @@ const dashboard = createRoute({
     const navigate = dashboard.useNavigate();
     // A link that names her opens her Dashboard, and she is followed from then on (recette 05/11, PRO-28).
     const agency = scopesCreators(user);
-    const listed = useCreators().data ?? NO_CREATORS;
+    // Recette navigation 27/11 (A1, choix de Charles : « le filtre ne bouge plus ») : for the accounts with the selector, a
+    // link or a line that names her opens her Dashboard by the address alone; the selector keeps what was chosen, and
+    // the way back returns to the agency's.
     useEffect(() => {
-      if (search.creatrice === undefined) return;
-      if (!agency) {
-        followCreator(search.creatrice);
-        return;
-      }
-      // For the accounts with the selector (ADR 0134 § 3), a link that names her sets it on her, and the address lets
-      // go of her name: from then on the selector alone says whose Dashboard this is. A creator who is not listed
-      // stays in the address: the page says she is not there, rather than open the agency's without a word.
-      if (!listed.some((creator) => creator.id === search.creatrice)) return;
-      scopeTo(search.creatrice);
-      void navigate({ search: agencySearch(agencySelectionOf(search)), replace: true });
-    }, [search, agency, navigate, listed]);
+      if (search.creatrice === undefined || agency) return;
+      followCreator(search.creatrice);
+    }, [search, agency]);
     const rail = railOf(user);
     const scoped = useScopedCreator(agency);
     // The agency's figures are the owner's and an active manager's (ADR 0078 § 1): the Dashboard opens on them, or on
@@ -198,7 +189,7 @@ const dashboard = createRoute({
     if (agency) {
       const selection = agencySelectionOf(search);
       const openCreator = (id: string): void => {
-        scopeTo(id);
+        void navigate({ search: { ...agencySearch(selection), creatrice: id } });
       };
       const shown = search.creatrice ?? scoped ?? undefined;
       if (shown === undefined) {
@@ -229,6 +220,7 @@ const dashboard = createRoute({
             onSelection: (next) => void navigate({ search: agencySearch(next), replace: true }),
             onAgency: () => {
               scopeTo(null);
+              if (search.creatrice !== undefined) void navigate({ search: agencySearch(selection) });
             },
             canOpenSettings: user.role === 'owner',
           }}
@@ -303,17 +295,12 @@ const creators = createRoute({
     }
   },
   component: function Creators() {
-    const { user } = rootRoute.useRouteContext();
     const search = creators.useSearch();
     const creatrice = search.creatrice;
     const navigate = creators.useNavigate();
     const tab = sheetOf(search);
     // Here the address is the choice (ADR 0134 § 3): her sheet sets the selector on her, the list on « Toutes ». The
     // menu's link carries the creator chosen, so that Créatrices opens on her.
-    const chooses = scopesCreators(user);
-    useEffect(() => {
-      if (chooses) scopeTo(creatrice ?? null);
-    }, [chooses, creatrice]);
     return (
       <CreatorsPage
         tab={tab}
@@ -390,12 +377,10 @@ const traffic = createRoute({
     useEffect(() => {
       if (gone) void navigate({ search: {}, replace: true, state: { notice: CREATOR_GONE } });
     }, [gone, navigate]);
-    // A link that names a creator sets the selector on her, as on Suivi.
-    const chooses = scopesCreators(user);
-    useEffect(() => {
-      if (chooses && creatrice !== undefined && !gone) scopeTo(creatrice);
-    }, [chooses, creatrice, gone]);
-    return <TrafficPage scoped={useScopedCreator(chooses)} canEdit={user.role === 'owner'} />;
+    // A link that names a creator opens her links without moving the selector (A1, 27/11).
+    const scoped = useScopedCreator(scopesCreators(user));
+    const shown = creatrice !== undefined && !gone ? creatrice : scoped;
+    return <TrafficPage scoped={shown} canEdit={user.role === 'owner'} />;
   },
 });
 // Suivi › Fans: every fan of a creator (ADR 0124), the owner's and an active manager's, a sub-tab of Suivi (ADR 0134
@@ -433,12 +418,11 @@ const tracking = createRoute({
     const navigate = tracking.useNavigate();
     const { user } = rootRoute.useRouteContext();
     const rail = railOf(user);
-    // A link that names her conversation's creator sets the selector on her: her line is then on screen.
+    // A link that names her conversation's creator leaves the selector as it is (A1, 27/11): when the selector is on
+    // another creator, the list shows them all for this visit, so that her line is on screen.
     const chooses = scopesCreators(user);
-    useEffect(() => {
-      if (chooses && creatrice !== undefined) scopeTo(creatrice);
-    }, [chooses, creatrice]);
-    const scoped = useScopedCreator(chooses);
+    const chosen = useScopedCreator(chooses);
+    const scoped = creatrice !== undefined && chosen !== null && chosen !== creatrice ? null : chosen;
     const props = {
       selected: conversation ?? null,
       selectedCreator: creatrice ?? null,
@@ -568,21 +552,29 @@ const sales = createRoute({
 const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
-  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01).
-  validateSearch: (search: Record<string, unknown>): { readonly demande?: string } => {
-    const { demande } = search;
-    return typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {};
+  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01); `?depot=`,
+  // the coffre's and her day's, on a tile of hers (recette MOD-06).
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { readonly demande?: string; readonly depot?: DropCategory } => {
+    const { demande, depot } = search;
+    const tile = DROP_TILES.find((category) => category === depot);
+    return {
+      ...(typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {}),
+      ...(tile === undefined ? {} : { depot: tile }),
+    };
   },
   component: function Content() {
     const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
-    const { demande } = content.useSearch();
+    const { demande, depot } = content.useSearch();
     return (
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
           onOpenStock={() => void navigate({ to: '/contenu/coffre' })}
           asked={demande ?? null}
+          tile={depot ?? null}
           onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
@@ -596,7 +588,7 @@ const contentStock = createRoute({
   path: '/contenu/coffre',
   component: function ContentStock() {
     const navigate = contentStock.useNavigate();
-    return <MyStockPage onDrop={() => void navigate({ to: '/contenu' })} />;
+    return <MyStockPage onDrop={(depot) => void navigate({ to: '/contenu', search: { depot } })} />;
   },
 });
 /** Her script, card by card (SC-02 lot b2): a drop of hers, by its id; any other address goes back to Contenu. */
@@ -1191,17 +1183,7 @@ const telegram = createRoute({
       throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
-  validateSearch: parseTelegramSearch,
-  component: function Telegram() {
-    const search = telegram.useSearch();
-    const navigate = telegram.useNavigate();
-    return (
-      <TelegramPage
-        tab={tabOfSearch(search)}
-        onTab={(tab) => void navigate({ search: searchOfTab(tab), replace: true })}
-      />
-    );
-  },
+  component: TelegramPage,
 });
 const alerts = createRoute({
   getParentRoute: () => settings,
@@ -1321,7 +1303,7 @@ const extensionHelp = createRoute({
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
     // The trend watch is the owner's alone (ADR 0024, amendement du 16/11): the team is shown the copilot instead.
-    return <ExtensionPage watches={user.role === 'owner'} />;
+    return <ExtensionPage watches={user.role === 'owner'} security={securityPathOf(user)} />;
   },
 });
 /**

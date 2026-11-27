@@ -42,7 +42,7 @@ Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DAT
 
 ## Tests d'intégration
 
-`pnpm --filter @impera/db test:integration` démarre un Postgres 16 avec Testcontainers (Docker requis), crée les deux rôles comme en production, puis une base migrée par fichier de test (`createTestDb`). Sans Docker, `IMPERA_TEST_PG_URL` donne l'URL superutilisateur d'un Postgres 16 jetable à utiliser à la place.
+`pnpm --filter @impera/db test:integration` démarre un Postgres 17 (la version de la production) avec Testcontainers (Docker requis), crée les deux rôles comme en production, puis une base migrée par fichier de test (`createTestDb`). Sans Docker, `IMPERA_TEST_PG_URL` donne l'URL superutilisateur d'un Postgres 17 jetable à utiliser à la place.
 
 ## Écarts avec `data-model.md`
 

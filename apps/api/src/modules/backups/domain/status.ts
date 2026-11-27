@@ -33,10 +33,10 @@ export function backupState(lastSucceededAt: Date | null, now: Date): BackupStat
 }
 
 /**
- * Whether the state calls for the Telegram alert, given when the first run of the service started (`null`: no row
+ * Whether the state calls for the agency alert, given when the first run of the service started (`null`: no row
  * at all). `overdue` always does. `never` does once the service has been trying for 26 hours: right after a
  * deployment, before the first night, no success yet is no news. No row at all means the service never ran (a
- * development database, or a deployment without it): the Dashboard shows it in amber, Telegram says nothing.
+ * development database, or a deployment without it): the Dashboard shows it in amber, no notification rings.
  */
 export function needsAlert(state: BackupState, firstRunStartedAt: Date | null, now: Date): boolean {
   if (state === 'overdue') return true;

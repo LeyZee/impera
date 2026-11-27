@@ -1,14 +1,10 @@
 import { JOB_PAYLOADS, type StoredPersona } from '@impera/contracts';
-import { withAdmin } from '@impera/db';
 import type { LlmGateway } from '@impera/llm';
 
 import { secretOrNull } from '../config';
 import { defineTask } from '../jobs';
 import type { Logger } from '../logger';
 import { channelWriterPersona } from '../modules/agent';
-import type { AlertsModule } from '../modules/alerts';
-import { salesFeedTotals } from '../modules/connectors';
-import { latestRateOf } from '../modules/payroll';
 import {
   startTelegramModule,
   type ChannelLinksSource,
@@ -17,14 +13,6 @@ import {
 } from '../modules/telegram';
 
 import type { Routes, Shared, TasksOf } from './shared';
-
-/** The agency's day (ADR 0023 § Paie, Europe/Paris until it has a setting), as `YYYY-MM-DD`. */
-const AGENCY_DAY = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Europe/Paris',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
 
 export interface WiredTelegram {
   /** Null without CREDENTIALS_ENCRYPTION_KEYS: a bot token is never kept unsealed (ADR 0020 §5). */
@@ -55,7 +43,6 @@ function channelPersonaOf(active: ActiveVersion): ChannelPersonaSource {
 export async function wireTelegram(
   shared: Shared,
   deps: {
-    readonly alerts: AlertsModule;
     /** ADR 0080 § 5: the app's gateway and her active persona write her channel's posts. */
     readonly channelWriter?: {
       readonly gateway: Pick<LlmGateway, 'channelPost'>;
@@ -74,34 +61,8 @@ export async function wireTelegram(
           adminDb,
           ...(deps.channelLinks !== undefined && { channelLinks: deps.channelLinks }),
           encryptionKeys: credentialKeys,
-          webOrigin: config.WEB_ORIGIN,
-          onUncovered: (event) => {
-            logger.error({ eventId: event.id }, 'urgent alert reaches no Telegram group');
-          },
           onUnreadableTokens: (bots) => {
             logger.error({ bots }, 'Telegram bot tokens unreadable with CREDENTIALS_ENCRYPTION_KEYS');
-          },
-          alertNames: {
-            ofCreator: async (creatorId) =>
-              new Map([...(await deps.alerts.store.names(creatorId))].map(([id, alert]) => [id, alert.name])),
-          },
-          // The evening digest reads her day in `connectors` (CRM-04) in one transaction, as the admin role: the job
-          // sees every creator. The totals, the day's refunds by their own day, how far each register was read.
-          salesDay: {
-            dayOf: (creatorId, day) =>
-              withAdmin(adminDb, async (tx) => ({
-                totals: await salesFeedTotals.totalsOf(tx, { creatorId, from: day, to: day }),
-                refunds: await salesFeedTotals.refundsOf(tx, { creatorId, day }),
-                readings: await salesFeedTotals.readingsOf(tx, creatorId),
-              })),
-          },
-          // A dollar sale against the minimum in euros: the newest ECB rate of its day or before (ADR 0033), the day in
-          // the agency's zone, as the creator's screen and the Dashboard convert.
-          usdRate: {
-            onDayOf: async (occurredAt) => {
-              const day = AGENCY_DAY.format(occurredAt);
-              return (await withAdmin(adminDb, (tx) => latestRateOf(tx, 'USD', day)))?.rateMicros ?? null;
-            },
           },
           ...(deps.channelWriter !== undefined && {
             channelWriter: {
@@ -110,7 +71,7 @@ export async function wireTelegram(
             },
           }),
         });
-  if (module === null) logger.warn('Telegram notifications off: CREDENTIALS_ENCRYPTION_KEYS is not set');
+  if (module === null) logger.warn('Telegram channels off: CREDENTIALS_ENCRYPTION_KEYS is not set');
 
   /** A Telegram job when the module is off: nothing to do, said once per run. */
   const withTelegram =
@@ -126,19 +87,6 @@ export async function wireTelegram(
   return {
     module,
     tasks: {
-      'telegram.scan': defineTask(
-        'telegram.scan',
-        JOB_PAYLOADS['telegram.scan'],
-        logger,
-        withTelegram((telegram) => telegram.jobs.scan()),
-      ),
-      'telegram.flush_chat': defineTask(
-        'telegram.flush_chat',
-        JOB_PAYLOADS['telegram.flush_chat'],
-        logger,
-        (payload, context) =>
-          withTelegram((telegram) => telegram.jobs.flushChat(payload.chatId))(payload, context),
-      ),
       'telegram.dispatch_polls': defineTask(
         'telegram.dispatch_polls',
         JOB_PAYLOADS['telegram.dispatch_polls'],
@@ -155,37 +103,7 @@ export async function wireTelegram(
             context,
           ),
       ),
-      'telegram.morning_digest': defineTask(
-        'telegram.morning_digest',
-        JOB_PAYLOADS['telegram.morning_digest'],
-        logger,
-        withTelegram((telegram) => telegram.jobs.morningDigest()),
-      ),
-      'telegram.evening_digest': defineTask(
-        'telegram.evening_digest',
-        JOB_PAYLOADS['telegram.evening_digest'],
-        logger,
-        withTelegram((telegram) => telegram.jobs.eveningDigest()),
-      ),
-      'telegram.connection_reminders': defineTask(
-        'telegram.connection_reminders',
-        JOB_PAYLOADS['telegram.connection_reminders'],
-        logger,
-        withTelegram((telegram) => telegram.jobs.connectionReminders()),
-      ),
-      'telegram.purge': defineTask(
-        'telegram.purge',
-        JOB_PAYLOADS['telegram.purge'],
-        logger,
-        withTelegram((telegram) => telegram.jobs.purge()),
-      ),
     },
-    routes:
-      module === null
-        ? []
-        : [
-            module.routes({ guard: requireRole('owner'), recentLogin }),
-            module.privateLinkRoutes({ guard: requireRole('owner', 'operator'), recentLogin }),
-          ],
+    routes: module === null ? [] : [module.routes({ guard: requireRole('owner'), recentLogin })],
   };
 }

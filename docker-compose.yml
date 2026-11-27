@@ -2,7 +2,10 @@
 # Integration tests do not use this file (Testcontainers starts its own Postgres).
 services:
   postgres:
-    image: postgres:16-alpine
+    # The production major version (Supabase, ADR 0152 § 2). A data volume made by an older major does not start
+    # under a newer one: a machine that still holds a 16 volume sets IMPERA_POSTGRES_IMAGE=postgres:16-alpine in .env
+    # until its data is moved (dump, then restore into a fresh 17 volume).
+    image: ${IMPERA_POSTGRES_IMAGE:-postgres:17-alpine}
     container_name: impera-postgres
     environment:
       POSTGRES_DB: impera

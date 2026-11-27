@@ -12,6 +12,7 @@ import {
   STOCK_NAMES,
   STOCK_RULES,
   STOCK_USES,
+  HER_USES,
   droppedOnLabel,
   durationLabel,
   filtered,
@@ -94,31 +95,32 @@ export function StockCategoryView({
           <p className="st-cat__use">
             {category === null
               ? 'Ce que l’IA a écrit et que personne n’a encore relu. Les chatteurs et l’IA de chatting lisent ces textes.'
-              : STOCK_USES[category]}
+              : (her ? HER_USES : STOCK_USES)[category]}
             {rule === undefined ? null : <span className="st-rule">{rule}</span>}
           </p>
         </div>
       </header>
 
-      <div className="st-figures" role="list">
+      <ul className="st-figures">
+        {/* On a phone they are the filter (recette MOD-10): each presses on, and off at a second tap. */}
         {figures.map(([label, value, target]) => (
-          <button
-            key={label}
-            type="button"
-            role="listitem"
-            className="nv-tile st-figure"
-            data-on={target !== null && filter === target}
-            data-tone={label === 'À valider' && value > 0 && !her ? 'warn' : undefined}
-            disabled={target === null}
-            onClick={() => {
-              if (target !== null) setFilter(filter === target ? 'all' : target);
-            }}
-          >
-            <span className="nv-tile__label">{label}</span>
-            <span className="nv-tile__value nv-num">{value}</span>
-          </button>
+          <li key={label}>
+            <button
+              type="button"
+              className="nv-tile st-figure"
+              aria-pressed={target === null ? undefined : filter === target}
+              data-tone={label === 'À valider' && value > 0 && !her ? 'warn' : undefined}
+              disabled={target === null}
+              onClick={() => {
+                if (target !== null) setFilter(filter === target ? 'all' : target);
+              }}
+            >
+              <span className="nv-tile__label">{label}</span>
+              <span className="nv-tile__value nv-num">{value}</span>
+            </button>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <div className="st-toolbar">
         <FilterBar value={filter} onChange={setFilter} />
@@ -138,9 +140,13 @@ export function StockCategoryView({
       {groups.length === 0 ? (
         <Empty title={filter === 'all' ? 'Rien ici pour l’instant.' : 'Rien sous ce filtre.'}>
           {filter === 'all'
-            ? her
-              ? 'Ce que tu déposes dans Contenu arrive ici.'
-              : 'Ce qu’elle dépose dans Contenu arrive ici.'
+            ? category === 'script'
+              ? her
+                ? 'Tes scripts arrivent ici quand tu réponds à une demande de l’agence.'
+                : 'Ses scripts arrivent ici quand elle répond à une demande de l’agence.'
+              : her
+                ? 'Ce que tu déposes dans Contenu arrive ici.'
+                : 'Ce qu’elle dépose dans Contenu arrive ici.'
             : 'Choisis « Tout » pour revoir chaque média.'}
         </Empty>
       ) : (

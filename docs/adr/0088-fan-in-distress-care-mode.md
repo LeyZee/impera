@@ -2,6 +2,7 @@
 
 Statut : accepted (« ok 0088 » de Charles le 11/11/2026, 17 h 40, chat du projet ; phrases amendées après la relecture du fil Agent acceptées par « ok phrases 0088 » le 12/11/2026, 23 h 12 ; décision de Charles sur carte, 11/11/2026 17 h 36, fil « Recetter les écrans du chatteur » : « IA en mode soin, validée », après son message de 17 h 35 : un chatteur, motivé par la commission, risque de vendre derrière, l'IA est préférable ; numéro attribué par le coordinateur)
 Date : 2026-11-11
+Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.
 Amende : le filet de sécurité de la recette AGT-01 (« ok filet sécurité » de Charles, 06/11/2026 18 h 41, `agent/domain/safety-net.ts`) pour l'idée noire seulement ; la règle « détresse → humain, sans réponse automatique » de la méthode de chatting ; `protectionFor` (P3-02, `agent/domain/hold.ts`), qui pose « Ne plus lui écrire » sur la détresse. Précise : 0021 (rester en personnage, fixé dans le code), 0019 (taux en réel et passage en Automatique), 0085 § 9 (fan fragile proposé, jamais posé seul), 0020 (alerte Telegram urgente). Ne touche pas au mineur possible, ni au harcèlement, à la demande dangereuse ou à l'arme. Changement de nature assumé : aujourd'hui le filet passe la main « avant qu'aucun modèle ne lise le message » ; en mode soin, le cerveau et la voix le lisent, pour lui répondre.
 
 ## Contexte
@@ -65,3 +66,7 @@ Par Charles le 11/11/2026 à 17 h 39 (« Je suis d'accord avec toutes tes recos.
 - Hors de ses créneaux de réponse (relecture Agent, 12/11) : le soin n'est pas reporté quand le code le sait déjà, un épisode ouvert ou des idées noires écrites en clair depuis sa dernière réponse. Rien ne part sans un humain, reporter ne ferait que retarder le moment où quelqu'un le voit. Un premier signe que seul le cerveau lit attend son ouverture.
 - Tranché par Charles le 12/11 (« victime seulement ») : le mode soin couvre le fan qui raconte un abus qu'il a subi, lu comme `distress` ; `real_abuse` ne nomme plus que l'abus qu'il a commis (corpus L28) et garde la passation et « Ne plus lui écrire ». Le prompt du cerveau le dit ainsi.
 - Lots suivants : les écrans (bandeau, ligne rouge d'« À traiter », fiche, « Il va mieux »), la réponse proposée de nouveau après un refus (trois fois au plus), le rappel Telegram au bout d'une heure, la levée des ventes gelées 30 jours après la sortie.
+
+## Amendement du 27/11/2026 : la relance par notification (ADR 0176 § 6)
+
+« L'alerte Telegram urgente est renvoyée une fois au bout d'une heure » devient : le relais de détresse sonne en notification Impera (`safety_alert`) chez les propriétaires, les managers de la créatrice et les chatteurs en shift sur elle, puis de nouveau toutes les 5 minutes pendant une heure tant que personne ne l'a pris. Jamais d'envoi au fan sans validation, comme avant.

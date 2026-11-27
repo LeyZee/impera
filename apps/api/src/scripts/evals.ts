@@ -59,7 +59,7 @@ import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './
 import { createCostMeter } from './evals/cost-meter';
 import { afterTurn, beforeTurn, type DialogueState, type TurnLeft } from './evals/dialogue';
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
-import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
+import { EVALS_CAP_EUR, evalsConfig, JUDGE_CHOICES } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { CONCURRENCY_HELP, concurrencyOf, createWorstCase, runScheduled } from './evals/schedule';
 import { scriptsInputOf } from './evals/scripts-input';
@@ -88,6 +88,8 @@ const { values } = parseArgs({
     'cap-eur': { type: 'string', default: String(EVALS_CAP_EUR) },
     transcripts: { type: 'string' },
     concurrency: { type: 'string' },
+    /** The judge, named (`mistral` or `google`): Gemini while the voice answers on Mistral (until 01/12/2026). */
+    judge: { type: 'string' },
   },
 });
 const drawsArg = z.coerce.number().int().min(1).max(5).safeParse(values.draws);
@@ -193,7 +195,12 @@ async function crmPersona(): Promise<PersonaForModels> {
 const persona = values['persona-from-crm']
   ? await crmPersona()
   : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.6.0.yaml'), 'utf8'), 'Elena', today);
-const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
+const judgeArg = z.enum(JUDGE_CHOICES).optional().safeParse(values.judge);
+if (!judgeArg.success) {
+  console.error(`evals --judge : ${JUDGE_CHOICES.join(' ou ')}.`);
+  process.exit(1);
+}
+const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials, judgeArg.data);
 // Each conversation's own cost, though several run at once: what the next ones are held at (`createWorstCase`).
 const meter = createCostMeter(createInMemoryCallLog(), config.dailyBudget.usdPerEur);
 const gateway = createLlmGateway({
@@ -208,7 +215,7 @@ console.log(
   `Juge : ${config.roles.judge.provider} ${config.roles.judge.model}` +
     (isIndependent
       ? ''
-      : ' (même fournisseur que la voix : notes à lire avec ce biais, voir evals/README.md)'),
+      : ' (même famille que la voix ou que son secours : notes à lire avec ce biais, voir evals/README.md)'),
 );
 const criteria = JudgeCriterionSchema.options;
 

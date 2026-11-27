@@ -22,12 +22,7 @@ import {
   type TodosAcrossCreators,
 } from '@impera/contracts';
 
-import type {
-  DashboardFacts,
-  DashboardWindow,
-  TelegramReading,
-  WaitingConversation,
-} from './dashboard-ports';
+import type { DashboardFacts, DashboardWindow, WaitingConversation } from './dashboard-ports';
 
 /** The day's AI budget, every creator together (packages/llm `BudgetStatus`). */
 export interface BudgetReading {
@@ -254,8 +249,6 @@ export function assembleDashboard(input: {
   readonly voice: VoiceHealth;
   /** Stuck jobs, hers or of no creator, as `stuckJobsOf` reads them for whoever asks. */
   readonly jobs: Dashboard['jobs'];
-  /** Undefined when Telegram is off. */
-  readonly telegram: TelegramReading | undefined;
   /**
    * The server lock of Automatique and the live rate it was decided on, read by `conversations` (ADR 0019): shown
    * as is, never recomputed here.
@@ -307,12 +300,7 @@ export function assembleDashboard(input: {
       fansWaitingOver10Min: facts.replies.fansWaitingOver10Min,
       conversationsOpen: facts.replies.conversationsOpen,
     },
-    guards: {
-      today: guardsToday(facts.handoffsToday),
-      telegramAlertsTonight: input.telegram?.alertsTonight ?? null,
-    },
-    telegramCoverage:
-      input.telegram === undefined ? null : { urgentReachable: input.telegram.urgentReachable },
+    guards: { today: guardsToday(facts.handoffsToday) },
     budget: {
       spentToday: cents(input.budget.spentEur),
       cap: input.budget.capEur,
