@@ -405,8 +405,10 @@
   gap: var(--nv-space-2);
   flex-wrap: wrap;
 }
+/* The note and « Rendre la main » on one line in the reader's column (380 px on a computer): the band keeps the
+ * thread in view instead of taking a third of it (recette 27/11, G17). */
 .tr-hand__give .nv-field {
-  flex: 1 1 14rem;
+  flex: 1 1 10rem;
   min-width: 0;
 }
 /* Giving back a grave handoff (minor, consent, distress): said in red, kept by default (PRO-26). */
