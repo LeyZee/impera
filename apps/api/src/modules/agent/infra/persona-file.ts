@@ -35,6 +35,8 @@ export interface PersonaForModels {
   readonly forbiddenTerms: readonly string[];
   /** What she never does (`never_do`): a custom order that asks for one is declined, never taken (audit du 16/11, M3). */
   readonly neverDo?: readonly string[];
+  /** The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): a guard blocks them. */
+  readonly degradingWords?: readonly string[];
   /**
    * Her pace of scripts and the heat they wait for (`agent.strategies.script_launch`), applied by `offerDecision`, never by a
    * prompt.
@@ -49,6 +51,8 @@ export interface PersonaForModels {
   readonly followUps: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
   /** False: her answer goes out as one message, whatever the voice wrote (`behavior.split_messages`). */
   readonly splitMessages: boolean;
+  /** She may play the jealous one when he speaks of another woman (`behavior.plays_jealous`); absent, she is not. */
+  readonly playsJealous: boolean;
   /** The only pet names she gives fans (`behavior.pet_names`); a guard flags any other. */
   readonly petNames: readonly string[];
   /** Her alert keywords (`notifications.alert_keywords`): one written by a fan pauses the agent for him (P4-01). */
@@ -195,6 +199,7 @@ export function personaForModels(
     personaSheet: stringify(forModels).trim(),
     forbiddenTerms: [...rules.disgusts, ...rules.never_say].filter((term) => !isPlaceholder(term)),
     neverDo: rules.never_do.filter((term) => !isPlaceholder(term)),
+    degradingWords: (rules.degrading_words ?? []).filter((term) => !isPlaceholder(term)),
     offerLimits: {
       cooldownHours: agent.strategies.script_launch.cooldown_hours,
       minDesire: scriptMinDesire,
@@ -215,6 +220,7 @@ export function personaForModels(
       spirit: agent.follow_ups.text,
     },
     splitMessages: agent.behavior.split_messages,
+    playsJealous: agent.behavior.plays_jealous ?? false,
     petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,
@@ -262,6 +268,8 @@ export function guardSettingsOf(persona: PersonaForModels, baseStyle: VoiceFormS
     forbiddenEmojis: persona.forbiddenEmojis,
     ...(persona.neverDo !== undefined && persona.neverDo.length > 0 && { neverDo: persona.neverDo }),
     ...(persona.petNames.length > 0 && { petNames: persona.petNames }),
+    ...(persona.degradingWords !== undefined &&
+      persona.degradingWords.length > 0 && { degradingWords: persona.degradingWords }),
     ...(persona.closeOnlyWords !== undefined && { closeOnlyWords: persona.closeOnlyWords }),
     form,
     ...(emojiStreakMax !== undefined && { emojiStreakMax }),

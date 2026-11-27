@@ -94,6 +94,21 @@ Donnés sur la maquette du Dashboard (fil de revue 08), valables pour tout le CR
 
 Ce qui le vérifie tout seul : `shell/figures/figures-answer.test.ts` échoue si un écran dessine un graphique sans rien brancher sur le pointeur, ou si une figure partagée perd son entrée ou son état allumé ; un `<Donut>` s'allume de lui-même quand l'écran ne tient pas la part allumée ; `shell/figures/one-drawing.test.ts` refuse le retour d'un dessin propre à un écran ; les tests de titres, de cibles de 44 px et de durées en dur existaient déjà. La hiérarchie, l'alignement et les icônes ne se vérifient pas par un test : ils se jugent sur captures, par le fil Design, avant Charles.
 
+### La hiérarchie d'abord (Charles, 2026-11-27)
+
+« À chaque fois qu'on travaille sur un nouvel écran, et même sur les autres, il faut s'assurer qu'il y a une belle hiérarchie des informations. C'est super important que l'œil pointe naturellement vers les trucs les plus importants, que les trucs les moins importants soient un peu plus discrets… pour une lisibilité complète et pour une navigation fluide, intuitive. »
+
+La hiérarchie est le premier critère de l'accord du fil Design, avant les briques, les couleurs et l'alignement. Un écran conforme au design system mais sans hiérarchie est refusé. Elle vaut pour un écran nouveau comme pour un écran existant qu'un lot touche : celui qui y ajoute une carte, un chiffre ou un bouton vérifie que l'ensemble se lit encore dans le bon ordre.
+
+Le fil Design la juge sur capture par quatre questions, dans cet ordre :
+
+1. **Qui lit l'écran, et à quel moment ?** Un chatteur qui finit son shift, une créatrice sur son téléphone, le propriétaire le matin. La réponse décide de tout le reste.
+2. **Quelle est la première chose que l'œil lit ?** Capture réduite au quart ou vue de loin : ce qui reste lisible doit être la réponse qu'il cherche (l'argent vendu, ce qu'il doit faire maintenant), dans ses mots à lui et non dans ceux d'Impera. Si c'est un titre de carte, un compteur interne ou un bouton secondaire, l'écran n'a pas choisi.
+3. **Quelle est la deuxième, puis la troisième ?** L'ordre de lecture suit l'ordre d'importance : taille, contraste et position descendent ensemble. Deux blocs de même poids côte à côte se départagent ; une rangée de tuiles égales n'est une réponse que si les chiffres ont vraiment la même importance.
+4. **Qu'est-ce qui peut se taire ?** Tout ce qui ne sert ni à agir ni à décider passe en `ink-muted` ou `ink-faint`, descend, ou se replie. Un écran ne gagne pas en clarté par ce qu'on y ajoute.
+
+L'accord posté sur la PR dit en une ligne ce que l'œil lit en premier sur chaque écran du lot. Un lot dont cette ligne ne peut pas s'écrire n'a pas d'accord.
+
 ## Où vivent les choses
 
 | Fichier                                                 | Rôle                                                                                                                                                |
@@ -199,7 +214,7 @@ Tout élément cliquable a les quatre états ; un écran prend la classe qui con
 - **Survol** : bouton néon, halo `shadow-neon` → `shadow-neon-strong` et +8 % de lumière ; autres boutons, teinte `glass-fill` ; bouton rond `nv-iconbtn`, grossit de 6 % ; ligne ou carte cliquable (`nv-tap`), `glass-fill` ; carte flottante (`nv-lift`), monte de 2px avec `shadow-lift`.
 - **Focus clavier** : anneau `focus` sur tout élément interactif. Un champ où l'on écrit garde sa plaque : contour fin à l'encre et halo doux, pas de cadre sombre sur fond gris. Visible sur verre dans les deux thèmes.
 - **Actif** : pression en gel `scale(1.03, 0.95)` (boutons), `0.95` (puces), `0.985` (lignes) en `dur-instant`, retour sur `ease-spring`.
-- **Sélection** : `select` (conversation ouverte, ligne active), `select-strong` (pouce d'un segment, onglet actif) ; une puce cochée (`aria-checked`) est remplie d'`ink`, comme une case `nv-check` cochée (qui importer, quels rapports). Une case qui vaut pour un groupe dont une partie seulement est cochée (un dossier du coffre dont certains médias sont importés) prend l'état `indeterminate` : un trait sur le même fond `ink`.
+- **Sélection** : `select` (conversation ouverte, ligne active), `select-strong` (pouce d'un segment, onglet actif) ; une puce cochée (`aria-checked`) est remplie d'`ink`, comme une case `nv-check` cochée (qui importer, quels rapports). Un choix unique parmi quelques phrases (la TVA d'un régime) passe par `nv-radio`, sa sœur ronde : un point dans un rond rempli d'`ink`. Une case qui vaut pour un groupe dont une partie seulement est cochée (un dossier du coffre dont certains médias sont importés) prend l'état `indeterminate` : un trait sur le même fond `ink`.
 - **Désactivé** : opacité 0,4, sans ombre ni survol. Pendant un envoi, le bouton reste visible avec un libellé d'état.
 
 Classes communes : `nv-btn` (actions), `nv-chip` (un choix parmi quelques-uns, cinq au plus), `nv-select` (un choix dans une liste plus longue : le composant `Select`, jamais un `<select>` du système), `nv-tap` (ligne, carte, élément de liste), `nv-lift` (carte flottante, pas un grand panneau), `nv-disclosure` (pli `<details>` avec titre `__title`, résumé `__sum` et contenu `__body`), `nv-enter` (entrée en fondu montant, décalée par `--nv-i`). `nv-guide` (un guide plié : un geste difficile, ses étapes et « Tu dois voir », puis « À savoir », « Jamais » en rouge, « Si ça coince » en ambre) prend une seule couleur par page, celle de la personne, par `--_c` : elle teinte la tuile de l'icône, le fond des numéros et le contour du guide ouvert, et les mots et les chiffres restent à l'encre. « Essentiel » et les repères sont des `nv-tag nv-tag--tint`.
@@ -310,7 +325,7 @@ Un écran de chiffres se comprend d'un coup d'œil, et il vit. Avant de le montr
 
 - Raccourcis communs au playground et au copilote : `a` valider, `e` corriger, `r` rejeter. Chaque bouton affiche sa touche (`nv-kbd`).
 - La proposition montre le brief en une ligne, le fil, le brouillon étiqueté, puis les faits utilisés et la latence en `nv-meta`.
-- Cibles ≥ 44px : les contrôles compacts (`nv-btn--sm`, `nv-iconbtn`, `nv-close`, `nv-switch`, `nv-check`) gardent une zone de clic de 44px autour d'un visuel plus petit.
+- Cibles ≥ 44px : les contrôles compacts (`nv-btn--sm`, `nv-iconbtn`, `nv-close`, `nv-switch`, `nv-check`, `nv-radio`) gardent une zone de clic de 44px autour d'un visuel plus petit.
 
 ## Correspondance avec shadcn/ui
 

@@ -24,6 +24,7 @@ import {
   createConversationsModule,
   type ConversationsModule,
   type DraftComposer,
+  MAX_SEND_ATTEMPTS,
   type OutboundSender,
 } from '../modules/conversations';
 import { createFansModule } from '../modules/fans';
@@ -38,7 +39,7 @@ const NO_LOG = { info: () => undefined, warn: () => undefined };
 const USER = UserIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e2');
 const VOICE = { voicePrompt: 'voice@e2e', voiceModel: 'model-e2e' };
 
-/** Fails every send with a timeout: the third attempt is the last. */
+/** Fails every send with a timeout: attempt `MAX_SEND_ATTEMPTS` is the last. */
 class FailingSender implements OutboundSender {
   sendText(): Promise<SendResult> {
     return Promise.reject(new DomainError('connector_timeout', 'timeout'));
@@ -238,10 +239,10 @@ describe('Telegram alerts from the conversations module', () => {
     const draftId = await lastDraft(conversationId);
     await conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] });
     const payload = { creatorId, conversationId, draftId, correlationId: 'e2e' };
-    for (const attempt of [1, 2]) {
+    for (let attempt = 1; attempt < MAX_SEND_ATTEMPTS; attempt += 1) {
       await expect(conversations.jobs.send(payload, NO_LOG, attempt)).rejects.toThrow();
     }
-    await conversations.jobs.send(payload, NO_LOG, 3);
+    await conversations.jobs.send(payload, NO_LOG, MAX_SEND_ATTEMPTS);
     await deliver();
     expect(texts()).toHaveLength(1);
     expect(texts()[0]).toContain('Un message de l’agent n’a pas pu partir');

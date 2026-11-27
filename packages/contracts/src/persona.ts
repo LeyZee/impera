@@ -311,6 +311,11 @@ export const PersonaLimitsSchema = z.strictObject({
   never_show: entries(120, 100),
   never_say: entries(120, 200, guardWord),
   disgusts: entries(120, 200, guardWord),
+  /**
+   * The degrading insults she never writes to him, even in the heat (Charles 26/11, guard `degrading_word`): the list is
+   * hers or the agency's, kept in her file, never in the repository. Absent: none checked.
+   */
+  degrading_words: entries(120, 200, guardWord).optional(),
 });
 
 export const PERSONA_EMOJIS_MAX = 20;

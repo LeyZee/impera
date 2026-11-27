@@ -4,7 +4,10 @@ Une ADR (Architecture Decision Record) fige une décision structurante avec son 
 
 ## Règles
 
-- Une ADR est **immuable** une fois `accepted`. Pour changer d'avis : nouvelle ADR qui `supersedes` l'ancienne (l'ancienne passe en `superseded`).
+- Une ADR `accepted` ne se réécrit pas : son texte d'origine reste lisible. Pour changer d'avis, deux voies (décision de Charles du 27/11/2026, qui entérine la pratique) :
+  - **amender en place** : un ajout daté en fin de fichier (« Avenant du JJ/MM : … », avec les mots de Charles), et le statut qui le dit ; ou
+  - **une nouvelle ADR** dont la ligne « Remplace : » ou « Amende : » cite le passage exact qu'elle change. L'ancienne reçoit alors en tête le bandeau « Changée en partie depuis » (voir `docs/regles/`), ou passe en `superseded` si elle est remplacée en entier.
+- Dans les deux cas, la page du sujet dans `docs/regles/` est mise à jour dans la même PR.
 - Statuts : `proposed` (une session Opus peut en créer une) → `accepted` (Charles ou la session d'architecture) → `superseded` / `rejected`.
 - Numérotation séquentielle à 4 chiffres, nom `NNNN-slug.md`.
 - Une session de code qui prend une décision structurante non couverte **doit** créer une ADR `proposed` et le dire dans sa fiche de tâche. Elle ne doit pas passer outre une ADR `accepted`.
@@ -174,7 +177,9 @@ Date : AAAA-MM-JJ
 | 0163 | Coffre Impera : le stock de ce qu'elle dépose, compté par usage, décrit et relu par les trois | accepted (précise 0055, 0044, 0159, 0161) |
 | 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
 | 0165 | « Où te verser » : le membre écrit où il est payé, scellé, et seul le propriétaire le lit | proposed |
+| 0166 | Le départ d'un membre : une heure de fin, la coche Reveal, un espace de départ fermé | proposed (précise 0023, 0025 ; amende le refus de connexion du 28/10) |
 | 0168 | La langue du fan décidée par le code, donnée à la voix comme une consigne fixe ; couverture des langues par les gardes, fermée par défaut | accepted |
 | 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025 ; amendée le 26/11 : le retour léger) |
+| 0171 | Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre | proposed |
 | 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
 | 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |

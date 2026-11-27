@@ -47,13 +47,14 @@ function serve(
   return calls;
 }
 
-function show(): void {
+function show(): QueryClient {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
       <ExceptionsPanel creatorId={CREATOR} hours={DAYS} />
     </QueryClientProvider>,
   );
+  return client;
 }
 
 const flat = (text: string | null): string => (text ?? '').replace(/\s/gu, ' ');
@@ -91,6 +92,18 @@ describe('Jours modifiés (ADR 0148 § 3)', () => {
       expect(calls.at(-1)).toEqual({ method: 'DELETE', url: `${BASE}/2026-11-21`, body: null });
     });
     expect(await screen.findByText('Demain suit de nouveau sa semaine type.')).toBeDefined();
+  });
+
+  it('reads her card again once a day is set back, so her switch says it at once (CODE-03)', async () => {
+    serve(view([{ date: '2026-11-21', ranges: [] }]), view([]));
+    const client = show();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const tomorrow = (await screen.findByText('Demain')).closest('li');
+    if (tomorrow === null) throw new Error('no line');
+    fireEvent.click(within(tomorrow).getByRole('button', { name: 'Rétablir Demain' }));
+    expect(await screen.findByText('Demain suit de nouveau sa semaine type.')).toBeDefined();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['dashboard', 'creators'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['dashboard', CREATOR] });
   });
 
   it('turns a day off: no AI that day', async () => {

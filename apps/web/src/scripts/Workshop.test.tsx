@@ -111,12 +111,17 @@ describe('the workshop of a structure', () => {
     );
   });
 
-  it('shuts the save while a field is empty, and says so', () => {
-    serve();
+  it('names the empty field, and leads « Enregistrer » to it rather than shut (recette COUV-10)', () => {
+    const calls = serve();
     renderWorkshop();
-    fireEvent.change(screen.getByLabelText('Nom de la structure'), { target: { value: '' } });
-    expect(screen.getByRole('button', { name: 'Enregistrer' })).toHaveProperty('disabled', true);
-    expect(screen.getAllByText('Un champ est vide').length).toBeGreaterThan(0);
+    const name = screen.getByLabelText('Nom de la structure');
+    fireEvent.change(name, { target: { value: '' } });
+    expect(screen.getByText('Donne un nom à la structure.')).toBeTruthy();
+    const save = screen.getByRole('button', { name: 'Enregistrer' });
+    expect(save).toHaveProperty('disabled', false);
+    fireEvent.click(save);
+    expect(document.activeElement).toBe(name);
+    expect(calls.posts).toHaveLength(0);
   });
 
   it('writes a new structure under its id, with the stage added', async () => {
@@ -134,7 +139,7 @@ describe('the workshop of a structure', () => {
   it('moves a stage with Alt and the arrows, and drops the bridge it leaves', () => {
     serve();
     renderWorkshop();
-    const bridges = (): number => screen.getAllByRole('button', { name: /^Pont \d & \d :/ }).length;
+    const bridges = (): number => screen.getAllByRole('button', { name: /^Pont vers l’étape \d :/ }).length;
     const before = bridges();
     const second = screen.getByRole('button', { name: /^Étape 2/ });
     fireEvent.keyDown(second, { key: 'ArrowUp', altKey: true });

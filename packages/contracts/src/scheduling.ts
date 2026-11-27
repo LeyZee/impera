@@ -980,6 +980,7 @@ export const SCHEDULING_ERROR_CODES = [
   'leave_shifts_conflict',
   'leave_own_decision_forbidden',
   'leave_date_invalid',
+  'availability_conflict',
   'shift_swap_not_found',
   'shift_swap_conflict',
   'shift_swap_open_conflict',

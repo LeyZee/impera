@@ -192,6 +192,9 @@ function ChannelPostWriter({
           >
             {writing ? 'Écriture…' : tried === null ? 'Écrire' : 'Réécrire'}
           </button>
+          {kind === 'main' && media.trim() === '' ? (
+            <p className="ps-hint">Décris le média pour qu’elle y réagisse.</p>
+          ) : null}
         </section>
       </div>
 
@@ -303,7 +306,7 @@ function Preview({ tried, creatorName }: { tried: TriedChannelPost; creatorName:
         )}
       </article>
       {violations.length === 0 ? (
-        <p className="ps-hint">Aucune garde levée. Fiche {tried.personaVersion}, rien n’est publié.</p>
+        <p className="ps-hint">Aucune garde levée. Persona v{tried.personaVersion}, rien n’est publié.</p>
       ) : (
         <>
           <ul className="tc-warnings" aria-label="Gardes">
@@ -313,7 +316,7 @@ function Preview({ tried, creatorName }: { tried: TriedChannelPost; creatorName:
               </li>
             ))}
           </ul>
-          <p className="ps-hint">Fiche {tried.personaVersion}, rien n’est publié.</p>
+          <p className="ps-hint">Persona v{tried.personaVersion}, rien n’est publié.</p>
         </>
       )}
     </>

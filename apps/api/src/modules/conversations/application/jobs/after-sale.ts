@@ -154,6 +154,7 @@ export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: A
           createdAt: at.at,
           bubbles: result.bubbles,
           softViolations: result.softViolations,
+          ...(result.retried !== undefined && { retried: result.retried }),
           ...(result.voice !== undefined && { voice: result.voice }),
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: [],

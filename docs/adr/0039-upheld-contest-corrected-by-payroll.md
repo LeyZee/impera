@@ -1,5 +1,15 @@
 # 0039. Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0040 · Factures : « annuler et refacturer » émet une facture rectificative, sous le régime de la facture annulée](0040-reissue-as-corrective-invoice.md) : Remplace : dans l'ADR 0039, au point 3, la phrase « Le second, positif, donne une ligne de la facture de cette quinzaine, qui imprime le dossier corrigé », et la conséquence « La ligne refacturée prend le régime du jour, alors que l'avoir garde celui de la facture d'origine ». La règle « la paire part ensemble ou pas du tout » de l'ADR 0039 vaut désormais pour l'avoir d'annulation et la facture rectificative. L'ADR 0039 reste telle quelle ; l'index des ADR renvoie d'elle à celle-ci.
+>
+> - [0072 · Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint](0072-departed-member-final-statement-and-written-off-balance.md) : Amende : l'ADR 0039 § 6 (la quinzaine de clôture) ; précise l'ADR 0038 (« le dernier relevé d'un membre qui part verse tout ») et l'ADR 0023 (§ Les règles d'Imperium : le report négatif)
+>
+> Toutes les décisions du même sujet : [`docs/regles/paie-et-factures.md`](../regles/paie-et-factures.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 01/11/2026 15h42, « Ok 0039 », sur le texte de la tête 46dd2f4, approuvée par Bilan)
 Date : 2026-11-01
 Remplace : dans l'ADR 0036, la phrase « Seul l'avoir qui répond à une contestation fait passer la facture en « créditée » » ; précise l'ADR 0023 (§ Factures : l'acceptation, la correction d'une facture)

@@ -1,5 +1,6 @@
 import {
   INVOICE_RETENTION_YEARS,
+  PAY_AMOUNT_MAX_MINOR,
   type InvoiceAcceptanceState,
   type InvoiceEvent,
   type InvoiceEventKind,
@@ -174,6 +175,20 @@ export function deadlineText(
 export const answerable = (item: Pick<InvoiceListItem, 'acceptance'>): boolean =>
   item.acceptance.state === 'pending';
 
+/**
+ * The most an upheld contest's amount may be, excluding VAT: in the agency's favour, a credit note never goes beyond
+ * its invoice (the server checks what its credit notes have left), otherwise what one adjustment of pay carries
+ * (recette MED-05: an amount above the invoice is refused while typed, not after the check).
+ */
+export function settleAmountMax(
+  item: Pick<InvoiceListItem, 'kind' | 'exclVatMinor'>,
+  side: 'contractor' | 'agency' | null,
+): number {
+  return side === 'agency' && item.kind === 'invoice'
+    ? Math.max(0, Math.min(item.exclVatMinor, PAY_AMOUNT_MAX_MINOR))
+    : PAY_AMOUNT_MAX_MINOR;
+}
+
 /** The contests the owner has to settle first, then the rest, each group in the server's order. */
 export function contestsFirst<T extends Pick<InvoiceListItem, 'acceptance'>>(items: readonly T[]): T[] {
   return [
@@ -261,6 +276,8 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
     case 'contractor_document_id_conflict':
     case 'contract_text_id_conflict':
       return 'Cet envoi existe déjà avec d’autres valeurs : recharge la page.';
+    case 'billing_regime_name_conflict':
+      return 'Un régime porte déjà ce nom : donne-lui un nom qui le distingue.';
     case 'billing_regime_not_found':
       return 'Ce régime n’existe plus.';
     case 'billing_regime_validated_conflict':

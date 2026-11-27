@@ -1,6 +1,6 @@
 # INS-02 Connecteur de liens en lecture seule : clics par endroit et par heure
 
-Statut : in progress (lots a, b et c faits : contrats, domaine, faux, origine du service, adaptateur en lecture seule, clé scellée du propriétaire, route « Détecter ses liens »)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in progress (lots a, b et c faits : contrats, domaine, faux, origine du service, adaptateur en lecture seule, clé scellée du propriétaire, route « Détecter ses liens »)
 Phase : Instagram (ADR 0120)
 Dépend de : ADR 0120 acceptée
 Branche : task/ins-02-link-stats-connector

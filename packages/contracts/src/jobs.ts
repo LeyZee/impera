@@ -10,6 +10,7 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   CreatorTaskIdSchema,
+  MemberDepartureIdSchema,
   DraftIdSchema,
   EventIdSchema,
   FanIdSchema,
@@ -64,6 +65,7 @@ export const JOB_NAMES = [
   'notifications.recap',
   'alerts.route',
   'notifications.creator_sale',
+  'notifications.creator_notices',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
   'creator_week.plan',
@@ -75,6 +77,7 @@ export const JOB_NAMES = [
   'scheduling.remind_reports',
   'scheduling.notify_incident',
   'team.apply_roles',
+  'team.member_departure',
   'owners.watch',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -153,6 +156,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.recap': 'Récapitulatif des notifications',
   'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
+  'notifications.creator_notices': 'Demandes, propositions et semaine dites à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
   'creator_week.plan': 'Semaine de la créatrice',
@@ -164,6 +168,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
   'team.apply_roles': 'Rôles de l’équipe',
+  'team.member_departure': 'Départ d’un membre',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
@@ -337,6 +342,12 @@ export const JOB_PAYLOADS = {
    */
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   /**
+   * Every five minutes (trou 9 du 21/11): what the agency asked of a creator in the last half hour (a request for
+   * content, a script, a proposition for her agenda, her week validated) told to her accounts, once each, on the sort
+   * she may turn off. A run missed is caught by the next one within the half hour.
+   */
+  'notifications.creator_notices': z.object({}),
+  /**
    * The reminder she chose for a task at an hour (CR-05 lot b3): enqueued with the task's write under the key
    * `creator_tasks.remind:<taskId>`, at its start less her minutes. `startsAt` is the start it was scheduled for: a
    * move replaces the job, and a job left from before rings nothing.
@@ -388,6 +399,11 @@ export const JOB_PAYLOADS = {
   'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
+  /**
+   * At the hour a departure ends (ADR 0166 § 2): applied once, replayed it does nothing more. By the owner who set it,
+   * or by an owner in office if he no longer is one; `scheduledBy` is checked against the departure before anything.
+   */
+  'team.member_departure': z.object({ departureId: MemberDepartureIdSchema, scheduledBy: UserIdSchema }),
   /**
    * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
    * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a
@@ -690,6 +706,8 @@ export const JOB_MAX_ATTEMPTS = {
   'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
+  // Every five minutes, and each notification rings once: the next run is the retry.
+  'notifications.creator_notices': 1,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
@@ -707,6 +725,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.remind_reports': 1,
   'scheduling.notify_incident': 3,
   'team.apply_roles': 1,
+  'team.member_departure': 5,
   // Every minute: the next run is the retry.
   'owners.watch': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.

@@ -1,5 +1,5 @@
 # MCP-UI L'écran Réglages › Agents connectés
-Statut : in-progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in-progress
 Phase : MCP (ADR 0026 § 3, ADR 0105 § 1), lot a
 Dépend de : les routes `/v1/settings/mcp-grants` (dans `main`)
 Branche : claude/project-thread-ab4eh2

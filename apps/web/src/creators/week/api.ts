@@ -17,7 +17,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 export const creatorWeekKey = (creatorId: CreatorId, week: string) =>
   ['creators', creatorId, 'week', week] as const;
 
-/** Her week starting on `week`; `null` while it is not computed yet (404). */
+/** Her week starting on `week`; `null` while it is not computed yet. */
 export function useAgencyCreatorWeek(
   creatorId: CreatorId,
   week: string,
@@ -26,7 +26,8 @@ export function useAgencyCreatorWeek(
     queryKey: creatorWeekKey(creatorId, week),
     queryFn: async () => {
       const response = await fetch(`/v1/creators/${creatorId}/weeks/${week}`, { credentials: 'include' });
-      if (response.status === 404) return null;
+      // 204 while it is not computed yet: an ordinary state (MAN-08, DS-14).
+      if (response.status === 204) return null;
       if (!response.ok) throw new Error(`GET week: ${String(response.status)}`);
       return AgencyCreatorWeekSchema.parse(await response.json());
     },

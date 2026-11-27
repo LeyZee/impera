@@ -1,7 +1,7 @@
 import { CreatorIdSchema, TeamMemberIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { fortnightOf, onShiftOf, requestOf, salesOf, todosOf } from './model';
+import { fortnightOf, hasActivePersonaOf, onShiftOf, requestOf, salesOf, todosOf } from './model';
 
 // Everything below is invented (ADR 0010).
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a1');
@@ -19,7 +19,17 @@ describe('the words of a card of the list of Créatrices', () => {
     const sales = { from: '2026-11-01', to: '2026-11-09', sales: 3, refunds: 1, revenueMinor: 123_450 };
     expect(flat(salesOf({ ...sales, usdLeftOut: false }).value)).toBe('1 234,50 €');
     expect(salesOf({ ...sales, usdLeftOut: true }).note).toBe('du 1 au 9 nov., hors ventes en dollars');
-    expect(salesOf(null)).toEqual({ value: '—', note: 'Registre des ventes non relié' });
+    expect(salesOf(null)).toEqual({ value: '—', note: 'Ventes : pas encore reliées' });
+  });
+
+  it('reads her persona from her « Mise en route », unknown when it is not read (PRO1-03)', () => {
+    const setup = (state: 'done' | 'todo') => ({
+      creatorId: CREATOR,
+      steps: [{ key: 'persona' as const, state, note: null }],
+    });
+    expect(hasActivePersonaOf(setup('done'))).toBe(true);
+    expect(hasActivePersonaOf(setup('todo'))).toBe(false);
+    expect(hasActivePersonaOf(undefined)).toBeUndefined();
   });
 
   it('says who is on shift on her, in the reader’s zone', () => {

@@ -1407,3 +1407,27 @@ button.sc-duty__one:active {
 .sc-decide .nv-btn {
   flex: none;
 }
+
+/* On a member's chip of « Ajouter un shift »: his week covers the hours (ADR 0171, trou 16). */
+.sc-cover {
+  margin-left: 2px;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.sc-cover[data-cover='full'] {
+  color: var(--nv-success);
+}
+/* On the chosen chip the word takes the chip's own ink: the success ink does not read on its light fill. */
+[aria-checked='true'] > .sc-cover,
+[aria-checked='true'] > .sc-cover[data-cover='full'] {
+  color: inherit;
+}
+/* « 2 dispos » under the hours of a place to fill (ADR 0171, trou 16): the success ink, quiet. */
+.sc-slot__dispos {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-success);
+  white-space: nowrap;
+}

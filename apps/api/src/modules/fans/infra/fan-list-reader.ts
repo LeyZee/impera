@@ -78,6 +78,8 @@ const RowSchema = z.object({
   last_paid_at: instant,
   conversation_id: ConversationIdSchema.nullable(),
   last_inbound_at: instant,
+  /** His last message's own time on the platform, never the time it was read in (PRO1-05). */
+  last_message_at: instant,
   last_outbound_at: instant,
   mode: z.string().nullable(),
   state: z.string().nullable(),
@@ -120,7 +122,7 @@ function itemOf(row: Row): FanListItem {
     fanId: row.id,
     displayName: row.display_name,
     firstSeenAt: row.first_seen_at.toISOString(),
-    lastMessageAt: row.last_inbound_at?.toISOString() ?? null,
+    lastMessageAt: row.last_message_at?.toISOString() ?? null,
     lastPaidAt: row.last_paid_at?.toISOString() ?? null,
     paidPeriod: { eurMinor: row.eur_period, usdMinor: row.usd_period },
     paidEver: { eurMinor: row.eur_ever, usdMinor: row.usd_ever },
@@ -151,7 +153,7 @@ export function createFanListReader(db: Database, usdRateMicrosOf: UsdRateMicros
           sort === 'paid'
             ? sql`(r.eur_${sql.raw(query.filter === 'big_payers' ? 'period' : 'ever')}::bigint
                   + ${usdInEur(sql.raw(`r.usd_${query.filter === 'big_payers' ? 'period' : 'ever'}::bigint`))})`
-            : sql`coalesce((extract(epoch from ${sql.raw(sort === 'last_message' ? 'r.last_inbound_at' : 'r.last_paid_at')}) * 1000000)::bigint, -1)`;
+            : sql`coalesce((extract(epoch from ${sql.raw(sort === 'last_message' ? 'r.last_message_at' : 'r.last_paid_at')}) * 1000000)::bigint, -1)`;
         const filter: SQL = {
           all: sql`true`,
           big_payers: sql`(r.eur_period > 0 or r.usd_period > 0)`,
@@ -189,11 +191,15 @@ export function createFanListReader(db: Database, usdRateMicrosOf: UsdRateMicros
                    coalesce(p.eur_ever, 0) as eur_ever, coalesce(p.usd_ever, 0) as usd_ever,
                    coalesce(p.eur_period, 0) as eur_period, coalesce(p.usd_period, 0) as usd_period,
                    p.last_paid_at, c.id as conversation_id, c.last_inbound_at, c.last_outbound_at, c.mode, c.state,
-                   c.care_since, u.name as holder_name
+                   c.care_since, u.name as holder_name,
+                   -- His last message at the platform's own time: a catch-up of the connector reads late, never anew.
+                   coalesce(c.last_inbound_message_at, c.last_inbound_at) as last_message_at
               from fans f
               left join paid p on p.account = f.platform_account_id and p.fan = f.platform_fan_id
               left join lateral (
-                select c.id, c.last_inbound_at, c.last_outbound_at, c.mode, c.state, c.care_since, c.routed_to_user_id
+                select c.id, c.last_inbound_at, c.last_outbound_at, c.mode, c.state, c.care_since, c.routed_to_user_id,
+                       (select max(m.platform_created_at) from messages m
+                         where m.conversation_id = c.id and m.direction = 'inbound') as last_inbound_message_at
                   from conversations c where c.fan_id = f.id
                  order by c.updated_at desc, c.id desc limit 1) c on true
               left join "user" u on u.id = c.routed_to_user_id
