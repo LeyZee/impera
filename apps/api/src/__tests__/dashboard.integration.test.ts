@@ -699,7 +699,7 @@ describe('GET /v1/dashboard', () => {
     expect(await reveal()).toMatchObject({
       outage: { reason: 'session_expired', since: readAgain.toISOString() },
     });
-    await account({ sessionState: 'active', lastPollAt: new Date() });
+    await account({ sessionState: 'valid', lastPollAt: new Date() });
   });
 
   it('gathers « À traiter » of every creator followed, each line naming hers, never one not followed (SUIVI-09)', async () => {
