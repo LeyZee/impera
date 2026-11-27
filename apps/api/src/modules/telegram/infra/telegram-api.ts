@@ -1,7 +1,7 @@
 import type { TelegramMembership } from '@impera/contracts';
 import { z } from 'zod';
 
-import type { ChannelFailure, ChannelResult, ChannelUpdate, NotificationChannel } from '../domain/ports';
+import type { ChannelFailure, ChannelResult, ChannelUpdate, BotChannel } from '../domain/ports';
 
 /**
  * The Telegram Bot API adapter (ADR 0020 §1, §5). The token sits in the URL (`/bot<token>/…`): nothing here logs
@@ -63,13 +63,9 @@ const UpdateSchema = z.object({
       chat: ChatSchema,
       migrate_to_chat_id: z.number().int().optional(),
       new_chat_title: z.string().optional(),
-      text: z.string().max(4096).optional(),
     })
     .optional(),
 });
-
-/** `/start <code>` (or `/start@bot <code>`), the deep link's form: the code alone is kept, never the rest of a text. */
-const START = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{1,64})\s*$/u;
 
 type Call = { ok: true; result: unknown } | { ok: false; failure: ChannelFailure; description: string };
 
@@ -165,15 +161,6 @@ function toUpdate(raw: unknown): ChannelUpdate | null {
       title: message.new_chat_title,
     };
   }
-  const start = message?.chat.type === 'private' ? START.exec(message.text ?? '') : null;
-  if (message !== undefined && start?.[1] !== undefined) {
-    return {
-      kind: 'start',
-      updateId: update.update_id,
-      telegramChatId: String(message.chat.id),
-      code: start[1],
-    };
-  }
   return { kind: 'other', updateId: update.update_id };
 }
 
@@ -183,7 +170,7 @@ function updateIdOf(raw: unknown): number | null {
   return parsed.success ? parsed.data.update_id : null;
 }
 
-export function createTelegramApi(options: TelegramApiOptions): NotificationChannel {
+export function createTelegramApi(options: TelegramApiOptions): BotChannel {
   const baseUrl = options.baseUrl ?? 'https://api.telegram.org';
 
   async function call(
@@ -279,21 +266,6 @@ export function createTelegramApi(options: TelegramApiOptions): NotificationChan
       return sent.success
         ? { ok: true, value: { messageId: sent.data.message_id } }
         : fail({ kind: 'unreachable' });
-    },
-    async edit(token, telegramChatId, messageId, text) {
-      const result = await call(token, 'editMessageText', {
-        chat_id: telegramChatId,
-        message_id: messageId,
-        text,
-        parse_mode: 'HTML',
-        link_preview_options: linkPreview,
-      });
-      if (result.ok) return { ok: true, value: null };
-      // A replayed edit: the message already reads the same.
-      if (result.failure.kind === 'bad_request' && result.description.includes('message is not modified')) {
-        return { ok: true, value: null };
-      }
-      return fail(result.failure);
     },
   };
 }

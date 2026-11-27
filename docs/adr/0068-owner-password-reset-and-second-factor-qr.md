@@ -2,6 +2,7 @@
 
 Statut : accepted (Charles, 05/11/2026, 18 h 13, « ok 0068 » ; canal choisi le 05/11/2026, 18 h 08, sur la carte du fil Bilan : « Les deux »)
 Date : 2026-11-05
+Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.
 Précise : ADR 0016 (clés jamais dans le chat), ADR 0046 (deuxième facteur), ADR 0020 (bot Telegram de l'agence), EQ-10 (lien de réinitialisation d'un membre). Ne remplace rien.
 
 ## Contexte
@@ -32,3 +33,7 @@ Précise : ADR 0016 (clés jamais dans le chat), ADR 0046 (deuxième facteur), A
 - **Questions secrètes** : faibles et devinables.
 - **Lien affiché sans canal** : n'importe qui connaissant l'e-mail prendrait le compte.
 - **QR par un service en ligne** : le secret sortirait du CRM.
+
+## Amendement du 27/11/2026 : plus de chat privé Telegram (ADR 0176 § 8)
+
+Le lien ne part plus dans un chat Telegram privé : la page « Mot de passe oublié » ne demande plus rien et dit d'où vient le lien. Un membre de l'équipe ou une créatrice le reçoit d'un propriétaire, depuis Équipe (EQ-10). Un propriétaire le fait faire sur le serveur par `pnpm ops:password-reset-link --email <e-mail>`, qui l'affiche là et ne l'envoie nulle part ; l'audit l'inscrit sans adresse IP. Le lien lui-même ne change pas (15 minutes, un toutes les 5 minutes au plus, sessions fermées, deuxième facteur inchangé). L'e-mail viendra avec le domaine.

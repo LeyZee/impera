@@ -91,4 +91,42 @@ describe('the reads of alerts.route (ADR 0150 § 18)', () => {
     );
     expect(managers.map((m) => m.userId)).not.toContain('manager-gone');
   });
+
+  it('reads the agency’s alerts apart, and the safety relays no takeover followed (27/11/2026)', async () => {
+    const creatorId = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+    const [taken, waiting] = ['01900000-0000-7000-8000-000000000031', '01900000-0000-7000-8000-000000000032'];
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+    const event = (type: string, payload: object, createdAt: Date, creator: string | null = creatorId) => ({
+      id: newId(EventIdSchema),
+      creatorId: creator,
+      type,
+      payload,
+      actor: 'test',
+      correlationId: 'test',
+      createdAt,
+    });
+    await test.admin.db.insert(schema.domainEvents).values([
+      event('handoff_requested', { conversationId: taken, cause: 'minor' }, minutesAgo(20)),
+      event('takeover_started', { conversationId: taken, userId: 'u1' }, minutesAgo(15)),
+      event('handoff_requested', { conversationId: waiting, cause: 'distress' }, minutesAgo(12)),
+      // A takeover before the relay does not answer it.
+      event('takeover_ended', { conversationId: waiting, userId: 'u1' }, minutesAgo(13)),
+      event('handoff_requested', { conversationId: waiting, cause: 'guard' }, minutesAgo(10)),
+      event('backup_overdue', { lastSucceededAt: null }, minutesAgo(5), null),
+    ]);
+
+    const reads = createRouterReads(test.service.db, () => Promise.resolve('Europe/Paris'));
+    const relays = await reads.waitingSafety(minutesAgo(65));
+    expect(
+      relays.filter((relay) => relay.creatorId === creatorId).map((relay) => relay.conversationId),
+    ).toEqual([waiting]);
+    const agency = await reads.agencyEvents(minutesAgo(30));
+    expect(agency.map((row) => row.type)).toEqual(
+      expect.arrayContaining(['handoff_requested', 'backup_overdue']),
+    );
+    expect(agency.map((row) => row.type)).not.toContain('takeover_started');
+  });
 });

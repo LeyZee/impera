@@ -36,7 +36,7 @@ export interface FiredAlert {
   readonly trigger: AlertTrigger;
   /** The cause of the handoff when it pauses the agent; absent, it only lets a human know. */
   readonly pauses?: HandoffCause;
-  /** Sent to Telegram when it only lets a human know: her alert's `notify` as it is now, always for the system's. */
+  /** Rung to the team when it only lets a human know: her alert's `notify` as it is now, always for the system's. */
   readonly notify: boolean;
 }
 

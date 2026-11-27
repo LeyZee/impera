@@ -5,8 +5,7 @@ import { MeNav } from './MeNav';
 
 import { playsTheGame } from '@/rewards/api';
 import { SecuritySection } from '@/security/SecuritySection';
-import { PrivateChat } from '@/settings/telegram/PrivateChat';
-import { Page, Panel, PanelSection, PageHeader } from '@/shell/layout';
+import { Page, PageHeader } from '@/shell/layout';
 
 /**
  * Moi › Sécurité (SEC-04, ADR 0046 § 7): a chatter's, a manager's and a creator's own sessions and backup codes, what
@@ -38,16 +37,6 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
         {/* The whole team links its extension: its copilot gestures count by it (recette 16/11, EXT-02). The watch is
             the owner's alone (ADR 0024, amendement du 16/11), whose Sécurité is in Réglages. */}
         <SecuritySection extensionLinks={user.role === 'creator' ? 'none' : 'copilot'} />
-        {user.role === 'creator' ? null : (
-          <PrivateChat
-            owner={false}
-            frame={(body) => (
-              <Panel title="Mon chat privé" eyebrow="Telegram">
-                <PanelSection>{body}</PanelSection>
-              </Panel>
-            )}
-          />
-        )}
       </div>
     </Page>
   );

@@ -7,6 +7,7 @@ import {
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { RoutedEventRow, RouterReads } from '../../application/route';
+import { AGENCY_EVENT_TYPES } from '../../domain/agency/classify';
 import { ROUTED_EVENT_TYPES, SAFETY_HANDOFF_CAUSES } from '../../domain/classify';
 import { creatorAlertLines } from '../../domain/creator-alerts';
 
@@ -45,6 +46,43 @@ function toRouted(row: RoutedRow): RoutedEventRow[] {
 
 export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promise<string>): RouterReads {
   const admin = <T>(fn: (tx: Transaction) => Promise<T>): Promise<T> => withAdmin(adminDb, fn);
+  const eventsOf = async (types: readonly string[], since: Date): Promise<RoutedEventRow[]> => {
+    const table = schema.domainEvents;
+    const page = (cursor: Cursor | null): Promise<Row[]> =>
+      admin((tx) =>
+        tx
+          .select({
+            id: table.id,
+            creatorId: table.creatorId,
+            type: table.type,
+            payload: table.payload,
+            createdAt: sql<string>`${table.createdAt}::text`,
+          })
+          .from(table)
+          .where(
+            and(
+              sql`${table.createdAt} > ${since.toISOString()}::timestamptz`,
+              inArray(table.type, [...types]),
+              cursor === null
+                ? undefined
+                : sql`(${table.createdAt}, ${table.id}) > (${cursor.createdAt}::timestamptz, ${cursor.id})`,
+            ),
+          )
+          .orderBy(table.createdAt, table.id)
+          .limit(EVENTS_PAGE),
+      );
+    const read: RoutedEventRow[] = [];
+    let cursor: Cursor | null = null;
+    // Page by page to the window's newest: a burst never keeps the newest events out of the run.
+    for (let count = 0; count < EVENTS_PAGES; count += 1) {
+      const rows: Row[] = await page(cursor);
+      for (const row of rows) read.push(...toRouted(row));
+      const last = rows.at(-1);
+      if (last === undefined || rows.length < EVENTS_PAGE) break;
+      cursor = { createdAt: last.createdAt, id: last.id };
+    }
+    return read;
+  };
   return {
     async safetyEvents(since) {
       const table = schema.domainEvents;
@@ -64,42 +102,52 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
       return rows.flatMap(toRouted);
     },
 
-    async events(since) {
-      const table = schema.domainEvents;
-      const page = (cursor: Cursor | null): Promise<Row[]> =>
-        admin((tx) =>
-          tx
-            .select({
-              id: table.id,
-              creatorId: table.creatorId,
-              type: table.type,
-              payload: table.payload,
-              createdAt: sql<string>`${table.createdAt}::text`,
-            })
-            .from(table)
-            .where(
-              and(
-                sql`${table.createdAt} > ${since.toISOString()}::timestamptz`,
-                inArray(table.type, [...ROUTED_EVENT_TYPES]),
-                cursor === null
-                  ? undefined
-                  : sql`(${table.createdAt}, ${table.id}) > (${cursor.createdAt}::timestamptz, ${cursor.id})`,
-              ),
+    events(since) {
+      return eventsOf([...ROUTED_EVENT_TYPES], since);
+    },
+
+    agencyEvents(since) {
+      return eventsOf([...AGENCY_EVENT_TYPES], since);
+    },
+
+    async waitingSafety(since) {
+      const rows = await admin((tx) =>
+        tx.execute<{
+          id: string;
+          creator_id: string | null;
+          conversation_id: string | null;
+          created_at: string;
+        }>(sql`
+          select e.id, e.creator_id, e.payload ->> 'conversationId' as conversation_id, e.created_at::text as created_at
+          from domain_events e
+          where e.type = 'handoff_requested'
+            and e.created_at > ${since.toISOString()}::timestamptz
+            and e.payload ->> 'cause' in (${sql.join(
+              SAFETY_HANDOFF_CAUSES.map((cause) => sql`${cause}`),
+              sql`, `,
+            )})
+            and not exists (
+              select 1 from domain_events t
+              where t.type in ('takeover_started', 'takeover_ended')
+                and t.payload ->> 'conversationId' = e.payload ->> 'conversationId'
+                and t.created_at >= e.created_at
             )
-            .orderBy(table.createdAt, table.id)
-            .limit(EVENTS_PAGE),
-        );
-      const read: RoutedEventRow[] = [];
-      let cursor: Cursor | null = null;
-      // Page by page to the window's newest: a burst never keeps the newest events out of the run.
-      for (let count = 0; count < EVENTS_PAGES; count += 1) {
-        const rows: Row[] = await page(cursor);
-        for (const row of rows) read.push(...toRouted(row));
-        const last = rows.at(-1);
-        if (last === undefined || rows.length < EVENTS_PAGE) break;
-        cursor = { createdAt: last.createdAt, id: last.id };
-      }
-      return read;
+          order by e.created_at, e.id
+        `),
+      );
+      return rows.rows.flatMap((row) => {
+        const creatorId = CreatorIdSchema.safeParse(row.creator_id);
+        return creatorId.success
+          ? [
+              {
+                id: row.id,
+                creatorId: creatorId.data,
+                conversationId: row.conversation_id,
+                createdAt: new Date(row.created_at),
+              },
+            ]
+          : [];
+      });
     },
 
     async lines(creatorId) {
