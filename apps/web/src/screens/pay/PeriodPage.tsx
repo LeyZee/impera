@@ -205,8 +205,11 @@ function PeriodView({
     ...(statement === undefined ? {} : { statement }),
   });
 
-  /** Validates `batch` one by one, in order: each refusal stays on its row, one of the period's stops the rest. */
-  const run = async (batch: readonly CommissionStatement[]) => {
+  /**
+   * Validates `batch` one by one, in order: each refusal stays on its row, one of the period's stops the rest. When
+   * the page goes away, all at once instead: a closed tab sends only what left before it closed (recette 27/11, C4).
+   */
+  const run = async (batch: readonly CommissionStatement[], leaving = false) => {
     const ids: ReadonlySet<string> = new Set(batch.map((one) => one.id));
     setRefusals((was) => new Map([...was].filter(([id]) => !ids.has(id))));
     let done = 0;
@@ -214,8 +217,9 @@ function PeriodView({
     let halted: PayRefusal | null = null;
     // What the password and the code must be given again for (EQ-15): the rest of the batch, from the first refused.
     let unconfirmed: readonly CommissionStatement[] = [];
+    const sentNow = leaving ? batch.map((one) => validateStatement(one.id, one.revision)) : null;
     for (const [index, one] of batch.entries()) {
-      const outcome = await validateStatement(one.id, one.revision);
+      const outcome = await (sentNow?.[index] ?? validateStatement(one.id, one.revision));
       if (outcome.kind === 'ok') {
         done += 1;
         continue;
@@ -275,8 +279,8 @@ function PeriodView({
           setSending(new Set());
         },
       },
-      async (): Promise<HoldResult> => {
-        const { done, refused, halted, unconfirmed } = await run(batch);
+      async (leaving): Promise<HoldResult> => {
+        const { done, refused, halted, unconfirmed } = await run(batch, leaving);
         if (unconfirmed.length > 0) {
           // The island says it, and its « Confirmer » opens the prompt: never both at once, the island would cover
           // the dialog's fields on a phone.
@@ -477,6 +481,7 @@ function PeriodView({
               <SelectAll
                 all={allChecked}
                 chosen={chosen.length}
+                held={pickable.filter((one) => sending.has(one.id)).length}
                 of={pickable.length}
                 onAll={() => {
                   setUnchecked(allChecked ? new Set(pickable.map((one) => one.id)) : new Set());
@@ -1000,12 +1005,15 @@ function Split({ label, shares }: { label: string; shares: readonly Share[] }): 
 function SelectAll({
   all,
   chosen,
+  held,
   of,
   onAll,
   onValidate,
 }: {
   all: boolean;
   chosen: number;
+  /** Being validated (the app's hold, then the requests): neither chosen nor to choose (recette 27/11, C4). */
+  held: number;
   of: number;
   onAll: () => void;
   onValidate: () => void;
@@ -1014,10 +1022,19 @@ function SelectAll({
   return (
     <div className="py-allrow">
       <label className="rp-all" htmlFor={`${id}-all`}>
-        <input id={`${id}-all`} type="checkbox" className="nv-check" checked={all} onChange={onAll} />
+        <input
+          id={`${id}-all`}
+          type="checkbox"
+          className="nv-check"
+          checked={held > 0 ? false : all}
+          disabled={held > 0 && held === of}
+          onChange={onAll}
+        />
         Tout sélectionner
         <span className="rp-all__count nv-num">
-          {String(chosen)} sur {String(of)}
+          {held > 0
+            ? `${String(held)} en validation${chosen > 0 ? `, ${String(chosen)} sur ${String(of - held)}` : ''}`
+            : `${String(chosen)} sur ${String(of)}`}
         </span>
       </label>
       <button
