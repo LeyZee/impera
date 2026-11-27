@@ -3,9 +3,9 @@
 ## Branches
 
 - `main` : toujours déployable. Elle ne change que par une PR à la CI verte, fusionnée (squash). Jamais de push direct.
-  - Le dépôt est privé sur un compte gratuit, donc GitHub n'applique aucune protection de branche. Le garde-fou est local : le hook pre-push `protect-main` (`scripts/protect-main.mjs`, installé par `pnpm install` via lefthook) refuse tout push vers `main` et sa suppression.
+  - Le dépôt est **public** (avenant du 27/11/2026 : il était écrit « privé », c'est faux depuis le renommage ; voir la règle 8 bis de `CLAUDE.md`) et GitHub n'y applique aucune protection de branche. Le garde-fou est local : le hook pre-push `protect-main` (`scripts/protect-main.mjs`, installé par `pnpm install` via lefthook) refuse tout push vers `main` et sa suppression.
   - Il se contourne et ne remplace pas une protection côté serveur. En urgence seulement, et en le disant dans le journal : `IMPERA_ALLOW_MAIN_PUSH=1 git push …`. `--no-verify` reste interdit.
-- `task/<id>-<slug>` en minuscules (`task/p0-03-database`) : une branche par fiche de tâche. Supprimée après fusion (squash).
+- `task/<id>-<slug>` en minuscules (`task/p0-03-database`) : une branche par fiche de tâche. ~~Supprimée après fusion (squash).~~ Avenant du 27/11/2026 : une branche n'est jamais supprimée (règle de Charles) ; dans le projet, la session travaille sur la branche qu'elle reçoit, une PR par fil, et le fil Bilan fusionne (commit de fusion, comme sur `main` aujourd'hui).
 - Pas de branche longue durée. Une fiche qui dure plus d'une semaine est trop grosse : on la découpe.
 
 ## Commits
@@ -32,7 +32,7 @@ Chaque commit écrit par une session se termine par ses deux lignes d'attributio
 - Petites : < 500 lignes de diff hors tests et fichiers générés. Au-delà, on découpe. Exception : les fiches de bootstrap (P0-01, P0-03) qui créent la structure ; leur revue porte sur la structure et les conventions.
 - La session ouvre la PR en brouillon (`gh pr create --draft`) dès que la branche compile, et la passe en « prête » quand `pnpm check` et `pnpm test` sont verts.
 - Une PR = une fiche. Pas de « tant que j'y étais ».
-- Fusion par squash, message = titre de la PR.
+- Fusion par squash, message = titre de la PR. *(Avenant du 27/11/2026 : en pratique le fil Bilan fusionne par commit de fusion ; c'est lui qui décide.)*
 
 ## Sessions en parallèle
 
