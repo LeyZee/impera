@@ -98,6 +98,7 @@ const BASE = {
   'GET /v1/creators': ok({ creators: CREATORS }),
   'GET /v1/alerts': ok({ custom: [ALERT], system: SYSTEM }),
   'GET /v1/settings/telegram': ok(OVERVIEW),
+  'GET /v1/scheduling/not-taken-delay': ok({ minutes: null }),
 };
 
 function renderSection(): void {
@@ -551,5 +552,71 @@ describe('the system’s alerts', () => {
     expect((await within(form).findByRole('alert')).textContent).toBe(
       'Le serveur ne répond pas. Réessaie dans un instant.',
     );
+  });
+});
+
+describe('« Chatteur pas là » (ADR 0094, lot b)', () => {
+  const delayLine = async (): Promise<HTMLElement> => {
+    const title = await screen.findByText('Chatteur pas là', { selector: '.al-line__name' });
+    const item = title.closest('li');
+    if (item === null) throw new Error('no line for Chatteur pas là');
+    return item;
+  };
+
+  it('says in amber that nothing is sent until the agency sets a delay, then saves the one typed', async () => {
+    let stored: unknown = { minutes: null };
+    const calls = serve({
+      ...BASE,
+      'GET /v1/scheduling/not-taken-delay': () => ({ status: 200, body: stored }),
+      'PUT /v1/scheduling/not-taken-delay': (body) => {
+        stored = body;
+        return { status: 200, body };
+      },
+    });
+    renderSection();
+    const item = await delayLine();
+    expect(
+      await within(item).findByText('À régler : tant qu’aucun délai n’est choisi, rien ne part.'),
+    ).toBeTruthy();
+    fireEvent.click(within(item).getByRole('button', { name: 'Régler' }));
+    // Refused here, never sent: below the contract's bounds.
+    fireEvent.change(within(item).getByLabelText('Délai après le début du shift'), {
+      target: { value: '2' },
+    });
+    fireEvent.click(within(item).getByRole('button', { name: 'Enregistrer' }));
+    expect(within(item).getByText('Un nombre de minutes entre 5 et 240.')).toBeTruthy();
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    fireEvent.change(within(item).getByLabelText('Délai après le début du shift'), {
+      target: { value: '90' },
+    });
+    fireEvent.click(within(item).getByRole('button', { name: 'Enregistrer' }));
+    expect(await within(item).findByText('1 h 30 après le début du shift, pour toute l’agence')).toBeTruthy();
+    expect(calls.filter((call) => call.method === 'PUT').map((call) => call.body)).toEqual([{ minutes: 90 }]);
+    expect(within(item).queryByText('À régler : tant qu’aucun délai n’est choisi, rien ne part.')).toBeNull();
+  });
+
+  it('stops the signal on « Ne plus prévenir », and says when the server does not answer', async () => {
+    let put: Reply = { status: 503 };
+    const calls = serve({
+      ...BASE,
+      'GET /v1/scheduling/not-taken-delay': ok({ minutes: 15 }),
+      'PUT /v1/scheduling/not-taken-delay': () => put,
+    });
+    renderSection();
+    const item = await delayLine();
+    expect(await within(item).findByText('15 min après le début du shift, pour toute l’agence')).toBeTruthy();
+    fireEvent.click(within(item).getByRole('button', { name: 'Changer' }));
+    fireEvent.click(within(item).getByRole('button', { name: 'Ne plus prévenir' }));
+    expect((await within(item).findByRole('alert')).textContent).toBe(
+      'Le serveur ne répond pas. Réessaie dans un instant.',
+    );
+    put = { status: 200, body: { minutes: null } };
+    fireEvent.click(within(item).getByRole('button', { name: 'Ne plus prévenir' }));
+    await waitFor(() => {
+      expect(calls.filter((call) => call.method === 'PUT').map((call) => call.body)).toEqual([
+        { minutes: null },
+        { minutes: null },
+      ]);
+    });
   });
 });

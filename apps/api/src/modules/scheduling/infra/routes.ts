@@ -34,6 +34,7 @@ import {
   PlanningSchema,
   PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
+  NotTakenDelaySchema,
   ReportGapThresholdSchema,
   SchedulingSettingsInputSchema,
   SchedulingSettingsQuerySchema,
@@ -635,6 +636,20 @@ export function createSchedulingRoutes(
         schema: { body: ReportGapThresholdSchema, response: { 200: ReportGapThresholdSchema } },
       },
       (request) => reports.saveReportGap(actorOf(request), request.body),
+    );
+
+    // « Chatteur pas là » (ADR 0094 § 1, lot b): the agency's delay, read by the agency, set by the owner. An alert's
+    // delay, not a rate: no password asked again.
+    app.get(
+      '/scheduling/not-taken-delay',
+      { preValidation: ownerOrMember, schema: { response: { 200: NotTakenDelaySchema } } },
+      (request) => reports.notTakenDelay(userOf(request)),
+    );
+
+    app.put(
+      '/scheduling/not-taken-delay',
+      { preValidation: owner, schema: { body: NotTakenDelaySchema, response: { 200: NotTakenDelaySchema } } },
+      (request) => reports.saveNotTakenDelay(actorOf(request), request.body),
     );
 
     // The accounts' pay rules, which the reports read in their own transaction, at the address the contract gives.

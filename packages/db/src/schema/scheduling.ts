@@ -84,6 +84,12 @@ export const schedulingSettings = pgTable(
     /** The threshold of a report against the platform (ADR 0073 § 3): 1 % (100) or 5 € (500) by default. */
     reportGapBps: integer('report_gap_bps').notNull().default(REPORT_GAP_THRESHOLD_DEFAULT.bps),
     reportGapMinor: integer('report_gap_minor').notNull().default(REPORT_GAP_THRESHOLD_DEFAULT.minor),
+    /**
+     * « Chatteur pas là » (ADR 0094 § 1, lot b): how long after a shift's start its member, not having taken it, is
+     * told to the owner and the managers. The agency's own setting, never written in the code: `null`, the signal is
+     * off until the owner sets it.
+     */
+    notTakenDelayMinutes: integer('not_taken_delay_minutes'),
     updatedBy: text('updated_by')
       .notNull()
       .references(() => user.id),
@@ -96,6 +102,10 @@ export const schedulingSettings = pgTable(
       sql`${t.slotLengthMinutes} in (60, 120, 180, 240, 360, 480, 720) and ${t.slotStartMinute} >= 0 and ${t.slotStartMinute} < ${t.slotLengthMinutes}`,
     ),
     check('scheduling_settings_margin_check', sql`${t.accessMarginMinutes} between 0 and 120`),
+    check(
+      'scheduling_settings_not_taken_delay_check',
+      sql`${t.notTakenDelayMinutes} is null or ${t.notTakenDelayMinutes} between 5 and 240`,
+    ),
     check(
       'scheduling_settings_report_gap_check',
       sql`${t.reportGapBps} between 0 and 10000 and ${t.reportGapMinor} between 0 and 100000`,
