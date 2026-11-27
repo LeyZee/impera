@@ -7,6 +7,7 @@ import {
   NewToAgencyMessageBodySchema,
   WaitingToAgencyMessagesSchema,
   type CreatorId,
+  type ToAgencyMessage,
   type UserRole,
   type WaitingToAgencyMessage,
 } from '@impera/contracts';
@@ -40,6 +41,14 @@ export interface MessageRoutesDeps {
   /** Every creator not archived: the agency's list is read one creator at a time, each under her own RLS. */
   readonly allCreatorIds: () => Promise<readonly CreatorId[]>;
   readonly clock?: () => Date;
+  /**
+   * Rings the other side once a message is written or answered (recette 27/11, G4 and G13); absent while push is
+   * off. Best effort: what is written stands whatever a phone answers.
+   */
+  readonly tell?: {
+    readonly agency: (message: ToAgencyMessage, now: Date) => Promise<unknown>;
+    readonly her: (message: ToAgencyMessage, now: Date) => Promise<unknown>;
+  };
 }
 
 /** Her writing to the agency: twenty an hour is far beyond a person, and a replay counts too. */
@@ -71,6 +80,9 @@ export function createMessageRoutes(deps: MessageRoutesDeps): FastifyPluginAsync
       },
       async (request, reply) => {
         const message = await asCreator(() => deps.store.write(signedIn(request.user), request.body));
+        await deps.tell?.agency(message, clock()).catch((error: unknown) => {
+          request.log.error({ err: error }, 'creator-messages: the agency was not told');
+        });
         return reply.code(201).send(message);
       },
     );
@@ -111,14 +123,19 @@ export function createMessageRoutes(deps: MessageRoutesDeps): FastifyPluginAsync
           response: { 200: ToAgencyMessageSchema },
         },
       },
-      (request) =>
-        deps.store.answer(
+      async (request) => {
+        const message = await deps.store.answer(
           request.params.creatorId,
           signedIn(request.user),
           request.params.id,
           request.body.answer,
           clock(),
-        ),
+        );
+        await deps.tell?.her(message, clock()).catch((error: unknown) => {
+          request.log.error({ err: error }, 'creator-messages: she was not told of the answer');
+        });
+        return message;
+      },
     );
 
     return Promise.resolve();

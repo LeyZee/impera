@@ -32,7 +32,9 @@ jobs:
   evals:
     name: Evals smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The smoke tier is 37 conversations of 3 draws each, one after the other (about 4 minutes each on 27/11): 45 minutes
+    # cut the first full run after 13. The 6 € cap stops the spend, not the clock.
+    timeout-minutes: 180
     env:
       HAS_XAI_KEY: ${{ secrets.LLM_XAI_API_KEY != '' }}
     steps:

@@ -54,6 +54,13 @@ describe('SecondFactorPage', () => {
     expect(screen.getByRole('link', { name: 'Ouvrir dans l’application' }).getAttribute('href')).toBe(URI);
     const key = screen.getByLabelText('Clé à recopier dans l’application');
     expect(key.textContent).toBe(keyOf(URI));
+    // On a computer, the app scans a QR code of the same link (recette 27/11, G7).
+    expect(
+      screen
+        .getByRole('img', { name: 'Code à scanner avec l’application' })
+        .querySelector('path')
+        ?.getAttribute('d'),
+    ).toMatch(/^M\d/u);
     // A narrow screen wraps the key between its groups, never inside one (recette 11/11, SOC-02).
     expect(key.className).toContain('break-words');
     expect(key.className).not.toContain('break-all');
@@ -72,7 +79,10 @@ describe('SecondFactorPage', () => {
     expect(open).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByLabelText('J’ai mis ces codes en lieu sûr.'));
     fireEvent.click(open);
-    expect(onActivated).toHaveBeenCalled();
+    // No Face ID in this browser: no offer of a key, Impera opens.
+    await waitFor(() => {
+      expect(onActivated).toHaveBeenCalled();
+    });
     expect(codesUnconfirmed()).toBe(false);
     expect(calls).toEqual([
       '/v1/auth/two-factor/enable {"password":"staple battery horse"}',

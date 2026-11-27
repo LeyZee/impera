@@ -835,6 +835,16 @@
     margin-top: 0;
     padding-right: 2px;
   }
+  /* Under the thumb, every ring is drawn bigger and reaches 44 px with its margin. */
+  .dy-tick,
+  .dy-marks[data-many] .dy-tick {
+    width: 34px;
+    height: 34px;
+  }
+  .dy-tick::before,
+  .dy-marks[data-many] .dy-tick::before {
+    inset: -5px;
+  }
 }
 .dy-line[data-done] .dy-tick {
   animation: dy-pop var(--nv-dur-base) var(--nv-ease-spring-bouncy);

@@ -33,6 +33,13 @@ describe('funnelSteps', () => {
     expect(funnelSteps([100, 90], [100, 50]).breakIndex).toBeNull();
   });
 
+  it('says no rate for a step larger than the one before: not the same fans', () => {
+    const { steps } = funnelSteps([1, 20, 14, 0]);
+    expect(steps.map((s) => s.rate)).toEqual([null, null, 70, 0]);
+    expect(steps.map((s) => s.width)).toEqual([100, 100, 100, 0]);
+    expect(funnelSteps([0, 3]).steps[1]?.rate).toBeNull();
+  });
+
   it('survives an empty step without dividing by zero', () => {
     const { steps } = funnelSteps([0, 0, 0]);
     expect(steps.map((s) => [s.width, s.rate])).toEqual([
