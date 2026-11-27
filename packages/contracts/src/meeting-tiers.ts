@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** The highest meeting tier a fan can reach (1 brand new … 5 very close): `relationshipTier`. */
+export const MEETING_TIER_MAX = 5;
+
 /**
  * @public When a fan asking to see her moves up a tier (guide 26/11): per creator, typed by the owner, never a value
  * in the repo (same pattern as ADR 0135 § 1). Storing and wiring these settings is the next batch: nothing reads them
