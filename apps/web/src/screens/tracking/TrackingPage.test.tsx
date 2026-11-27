@@ -901,7 +901,65 @@ describe('the reader of Suivi', () => {
     });
   });
 
-  it('folds the fan’s limits to one line, in red when nobody may write to him (IA-06)', async () => {
+  it('says his care mode since when, and closes it on « Il va mieux » asked twice (trou béant 4)', async () => {
+    const posted = serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
+    });
+    renderPage(OPEN);
+    const since = await screen.findByText(/^Mode soin depuis/u);
+    // A state to know, in calm blue with a heart: the amber stays for a person to act (recette du 21/11).
+    expect(since.closest('.tr-care')?.classList.contains('tr-hand--alert')).toBe(false);
+    expect(since.querySelector('svg.tr-care__icon')).not.toBeNull();
+    expect(screen.getByText(/rien ne lui est vendu/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Il va mieux' }));
+    // Nothing goes on the first click: the second says what changes.
+    expect(posted).toEqual([]);
+    expect(screen.getByText(/Ses ventes restent gelées/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Oui, il va mieux' }));
+    await waitFor(() => {
+      expect(posted).toEqual([{ action: 'close', body: {} }]);
+    });
+  });
+
+  it('says « Mode soin » under his name and at the head of his sheet, never « Rien à faire » (Design 21/11)', async () => {
+    serve({
+      ...withDraft,
+      detail: () => ({
+        status: 200,
+        body: waiting({
+          careSince: '2026-10-17T19:00:00Z',
+          state: 'idle',
+          openDrafts: [],
+          lastInboundAt: '2026-10-17T20:00:00Z',
+          lastOutboundAt: '2026-10-17T20:05:00Z',
+        }),
+      }),
+    });
+    renderPage(OPEN);
+    await screen.findByText(/^Mode soin depuis/u);
+    expect(document.querySelector('.tr-reader__state-label')?.textContent).toBe('Mode soin');
+    expect(screen.queryByText('Rien à faire', { selector: '.tr-reader__state-label' })).toBeNull();
+    expect(screen.queryByText('Rien à signaler')).toBeNull();
+  });
+
+  it('shows a chatter the care mode without « Il va mieux », and a creator nothing of it', async () => {
+    serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByText(/^Mode soin depuis/u)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Il va mieux' })).toBeNull();
+    expect(screen.getByText(/Seuls le propriétaire et un manager/u)).toBeTruthy();
+    cleanup();
+
+    renderPage(OPEN, false);
+    await screen.findByText('Fan 1');
+    expect(screen.queryByText(/^Mode soin depuis/u)).toBeNull();
+  });
+
+  it('folds the fan’s limits to one line, in amber when one stops the agent', async () => {
     serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting() }),
@@ -920,7 +978,7 @@ describe('the reader of Suivi', () => {
     expect(line.closest('.tr-warn')).toBeNull();
   });
 
-  it('says nothing to learn once every line is learnt, and never asks for a creator', async () => {
+  it('says nothing to learn once every line is learnt', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
     renderPage(OPEN);
     await screen.findByText('Limites du fan');
@@ -928,13 +986,6 @@ describe('the reader of Suivi', () => {
       expect(kycCalls()).toHaveLength(1);
     });
     expect(screen.queryByText('À apprendre')).toBeNull();
-    cleanup();
-
-    serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }), kyc: ['job'] });
-    renderPage(OPEN, false);
-    await screen.findByText('Limites du fan');
-    expect(screen.queryByText('À apprendre')).toBeNull();
-    expect(kycCalls()).toHaveLength(0);
   });
 
   it('says nothing to learn when the server does not answer for it', async () => {
@@ -1354,13 +1405,13 @@ describe('the reader of Suivi', () => {
     expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
   });
 
-  it('lets a creator read, never decide', async () => {
+  it('lets a chatter decide his draft, and only read the fan’s limits', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
-    renderPage(OPEN, false);
-    expect(await screen.findByText('Tu lis seulement : l’équipe décide.')).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Reprendre la main' })).toBeNull();
-    // Her fan's limits: read, never changed.
+    // His own Suivi, as ChatterTrackingPage mounts it (selfScope).
+    renderPage(OPEN, true, true, true);
+    expect(await screen.findByRole('button', { name: 'Valider' })).toBeDefined();
+    expect(screen.queryByText('Tu lis seulement : l’équipe décide.')).toBeNull();
+    // The fan's limits: read, changed by the owner and the managers only.
     expect(await screen.findByRole('switch', { name: /Ventes gelées/u })).toHaveProperty('disabled', true);
     expect(screen.queryByRole('button', { name: 'Confirmer son âge' })).toBeNull();
   });

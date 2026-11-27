@@ -82,10 +82,22 @@ export function assertJoinedBy(joinedOn: string, period: PayPeriod): void {
   if (period < payPeriodOfDay(joinedOn)) throw new PayPeriodClosed(period, { beforeJoining: true });
 }
 
-/** Only the owner or an active manager writes a member's pay, never their own (the policies say the same). */
+/**
+ * Only the owner or an active manager writes a member's pay, never their own (the policies say the same). What a
+ * manager writes is a penalty and a validation; what adds to a pay is the owner's (`assertGivesPayOf`).
+ */
 export function assertWritesPayOf(reader: PayReader, memberId: TeamMemberId): void {
   if (reader.memberId !== null && reader.memberId === memberId) throw new PayrollOwnForbidden();
   if (reader.scope === 'self') throw new PayrollForbidden();
+}
+
+/**
+ * A bonus, its cancelling and an adjustment are the owner's alone, never for themselves (Charles, the money rules: a
+ * manager takes with a penalty, only the owner gives or corrects; the policies say the same).
+ */
+export function assertGivesPayOf(reader: PayReader, memberId: TeamMemberId): void {
+  if (reader.memberId !== null && reader.memberId === memberId) throw new PayrollOwnForbidden();
+  if (reader.scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
 }
 
 const latest = (periods: readonly PayPeriod[]): PayPeriod => {

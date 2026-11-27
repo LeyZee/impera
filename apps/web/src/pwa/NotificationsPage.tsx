@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
+import { NotificationInbox } from './NotificationInbox';
 import {
   PUSH_KEY_URL,
   pushState,
@@ -20,8 +21,9 @@ import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
- * /notifications (CR-01): for every role, from the account's menu. This device: on or off, and a test. The account:
- * quiet hours and the daily cap, which the server applies to every device (ADR 0042 § 7).
+ * /notifications (CR-01): for every role, from the account's menu. First « Tes notifications », the last seven days,
+ * where the morning recap leads (trou 9 du 21/11). Then this device: on or off, and a test. The account: quiet hours
+ * and the daily cap, which the server applies to every device (ADR 0042 § 7).
  */
 
 const PREFERENCES_URL = '/v1/notifications/preferences';
@@ -351,9 +353,10 @@ export function NotificationsPage({ creator = false }: { creator?: boolean }): J
       <PageHeader
         eyebrow={<OffRailBack />}
         title="Notifications"
-        lead="Ce qui sonne sur tes appareils, et quand ça se tait."
+        lead="Ce qui t’attend, ce qui sonne sur tes appareils, et quand ça se tait."
       />
       <div className="nv-notif">
+        <NotificationInbox />
         <ThisDevice quiet={preferences.isError && preferences.data === undefined} />
         {preferences.data === undefined ? (
           preferences.isError ? (

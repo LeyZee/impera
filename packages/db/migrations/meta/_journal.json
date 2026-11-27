@@ -1317,6 +1317,139 @@
       "when": 1795267254967,
       "tag": "0246_drop_media_job_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1795269629718,
+      "tag": "0247_shift_check_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1795269638355,
+      "tag": "0248_team_announcements",
+      "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1795269698355,
+      "tag": "0249_llm_purpose_media_telegram",
+      "breakpoints": true
+    },
+    {
+      "idx": 191,
+      "version": "7",
+      "when": 1795275869236,
+      "tag": "0250_creator_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 192,
+      "version": "7",
+      "when": 1795277087019,
+      "tag": "0251_pay_gifts_owner_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
+      "when": 1795278389200,
+      "tag": "0252_script_step_daily",
+      "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "7",
+      "when": 1795283798403,
+      "tag": "0253_script_summary_job",
+      "breakpoints": true
+    },
+    {
+      "idx": 195,
+      "version": "7",
+      "when": 1795283858403,
+      "tag": "0254_vault_sent_for_free",
+      "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1795289305453,
+      "tag": "0255_llm_purpose_instagram_caption",
+      "breakpoints": true
+    },
+    {
+      "idx": 197,
+      "version": "7",
+      "when": 1795706804681,
+      "tag": "0266_creator_decisions_other_ideas",
+      "breakpoints": true
+    },
+    {
+      "idx": 198,
+      "version": "7",
+      "when": 1795711433789,
+      "tag": "0267_custom_order_answer",
+      "breakpoints": true
+    },
+    {
+      "idx": 199,
+      "version": "7",
+      "when": 1795711493789,
+      "tag": "0268_drop_redo",
+      "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "7",
+      "when": 1795717780662,
+      "tag": "0269_content_stock",
+      "breakpoints": true
+    },
+    {
+      "idx": 201,
+      "version": "7",
+      "when": 1795719379268,
+      "tag": "0270_creator_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 202,
+      "version": "7",
+      "when": 1795719390805,
+      "tag": "0271_creator_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "7",
+      "when": 1795719450805,
+      "tag": "0272_sale_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1795726436717,
+      "tag": "0273_fan_language",
+      "breakpoints": true
+    },
+    {
+      "idx": 205,
+      "version": "7",
+      "when": 1795726496717,
+      "tag": "0274_shift_incident_steps",
+      "breakpoints": true
+    },
+    {
+      "idx": 206,
+      "version": "7",
+      "when": 1795726556717,
+      "tag": "0275_shift_feedback_draft_reason",
+      "breakpoints": true
     }
   ]
 }

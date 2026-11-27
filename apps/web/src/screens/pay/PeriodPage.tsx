@@ -13,6 +13,7 @@ import { useEffect, useId, useState, type JSX, type ReactNode } from 'react';
 import { CloseDialog } from './CloseDialog';
 import { HeldSalesPanel } from './HeldSalesPanel';
 import { PayNav } from './PayNav';
+import { SaleClaimsPanel } from './SaleClaimsPanel';
 import { SalesToGivePanel } from './SalesToGivePanel';
 import { StatementDialog } from './StatementDialog';
 import {
@@ -139,6 +140,9 @@ interface Stopped {
 }
 
 /** What a period's statements are: a refusal said about them holds until one of them changes. */
+/** Where « Voir les ventes de ce shift » scrolls to. */
+const GIVE_ANCHOR = 'py-give';
+
 const stateOf = (period: PayrollPeriod): string =>
   `${period.closing?.closedAt ?? ''}|${period.statements.map((one) => `${one.id}:${String(one.revision)}:${one.status}`).join(',')}`;
 
@@ -176,6 +180,8 @@ function PeriodView({
   const [stopped, setStopped] = useState<Stopped | null>(null);
   const [closing, setClosing] = useState<readonly CommissionStatement[] | null>(null);
   const [opened, setOpened] = useState<{ readonly id: string; readonly paying: boolean } | null>(null);
+  // « Voir les ventes de ce shift » opens « Donner une vente » again on that day (ADR 0101 § 19).
+  const [giveFrom, setGiveFrom] = useState<{ readonly day: string; readonly opened: number } | null>(null);
   // The statement asked from a member's record: opened once the period is read, or said missing (EQ-11).
   const [asked, setAsked] = useState(member);
   const [absent, setAbsent] = useState<string | null>(null);
@@ -578,6 +584,24 @@ function PeriodView({
             {rows.length === 0 ? null : <p className="py-quiet">{quietOf(data, now)}</p>}
           </div>
         </Panel>
+        <SaleClaimsPanel
+          period={data.period}
+          names={names}
+          me={me}
+          reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+          onShowDay={
+            today === null || data.closing !== null
+              ? null
+              : (day) => {
+                  setGiveFrom((was) => ({ day, opened: (was?.opened ?? 0) + 1 }));
+                  requestAnimationFrame(() => {
+                    document
+                      .getElementById(GIVE_ANCHOR)
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                }
+          }
+        />
         <HeldSalesPanel
           period={data.period}
           names={names}
@@ -585,15 +609,19 @@ function PeriodView({
           reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
         />
         {today === null ? null : (
-          <SalesToGivePanel
-            period={data.period}
-            open={data.closing === null}
-            today={today}
-            names={names}
-            me={me}
-            reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
-            owner={user.teamScope === 'owner'}
-          />
+          <div id={GIVE_ANCHOR} className="py-give__anchor">
+            <SalesToGivePanel
+              key={`${data.period}:${String(giveFrom?.opened ?? 0)}`}
+              startDay={giveFrom?.day}
+              period={data.period}
+              open={data.closing === null}
+              today={today}
+              names={names}
+              me={me}
+              reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+              owner={user.teamScope === 'owner'}
+            />
+          </div>
         )}
       </div>
       {openedStatement === undefined || opened === null ? null : (

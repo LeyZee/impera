@@ -2,6 +2,7 @@ import type { CreatorFan } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { CreatorReader } from './CreatorReader';
+import { EarningsCard } from './EarningsCard';
 import { FanInsights, FanInsightsWaitLine } from './FanInsights';
 import { useCreatorFanInsights, useCreatorFans } from './api';
 import { fanName, seenOf, unlockedOf } from './view';
@@ -15,9 +16,10 @@ import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
- * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her fans first, what each unlocked and when he was last seen; a fan
- * opens his conversation, read only. « Qui sont tes fans » comes after them (choice of 21/11). Her earnings and her sales (CR-04) come above them once they exist; until then
- * the price is said « avant parts », what he paid and not what she earns (recette 05/11, reco 20). No note of a fan:
+ * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her part and her sales first (CR-04, « Ta part »), then her fans, what
+ * each unlocked and when he was last seen; a fan opens his conversation, read only. « Qui sont tes fans » comes after
+ * them (choice of 21/11). Beside a fan, the price is said « avant parts », what he paid and not what she earns (recette
+ * 05/11, reco 20). No note of a fan:
  * what the agency knows of him is its own (Charles, 03/11).
  */
 export function CreatorSalesPage({
@@ -53,6 +55,7 @@ export function CreatorSalesPage({
           }}
         />
       ) : null}
+      {silent ? null : <EarningsCard />}
       {silent ? null : (
         <div className="vt-cols">
           <div className="vt-list">

@@ -1,4 +1,5 @@
 import {
+  AgencyLinkHoursResponseSchema,
   AgencyRedirectLinkSchema,
   AgencyRedirectLinksResponseSchema,
   ApiErrorSchema,
@@ -6,6 +7,7 @@ import {
   LinkServiceRefusalBodySchema,
   REAUTHENTICATION_ERROR_CODE,
   refusalOf,
+  type AgencyLinkHour,
   type AgencyRedirectLink,
   type AgencyRedirectLinkWrite,
   type LinkProposal,
@@ -49,6 +51,23 @@ export function useRedirectLinks(creatorId: string): UseQueryResult<readonly Age
     queryFn: () => fetchLinks(creatorId),
     retry: 1,
     retryDelay: 400,
+  });
+}
+
+export const hoursQueryKey = (creatorId: string): readonly string[] => ['redirect-links', creatorId, 'hours'];
+
+/** The last 48 hours of her linked links (INS-02 lot e3), read again every five minutes while the page is open. */
+export function useLinkHours(creatorId: string): UseQueryResult<readonly AgencyLinkHour[]> {
+  return useQuery({
+    queryKey: hoursQueryKey(creatorId),
+    queryFn: async () => {
+      const response = await fetch(`${path(creatorId)}/hours`, { credentials: 'include' });
+      if (!response.ok) throw new Error(`GET redirect-links/hours: ${String(response.status)}`);
+      return AgencyLinkHoursResponseSchema.parse(await response.json()).hours;
+    },
+    retry: 1,
+    retryDelay: 400,
+    refetchInterval: 5 * 60_000,
   });
 }
 
@@ -128,4 +147,35 @@ export async function detectLinks(creatorId: string): Promise<DetectOutcome> {
   if (response.status === 429) return refused('Trop d’essais. Attends une minute avant de réessayer.');
   if (response.status === 403) return refused('Seul le propriétaire détecte les liens.');
   return refused(UNAVAILABLE);
+}
+
+/**
+ * « Relier » (INS-02 lot e2): the server reads the agency's account at the redirect service and keeps the reference
+ * of the link that has exactly this address, so that its hours are read. A refusal comes back as the sentence to show.
+ */
+export async function attachLink(
+  creatorId: string,
+  linkId: string,
+): Promise<{ readonly kind: 'ok' } | { readonly kind: 'refused'; readonly message: string }> {
+  const refused = (message: string) => ({ kind: 'refused' as const, message });
+  let response: Response;
+  try {
+    response = await fetch(`${path(creatorId)}/${encodeURIComponent(linkId)}/attach`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch {
+    return refused(UNAVAILABLE);
+  }
+  if (response.ok) return { kind: 'ok' };
+  const body: unknown = await response.json().catch(() => null);
+  if (response.status === 422) {
+    const refusal = LinkServiceRefusalBodySchema.safeParse(body);
+    return refused(refusal.success ? refusalOf(refusal.data).message : UNAVAILABLE);
+  }
+  if (response.status === 401) return refused('Ta session a expiré. Reconnecte-toi.');
+  if (response.status === 429) return refused('Trop d’essais. Attends une minute avant de réessayer.');
+  if (response.status === 403) return refused('Seul le propriétaire relie un lien.');
+  const error = ApiErrorSchema.safeParse(body);
+  return refused((error.success ? REFUSALS[error.data.error.code] : undefined) ?? UNAVAILABLE);
 }

@@ -9,8 +9,11 @@ import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
 import { AlertsTab } from './alerts/AlertsTab';
 import { useCreators } from './api';
+import { CopilotSection } from './copilot/CopilotSection';
+import { CustomOrdersSection } from './custom-orders/CustomOrdersSection';
 import { CustomPricesSection } from './custom-prices/CustomPricesSection';
 import { DropsSection } from './drops/DropsSection';
+import { FanTiersSection } from './fan-tiers/FanTiersSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
@@ -32,6 +35,7 @@ import {
   creatorsSearch,
   rememberCreatorTab,
   scriptSearch,
+  sheetSearch,
   sheetsFor,
   tabOf,
   type CreatorSheet,
@@ -50,6 +54,7 @@ import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 import { creatorSheetTitle } from '@/shell/nav';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
+import { StockSection } from '@/stock/StockOverview';
 
 export type CreatorTab = CreatorSheet;
 
@@ -76,8 +81,10 @@ const TAB_VIEWS: Partial<
   media: {
     label: 'Vue de ses médias',
     views: [
-      ['vault', 'Coffre'],
+      // Two coffres (ADR 0162): Reveal's, synchronised, and Impera's, what she dropped by use.
+      ['vault', 'Coffre Reveal'],
       ['content', 'Dépôts'],
+      ['stock', 'Coffre Impera'],
     ],
   },
   scripts: {
@@ -370,16 +377,29 @@ export function CreatorsPage({
       );
     }
     if (shown === 'custom' && current !== undefined) {
+      // Her orders first, read by an active manager too; her grid, the owner's alone, below (trous béants point 6).
       return (
-        <CustomPricesSection
-          key={current.id}
-          creatorId={current.id}
-          creatorName={current.displayName}
-          onDirty={setDirty}
-        />
+        <div className="cso-sheet">
+          <CustomOrdersSection
+            key={`orders-${current.id}`}
+            creatorId={current.id}
+            creatorName={current.displayName}
+            canAnswer={isOwner}
+          />
+          {isOwner ? (
+            <CustomPricesSection
+              key={current.id}
+              creatorId={current.id}
+              creatorName={current.displayName}
+              onDirty={setDirty}
+            />
+          ) : null}
+        </div>
       );
     }
     if (shown === 'structures' && current !== undefined) return <StructuresView />;
+    if (shown === 'stock' && current !== undefined)
+      return <StockSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     if (shown === 'content' && current !== undefined) {
       return (
         <DropsSection
@@ -405,6 +425,11 @@ export function CreatorsPage({
               onDirty={setRateDirty}
             />
           </div>
+          {isOwner ? (
+            <div id="paliers" className="cr-account__card">
+              <FanTiersSection creatorId={current.id} />
+            </div>
+          ) : null}
           <div id={accountCardId('profile')} className="cr-account__card">
             <ProfileSection creatorId={current.id} creatorName={current.displayName} />
           </div>
@@ -418,12 +443,12 @@ export function CreatorsPage({
       return <AlertsTab key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
     return shown === 'hours' && current !== undefined ? (
-      <HoursSection
-        key={current.id}
-        creatorId={current.id}
-        creatorName={current.displayName}
-        onDirty={setDirty}
-      />
+      // Her AI: the copilot of the extension first, its switches decide what her chatters get beside Reveal; then her
+      // hours (trous béants, 21/11: the switches had no screen, the drafts were off for every creator).
+      <div className="cr-ai" key={current.id}>
+        <CopilotSection creatorId={current.id} creatorName={current.displayName} />
+        <HoursSection creatorId={current.id} creatorName={current.displayName} onDirty={setDirty} />
+      </div>
     ) : (
       <PersonaSection
         key={selected ?? 'none'}
@@ -501,7 +526,7 @@ export function CreatorsPage({
                 label="Fiche de la créatrice"
                 items={tabs.map(({ name, first }) => ({
                   to: '/creatrices',
-                  search: creatorsSearch(first, selected),
+                  search: sheetSearch(sheets, first, selected),
                   current: shownTab === name,
                   label: TAB_LABELS[name],
                 }))}

@@ -897,7 +897,7 @@ function Head({
               {`Activer la version ${draft.meta.version}`}
             </button>
           ) : null}
-          {/* Read only, nothing is saved here: neither the button nor what a save does (MAN-04). */}
+          {/* Read-only (a manager, a chatter): no action to offer, the state line says why (trou béant 18). */}
           {readOnly ? null : (
             <button
               type="button"

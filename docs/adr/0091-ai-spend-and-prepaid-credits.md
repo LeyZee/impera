@@ -42,6 +42,14 @@ On ne peut donc pas lire le solde avec les clés que le CRM a déjà.
    - **ElevenLabs dans Consommation IA** : il compte en caractères, pas en argent. Sa carte montre les caractères restants du mois, environ combien de vocaux, la date où le mois revient et l'offre gratuite, lus par la vérification de la clé (toutes les 15 minutes ou « Vérifier maintenant »). Ambre sous 10 %, rouge à zéro, comme sa ligne de Services. L'offre gratuite d'ElevenLabs interdit l'usage commercial : l'écran le dit, sans rien bloquer.
    - La clé de gestion de xAI reste non reliée (§ 5) : Grok est sur l'abonnement, dont aucune API ne donne le quota.
 
+8. **Le prévisionnel (demande de Charles, 21/11/2026, 13 h 03 : « le bloc prévisionnel, ce mois-ci, le mois suivant, bas, réaliste et haut, par poste, avec l'effet de 50 % de trafic en plus », pour sa trésorerie).** Un bloc « Prévisionnel » dans Consommation IA, calculé par le serveur depuis `llm_calls` et le registre des ventes, sommes seulement :
+   - **Rythme** : la moyenne par jour de la dernière semaine complète (comme « Prévu fin du mois ») ; le **bas** et le **haut** sont la plus calme et la plus chargée des deux dernières semaines. Sous huit jours de recul, une bande fixe de −20 % / +25 %. Ce mois-ci = déjà dépensé + rythme × jours restants ; le mois suivant = rythme × ses jours.
+   - **Par usage** : Chatting Reveal (les appels d'une créatrice), Médias et scripts décrits (usage `media`), Canal Telegram (usage `telegram`), Instagram (commentaires et veille), Playground et tests (appels sans créatrice, et le juge), Essais des services. Les usages `media` et `telegram` sont posés par la passerelle elle-même sur ses appels dédiés ; le plafond du jour et la santé les comptent comme avant.
+   - **Par créatrice**, avec ses conversations par jour et la part de ses ventes.
+   - **Trafic** : avec 50 % de conversations en plus, seul le chatting grandit ; le coût d'une conversation sur une journée est le chatting de la semaine divisé par ses conversations-jours.
+   - **Plafond** : quand le rythme réaliste, ou celui avec plus de trafic, dépasse le plafond du jour, un avertissement ambre le dit, avec le maximum du mois suivant et le plafond qu'il faudrait pour tout laisser à l'IA.
+   - **Ventes** : le net de Reveal en euros, remboursements déduits, sur les mêmes jours et prévu de la même façon ; le coût de l'IA en part de ces ventes. Une comparaison à une commission de chatteurs attendra un taux saisi par le propriétaire : aucun taux de l'agence n'est écrit dans le code.
+
 ## Conséquences
 
 - Le décompte s'écarte du vrai solde si un appel est fait hors du CRM (console, autre outil) : l'écran invite à noter le solde lu de temps en temps, ce qui recale tout.
@@ -49,3 +57,4 @@ On ne peut donc pas lire le solde avec les clés que le CRM a déjà.
 - Nouvelle table en `FORCE ROW LEVEL SECURITY`, nouveau type d'événement `ai_credits_low`, nouveau job horaire `ai_usage.check_credits`, trois routes sous `/v1/settings/ai-usage`.
 - Amendement § 6 : migration 0204 (`subscription` dans le registre, statut `quota_exhausted` du journal indexé par fournisseur, événement `ai_quota_exhausted` dans les contrôles de type et le déclencheur Telegram) ; la vérification passe de l'heure aux cinq minutes.
 - Amendement § 7 : migration 0221 (usage `probe` dans `llm_calls`, dernier essai et mois d'ElevenLabs dans `provider_credentials`) ; route `POST /v1/settings/providers/:provider/probe` (propriétaire, quatre par minute) ; la carte ElevenLabs dans `GET /v1/settings/ai-usage` (`voice`).
+- Amendement § 8 : migration 0256 (provisoire) (usages `media` et `telegram` dans `llm_calls`) ; une lecture de plus par le rôle de service dans `ai-usage` (le journal par usage et par créatrice, les ventes et les noms des créatrices, en une requête), plafond de `service-role-ceiling.ts` monté de 9 à 10 et total de 277 à 278.

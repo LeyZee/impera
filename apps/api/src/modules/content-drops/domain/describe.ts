@@ -231,6 +231,22 @@ function shownBefore(a: ReviewedRow, b: ReviewedRow): boolean {
 export type ValidationRefusal = 'not_shown' | 'alone';
 
 /**
+ * Whether a description waits for the agency (Sécurité on #995): a reason the code held it for a human (ADR 0083 § 3
+ * to 5) or a flag of the vision. She reads it, she never lifts it; a content that cannot be read waits too.
+ */
+export function awaitsAgency(row: {
+  readonly reviewReasons: readonly string[];
+  readonly content: unknown;
+}): boolean {
+  if (row.reviewReasons.length > 0) return true;
+  const flags =
+    typeof row.content === 'object' && row.content !== null && 'flags' in row.content
+      ? row.content.flags
+      : null;
+  return !Array.isArray(flags) || flags.length > 0;
+}
+
+/**
  * Whether these rows can be validated together: each the one its media is shown with now (a newer row came, the
  * screen is late), and a row that waits for a human (ADR 0083 § 3 to 5) only alone, never under « Tout valider ».
  */

@@ -305,3 +305,11 @@ export const todosAcrossQuery = queryOptions({
   queryFn: fetchTodosAcross,
   refetchInterval: 30_000,
 });
+
+/**
+ * « Il va mieux » (ADR 0088 § 7): the owner or an active manager closes his care mode. His sales stay frozen and
+ * nothing explicit, as his limits say, until a person lifts them.
+ */
+export function closeCare(creatorId: string, conversationId: string): Promise<Decision> {
+  return command(creatorId, conversationId, 'care/close');
+}

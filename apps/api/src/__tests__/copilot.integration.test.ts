@@ -422,93 +422,6 @@ describe('copilot panel (ADR 0086)', () => {
     expect([late.statusCode, codeOf(late)]).toEqual([409, 'copilot_draft_conflict']);
   });
 
-  it('reconciles a placed draft with what left: as is it is validated, retouched it is corrected (EXT-02)', async () => {
-    const onShift = await chatter({ from: -30, to: 60 });
-    const token = await linkOf(onShift.cookie);
-    let sends = 0;
-    /** What the chatter sent himself in Reveal, read back by the connector. */
-    const sendOnPlatform = async (name: string, text: string) => {
-      sends += 1;
-      await app.modules.conversations.ingestMessage({
-        creatorId: nora.creatorId,
-        platformAccountId: nora.accountId,
-        platformConversationId: `c-${name}`,
-        platformFanId: `f-${name}`,
-        fanDisplayName: name,
-        message: {
-          ref: { platform: 'reveal', id: `out-${name}-${String(sends)}` },
-          conversationRef: { platform: 'reveal', id: `c-${name}` },
-          direction: 'outbound',
-          text,
-          media: [],
-          priceMinor: null,
-          currency: null,
-          isPaid: false,
-          createdAt: new Date(Date.now() + sends).toISOString(),
-        },
-        correlationId: 'reconcile',
-      });
-    };
-    const decided = async (draftId: DraftId) => {
-      const [row] = await test.admin.db
-        .select({
-          status: schema.drafts.status,
-          decidedBy: schema.drafts.decidedBy,
-          finalBubbles: schema.drafts.finalBubbles,
-        })
-        .from(schema.drafts)
-        .where(eq(schema.drafts.id, draftId));
-      return row;
-    };
-    const stateOf = async (conversationId: ConversationId) => {
-      const [row] = await test.admin.db
-        .select({ state: schema.conversations.state })
-        .from(schema.conversations)
-        .where(eq(schema.conversations.id, conversationId));
-      return row?.state;
-    };
-
-    for (const [name, sent, verdict] of [
-      ['Lucas', [...FIXED_BUBBLES], { kind: 'validated' }],
-      ['Noah', ['Coucou toi', 'Tu fais quoi de beau ?'], { kind: 'corrected' }],
-    ] as const) {
-      const conversationId = await seed(nora, name);
-      const { draft } = await readyDraft(name, onShift.cookie);
-      await test.admin.db
-        .update(schema.drafts)
-        .set({ promptHashes: { voicePrompt: 'voice@test', voiceModel: 'model-test' } })
-        .where(eq(schema.drafts.id, draft.draftId));
-      const placed = { kind: 'placed', creatorId: nora.creatorId, edited: verdict.kind === 'corrected' };
-      expect((await gesture(draft.draftId, placed, token)).statusCode).toBe(200);
-
-      // One bubble at a time: the first leaves nothing decided, nor the conversation in human hands.
-      const [first, second] = sent;
-      await sendOnPlatform(name, first);
-      expect((await decided(draft.draftId))?.status).toBe('pending');
-      expect(await stateOf(conversationId)).toBe('awaiting_approval');
-      await sendOnPlatform(name, second);
-
-      expect(await decided(draft.draftId)).toEqual({
-        status: 'sent',
-        decidedBy: `human:${onShift.userId}`,
-        finalBubbles: verdict.kind === 'corrected' ? [...sent] : null,
-      });
-      expect(await stateOf(conversationId)).toBe('idle');
-      const ratings = await ratingsOf(draft.draftId);
-      expect(ratings).toHaveLength(1);
-      expect(ratings[0]).toMatchObject({
-        source: 'live',
-        verdictKind: verdict.kind,
-        ...(verdict.kind === 'corrected' && { verdict: { kind: 'corrected', text: sent.join('\n') } }),
-      });
-      // The panel says it left.
-      expect((await draftOf(name, onShift.cookie)).view).toMatchObject({
-        state: 'none',
-        sent: { draftId: draft.draftId },
-      });
-    }
-  });
-
   it('refuses a gesture off shift, on another creator, or on a draft she does not have', async () => {
     const owner = await linkOf(ownerCookie);
     const { draft } = await readyDraft('Julien', ownerCookie);
@@ -524,5 +437,209 @@ describe('copilot panel (ADR 0086)', () => {
     const misplaced = await gesture(draft.draftId, { ...placed, creatorId: ines.creatorId }, owner);
     expect([misplaced.statusCode, codeOf(misplaced)]).toEqual([404, 'draft_not_found']);
     expect((await gesture(draft.draftId, placed, owner)).statusCode).toBe(200);
+  });
+
+  describe('what left decides the placed draft (ADR 0086 § 5)', () => {
+    let sends = 0;
+    /** A message of the creator's side read on the platform, as the connector reports one a chatter sent. */
+    const sentOnReveal = (name: string, text: string, createdAt = new Date()) => {
+      sends += 1;
+      return app.modules.conversations.ingestMessage({
+        creatorId: nora.creatorId,
+        platformAccountId: nora.accountId,
+        platformConversationId: `c-${name}`,
+        platformFanId: `f-${name}`,
+        fanDisplayName: name,
+        message: {
+          ref: { platform: 'reveal', id: `out-${name}-${String(sends)}` },
+          conversationRef: { platform: 'reveal', id: `c-${name}` },
+          direction: 'outbound',
+          text,
+          media: [],
+          priceMinor: null,
+          currency: null,
+          isPaid: false,
+          createdAt: createdAt.toISOString(),
+        },
+        correlationId: 'reveal',
+      });
+    };
+
+    /** A fresh conversation with her draft, stamped with the voice that wrote it (the live rate reads it), placed. */
+    const placedDraft = async (name: string, onShift: Member, token: string) => {
+      const conversationId = await seed(nora, name);
+      const { draft } = await readyDraft(name, onShift.cookie);
+      await test.admin.db
+        .update(schema.drafts)
+        .set({ promptHashes: { voicePrompt: 'voice@test', voiceModel: 'model-test' } })
+        .where(eq(schema.drafts.id, draft.draftId));
+      const placed = await gesture(
+        draft.draftId,
+        { kind: 'placed', creatorId: nora.creatorId, edited: false },
+        token,
+      );
+      expect(placed.statusCode).toBe(200);
+      return { conversationId, draftId: draft.draftId };
+    };
+
+    const settled = async (draftId: DraftId) => {
+      const [row] = await test.admin.db
+        .select({ status: schema.drafts.status, finalBubbles: schema.drafts.finalBubbles })
+        .from(schema.drafts)
+        .where(eq(schema.drafts.id, draftId));
+      const ratings = await ratingsOf(draftId);
+      return { ...row, ratings: ratings.map((rating) => [rating.source, rating.verdict]) };
+    };
+    const stateOf = async (conversationId: ConversationId) => {
+      const [row] = await test.admin.db
+        .select({ state: schema.conversations.state })
+        .from(schema.conversations)
+        .where(eq(schema.conversations.id, conversationId));
+      return row?.state;
+    };
+    const linkedTo = async (draftId: DraftId) =>
+      (
+        await test.admin.db
+          .select({ text: schema.messages.text, author: schema.messages.author })
+          .from(schema.messages)
+          .where(eq(schema.messages.draftId, draftId))
+      ).map((message) => [message.author, message.text]);
+    const queued = async (key: string) =>
+      z.array(z.object({ in_minutes: z.number() })).parse(
+        (
+          await test.admin.db.execute(
+            sql`select round(extract(epoch from run_at - now()) / 60)::int as in_minutes
+                    from graphile_worker._private_jobs where key = ${key}`,
+          )
+        ).rows,
+      );
+    const sendsOf = async (draftId: DraftId) =>
+      (
+        await test.admin.db.execute(
+          sql`select 1 from graphile_worker._private_jobs j
+                join graphile_worker._private_tasks t on t.id = j.task_id
+                where t.identifier = 'conversation.send' and j.payload->>'draftId' = ${draftId}`,
+        )
+      ).rows.length;
+    const settle = (conversationId: ConversationId, draftId: DraftId) =>
+      app.modules.conversations.jobs.settlePlaced({
+        creatorId: nora.creatorId,
+        conversationId,
+        draftId,
+        correlationId: 'settle',
+      });
+
+    it('validates the draft sent as it was, bubble after bubble, rated live, and sends nothing after it', async () => {
+      const onShift = await chatter({ from: -30, to: 60 });
+      const token = await linkOf(onShift.cookie);
+      const { conversationId, draftId } = await placedDraft('Lea', onShift, token);
+      // Its window is scheduled once: after 15 minutes, and what the connector takes to read what left.
+      expect(await queued(`conversation.settle_placed:${draftId}`)).toEqual([{ in_minutes: 17 }]);
+
+      await sentOnReveal('Lea', FIXED_BUBBLES[0]);
+      // The fan is answered, and the draft waits for its other bubble: the panel still shows it.
+      expect(await stateOf(conversationId)).toBe('idle');
+      expect((await settled(draftId)).status).toBe('pending');
+      expect((await readyDraft('Lea', onShift.cookie)).draft.draftId).toBe(draftId);
+
+      await sentOnReveal('Lea', ` ${FIXED_BUBBLES[1]}`);
+      expect(await settled(draftId)).toEqual({
+        status: 'sent',
+        finalBubbles: null,
+        ratings: [['live', { kind: 'validated' }]],
+      });
+      expect(await linkedTo(draftId)).toEqual([
+        ['human', FIXED_BUBBLES[0]],
+        ['human', ` ${FIXED_BUBBLES[1]}`],
+      ]);
+      expect(await stateOf(conversationId)).toBe('idle');
+      expect(await sendsOf(draftId)).toBe(0);
+      const [event] = await test.admin.db
+        .select({ type: schema.conversationEvents.type, payload: schema.conversationEvents.payload })
+        .from(schema.conversationEvents)
+        .where(
+          and(
+            eq(schema.conversationEvents.conversationId, conversationId),
+            eq(schema.conversationEvents.type, 'draft_approved'),
+          ),
+        );
+      expect(event?.payload).toMatchObject({
+        draftId,
+        status: 'approved',
+        decidedBy: onShift.userId,
+        sentOnPlatform: true,
+      });
+      expect((await draftOf('Lea', onShift.cookie)).view?.state).toBe('none');
+
+      // Its window closing later changes nothing.
+      await settle(conversationId, draftId);
+      expect((await settled(draftId)).ratings).toHaveLength(1);
+    });
+
+    it('corrects the draft with the text really sent when a word changed', async () => {
+      const onShift = await chatter({ from: -30, to: 60 });
+      const token = await linkOf(onShift.cookie);
+      const { draftId } = await placedDraft('Mila', onShift, token);
+
+      await sentOnReveal('Mila', 'Coucou mon cœur ✨');
+      await sentOnReveal('Mila', FIXED_BUBBLES[1]);
+      expect(await settled(draftId)).toEqual({
+        status: 'sent',
+        finalBubbles: ['Coucou mon cœur ✨', FIXED_BUBBLES[1]],
+        ratings: [['live', { kind: 'corrected', text: `Coucou mon cœur ✨\n${FIXED_BUBBLES[1]}` }]],
+      });
+    });
+
+    it('settles at its window what left of it, and expires a draft nothing left of', async () => {
+      const onShift = await chatter({ from: -30, to: 60 });
+      const token = await linkOf(onShift.cookie);
+      const half = await placedDraft('Nael', onShift, token);
+      await sentOnReveal('Nael', FIXED_BUBBLES[0]);
+      await settle(half.conversationId, half.draftId);
+      expect(await settled(half.draftId)).toEqual({
+        status: 'sent',
+        finalBubbles: [FIXED_BUBBLES[0]],
+        ratings: [['live', { kind: 'corrected', text: FIXED_BUBBLES[0] }]],
+      });
+
+      const kept = await placedDraft('Owen', onShift, token);
+      await settle(kept.conversationId, kept.draftId);
+      expect(await settled(kept.draftId)).toEqual({ status: 'expired', finalBubbles: null, ratings: [] });
+      expect(await stateOf(kept.conversationId)).toBe('idle');
+    });
+
+    it('decides a half-sent draft when the fan writes again, and never reads a message of another time as it', async () => {
+      const onShift = await chatter({ from: -30, to: 60 });
+      const token = await linkOf(onShift.cookie);
+      const { draftId } = await placedDraft('Pia', onShift, token);
+      await sentOnReveal('Pia', FIXED_BUBBLES[0]);
+      // His answer comes before the second bubble left: what left decides it.
+      await app.modules.conversations.ingestMessage({
+        creatorId: nora.creatorId,
+        platformAccountId: nora.accountId,
+        platformConversationId: 'c-Pia',
+        platformFanId: 'f-Pia',
+        fanDisplayName: 'Pia',
+        message: {
+          ref: { platform: 'reveal', id: 'm-Pia-2' },
+          conversationRef: { platform: 'reveal', id: 'c-Pia' },
+          direction: 'inbound',
+          text: 'Rien de spécial',
+          media: [],
+          priceMinor: null,
+          currency: null,
+          isPaid: false,
+          createdAt: new Date().toISOString(),
+        },
+        correlationId: 'reveal',
+      });
+      expect(await settled(draftId)).toMatchObject({ status: 'sent', finalBubbles: [FIXED_BUBBLES[0]] });
+
+      // Sent twenty minutes after the placing: someone's own words, the draft falls as before.
+      const late = await placedDraft('Rae', onShift, token);
+      await sentOnReveal('Rae', FIXED_BUBBLES[0], new Date(Date.now() + 20 * MINUTE));
+      expect(await settled(late.draftId)).toEqual({ status: 'expired', finalBubbles: null, ratings: [] });
+      expect(await linkedTo(late.draftId)).toEqual([]);
+    });
   });
 });

@@ -799,6 +799,11 @@ export const PLATFORM_SCRIPT_GAPS = [
   'media_twice',
   /** A step carries a « Tarif réduit » on the platform: never sold at a discount (recette 16/11, Charles). */
   'step_discounted',
+  /**
+   * A paid step sells a media offered once, sent for free or out in a drop that leaves for free (ADR 0145 § 2,
+   * Charles: « un média offert n'est jamais revendu »).
+   */
+  'media_offered',
 ] as const;
 
 /** The longest condition in text (ADR 0112 § 5), as Reveal's own: one sentence the brain reads. */
@@ -941,3 +946,71 @@ export const CorrectPlatformScriptDescriptionBodySchema = z.strictObject({
   descriptionId: MediaDescriptionIdSchema,
   detailed: z.string().trim().min(1).max(6000),
 });
+
+/**
+ * The performance of her scripts (ADR 0129, sous-lot 4c): what a figure needs before it is a rate. Under it the figure
+ * reads « Pas assez de données (n fans) », never a percentage (§ 8).
+ */
+export const SCRIPT_STATS_MIN_FANS = 20;
+
+/** The periods the performance reads over, in days (ADR 0129 § 15). */
+export const ScriptPerformanceDaysSchema = z.union([z.literal(7), z.literal(30), z.literal(90)]);
+export type ScriptPerformanceDays = z.infer<typeof ScriptPerformanceDaysSchema>;
+
+/** `GET …/platform-scripts/performance?days=`: 30 when not given. */
+export const ScriptPerformanceQuerySchema = z.object({
+  days: z.coerce.number().pipe(ScriptPerformanceDaysSchema).default(30),
+});
+
+/** Reveal's own count of a step over the period, every seller together (ADR 0129 §§ 9 and 12). */
+export const RevealStepTotalsSchema = z.object({
+  sent: z.number().int().min(0),
+  purchased: z.number().int().min(0),
+  paidMinor: z.number().int().min(0),
+});
+export type RevealStepTotals = z.infer<typeof RevealStepTotalsSchema>;
+
+/** One step of a script by rank, its branches together. */
+export const ScriptStepPerformanceSchema = z.object({
+  /** Its rank in the script, from 0: the index the runs know it by. */
+  rank: z.number().int().min(0),
+  paid: z.boolean(),
+  /** The fans of the period's runs who received it. */
+  sent: z.number().int().min(0),
+  /** Of them, those who bought it (a paid step only; 0 for an offered one). */
+  bought: z.number().int().min(0),
+  /** `bought / sent` for a paid step received by at least `SCRIPT_STATS_MIN_FANS` fans; `null` otherwise. */
+  purchaseRate: z.number().min(0).max(1).nullable(),
+  /** Reveal's count over the period; `null` until a reading of each of its branches falls in it. */
+  reveal: RevealStepTotalsSchema.nullable(),
+});
+export type ScriptStepPerformance = z.infer<typeof ScriptStepPerformanceSchema>;
+
+/** One active script of hers recognised in Reveal, over the period. */
+export const ScriptPerformanceSchema = z.object({
+  id: PlatformScriptIdSchema,
+  name: z.string(),
+  moment: PlatformScriptMomentSchema.nullable(),
+  currency: CurrencySchema,
+  /** Fans exposed: the runs started in the period (one per fan, a script never runs twice with the same). */
+  fans: z.number().int().min(0),
+  /** What the period's runs brought, at the price each step was bought at, VAT included. */
+  revenueMinor: z.number().int().min(0),
+  /** `revenueMinor / fans`, rounded, from `SCRIPT_STATS_MIN_FANS` fans on; `null` under. */
+  revenuePerFanMinor: z.number().int().min(0).nullable(),
+  steps: z.array(ScriptStepPerformanceSchema),
+  /** The day Reveal's counts start from (the reading before the period, else the period's first); `null` without. */
+  revealSince: z.iso.date().nullable(),
+});
+export type ScriptPerformanceDto = z.infer<typeof ScriptPerformanceSchema>;
+
+/** The owner and the active managers of her list only: how a script sells is an agency method (ADR 0129 § 17). */
+export const ScriptPerformanceListSchema = z.object({
+  days: ScriptPerformanceDaysSchema,
+  /** The period's start: the runs started from it are counted. */
+  since: z.iso.datetime(),
+  minFans: z.number().int().positive(),
+  /** Her active scripts, the most revenue per fan first, those under the minimum last. */
+  scripts: z.array(ScriptPerformanceSchema),
+});
+export type ScriptPerformanceList = z.infer<typeof ScriptPerformanceListSchema>;

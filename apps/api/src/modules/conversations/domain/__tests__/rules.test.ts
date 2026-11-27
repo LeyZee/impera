@@ -155,18 +155,13 @@ describe('stepCutBy (relecture Sécurité de #812)', () => {
 });
 
 describe('answersHisLastMessage (recette REV-04)', () => {
-  const his = { id: 'fan-new', direction: 'inbound' as const };
-  const hers = { id: 'old-reply', direction: 'outbound' as const };
+  const his = { direction: 'inbound' as const, at: new Date('2026-11-21T10:00:00Z') };
 
   it('answers him when it comes after his last message on the platform', () => {
-    expect(answersHisLastMessage([his, hers], 'old-reply')).toBe(true);
+    expect(answersHisLastMessage([his], new Date('2026-11-21T10:01:00Z'))).toBe(true);
   });
 
   it('never answers him with a message dated before his, whatever the order it reached us', () => {
-    expect(answersHisLastMessage([hers, his], 'old-reply')).toBe(false);
-  });
-
-  it('never answers him with a message too old to be among the last ones read', () => {
-    expect(answersHisLastMessage([his], 'old-reply')).toBe(false);
+    expect(answersHisLastMessage([his], new Date('2026-11-21T09:59:00Z'))).toBe(false);
   });
 });

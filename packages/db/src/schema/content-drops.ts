@@ -53,9 +53,10 @@ const readsTeam: SQL = sql`${notCreatorAccount} and ${currentScope} in ('owner',
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
 const ofHerTeam = (creatorId: PgColumn): SQL => sql`${readsTeam} and ${creatorId} = ${currentCreator}`;
 /**
- * The jobs on a medium she dropped (its reduced picture, its description), in her creator and under the app role
- * (`withTenantJob(…, 'drop_media', …)`, ADR 0087 lot c): they read what the drop says of the medium, and write nothing
- * here. No account's session sets `app.job`.
+ * The jobs on what she dropped (a medium's reduced picture, its description, a sent script's synthesis), in her creator
+ * and under the app role (`withTenantJob(…, 'drop_media', …)`, ADR 0087 lot c): they read what the drop says of the
+ * medium, and write here only the brain's synthesis of a script (`script_drop_summaries`, never validated by them).
+ * No account's session sets `app.job`.
  */
 const dropMediaJob = (creatorId: PgColumn): SQL =>
   sql`${creatorId} = ${currentCreator} and nullif(current_setting('app.job', true), '') = 'drop_media'`;
@@ -195,6 +196,12 @@ export const contentDrops = pgTable(
       .references(() => user.id),
     withdrawnBy: text('withdrawn_by').references(() => user.id),
     withdrawnAt: timestampTz('withdrawn_at'),
+    /**
+     * « À refaire » (trou 7 du 21/11): the agency's sentence when it withdrew the drop for her to do again. Her request
+     * opens again and her screen shows the sentence. Written by the team with the withdrawal, never by her
+     * (`guard_content_drop_redo`). Null for any other drop, withdrawn by her or not.
+     */
+    redoSentence: text('redo_sentence'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -208,7 +215,10 @@ export const contentDrops = pgTable(
     ),
     check(
       'content_drops_blocked_check',
-      sql`(${t.state} = 'blocked') = (${t.blockedReason} is not null)
+      // A withdrawn drop keeps why it was blocked (grande recette du 21/11): she may withdraw it, and her guard never
+      // lets her clear the reason.
+      sql`(${t.state} <> 'blocked' or ${t.blockedReason} is not null)
+        and (${t.blockedReason} is null or ${t.state} in ('blocked', 'withdrawn'))
         and coalesce(char_length(${t.blockedReason}), 1) between 1 and 200`,
     ),
     check(
@@ -220,6 +230,10 @@ export const contentDrops = pgTable(
       'content_drops_withdrawn_check',
       sql`(${t.state} = 'withdrawn') = (${t.withdrawnAt} is not null)
         and (${t.withdrawnAt} is null) = (${t.withdrawnBy} is null)`,
+    ),
+    check(
+      'content_drops_redo_check',
+      sql`${t.redoSentence} is null or (${t.state} = 'withdrawn' and char_length(${t.redoSentence}) between 1 and 200)`,
     ),
     check('content_drops_script_check', sql`${t.category} <> 'script' or ${t.requestId} is not null`),
     check(
@@ -311,6 +325,13 @@ export const contentDropFiles = pgTable(
      * medium goes as a withdrawn drop's does (CR-06 c).
      */
     replacedAt: timestampTz('replaced_at'),
+    /**
+     * The agency's « À refaire » on this medium alone (trou 7 du 21/11, coffre): she replaces it where it is, the drop
+     * stays. Written by her team only (`guard_content_drop_file_redo`).
+     */
+    redoSentence: text('redo_sentence'),
+    redoAt: timestampTz('redo_at'),
+    redoBy: text('redo_by').references(() => user.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -324,8 +345,12 @@ export const contentDropFiles = pgTable(
       'content_drop_files_slot_check',
       sql`(${t.slotKey} is null or char_length(${t.slotKey}) between 4 and 40)
         and (${t.minSeconds} is null) = (${t.maxSeconds} is null)
-        and (${t.minSeconds} is null or (${t.slotKey} is not null and ${t.minSeconds} between 1 and ${t.maxSeconds}))
-        and (${t.replacedAt} is null or ${t.slotKey} is not null)`,
+        and (${t.minSeconds} is null or (${t.slotKey} is not null and ${t.minSeconds} between 1 and ${t.maxSeconds}))`,
+    ),
+    check(
+      'content_drop_files_redo_check',
+      sql`(${t.redoSentence} is null) = (${t.redoAt} is null) and (${t.redoAt} is null) = (${t.redoBy} is null)
+        and coalesce(char_length(${t.redoSentence}), 1) between 1 and 200`,
     ),
     // The heaviest file of each kind (`DROP_MAX_BYTES`, ADR 0070 § 1): 10 Gio for a video, 30 Mo for a photo or a vocal.
     check(
@@ -375,6 +400,30 @@ export const contentDropFiles = pgTable(
       )`,
       withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
     }),
+    // She replaces in place a medium her team asked again, or one the cleaning refused (trou 7 du 21/11), in a drop
+    // received and not out (a script copied into Reveal still is): the old file set aside, once...
+    pgPolicy('creator_redo_replace', {
+      for: 'update',
+      using: sql`${hers(t.creatorId)} and ${t.replacedAt} is null
+        and (${t.redoSentence} is not null or ${t.state} = 'refused') and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      )`,
+      withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
+    }),
+    // ...and the new one at its place and step, awaiting its bytes. The receipt job settles the drop once it is in.
+    pgPolicy('creator_redo_insert', {
+      for: 'insert',
+      withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'awaiting' and ${t.replacedAt} is null
+        and ${t.redoSentence} is null and ${t.mediaAssetId} is null and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      ) and exists (
+        select 1 from content_drop_files old where old.drop_id = ${t.dropId} and old.creator_id = ${t.creatorId}
+          and old.position = ${t.position} and old.slot_key is not distinct from ${t.slotKey}
+          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')
+      )`,
+    }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
     pgPolicy('team_insert', {
@@ -382,6 +431,17 @@ export const contentDropFiles = pgTable(
       withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.state} = 'awaiting' and exists (
         select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId} and d.state = 'uploading'
       )`,
+    }),
+    // « À refaire » on one live medium of a drop received and not out, or of a script already copied into Reveal (trou 7
+    // du 21/11, Charles: it is copied again): its redo columns only (the column grant), never its place.
+    pgPolicy('team_redo', {
+      for: 'update',
+      using: sql`${ofHerTeam(t.creatorId)} and ${t.replacedAt} is null and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      )`,
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.replacedAt} is null
+        and (${t.redoBy} is null or ${t.redoBy} = nullif(current_setting('app.user_id', true), ''))`,
     }),
   ],
 );
@@ -446,6 +506,12 @@ export const scriptDropSummaries = pgTable(
       .where(sql`${t.author} = 'brain'`),
     index('script_drop_summaries_creator_idx').on(t.creatorId),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    // The synthesis job (SEC-16 lot c): reads what was told already, writes the brain's telling, never a validated one.
+    pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
+    pgPolicy('job_insert', {
+      for: 'insert',
+      withCheck: sql`${dropMediaJob(t.creatorId)} and ${t.author} = 'brain' and ${t.validatedBy} is null`,
+    }),
     // Her team validates a synthesis; only the two columns of the stamp are granted (migration 0152).
     pgPolicy('team_validate', {
       for: 'update',

@@ -25,10 +25,10 @@ async function serve(read: WeekDraftStore['read']) {
       forValidation: unused,
       markValidated: unused,
     },
-    days: { read: unused, write: unused },
-    agenda: { suggestWeek: unused, herWeek: unused, tickLine: unused },
+    days: { read: unused, write: unused, teamDays: unused },
+    agenda: { suggestWeek: unused, herWeek: unused, tickLine: unused, teamWeek: unused },
     accept: unused,
-    facts: { arrivals: unused },
+    facts: { arrivals: unused, teamArrivals: unused },
     requireRole: () => (request) => {
       request.user = {
         id: 'owner-1',

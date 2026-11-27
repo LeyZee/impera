@@ -42,6 +42,7 @@ const shift = (n: number, startsAt: string, endsAt: string, memberId = THEO): Re
   endsAt,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
 });
 
 const me = {

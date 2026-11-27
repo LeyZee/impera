@@ -18,7 +18,7 @@ import { euros } from './flags-model';
 
 import { CAUSE_LABELS, handoffCauseLabel } from '@/agent/causes';
 import { GUARD_LABELS } from '@/agent/guards';
-import { addDays, clockAt, dayMonth, dayOf, weekdayOf } from '@/scheduling/time';
+import { addDays, clockAt, dayMonth, dayOf, daysFrom, longDay, weekdayOf } from '@/scheduling/time';
 
 /*
  * The reader of Suivi in words: the thread in reading order, the agent's notes where it stopped or a human stepped
@@ -388,4 +388,16 @@ export function isOutdated(status: number, body: unknown): boolean {
   const error = ApiErrorSchema.safeParse(body);
   const code = error.success ? error.data.error.code : null;
   return code === 'draft_conflict' || code === 'transition_conflict' || status === 404;
+}
+
+/**
+ * The care mode's banner title (ADR 0088, trou béant 4): since which day, and for how long once it lasts, so that an
+ * episode forgotten for weeks is seen at a glance.
+ */
+export function careSinceText(since: string, now: Date, timeZone: string = viewerZone()): string {
+  const day = dayOf(since, timeZone);
+  const days = daysFrom(day, dayOf(now, timeZone));
+  if (days <= 0) return 'Mode soin depuis aujourd’hui';
+  if (days === 1) return 'Mode soin depuis hier';
+  return `Mode soin depuis le ${longDay(day)} (${String(days)} jours)`;
 }

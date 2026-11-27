@@ -3,11 +3,9 @@ import './sidepanel.css';
 
 import {
   CRM_RAILS,
-  FanCardGroupSchema,
   type CopilotDraftView,
   type CopilotVerdictBody,
   type DraftId,
-  type FanCardGroup,
   type RejectReason,
 } from '@impera/contracts';
 import { browser } from 'wxt/browser';
@@ -22,8 +20,8 @@ import { ADDRESS_KEY, BUILT_IN_CRM, storedOrigin } from '../../lib/crm-origin-st
 import { readCrmSession } from '../../lib/session';
 import { kindOf } from '../../lib/who';
 
-import { drawnKey, keepsDone, reconciledDone } from './redraw';
-import { render, type DraftPart, type GestureDone, type PanelScreen } from './view';
+import { drawnKey, keepsDone } from './redraw';
+import { panelTabs, render, type DraftPart, type GestureDone, type PanelScreen, type PanelTab } from './view';
 
 /**
  * The copilot side panel's browser side (ADR 0086, lot b): it follows the conversation open in Reveal in this window,
@@ -36,7 +34,6 @@ import { render, type DraftPart, type GestureDone, type PanelScreen } from './vi
 const DRAFT_EVERY_MS = 5_000;
 const CARD_EVERY_MS = 30_000;
 const STANDING_EVERY_MS = 30_000;
-const GROUPS_KEY = 'copilotOpenGroups';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 
 function applyTheme(): void {
@@ -76,7 +73,12 @@ interface Gesture {
   readonly body: CopilotVerdictBody | null;
 }
 let gesture: Gesture | null = null;
-let openGroups = new Set<FanCardGroup>();
+/** The tab under the draft (Charles 21/11, piste C): for this conversation only, « L’essentiel » first. */
+let tab: PanelTab = 'essentials';
+/** « N à découvrir » open (Design 16/11, lot 0141-3): for this conversation only. */
+let discoverOpen = false;
+/** « Où on en est » past its three signals: for this conversation only (ADR 0141). */
+let signalsOpen = false;
 let screen: PanelScreen = { kind: 'loading' };
 let drawn = '';
 /** Each read carries the turn it started on: a late answer for a conversation left since is dropped. */
@@ -91,7 +93,7 @@ async function count(draftId: DraftId, body: CopilotVerdictBody): Promise<void> 
   const message: FromPanel = { type: 'panel/verdict', draftId, body };
   const answer: unknown = await browser.runtime.sendMessage(message).catch(() => 'unreachable');
   const sent = VerdictSentSchema.safeParse(answer);
-  if (gesture?.draftId !== draftId || gesture.done === null || gesture.done.sent === 'reconciled') return;
+  if (gesture?.draftId !== draftId || gesture.done === null) return;
   setGesture({ ...gesture, done: { ...gesture.done, sent: sent.success ? sent.data : 'unreachable' } });
 }
 
@@ -152,12 +154,18 @@ async function copyNext(): Promise<void> {
 
 const actions = {
   openCrm: () => void browser.tabs.create({ url: `${origin}/` }),
-  toggleGroup: (group: FanCardGroup, open: boolean) => {
-    if (open === openGroups.has(group)) return;
-    openGroups = new Set(openGroups);
-    if (open) openGroups.add(group);
-    else openGroups.delete(group);
-    void browser.storage.local.set({ [GROUPS_KEY]: [...openGroups] }).catch(() => undefined);
+  pickTab: (next: PanelTab) => {
+    if (next === tab) return;
+    tab = next;
+    redraw();
+  },
+  toggleDiscover: (open: boolean) => {
+    // Kept without a redraw: the fold is already as he left it.
+    discoverOpen = open;
+  },
+  showSignals: () => {
+    signalsOpen = true;
+    redraw();
   },
   place: (edited: boolean) => void place(edited),
   copyNext: () => void copyNext(),
@@ -224,7 +232,16 @@ document.addEventListener('keydown', (event) => {
     }
     return;
   }
-  if (event.ctrlKey || event.metaKey || event.altKey || gesture?.mode !== 'idle') return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  // 1 to 5 open the tabs under the draft, whatever the draft is doing (Charles 21/11, piste C).
+  if (/^[1-9]$/.test(event.key)) {
+    const next = panelTabs(screen)[Number(event.key) - 1];
+    if (next === undefined) return;
+    event.preventDefault();
+    actions.pickTab(next);
+    return;
+  }
+  if (gesture?.mode !== 'idle') return;
   const run = {
     a: () => {
       if (gesture?.done?.outcome === 'placed') actions.copyNext();
@@ -259,11 +276,6 @@ function leftPart(): DraftPart | null {
 }
 
 function draftPart(): DraftPart {
-  if (view?.state === 'none' && gesture !== null) {
-    const reconciled = reconciledDone(gesture.done, gesture.draftId, view.sent?.draftId);
-    // Said from now, a while (EXT-23).
-    if (reconciled !== null) gesture = { ...gesture, done: reconciled, doneAt: Date.now() };
-  }
   if (view === null || view.state === 'off' || view.state === 'none') return leftPart() ?? { kind: 'hidden' };
   if (view.state === 'writing') return leftPart() ?? { kind: 'writing' };
   const { draft } = view;
@@ -302,13 +314,18 @@ function cardScreen(cardOn: boolean): PanelScreen {
   return {
     kind: 'conversation',
     fanName,
+    money: view?.conversation.standing ?? null,
     standing,
     cardOn,
     opensCreators: opensCreators === true,
     card: card === null ? null : card.kind === 'card' ? card.card : card.kind,
-    openGroups,
+    tab,
     newSince,
     draft: draftPart(),
+    // A server that does not send it yet draws the panel as before (ADR 0141).
+    assist: view?.state === 'none' || view?.state === 'ready' ? (view.assist ?? null) : null,
+    discoverOpen,
+    signalsOpen,
     now: new Date(),
   };
 }
@@ -335,6 +352,9 @@ async function refresh(): Promise<void> {
     newSince = null;
     view = null;
     gesture = null;
+    tab = 'essentials';
+    discoverOpen = false;
+    signalsOpen = false;
   }
   if (conversationId === null) {
     show({ kind: 'no_conversation' });
@@ -406,9 +426,6 @@ async function start(): Promise<void> {
     Number.isInteger(asked) && asked > 0
       ? asked
       : (await browser.windows.getCurrent().catch(() => undefined))?.id;
-  const stored: Record<string, unknown> = await browser.storage.local.get(GROUPS_KEY).catch(() => ({}));
-  const groups = FanCardGroupSchema.array().safeParse(stored[GROUPS_KEY]);
-  if (groups.success) openGroups = new Set(groups.data);
   // Zero gesture to follow (§ 10): another tab, another conversation in the same tab, and the fan changes.
   browser.tabs.onActivated.addListener((info) => {
     if (info.windowId === windowId) void refresh();

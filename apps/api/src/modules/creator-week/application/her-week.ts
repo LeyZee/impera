@@ -1,15 +1,18 @@
 import {
+  CreatorProgressSchema,
   CreatorWeekSchema,
+  type CreatorProgress,
   type CreatorWeek,
   type DeliveryLine,
   type DropCategory,
   type WeekNeed,
 } from '@impera/contracts';
 
-import type { HerWeekFrame, WeekAgendaStore } from '../../creator-tasks';
+import type { HerWeekFrame, HerWeekRead, WeekAgendaStore } from '../../creator-tasks';
 import { addDays, wallClockToInstant } from '../../scheduling/pure';
+import { DAY_DEFAULTS, dayLines } from '../domain/day';
 import { deliveryAsks, deliveryDue } from '../domain/plan';
-import type { AcceptSuggestion, WeekFactsReader } from '../domain/ports';
+import type { AcceptSuggestion, DayTickStore, WeekFactsReader } from '../domain/ports';
 
 export interface HerWeekDeps {
   readonly agenda: Pick<WeekAgendaStore, 'herWeek'>;
@@ -63,14 +66,15 @@ function deliveryLines(
   });
 }
 
-/** Her week as she reads it (ADR 0140 § 7): her shooting days with their lines, and her delivery. Empty before validation. */
-export async function herWeek(
-  deps: HerWeekDeps,
-  userId: string,
+/** Her week from its frames and what arrived of it: the same reading for her and for her team. */
+async function weekOf(
+  read: HerWeekRead,
   week: string,
-  now: Date,
+  arrivals: (
+    window: { readonly from: Date; readonly to: Date },
+    requestIds: readonly string[],
+  ) => ReturnType<WeekFactsReader['arrivals']>,
 ): Promise<CreatorWeek> {
-  const read = await deps.agenda.herWeek(userId, week, now);
   const shootDays = read.frames.filter((frame) => frame.role === 'shoot_day');
   const delivery = read.frames.find((frame) => frame.role === 'delivery') ?? null;
   const from = wallClockToInstant(week, 0, read.timeZone);
@@ -81,7 +85,7 @@ export async function herWeek(
   const arrived =
     delivery === null
       ? { byCategory: {}, answered: new Set<string>() }
-      : await deps.facts.arrivals(userId, { from, to }, requestIds);
+      : await arrivals({ from, to }, requestIds);
   const lines = deliveryLines(read.frames, arrived);
   return CreatorWeekSchema.parse({
     week,
@@ -111,6 +115,70 @@ export async function herWeek(
             lines,
             delivered: lines.every((line) => line.received >= line.asked),
           },
+  });
+}
+
+/** Her week as she reads it (ADR 0140 § 7): her shooting days with their lines, and her delivery. Empty before validation. */
+export async function herWeek(
+  deps: HerWeekDeps,
+  userId: string,
+  week: string,
+  now: Date,
+): Promise<CreatorWeek> {
+  const read = await deps.agenda.herWeek(userId, week, now);
+  return weekOf(read, week, (window, requestIds) => deps.facts.arrivals(userId, window, requestIds));
+}
+
+export interface ProgressDeps {
+  readonly agenda: Pick<WeekAgendaStore, 'teamWeek'>;
+  readonly facts: Pick<WeekFactsReader, 'teamArrivals'>;
+  readonly days: Pick<DayTickStore, 'teamDays'>;
+}
+
+/**
+ * « Où elle en est » (Charles, 21/11, trous béants n° 11): her seven days from her Monday, what she ticked against what
+ * her day asks, and how far her validated week went, read by her owner or an active manager exactly as she reads it.
+ */
+export async function creatorProgress(
+  deps: ProgressDeps,
+  creatorId: string,
+  userId: string,
+  week: string,
+  now: Date,
+): Promise<CreatorProgress> {
+  const sunday = addDays(week, 6);
+  const [read, ticked] = await Promise.all([
+    deps.agenda.teamWeek(creatorId, userId, week, now),
+    deps.days.teamDays(creatorId, userId, week, sunday, now),
+  ]);
+  const herWeekRead = await weekOf(read, week, (window, requestIds) =>
+    deps.facts.teamArrivals(creatorId, userId, window, requestIds),
+  );
+  const days = Array.from({ length: 7 }, (_, offset) => {
+    const day = addDays(week, offset);
+    const lines = dayLines(DAY_DEFAULTS, ticked.days.get(day) ?? {});
+    const essentials = lines.filter((line) => line.essential);
+    return {
+      day,
+      essentialsDone: essentials.reduce((sum, line) => sum + line.done, 0),
+      essentialsAsked: essentials.reduce((sum, line) => sum + line.target, 0),
+      done: lines.reduce((sum, line) => sum + line.done, 0),
+      asked: lines.reduce((sum, line) => sum + line.target, 0),
+      ahead: day > ticked.today,
+    };
+  });
+  const shot = herWeekRead.shootDays
+    .filter((shootDay) => shootDay.state !== 'declined')
+    .flatMap((shootDay) => shootDay.items);
+  return CreatorProgressSchema.parse({
+    week,
+    today: ticked.today,
+    days,
+    shoot:
+      herWeekRead.shootDays.length === 0
+        ? null
+        : { done: shot.filter((item) => item.done).length, asked: shot.length },
+    delivery: herWeekRead.delivery,
   });
 }
 

@@ -19,6 +19,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { recordCopilotGesture, type CopilotGestureDeps } from '../../application/copilot';
+import { copilotAssist } from '../../domain/copilot-assist';
 import {
   CopilotCreatorConflict,
   CopilotForbidden,
@@ -82,12 +83,13 @@ function assertCopilot(user: CurrentUser, creatorId: CreatorId): void {
   if (!onShift(user, creatorId)) throw new CopilotOffShift();
 }
 
-function viewOf(creatorId: CreatorId, read: CopilotRead): CopilotDraftView {
+function viewOf(creatorId: CreatorId, read: CopilotRead, now: Date): CopilotDraftView {
   const conversation = {
     creatorId,
     conversationId: read.conversationId,
     fanId: read.fanId,
     switches: read.switches,
+    standing: read.standing,
   };
   if (!read.switches.drafts) return { state: 'off', conversation };
   if (read.draft !== null)
@@ -99,16 +101,12 @@ function viewOf(creatorId: CreatorId, read: CopilotRead): CopilotDraftView {
         bubbles: [...read.draft.bubbles],
         createdAt: read.draft.createdAt.toISOString(),
         placedAt: read.draft.placedAt?.toISOString() ?? null,
+        translation: read.draft.translation,
       },
+      assist: copilotAssist(read.live, now, true),
     };
   if (read.writing) return { state: 'writing', conversation };
-  return {
-    state: 'none',
-    conversation,
-    ...(read.sent === null
-      ? {}
-      : { sent: { draftId: read.sent.draftId, sentAt: read.sent.at.toISOString() } }),
-  };
+  return { state: 'none', conversation, assist: copilotAssist(read.live, now, false) };
 }
 
 /**
@@ -160,13 +158,13 @@ export function createCopilotRoutes(deps: CopilotRouteDeps): FastifyPluginAsyncZ
         }
         if (other !== undefined) throw new CopilotCreatorConflict();
         assertCopilot(user, match.creatorId);
-        if (readsWhole(user, match.creatorId)) return viewOf(match.creatorId, match.read);
+        if (readsWhole(user, match.creatorId)) return viewOf(match.creatorId, match.read, new Date());
         // A chatter's opening goes to the audit log before he reads anything (§ 7), at most once per 15 minutes.
         const traced = await deps.reader.read(match.creatorId, conversation, {
           userId: UserIdSchema.parse(user.id),
           ip: request.ip,
         });
-        return traced === null ? { state: 'unknown' as const } : viewOf(match.creatorId, traced);
+        return traced === null ? { state: 'unknown' as const } : viewOf(match.creatorId, traced, new Date());
       },
     );
 

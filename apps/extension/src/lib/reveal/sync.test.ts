@@ -65,6 +65,18 @@ describe('captureSession', () => {
     expect(tap.reload).not.toHaveBeenCalled();
   });
 
+  // ADR 0147 § 3: the tab closed, or another came to the front, while the opening's sync listened.
+  it('stops listening at once, with nothing, when told to leave', async () => {
+    const tap = fakeTap();
+    const leave = new AbortController();
+    const captured = captureSession(tap, 7, 'model-a1', FRAME, TIMING, leave.signal);
+    tap.emit({ url: 'https://api.reveal.me/users/member-b2/notifications', requestHeaders: AUTH });
+    leave.abort();
+    expect(await captured).toBeNull();
+    expect(tap.listening()).toBe(false);
+    expect(await captureSession(fakeTap(), 7, null, FRAME, TIMING, leave.signal)).toBeNull();
+  });
+
   // 19/11: the tab named another creator first, and the CRM refused the session (409).
   it('keeps listening past another creator until the account’s model shows', async () => {
     const tap = fakeTap();

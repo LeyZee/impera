@@ -24,6 +24,7 @@ import { buildServer } from '../server';
 import { payInputReadsOf } from '../wiring/payroll';
 
 import { testConfig } from './support/config';
+import { fortnightDawn } from './support/paris';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
 /** Periods of 2025: they have ended. */
@@ -77,6 +78,28 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
     )
       .map((row) => row.id)
       .sort();
+
+  /** Pay's routes on a module of their own, with the reads or the clock a case needs, on the team's database. */
+  const payServer = async (deps: { reads?: ReturnType<typeof payInputReadsOf>; now?: () => Date }) => {
+    const module = createPayrollModule({
+      db: app.db.db,
+      adminDb: app.adminDb.db,
+      reads: deps.reads ?? payInputReadsOf(app.modules),
+      shiftFacts: app.modules.scheduling.pay.shiftFacts,
+      endedShifts: app.modules.scheduling.pay.endedShifts,
+      rateJobSince: null,
+      payouts: payoutGate,
+      afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
+      ...(deps.now !== undefined && { now: deps.now }),
+    });
+    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
+    return buildServer({
+      config,
+      logger: createLogger(config),
+      routes: [module.routes(app.requireRole, createRequireRecentLogin(app.auth, app.db.db))],
+      readiness: app.readiness,
+    });
+  };
 
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'));
@@ -293,21 +316,8 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
     await report(lea, Q10, 1_000, { account: team.beas });
     await recalculate(Q10);
     // A pay module that reads Anna only, as a validator who could not read Béa would.
-    const blind = createPayrollModule({
-      db: app.db.db,
-      adminDb: app.adminDb.db,
+    const blindServer = await payServer({
       reads: { ...payInputReadsOf(app.modules), creatorIds: () => Promise.resolve([anna]) },
-      shiftFacts: app.modules.scheduling.pay.shiftFacts,
-      rateJobSince: null,
-      payouts: payoutGate,
-      afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
-    });
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
-    const blindServer = await buildServer({
-      config,
-      logger: createLogger(config),
-      routes: [blind.routes(app.requireRole, createRequireRecentLogin(app.auth, app.db.db))],
-      readiness: app.readiness,
     });
     try {
       expect(refusal(await validate(owner, theo, Q10, blindServer))).toEqual(
@@ -439,9 +449,18 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
   });
 
   it('refuses a period that has not ended in the agency’s zone', async () => {
-    const current = payPeriodAt(new Date(), 'Europe/Paris');
+    // Pay's clock at 00:00:30 in Paris on the first day of the running fortnight: just begun, whatever the hour.
+    const dawn = fortnightDawn();
+    const current = payPeriodAt(dawn, 'Europe/Paris');
     await report(lea, current, 1_000);
     await recalculate(current);
-    expect(refusal(await validate(owner, lea, current)).code).toBe('commission_statement_open_conflict');
+    const atDawn = await payServer({ now: () => dawn });
+    try {
+      expect(refusal(await validate(owner, lea, current, atDawn)).code).toBe(
+        'commission_statement_open_conflict',
+      );
+    } finally {
+      await atDawn.close();
+    }
   });
 });

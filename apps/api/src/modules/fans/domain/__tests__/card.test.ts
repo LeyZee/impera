@@ -1,8 +1,16 @@
 import { MessageIdSchema, UserIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { cardOf, checkedValue, itemsOf, neverKept, planCardEdit, quoteOf } from '../card';
-import { FanCardValueInvalid, FanCardValueRefused } from '../errors';
+import {
+  cardOf,
+  checkedValue,
+  itemsOf,
+  neverKept,
+  planCardEdit,
+  planOtherRetraction,
+  quoteOf,
+} from '../card';
+import { FanCardOtherNotFound, FanCardValueInvalid, FanCardValueRefused } from '../errors';
 import { kycSlotsToLearn, planFacts, selectActiveFacts, type FactProposal, type StoredFact } from '../facts';
 
 const chatter = UserIdSchema.parse('00000000-0000-4000-8000-0000000000c1');
@@ -208,7 +216,15 @@ describe('the card as it reads (§ 3, § 5)', () => {
       'Jeux vidéo',
     ]);
     expect(card.others).toEqual([
-      { key: 'note_1', value: 'Aime qu’on le taquine', source: 'noted', observedAt: august },
+      {
+        factId: 'o-1',
+        key: 'note_1',
+        value: 'Aime qu’on le taquine',
+        source: 'noted',
+        observedAt: august,
+        notedBy: null,
+        notedByName: null,
+      },
     ]);
   });
 
@@ -233,5 +249,71 @@ describe('a cleared field', () => {
     const cleared = note({ value: '' });
     expect(selectActiveFacts([cleared], now)).toEqual([]);
     expect(kycSlotsToLearn(['location', 'age'], [cleared], now)).toEqual(['location', 'age']);
+  });
+});
+
+describe('« Autres »: its author, and « Retirer » (trou béant 17)', () => {
+  const handBack = note({
+    id: 'o-2',
+    category: 'operator_note',
+    key: 'note_2',
+    value: 'Ne jamais parler de sa femme',
+  });
+  const retired = UserIdSchema.parse('00000000-0000-4000-8000-0000000000c2');
+
+  it('names who left a note at the hand-back', () => {
+    expect(cardOf([handBack], [], now, new Map([[chatter, 'Léa']])).others).toEqual([
+      expect.objectContaining({ factId: 'o-2', source: 'noted', notedBy: chatter, notedByName: 'Léa' }),
+    ]);
+  });
+
+  it('a note left with its author is kept noted in their name, and a replay writes nothing', () => {
+    const written = planFacts(
+      [],
+      [proposal({ category: 'operator_note', key: 'note_2', notedBy: chatter })],
+      now,
+    );
+    expect(written.map(({ fact }) => [fact.kind, fact.notedBy])).toEqual([['noted', chatter]]);
+    const replay = planFacts(
+      [note({ id: 'o-2', category: 'operator_note', key: 'note_2', value: 'Grenoble', observedAt: august })],
+      [proposal({ category: 'operator_note', key: 'note_2', notedBy: chatter })],
+      now,
+    );
+    expect(replay).toEqual([]);
+  });
+
+  it('retracts a line with an empty line in the name of who retracts, that the AI no longer reads', () => {
+    const [write, ...rest] = planOtherRetraction('o-2', [handBack], retired, now);
+    expect(rest).toEqual([]);
+    expect(write).toEqual({
+      fact: {
+        category: 'operator_note',
+        key: 'note_2',
+        value: '',
+        kind: 'noted',
+        confidence: 1,
+        sourceMessageId: null,
+        observedAt: now,
+        expiresAt: null,
+        notedBy: retired,
+      },
+      supersedes: 'o-2',
+    });
+    const after = [
+      { ...handBack, supersededBy: 'r-1' },
+      { ...(write?.fact ?? handBack), id: 'r-1', supersededBy: null },
+    ];
+    expect(cardOf(after, [], now).others).toEqual([]);
+    expect(selectActiveFacts(after, now)).toEqual([]);
+  });
+
+  it('retracts a fact the AI kept off the fields, never a field nor a line retracted already', () => {
+    const job = stored({ id: 'x-1', category: 'interests', key: 'collection', value: 'Montres anciennes' });
+    expect(planOtherRetraction('x-1', [job], retired, now)[0]?.supersedes).toBe('x-1');
+    expect(() => planOtherRetraction('f-1', [stored()], retired, now)).toThrow(FanCardOtherNotFound);
+    expect(() => planOtherRetraction('o-2', [{ ...handBack, value: '' }], retired, now)).toThrow(
+      FanCardOtherNotFound,
+    );
+    expect(() => planOtherRetraction('absent', [handBack], retired, now)).toThrow(FanCardOtherNotFound);
   });
 });

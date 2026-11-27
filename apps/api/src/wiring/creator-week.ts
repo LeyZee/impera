@@ -1,5 +1,5 @@
 import { ContentRequestIdSchema, JOB_PAYLOADS } from '@impera/contracts';
-import { withAdmin, withCreatorAccount } from '@impera/db';
+import { withAdmin, withCreatorAccount, withTenantMember } from '@impera/db';
 
 import { defineTask } from '../jobs';
 import { weekArrivals, weekStockUnscoped } from '../modules/content-drops';
@@ -57,6 +57,9 @@ export function wireCreatorWeek(
       withCreatorAccount(shared.db, userId, (tx, creatorId) =>
         weekArrivals(tx, creatorId, window, requestIds),
       ),
+    // Her team's « Où elle en est »: the reader's own account and the team's RLS, the scope checked by the week's read.
+    teamArrivals: (creatorId, userId, window, requestIds) =>
+      withTenantMember(shared.db, creatorId, userId, (tx) => weekArrivals(tx, creatorId, window, requestIds)),
   };
   const module = createCreatorWeekModule({
     db: shared.db,

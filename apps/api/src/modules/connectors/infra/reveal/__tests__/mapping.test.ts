@@ -9,6 +9,7 @@ import {
   scriptsOf,
   sentStepsOf,
   snapshotOf,
+  totalsOf,
   transactionOf,
   vaultMediaOf,
   type OwnMessages,
@@ -491,5 +492,21 @@ describe('origin of a message (ADR 0110)', () => {
     const pattern = automationPattern('Prix (spécial) : 9.99 € ? *oui*');
     expect(pattern?.test('Prix (spécial) : 9.99 € ? *oui*')).toBe(true);
     expect(pattern?.test('Prix (spécial) : 9x99 € ? *oui*')).toBe(false);
+  });
+});
+
+describe('totalsOf', () => {
+  const line = { sentCount: 4, paidBundlesCount: 2, paidBundlesTotalAmount: 3000 };
+
+  it('keeps the three totals the platform gives for a step', () => {
+    expect(totalsOf(line)).toEqual({ totals: { sent: 4, purchased: 2, paidMinor: 3000 } });
+  });
+
+  it('sets a step’s totals aside when one is missing or out of range, never failing the import', () => {
+    expect(totalsOf(undefined)).toEqual({});
+    expect(totalsOf({ ...line, sentCount: undefined })).toEqual({});
+    expect(totalsOf({ ...line, paidBundlesTotalAmount: 2_147_483_648 })).toEqual({});
+    expect(totalsOf({ ...line, paidBundlesCount: -1 })).toEqual({});
+    expect(totalsOf({ ...line, sentCount: 1.5 })).toEqual({});
   });
 });

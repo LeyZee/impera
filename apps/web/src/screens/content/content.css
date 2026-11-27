@@ -125,12 +125,35 @@
   font-size: var(--nv-text-footnote);
   font-weight: 600;
 }
+.ct-redo {
+  display: grid;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 38%, transparent);
+}
+.ct-redo__tag {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+.ct-redo__why {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
 .ct-card__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--nv-space-2);
   margin-top: var(--nv-space-1);
+}
+/* A bare button's text on the card's edge, as its other lines (Design, 21/11). */
+.ct-card__actions > .nv-btn--plain:first-child {
+  margin-left: calc(-1 * var(--nv-space-4));
 }
 .ct-card__ask {
   font-size: var(--nv-text-footnote);
@@ -271,6 +294,18 @@
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
   text-align: right;
+}
+.ct-file__what {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ct-file__why {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
 }
 .ct-file__line--warn {
   color: var(--nv-warning);

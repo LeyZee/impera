@@ -352,9 +352,20 @@ describe('Paie › Primes et malus', () => {
       };
     };
     renderPage(IRIS_ME);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter une prime ou un malus' }));
+    // A manager adds a penalty, nothing else: a bonus and an adjustment are the owner's, and so is a bonus's cancel.
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un malus' }));
+    expect(screen.queryByRole('button', { name: 'Ajouter une prime ou un malus' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Annuler la prime/u })).toBeNull();
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
+    expect(
+      within(dialog)
+        .getAllByRole('radio')
+        .map((one) => one.textContent)
+        .slice(0, 2),
+    ).toEqual(['Malus', 'Malus en pourcentage']);
+    expect(within(dialog).queryByRole('radio', { name: 'Prime' })).toBeNull();
+    expect(within(dialog).queryByRole('radio', { name: 'Ajustement' })).toBeNull();
+    expect(within(dialog).getByRole('radio', { name: 'Malus' }).getAttribute('aria-checked')).toBe('true');
     expect(text(within(dialog).getByRole('heading'))).toBe('Ajouter un malus');
     const member = within(dialog).getByRole('combobox', { name: 'Pour' });
     expect(member.textContent).toBe('Choisir un membre');
@@ -419,9 +430,8 @@ describe('Paie › Primes et malus', () => {
       return Promise.resolve('ok');
     });
     renderPage(IRIS_ME);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter une prime ou un malus' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un malus' }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
     chooseValue(within(dialog).getByRole('combobox', { name: 'Pour' }), LOU.id);
     fireEvent.change(within(dialog).getByLabelText('Montant'), { target: { value: '20' } });
     fireEvent.change(within(dialog).getByLabelText('Motif'), {

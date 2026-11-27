@@ -162,6 +162,8 @@ export interface SheetFacts {
   readonly band: string | null;
   /** How many fields of his card wait for a chatter (ADR 0085 § 6); none when not read (a creator). */
   readonly toCheck?: number;
+  /** He is in the care mode (ADR 0088): said first, never « Rien à signaler » (Design, recette du 21/11). */
+  readonly care?: boolean;
 }
 
 /**
@@ -170,6 +172,13 @@ export interface SheetFacts {
  * « Rien à signaler », and nothing is said while they are read (recette 05/11, CHAT-03).
  */
 export function sheetSummary(facts: SheetFacts): { readonly urgent: string | null; readonly rest: string } {
+  const read = foldedSummary(facts);
+  if (facts.care !== true) return read;
+  const rest = read.rest === 'Rien à signaler' || read.rest === '' ? [] : [read.rest];
+  return { urgent: read.urgent, rest: ['Mode soin', ...rest].join(' · ') };
+}
+
+function foldedSummary(facts: SheetFacts): { readonly urgent: string | null; readonly rest: string } {
   const rest: string[] = [];
   const { flags } = facts;
   if (facts.toLearn !== null && facts.toLearn > 0) rest.push(`${String(facts.toLearn)} à apprendre`);

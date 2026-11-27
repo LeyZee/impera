@@ -34,6 +34,7 @@ import {
 
 import { useCreatorScope } from '@/agent/scope';
 import { creatorsSearch, sheetsFor, useRememberedSheet, type CreatorSheet } from '@/creators/search';
+import { GuidesBesideProvider } from '@/help/beside';
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
 import { useFollowDeviceZone } from '@/pwa/device-zone';
@@ -167,13 +168,15 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
           >
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
-          <Stage
-            key={current ?? 'none'}
-            pathname={pathname}
-            stage={main}
-            scoped={scopesCreators(user)}
-            home={rail.home}
-          />
+          <GuidesBesideProvider user={user} pathname={pathname}>
+            <Stage
+              key={current ?? 'none'}
+              pathname={pathname}
+              stage={main}
+              scoped={scopesCreators(user)}
+              home={rail.home}
+            />
+          </GuidesBesideProvider>
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
           <div className="nv-offline-region" role="status">
@@ -344,6 +347,11 @@ export function RailNav({
   }, [current]);
 
   const { chosen: scoped } = useCreatorScope();
+  const playIcon = (event: { readonly currentTarget: Element }): void => {
+    const icon = event.currentTarget.querySelector('svg');
+    if (icon !== null) playOnce(icon, 'is-playing');
+  };
+
   const link = (item: NavItem): JSX.Element => (
     <Link
       key={item.to}
@@ -363,6 +371,8 @@ export function RailNav({
       // only the exact address counts, so that /equipe/nexiste-pas lights nothing (NAV-01).
       activeOptions={{ exact: item.to !== current }}
       title={item.label}
+      // Every click plays the icon's gesture, on the tab already open too (Charles, 21/11).
+      onClick={playIcon}
     >
       <NavIcon name={item.icon} />
       <span className="nv-rail__label">{item.label}</span>
@@ -423,7 +433,8 @@ export function RailNav({
           aria-haspopup="dialog"
           aria-expanded={isMoreOpen}
           data-current={isInMore}
-          onClick={() => {
+          onClick={(event) => {
+            playIcon(event);
             setIsMoreOpen(!isMoreOpen);
           }}
         >

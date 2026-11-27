@@ -333,6 +333,20 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
   response_delay_minutes: PersonaSchema.shape.behavior.shape.response_delay_minutes,
 });
 
+/** The most examples of her messages per language, and the longest one. */
+export const LANGUAGE_EXAMPLES_MAX = 12;
+export const LANGUAGE_EXAMPLE_MAX_CHARS = 300;
+
+/**
+ * « Exemples de messages dans cette langue » (ADR 0168 § 3): her messages written in a language of hers, per language,
+ * given to the voice only when it writes in that language. Optional, empty by default; typed by the owner.
+ */
+export const LanguageExamplesSchema = z.partialRecord(
+  z.enum(LANGUAGES),
+  z.array(z.string().trim().min(1).max(LANGUAGE_EXAMPLE_MAX_CHARS)).max(LANGUAGE_EXAMPLES_MAX),
+);
+export type LanguageExamples = z.infer<typeof LanguageExamplesSchema>;
+
 /** « Réglages de l'agent » (ADR 0079 § 4): versioned with the sheet, applied by the code, never a question of hers. */
 export const PersonaAgentSettingsSchema = z.strictObject({
   strategies: PersonaStrategiesSchema,
@@ -342,6 +356,8 @@ export const PersonaAgentSettingsSchema = z.strictObject({
   rules: PersonaAgentRulesSchema,
   /** Her replies to price objections (ADR 0090 § 10): the owner's and the agent's, never hers nor a chatter's. */
   objection_replies: ObjectionRepliesSchema.default({}),
+  /** Her messages per language (ADR 0168 § 3): the voice reads those of the language it writes in, only. */
+  language_examples: LanguageExamplesSchema.default({}),
 });
 export type PersonaAgentSettings = z.infer<typeof PersonaAgentSettingsSchema>;
 
@@ -650,6 +666,7 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
       },
       rules: { ...v1.limits, emojis_forbidden: w?.emojis_forbidden ?? [] },
       objection_replies: {},
+      language_examples: {},
     },
   };
   return { persona, moved };

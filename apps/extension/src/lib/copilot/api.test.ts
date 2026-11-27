@@ -11,6 +11,7 @@ const CONVERSATION = {
   conversationId: id(2),
   fanId: id(3),
   switches: { fanCard: true, drafts: false },
+  standing: null,
 };
 
 function answer(status: number, body: unknown): Fetch {

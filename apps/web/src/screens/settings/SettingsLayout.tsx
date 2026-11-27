@@ -3,6 +3,7 @@ import { Link, Navigate, Outlet, useRouterState } from '@tanstack/react-router';
 import { Fragment, useState, useSyncExternalStore, type JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
+import { AgentsSection } from '@/settings/agents/AgentsSection';
 import { BudgetSection } from '@/settings/ai-budget/BudgetSection';
 import { aiBudgetQueryKey } from '@/settings/ai-budget/api';
 import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
@@ -51,12 +52,20 @@ const item = (to: ScreenPath): SettingsItem => ({ to, label: screenLabel(to) });
  */
 const GROUPS: readonly SettingsGroup[] = [
   { title: 'Connexions', items: [item('/reglages/ventes'), item('/reglages/telegram')] },
-  { title: 'IA', items: [item('/reglages/modeles-ia'), item('/reglages/consommation-ia')] },
+  {
+    title: 'IA',
+    items: [
+      item('/reglages/modeles-ia'),
+      item('/reglages/consommation-ia'),
+      item('/reglages/agents-connectes'),
+    ],
+  },
   { title: 'Argent', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
   {
     title: 'Protection',
     items: [item('/reglages/alertes'), item('/reglages/sauvegardes'), item('/reglages/securite')],
   },
+  { title: 'Aide', items: [item('/reglages/aide')] },
 ];
 
 /** The section Réglages opens on, on a computer: the list's first. */
@@ -202,6 +211,11 @@ export function AiModelsPage(): JSX.Element {
 /** Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge its credits. */
 export function AiUsagePage(): JSX.Element {
   return <AiUsageSection />;
+}
+
+/** Réglages › Agents connectés (ADR 0026 § 3, ADR 0105 § 1): the owner's agents, their tokens and what they read. */
+export function AgentsPage(): JSX.Element {
+  return <AgentsSection />;
 }
 
 /**

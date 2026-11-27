@@ -1,4 +1,5 @@
 import {
+  AgencyLinkHoursResponseSchema,
   AgencyRedirectLinkSchema,
   AgencyRedirectLinksResponseSchema,
   AgencyRedirectLinkWriteSchema,
@@ -6,6 +7,7 @@ import {
   CreatorIdSchema,
   CreatorLinksResponseSchema,
   DomainError,
+  LINK_HOURS_SHOWN,
   LINK_SERVICE_UNPROCESSABLE,
   limitKeyOf,
   LinkProposalsResponseSchema,
@@ -77,6 +79,20 @@ export function createRedirectLinkRoutes(
       async (request) => ({
         links: [...(await store.listForAgency(actorOf(request), request.params.creatorId))],
       }),
+    );
+
+    app.get(
+      '/creators/:creatorId/redirect-links/hours',
+      { ...agency, schema: { params: CreatorParams, response: { 200: AgencyLinkHoursResponseSchema } } },
+      async (request) => {
+        // From the start of the hour `LINK_HOURS_SHOWN` hours ago: the current hour is the last of the window.
+        const since = new Date(
+          Math.floor(Date.now() / 3_600_000) * 3_600_000 - (LINK_HOURS_SHOWN - 1) * 3_600_000,
+        );
+        return {
+          hours: [...(await store.hoursForAgency(actorOf(request), request.params.creatorId, since))],
+        };
+      },
     );
 
     app.post(
@@ -172,7 +188,7 @@ export function createRedirectLinkRoutes(
         if (!detected.ok) throw new RefusalError(LINK_SERVICE_UNPROCESSABLE, detected.error);
         const found = serviceLinkOf(link, detected.links);
         if (found === null) throw new RedirectLinkError('not_at_service');
-        return store.attach(actor, creatorId, linkId, found.ref);
+        return store.attach(actor, creatorId, linkId, link.url, found.ref);
       },
     );
 

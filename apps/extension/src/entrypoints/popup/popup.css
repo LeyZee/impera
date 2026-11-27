@@ -724,6 +724,25 @@ body {
 .pp-reveal__pupils {
   transform-box: view-box;
 }
+/*
+ * At rest, a glance now and then (Charles 21/11, « tac, tac »): the eyes look right, snap to the left, hold a beat and
+ * snap back. Steps, not a glide; every 5 s, never under reduced motion.
+ */
+.pp-reveal:not(.is-reading) .pp-reveal__pupils {
+  animation: pp-reveal-glance 5s steps(1, end) 1.2s infinite;
+}
+@keyframes pp-reveal-glance {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  72% {
+    transform: translateX(-4.6px);
+  }
+  84% {
+    transform: translateX(0);
+  }
+}
 /* While a session is on its way, the eyes read the tab, from one side to the other. */
 .pp-reveal.is-reading .pp-reveal__pupils {
   animation: pp-reveal-read 1.6s var(--nv-ease-out, ease-in-out) infinite;
@@ -749,7 +768,7 @@ body {
   .pp-skeleton,
   .pp-sync__dot.is-live,
   .pp-sync__gauge.is-fresh .nv-gauge__fill,
-  .pp-reveal.is-reading .pp-reveal__pupils {
+  .pp-reveal .pp-reveal__pupils {
     animation: none;
   }
   .pp-sync__check path {

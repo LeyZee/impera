@@ -1,4 +1,4 @@
-import type { KycSlot } from '@impera/contracts';
+import type { KycSlot, Language } from '@impera/contracts';
 import { loadPrompt, type LlmGateway } from '@impera/llm';
 
 import type { FansModule } from '../fans';
@@ -105,6 +105,8 @@ export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/scrip
 export { channelWriterPersona } from './infra/channel-persona';
 /** @public Her public panels and guards for a reply to an Instagram comment (ADR 0122 § 2), the `instagram-comments` port. */
 export { commentWriterPersona } from './infra/channel-persona';
+/** @public Her public panels and guards for the caption of a Reel (ADR 0164 § 9), the `instagram-captions` port. */
+export { captionWriterPersona } from './infra/channel-persona';
 /** @public Réglages › Alertes tries an alert on an example message (`POST /v1/alerts/test`, P4-01). */
 export { createAlertTester, type AlertTester } from './infra/alert-test';
 /** @public The persona module refuses a version whose sample replies a hard guard would block (P5-01). */
@@ -136,7 +138,13 @@ export interface DraftComposerStartOptions {
   /** His limits: nothing is written to a stopped fan, and a risk sets them itself (P3-02). */
   readonly fans?: Pick<
     FansModule,
-    'flags' | 'setFlag' | 'setFlagIfUnset' | 'clearFlag' | 'confirmDeclaredAge'
+    | 'flags'
+    | 'setFlag'
+    | 'setFlagIfUnset'
+    | 'clearFlag'
+    | 'confirmDeclaredAge'
+    | 'language'
+    | 'keepDetectedLanguage'
   >;
   /** A note of hers kept out of the prompt (it looked like an order): a chatter's real note would vanish unseen. */
   readonly onDroppedNotes?: DraftComposerDeps['onDroppedNotes'];
@@ -182,6 +190,8 @@ function composerFields(
       splitMessages: persona.splitMessages,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(examples.length > 0 && { voiceExamples: examples }),
+      ...(persona.spokenLanguages !== undefined && { spokenLanguages: persona.spokenLanguages }),
+      ...(persona.languageExamples !== undefined && { languageExamples: persona.languageExamples }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -278,6 +288,19 @@ export function startKycSlots(options: {
   const now = options.now ?? (() => new Date());
   return async (creatorId) =>
     (await activePersonaForModels(options.activePersona, creatorId, now()))?.kycSlots ?? null;
+}
+
+/**
+ * The languages her active persona speaks, in her order (ADR 0168), for his language on his card: empty without an
+ * active version. @public Wired by the composition root on the `fans` routes.
+ */
+export function startPersonaLanguages(options: {
+  readonly activePersona: ActivePersonaSource;
+  readonly now?: () => Date;
+}): (creatorId: string) => Promise<readonly Language[]> {
+  const now = options.now ?? (() => new Date());
+  return async (creatorId) =>
+    (await activePersonaForModels(options.activePersona, creatorId, now()))?.spokenLanguages ?? [];
 }
 
 /** The guards of a creator's approvals: her active version's hard limits, `null` without one (fail closed). */

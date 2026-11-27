@@ -1,6 +1,20 @@
 import { DROP_CATEGORY_LABELS, type CreatorOnDuty } from '@impera/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
+
+import { DecisionStack } from './DecisionStack';
+import { DayHero } from './day-hero/DayHero';
+import {
+  answerDecision,
+  askOtherIdeas,
+  DECISIONS_KEY,
+  putDecisionAside,
+  useDecisions,
+} from './decisions-api';
+import { HerFigures } from './her-figures/HerFigures';
+import { HerLimits } from './her-limits/HerLimits';
+import { ToAgencyCard } from './to-agency/ToAgencyCard';
 
 import { useCreatorOnDuty } from '@/scheduling/api';
 import '@/scheduling/scheduling.css';
@@ -17,6 +31,7 @@ import {
   untilOf,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { DayCard } from '@/screens/agenda/DayCard';
 import { Glance } from '@/screens/agenda/DayView';
 import { FreshnessNote } from '@/screens/agenda/FreshnessNote';
 import { useAgenda, useWithPending } from '@/screens/agenda/api';
@@ -47,8 +62,12 @@ export function CreatorTodayPage(): JSX.Element {
   const down = (day.isError && day.data === undefined) || onDuty.isError;
   return (
     <Page width="narrow">
-      <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée, et qui répond à tes fans." />
-      <div className="sc-today">
+      <PageHeader
+        eyebrow={longDay(today)}
+        title="Aujourd’hui"
+        lead="Ta journée d’abord, puis tes chiffres."
+      />
+      <div className="sc-today ag-scope">
         {down ? (
           <Failure
             onRetry={() => {
@@ -57,12 +76,57 @@ export function CreatorTodayPage(): JSX.Element {
             }}
           />
         ) : null}
-        {/* What she owes first: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
+        {/* The one big thing: all that is asked of her today, wherever it lives (Charles, 21/11). */}
+        <DayHero today={today} />
+        {/* What waits on her answer comes before the rest, one question at a time (ADR 0164). */}
+        <Decisions />
+        <DayCard />
+        {/* What she owes next: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
         <ToSend today={today} />
         <HerDay now={now} today={today} quiet={down} />
+        <HerFigures />
+        <HerLimits today={today} />
+        <ToAgencyCard />
         <Fans now={now} today={today} />
       </div>
     </Page>
+  );
+}
+
+/**
+ * « À décider » (ADR 0164): what the agency's code asks her about a content of hers. Nothing while nothing waits, or
+ * while the server is silent: the page says that once, on top.
+ */
+function Decisions(): JSX.Element | null {
+  const decisions = useDecisions();
+  const client = useQueryClient();
+  if (decisions.data === undefined) return null;
+  const again = (): Promise<void> => client.invalidateQueries({ queryKey: DECISIONS_KEY });
+  return (
+    <DecisionStack
+      decisions={decisions.data}
+      onAnswer={async (decision, key) => {
+        try {
+          return await answerDecision(decision.id, key);
+        } finally {
+          void again();
+        }
+      }}
+      onLater={async (decision) => {
+        try {
+          await putDecisionAside(decision.id);
+        } finally {
+          await again();
+        }
+      }}
+      onOtherIdeas={async (decision, hints, wish) => {
+        try {
+          return (await askOtherIdeas(decision.id, hints, wish)).answers;
+        } finally {
+          void again();
+        }
+      }}
+    />
   );
 }
 

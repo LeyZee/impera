@@ -2,6 +2,8 @@ import {
   AcceptCreatorWeekBodySchema,
   AgencyCreatorWeekSchema,
   CreatorDayQuerySchema,
+  CreatorProgressParamsSchema,
+  CreatorProgressSchema,
   CreatorWeekParamsSchema,
   CreatorWeekQuerySchema,
   CreatorWeekSchema,
@@ -21,7 +23,7 @@ import { z } from 'zod';
 
 import type { WeekAgendaStore } from '../../../creator-tasks';
 import { herDay } from '../../application/her-day';
-import { acceptWeek, herWeek } from '../../application/her-week';
+import { acceptWeek, creatorProgress, herWeek } from '../../application/her-week';
 import { validateWeek } from '../../application/validate';
 import { mondayOf } from '../../domain/plan';
 import type { AcceptSuggestion, DayTickStore, WeekDraftStore, WeekFactsReader } from '../../domain/ports';
@@ -34,7 +36,7 @@ export interface WeekRoutesDeps {
   readonly days: DayTickStore;
   readonly agenda: WeekAgendaStore;
   readonly accept: AcceptSuggestion;
-  readonly facts: Pick<WeekFactsReader, 'arrivals'>;
+  readonly facts: Pick<WeekFactsReader, 'arrivals' | 'teamArrivals'>;
   readonly requireRole: RequireRole;
   readonly clock?: () => Date;
 }
@@ -91,6 +93,27 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
         // A week not computed yet is a normal case, never a 404 the browser logs as an error (MAN-08, DS-14).
         return week ?? { week: null };
       },
+    );
+
+    // « Où elle en est » (trous béants n° 11): her seven days and her validated week, as she reads them.
+    app.get(
+      '/creators/:creatorId/progress',
+      {
+        preValidation: deps.requireRole('owner', 'operator'),
+        schema: {
+          params: CreatorProgressParamsSchema,
+          querystring: CreatorWeekQuerySchema,
+          response: { 200: CreatorProgressSchema },
+        },
+      },
+      (request) =>
+        creatorProgress(
+          { agenda: deps.agenda, facts: deps.facts, days: deps.days },
+          request.params.creatorId,
+          signedIn(request.user),
+          mondayOf(request.query.week),
+          clock(),
+        ),
     );
 
     app.post(

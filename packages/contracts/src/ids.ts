@@ -79,6 +79,10 @@ export type TeamMemberId = z.infer<typeof TeamMemberIdSchema>;
 export const TeamMemberNoteIdSchema = uuid.brand<'TeamMemberNoteId'>();
 export type TeamMemberNoteId = z.infer<typeof TeamMemberNoteIdSchema>;
 
+/** An announcement to the team (EQ-12): see `announcements.ts`. */
+export const AnnouncementIdSchema = uuid.brand<'AnnouncementId'>();
+export type AnnouncementId = z.infer<typeof AnnouncementIdSchema>;
+
 export const CommissionPresetIdSchema = uuid.brand<'CommissionPresetId'>();
 export type CommissionPresetId = z.infer<typeof CommissionPresetIdSchema>;
 
@@ -152,6 +156,10 @@ export type PaySaleDecisionId = z.infer<typeof PaySaleDecisionIdSchema>;
 /** A chatter's signal that a sale on their statement is not theirs, or its withdrawal (CRM-03 lot b4c, ADR 0050 § 5). */
 export const PaySaleSignalIdSchema = uuid.brand<'PaySaleSignalId'>();
 export type PaySaleSignalId = z.infer<typeof PaySaleSignalIdSchema>;
+
+/** A chatter's « J'ai été décisif sur une vente » on one of his shifts (ADR 0101 § 18, trou 15). */
+export const SaleClaimIdSchema = uuid.brand<'SaleClaimId'>();
+export type SaleClaimId = z.infer<typeof SaleClaimIdSchema>;
 
 /** What a validated statement carries to the next pay period instead of paying it (EQ-04). */
 export const CarryOverIdSchema = uuid.brand<'CarryOverId'>();
@@ -240,6 +248,10 @@ export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
 /** One thing to shoot on one of her shooting days (`creator_shoot_items`, ADR 0140 § 24). */
 export const ShootItemIdSchema = uuid.brand<'ShootItemId'>();
 export type ShootItemId = z.infer<typeof ShootItemIdSchema>;
+
+/** A question put to her (`creator_decisions`, ADR 0164). */
+export const CreatorDecisionIdSchema = uuid.brand<'CreatorDecisionId'>();
+export type CreatorDecisionId = z.infer<typeof CreatorDecisionIdSchema>;
 
 /** A drop of hers (`content_drops`, CR-06, ADR 0044 § 1 and ADR 0055): drawn by her phone, so that a replay adds nothing. */
 export const ContentDropIdSchema = uuid.brand<'ContentDropId'>();

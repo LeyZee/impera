@@ -43,9 +43,11 @@ import { confinePinnedGets } from './modules/connectors';
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
+import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './modules/creator-decisions';
 import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
+import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
 import type { NotificationsModule } from './modules/notifications';
@@ -81,10 +83,13 @@ import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
+import { wireCreatorLimits } from './wiring/creator-limits';
+import { wireCreatorMessages } from './wiring/creator-messages';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireCreatorWeek } from './wiring/creator-week';
 import { wireCustomOrders } from './wiring/custom-orders';
 import { wireFans } from './wiring/fans';
+import { wireInstagramCaptions } from './wiring/instagram-captions';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
 import { wireMedia, wireVaultDescriptions } from './wiring/media';
@@ -118,6 +123,10 @@ interface Modules {
   readonly creatorTasks: CreatorTasksModule;
   /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
   readonly creatorWeek: CreatorWeekModule;
+  /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
+  readonly creatorDecisions: CreatorDecisionsModule;
+  /** The captions proposed for her Reels (ADR 0164 § 9): its job, called by the tests. */
+  readonly instagramCaptions: InstagramCaptionsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -208,10 +217,10 @@ export interface AppOptions {
   readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
   readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
-  /** Tests plug a brain with a fixed identity here, for her native scripts (SC-04 lot c8); the app's gateway otherwise. */
-  readonly scriptIdentityBrain?: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
+  /** Tests only: another voice than the gateway's for the captions of her Reels (ADR 0164 § 9). */
+  readonly captionVoice?: Pick<LlmGateway, 'proposeCaptions'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -226,6 +235,8 @@ export interface AppOptions {
    * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
+  /** Tests only: the clock of « À décider » (ADR 0164), to pass a question's end. */
+  readonly decisionsClock?: () => Date;
   /**
    * Tests set the connectors' clock here, to make an unreachable register last a quarter of an hour (Telegram P3-12);
    * the system's otherwise.
@@ -408,6 +419,16 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
+  const creatorLimits = wireCreatorLimits(shared);
+  const creatorMessages = wireCreatorMessages(shared, { allCreatorIds: persona.allCreatorIds });
+  const creatorDecisions = createCreatorDecisionsModule({
+    db: shared.db,
+    requireRole: shared.requireRole,
+    // Late bound: the captions ask through this module's door, and this module asks them for other ideas.
+    otherIdeas: { caption: (ask) => instagramCaptions.module.otherIdeas(ask) },
+    notify: notifications.module.notify,
+    ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
+  });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,
@@ -426,6 +447,16 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
+    // Late bound: the captions read her described drops, and her drops tell them of each description.
+    onDescribed: (creatorId, mediaAssetId, correlationId) =>
+      instagramCaptions.module.described(creatorId, mediaAssetId, correlationId),
+  });
+  const instagramCaptions = wireInstagramCaptions(shared, {
+    gateway: options.captionVoice ?? llm.gateway,
+    contentDrops: contentDrops.module,
+    activePersona: persona.activePersona,
+    asking: creatorDecisions.asking,
+    ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
   });
   // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
   const vaultDescriptions = wireVaultDescriptions(shared, {
@@ -439,7 +470,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     contentDrops: contentDrops.module,
     connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
-    brain: options.scriptIdentityBrain ?? llm.gateway,
   });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
@@ -470,7 +500,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     activePersona: persona.activePersona,
     connectors: connectors.module,
     scripts: scripts.module,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.6.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
@@ -564,6 +594,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     notifications: notifications.module,
     creatorTasks: creatorTasks.module,
     creatorWeek: creatorWeek.module,
+    creatorDecisions,
+    instagramCaptions: instagramCaptions.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -587,6 +619,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...instagramCaptions.tasks,
     ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
@@ -706,15 +739,19 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         },
         // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
         async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+        agent.personaLanguagesOf,
       ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
       ...redirectLinks.routes,
+      ...creatorLimits.routes,
+      ...creatorMessages.routes,
       ...customOrders.routes,
       ...creatorTasks.routes,
       ...creatorWeek.routes,
+      creatorDecisions.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,
       ...contractors.routes,

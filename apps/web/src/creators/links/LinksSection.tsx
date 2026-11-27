@@ -12,7 +12,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
-import { detectLinks, linksQueryKey, saveRedirectLink, useRedirectLinks, type DetectOutcome } from './api';
+import { Chain } from './Chain';
+import {
+  attachLink,
+  detectLinks,
+  linksQueryKey,
+  saveRedirectLink,
+  useRedirectLinks,
+  type DetectOutcome,
+} from './api';
 import { linkProblems, middleCut, PLACEMENT_LABELS } from './model';
 
 import { fetchLinkService } from '@/settings/link-service/api';
@@ -80,6 +88,15 @@ export function LinksSection({
   const links = read.data;
   const refresh = (): Promise<void> => client.invalidateQueries({ queryKey: linksQueryKey(creatorId) });
 
+  async function attach(link: AgencyRedirectLink): Promise<void> {
+    setBusyId(link.id);
+    setFailed(null);
+    const outcome = await attachLink(creatorId, link.id);
+    if (outcome.kind === 'refused') setFailed(`« ${link.name} » : ${outcome.message}`);
+    await refresh();
+    setBusyId(null);
+  }
+
   async function toggle(link: AgencyRedirectLink, enabled: boolean): Promise<void> {
     setBusyId(link.id);
     setFailed(null);
@@ -132,6 +149,12 @@ export function LinksSection({
                 ) : (
                   <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
                 )}
+                {link.attached ? (
+                  <span className="cl-row__linked">
+                    <Chain />
+                    Relié
+                  </span>
+                ) : null}
                 {canEdit ? (
                   <>
                     <label className="cl-row__switch">
@@ -148,6 +171,21 @@ export function LinksSection({
                         }}
                       />
                     </label>
+                    {link.attached ? null : (
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--soft nv-btn--sm"
+                        disabled={busyId === link.id}
+                        aria-busy={busyId === link.id}
+                        aria-label={`Relier le lien « ${link.name} » pour lire ses clics chaque heure`}
+                        onClick={() => {
+                          void attach(link);
+                        }}
+                      >
+                        <Chain />
+                        Relier
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="nv-btn nv-btn--soft nv-btn--sm"

@@ -6,6 +6,7 @@ import {
   draftOf,
   eurosOfMinor,
   minorOfEuros,
+  newReadyVideo,
   newSupplement,
   percentOf,
   quoteSentence,
@@ -35,6 +36,28 @@ describe('what the owner types', () => {
   });
 });
 
+describe('the videos already shot', () => {
+  it('needs a name and a whole range, low end first, at least 1 €', () => {
+    const draft = draftOf(emptyCustomPriceGrid());
+    const line = newReadyVideo();
+    expect(line.id).toMatch(/^rv_[0-9a-f]{8}$/u);
+    const typed = { ...draft, readyVideos: [{ ...line, min: '0,50', max: '' }] };
+    expect([...readDraft(typed).problems.keys()]).toEqual([
+      `${line.id}.label`,
+      `${line.id}.min`,
+      `${line.id}.max`,
+    ]);
+    const upside = { ...draft, readyVideos: [{ ...line, label: 'Type A', min: '40', max: '20' }] };
+    expect(readDraft(upside).problems.get(`${line.id}.max`)).toBe('Au moins le bas de la fourchette.');
+    const good = { ...draft, readyVideos: [{ ...line, label: 'Type A', min: '20', max: '40' }] };
+    expect(readDraft(good).grid?.readyVideos).toEqual([
+      { id: line.id, label: 'Type A', offered: true, minMinor: 2_000, maxMinor: 4_000 },
+    ]);
+    expect(changesBetween(draft, good)).toBe(1);
+    expect(draftOf(readDraft(good).grid ?? emptyCustomPriceGrid()).readyVideos).toEqual(good.readyVideos);
+  });
+});
+
 describe('the draft of the grid', () => {
   it('gives back the grid it was made from, and counts no change', () => {
     const grid = emptyCustomPriceGrid();
@@ -50,6 +73,7 @@ describe('the draft of the grid', () => {
         line.format === 'call' ? { ...line, price: '3,5', minMinutes: '0' } : line,
       ),
       supplements: [...draft.supplements, { ...newSupplement(), percent: '20' }],
+      readyVideos: draft.readyVideos,
     };
     const read = readDraft(typed);
     expect(read.grid).toBeNull();

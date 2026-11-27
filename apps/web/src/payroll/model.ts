@@ -763,6 +763,16 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return 'Cette saisie existe déjà avec d’autres valeurs : recharge la page.';
     case 'pay_sale_signal_state_conflict':
       return 'Ce signalement a déjà changé : la liste est relue.';
+    case 'sale_claim_not_found':
+      return 'Ce signalement n’existe plus : la liste est relue.';
+    case 'sale_claim_conflict':
+      return 'Ce signalement est déjà parti avec un autre texte : recharge la page.';
+    case 'sale_claim_shift_conflict':
+      return 'Ce shift n’est plus signalable : il n’est pas à toi, pas fini, trop ancien ou déjà signalé.';
+    case 'sale_claims_too_many_conflict':
+      return 'Tu as déjà 3 signalements en attente : attends qu’un manager y réponde.';
+    case 'sale_claim_answered_conflict':
+      return 'Ce signalement a déjà sa réponse : la liste est relue.';
     case 'pay_rule_started_invalid':
       return period === null
         ? 'Cette quinzaine a commencé : une règle de paie part d’une quinzaine qui n’a pas commencé.'

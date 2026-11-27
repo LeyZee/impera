@@ -10,11 +10,13 @@ import {
   type DesireCurve,
   type MessageView,
   type SendingStop,
+  type ToTalk,
   type UserId,
 } from '@impera/contracts';
 
 import { ConversationForbidden, ConversationNotFound, CreatorForbidden } from '../domain/errors';
 import type { ConversationReader, Page, PageRequest } from '../domain/ports';
+import { toTalkOf } from '../domain/to-talk';
 
 /**
  * Who reads the conversations, bounded by creator ids (ADR 0026 § 1): what a route reads of the signed-in user, and
@@ -82,6 +84,8 @@ export interface ConversationReads {
     creatorId: CreatorId,
     page: PageRequest,
   ): Promise<Page<ConversationSummary>>;
+  /** « À qui parler maintenant », with the same rule as the list: only those he holds when he does not treat them all. */
+  toTalk(viewer: ConversationViewer, creatorId: CreatorId, now: Date): Promise<ToTalk>;
   get(
     viewer: ConversationViewer,
     creatorId: CreatorId,
@@ -157,6 +161,15 @@ export function createConversationReads(reader: ConversationReader): Conversatio
       const heldOnly = !treatsEveryConversation(viewer, creatorId);
       if (heldOnly && !viewer.routedCreators.includes(creatorId)) throw new CreatorForbidden();
       return reader.list(creatorId, page, { userId: viewer.userId, heldOnly });
+    },
+    async toTalk(viewer, creatorId, now) {
+      const heldOnly = !treatsEveryConversation(viewer, creatorId);
+      if (heldOnly && !viewer.routedCreators.includes(creatorId)) throw new CreatorForbidden();
+      const { candidates, tiers } = await reader.toTalkCandidates(creatorId, {
+        userId: viewer.userId,
+        heldOnly,
+      });
+      return toTalkOf(creatorId, candidates, tiers, now);
     },
     async get(viewer, creatorId, conversationId, origin) {
       const userId = await readerOn(viewer, creatorId, conversationId, origin);

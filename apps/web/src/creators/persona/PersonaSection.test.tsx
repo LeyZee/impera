@@ -305,7 +305,7 @@ describe('Créatrices › Persona, recette 28/10', () => {
     expect(
       screen.getByText('Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.'),
     ).toBeDefined();
-    // Nothing that says a save is possible here (MAN-04).
+    // Nothing to save, so no save button at all, nor the line about saving (trou béant 18).
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     expect(screen.queryByText(/Chaque enregistrement crée une nouvelle version/u)).toBeNull();
   });

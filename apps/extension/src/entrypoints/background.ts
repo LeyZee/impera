@@ -13,8 +13,11 @@ import { z } from 'zod';
 import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
 import { storedOrigin } from '../lib/crm-origin-store';
 import { fetchSyncableAccounts, sendSession } from '../lib/reveal/api';
+import { syncAtOpening, type AutoSynced } from '../lib/reveal/auto';
 import { REVEAL_API_PATTERN } from '../lib/reveal/capture';
 import {
+  GIVE_UP_AFTER_MS,
+  SETTLE_MS,
   captureSession,
   readReveal,
   sendHeld,
@@ -401,7 +404,11 @@ export default defineBackground(() => {
   const revealTap: RequestTap = {
     listen: (tabId, listener) => {
       const registered: Heard = (details) => {
-        listener({ url: details.url, requestHeaders: details.requestHeaders ?? [] });
+        listener({
+          url: details.url,
+          requestHeaders: details.requestHeaders ?? [],
+          frameId: details.frameId,
+        });
         return undefined;
       };
       heard.set(listener, registered);
@@ -422,6 +429,72 @@ export default defineBackground(() => {
 
   /** The session read and not sent yet: this worker's memory alone (lib/reveal/sync.ts). */
   const held = sessionHold();
+
+  /**
+   * The sync at the opening (ADR 0147 § 3): the main frame of that tab only, never reloaded, and the listening ends as
+   * soon as the tab closes or another one comes to the front.
+   */
+  async function syncAtOpeningOf(tabId: number): Promise<AutoSynced> {
+    const tab = await browser.tabs.get(tabId).catch(() => null);
+    if (tab?.active !== true || placeOf(tab.url, '') !== 'reveal') return { state: 'idle' };
+    const leave = new AbortController();
+    const left = (): void => {
+      leave.abort();
+    };
+    const activated = (info: { tabId: number }): void => {
+      if (info.tabId !== tabId) left();
+    };
+    const removed = (closed: number): void => {
+      if (closed === tabId) left();
+    };
+    browser.tabs.onActivated.addListener(activated);
+    browser.tabs.onRemoved.addListener(removed);
+    // Each listener of the capture, as registered: its main-frame filter, so that `stop` removes the right one.
+    const filtered = new Map<(request: SeenRequest) => void, (request: SeenRequest) => void>();
+    const mainFrame: RequestTap = {
+      listen: (id, listener) => {
+        const only = (request: SeenRequest): void => {
+          if (request.frameId === 0) listener(request);
+        };
+        filtered.set(listener, only);
+        revealTap.listen(id, only);
+      },
+      stop: (listener) => {
+        const only = filtered.get(listener);
+        filtered.delete(listener);
+        if (only !== undefined) revealTap.stop(only);
+      },
+      // Never at the opening: reloading stays the click's (§ 3).
+      reload: () => undefined,
+    };
+    try {
+      return await syncAtOpening({
+        readLink,
+        origin: crmOrigin,
+        accounts: fetchSyncableAccounts,
+        capture: (expected) =>
+          captureSession(
+            mainFrame,
+            tabId,
+            expected,
+            { userAgent: navigator.userAgent, now: () => new Date() },
+            { nudgeMs: GIVE_UP_AFTER_MS, waitMs: GIVE_UP_AFTER_MS, settleMs: SETTLE_MS },
+            leave.signal,
+          ),
+        send: (origin, token, accountId, session, trigger) =>
+          sendSession(origin, token, accountId, session, fetch, trigger),
+        markRevoked,
+        remember: async (accountId, modelId) => {
+          await browser.storage.local.set({
+            [MODELS_KEY]: { ...(await revealModels()), [accountId]: modelId },
+          });
+        },
+      });
+    } finally {
+      browser.tabs.onActivated.removeListener(activated);
+      browser.tabs.onRemoved.removeListener(removed);
+    }
+  }
 
   async function revealModels(): Promise<Readonly<Record<string, string>>> {
     const stored: Record<string, unknown> = await browser.storage.local.get(MODELS_KEY).catch(() => ({}));
@@ -539,6 +612,8 @@ export default defineBackground(() => {
       case 'popup/reveal-cancel':
         held.drop();
         return { ok: true };
+      case 'popup/reveal-auto':
+        return syncAtOpeningOf(message.tabId);
     }
   }
 

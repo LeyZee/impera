@@ -539,6 +539,7 @@ describe('a member’s signal on a sale (CRM-03 lot b4c)', () => {
           netMinor: -4_200,
           occurredAt: null,
           lateFrom: null,
+          saleOccurredAt: null,
           state: 'signalled',
           signal: { note: null, signalledAt: '2026-11-02T09:00:00.000Z' },
           given: null,

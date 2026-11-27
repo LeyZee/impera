@@ -1,6 +1,6 @@
 # 0109. L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre
 
-Statut : accepted (« ok 0109 » de Charles le 13/11/2026, 2 h 53 heure de Paris, fil « Bilan », sur les huit règles du § Décision ; redit le 14/11/2026, 12 h 36 heure de Paris, dans le chat du projet ; numéro attribué par le coordinateur ; demande de Design, fiche CHA-30)
+Statut : accepted (« ok 0109 » de Charles le 13/11/2026, 2 h 53 heure de Paris, fil « Bilan », sur les huit règles du § Décision ; redit le 14/11/2026, 12 h 36 heure de Paris, dans le chat du projet ; numéro attribué par le coordinateur ; demande de Design, fiche CHA-30). Amendée le 21/11/2026 (§ 9 à 13 : une note sur le fan depuis l'extension, choix de Charles sur carte)
 Date : 2026-11-14
 Précise : l'ADR 0066 § 7 (l'extension écrit avec la liaison par personne, jamais avec le cookie du CRM), l'ADR 0086 § 8 (le panneau copilote écrit par cette liaison), l'ADR 0085 (fiche du fan) et l'ADR 0025 (le chatteur ne traite sa créatrice que pendant son shift). Ne remplace rien.
 
@@ -56,3 +56,14 @@ Négatives, à surveiller :
 - **Ouvrir la route du CRM à l'origine de l'extension** : le cookie du CRM servirait depuis l'extension, ce que l'ADR 0066 § 7 interdit, et toute route du CRM deviendrait atteignable de la même façon.
 - **Donner la portée de la fiche à toutes les liaisons existantes** : un chatteur gagnerait une écriture sans geste de sa part (règle 5).
 - **Une portée plus large d'emblée** (notes du chatteur, liste des fans) : chaque geste en plus est une règle de plus à faire valider (règle 8).
+
+
+## Amendement du 21/11/2026 : une note sur le fan depuis l'extension
+
+Le rapport « trous béants » du 21/11 a montré que le panneau ne laisse rien noter au chatteur sur le fan, alors que le chatteur suivant et l'IA en ont besoin. Charles a choisi sur carte, le 21/11/2026, « Oui, une note depuis l'extension ». C'est la nouvelle règle que demande le § 8 ; elle ajoute un seul geste et ne change rien d'autre.
+
+9. **Un second geste : écrire une note sur le fan.** C'est la même note que celle de « Rendre la main » : une ligne de 300 caractères au plus, gardée comme fait `operator_note`. Le chatteur suivant la lit dans le panneau et dans le CRM. L'IA la lit comme une note d'opérateur, une donnée dans son bloc typé, jamais une instruction. Une note ne s'efface ni ne se modifie depuis l'extension : on en écrit une nouvelle.
+10. **Les mêmes bornes que la case de la fiche.** Mêmes droits que dans le CRM, par la même fonction. Seulement pendant le shift, sur les créatrices du shift (§ 3). Rien d'autre n'est ouvert (§ 4). Chaque note entre au journal avec la mention « depuis l'extension », sans sa valeur (§ 6).
+11. **Une portée à part, `operator_note`**, du nom de la note qu'elle permet d'écrire (`fan_note` est la note client d'une plateforme, autre chose). Elle est donnée aux liaisons créées après ce changement, si la personne peut écrire cette note dans le CRM. Les liaisons existantes ne la gagnent pas en silence (§ 5) : il faut relier l'extension à nouveau.
+12. **Une route sœur de plus** : `POST /v1/copilot/fans/:id/notes`, dans la liste fermée des routes, avec la liaison seule. Elle appelle la commande du CRM par l'`index.ts` de son module et ne rend que la note écrite.
+13. **Qui fait quoi** : Bilan, la portée, la route et le journal, relus par Sécurité ; Agent, la lecture par l'IA (déjà faite pour « Rendre la main ») ; Extension, le champ dans le panneau, avec les captures Nuit et Jour et l'avis de Design avant Charles.

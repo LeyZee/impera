@@ -2,6 +2,7 @@ import type { DraftView } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 
+import { CareBanner } from './CareBanner';
 import { useFanFlags } from './FanLimits';
 import { FanSheet } from './FanSheet';
 import {
@@ -37,6 +38,7 @@ import {
   READER_STATE_LABELS,
   situationOf,
   STOP_SITUATION,
+  withCare,
 } from './view';
 
 import { initialOf } from '@/lib/utils';
@@ -196,6 +198,7 @@ export function Reader({
           desire={detail.desire}
           canDecide={canDecide}
           canSetLimits={canDecide && !selfScope}
+          care={canDecide && detail.careSince !== null}
           layout="aside"
         />
       </aside>
@@ -245,14 +248,18 @@ function Loaded({
   const situation =
     stopAhead && drafts.state === 'awaiting_approval'
       ? STOP_SITUATION
-      : situationOf(
-          {
-            state: drafts.state,
-            lastInboundAt: detail.lastInboundAt,
-            lastOutboundAt: detail.lastOutboundAt,
-            heldBy: detail.heldBy,
-          },
-          selfScope,
+      : withCare(
+          situationOf(
+            {
+              state: drafts.state,
+              lastInboundAt: detail.lastInboundAt,
+              lastOutboundAt: detail.lastOutboundAt,
+              heldBy: detail.heldBy,
+            },
+            selfScope,
+          ),
+          // Never said to a creator, who never reads his care mode (ADR 0063).
+          canDecide && detail.careSince !== null,
         );
   // A chatter gives back his own hand, or a handoff nobody took; another person's he only reads (EQ-13).
   const canGiveBack = canDecide && !(selfScope && detail.heldBy === 'other');
@@ -393,6 +400,7 @@ function Loaded({
             desire={detail.desire}
             canDecide={canDecide}
             canSetLimits={canDecide && !selfScope}
+            care={canDecide && detail.careSince !== null}
           />
         )}
       </div>
@@ -415,6 +423,17 @@ function Loaded({
         <p className="tr-warn tr-line" role="status">
           {outdated}
         </p>
+      )}
+      {/* Never shown to a creator: her inbox is the agency's (ADR 0063). */}
+      {detail.careSince === null || !canDecide ? null : (
+        <CareBanner
+          creatorId={creatorId}
+          conversationId={detail.id}
+          since={detail.careSince}
+          // Whoever reads the whole creator: the owner, an active manager (the server checks it again).
+          canClose={!selfScope}
+          onClosed={settle}
+        />
       )}
       {fanWaits ? (
         <div className="tr-hand tr-hand--alert">

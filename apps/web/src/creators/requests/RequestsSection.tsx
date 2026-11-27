@@ -321,6 +321,11 @@ function RequestCard({
         <div className="rq-card__text">
           <p className="rq-reason">{request.reason}</p>
           {row.structureName === null ? null : <p className="rq-meta">Structure : {row.structureName}</p>}
+          {row.standing === 'redo' && request.redo !== null ? (
+            <p className="rq-note" data-tone="warn">
+              À refaire : {request.redo.sentence}
+            </p>
+          ) : null}
           {row.standing === 'refused' ? (
             <p className="rq-note">
               {request.refusalReason === null

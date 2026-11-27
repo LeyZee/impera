@@ -1,9 +1,11 @@
 import type {
+  CaptionProposals,
   CommentOutcome,
   CommentPromptInput,
   DropMediaDescription,
   FanCardRead,
   FanFlags,
+  Language,
   LlmPurpose,
   MediaDescription,
   Money,
@@ -113,7 +115,8 @@ export interface SenseInput {
 export interface DropSenseInput {
   readonly media: Exclude<SenseMedia, { readonly kind: 'audio' }>;
   readonly context: DropContext;
-  readonly trace?: CallTrace;
+  /** Always a `media` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** What the code knows of a drop, given to the model as data. */
@@ -196,8 +199,22 @@ export interface VoiceWaitingStep {
   readonly mediaSheet: string | null;
 }
 
+/**
+ * The language she writes in, decided by code (ADR 0168 § 2), never guessed by the model: a fixed instruction of the
+ * voice, with his language she does not speak (said once, her way) and her examples in that language, when she has some.
+ */
+export interface VoiceLanguage {
+  readonly reply: Language;
+  /** His language she does not speak, to tell him once; `'unknown'` when code cannot name it; `null`: nothing to say. */
+  readonly notSpoken: Language | 'unknown' | null;
+  /** Her messages written in `reply` (persona, `language_examples`): read only when she writes in that language. */
+  readonly examples?: readonly string[];
+}
+
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
+  /** The language of her answer (ADR 0168). Absent: the prompt says nothing more than her sheet. */
+  readonly language?: VoiceLanguage;
   /**
    * A reply of her bank to his price objection (ADR 0090 § 8), chosen by code: the voice says it in her words, in a
    * typed block after the brief. Absent, none.
@@ -267,7 +284,8 @@ export interface ChannelPostInput {
   readonly destination: string | null;
   /** The agency's advice for this post (§ 2.3); null: none. */
   readonly advice: string | null;
-  readonly trace?: CallTrace;
+  /** Always a `telegram` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /**
@@ -282,10 +300,44 @@ export interface InstagramCommentInput {
   readonly examples: readonly string[];
   /** Her most recent replies, so that she does not write the same one twice; empty: none. */
   readonly recentReplies: readonly string[];
+  /**
+   * Her real replies to the comments that read closest to this one, picked by the code (Charles, 26/11): in the
+   * message, not the system, so the cached system stays the same from one comment to the next; empty: none.
+   */
+  readonly nearExamples?: readonly { readonly comment: string; readonly reply: string }[];
+  /** The shape of her reply to the closest comment, decided by the code (`replyShapeOf`); absent: the prompt alone. */
+  readonly replyShape?: {
+    readonly emojis: 0 | 1 | 2;
+    readonly exclaims: boolean;
+    readonly words: number;
+  };
   readonly comment: CommentPromptInput;
   /** What the guards refused in a first reply: this call is the one rewrite (§ 3). Rule names only, never a text. */
   readonly refusedBy?: readonly string[];
   /** Always a comment call: its purpose is set by the gateway. */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
+}
+
+/** What three captions are written from (ADR 0164 § 9). Every text of hers or of a media is read as data. */
+export interface CaptionProposalsInput {
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  /** Her past captions that did well, the most recent first; empty: none. */
+  readonly examples: readonly string[];
+  /** What the vision AI saw in the video (ADR 0083 § 2). */
+  readonly mediaDescription: string;
+  readonly durationS: number | null;
+  /** The sentence she wrote with her drop; null: none. */
+  readonly sentence: string | null;
+  /** « D'autres idées »: the hints she touched, in French, and her own line; the captions she already read. */
+  readonly otherIdeas?: {
+    readonly hints: readonly string[];
+    readonly note: string;
+    readonly seen: readonly string[];
+  };
+  /** What the guard refused in a first answer: this call is the one rewrite. Rule names only, never a text. */
+  readonly refusedBy?: readonly string[];
+  /** Always a caption call: its purpose is set by the gateway. */
   readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
@@ -315,7 +367,8 @@ export interface ScriptSummaryInput {
   readonly scriptName: string;
   readonly moment: 'day' | 'night' | null;
   readonly steps: readonly ScriptSummaryStep[];
-  readonly trace?: CallTrace;
+  /** Always a `media` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** A step of a native script, as the identity is told it: its name, its offer's text and its media in order. */
@@ -334,7 +387,8 @@ interface ScriptIdentityStep {
 export interface ScriptIdentityInput {
   readonly scriptName: string;
   readonly steps: readonly ScriptIdentityStep[];
-  readonly trace?: CallTrace;
+  /** Always a `media` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** A message of the conversation the card is read in, numbered from 1 in the order they were written. */
@@ -424,6 +478,11 @@ export interface LlmGateway {
    * purpose `instagram_comment` and stopped by the daily cap. The guards run after, in the code.
    */
   instagramComment(input: InstagramCommentInput): Promise<Result<LlmSuccess<CommentOutcome>, LlmFailure>>;
+  /**
+   * Captions for a Reel she dropped, each in its own style (ADR 0164 § 9, prompt `voice/instagram-caption`): journaled
+   * under the purpose `instagram_caption` and stopped by the daily cap. The guard runs after, in the code.
+   */
+  proposeCaptions(input: CaptionProposalsInput): Promise<Result<LlmSuccess<CaptionProposals>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
   /** A native script's identity (SC-04 lot c8, prompt `brain/script-identity`), under the daily cap. */
@@ -474,6 +533,7 @@ export interface LlmGatewayDeps {
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
     readonly instagramComment?: PromptTemplate;
+    readonly instagramCaption?: PromptTemplate;
     readonly scriptSummary?: PromptTemplate;
     readonly scriptIdentity?: PromptTemplate;
     readonly fanCard?: PromptTemplate;

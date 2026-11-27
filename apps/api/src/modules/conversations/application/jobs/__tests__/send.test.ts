@@ -50,7 +50,8 @@ const draft: Draft = {
   createdAt: new Date('2026-11-20T20:59:00Z'),
   facts: [],
   scriptStep: null,
-  placed: null,
+  placedAt: null,
+  placedBy: null,
 };
 
 interface StatusChange {
@@ -78,6 +79,7 @@ function world(send: OutboundSender['sendText']) {
     messages: {
       insertIfNew: () => Promise.resolve(true),
       countForDraft: () => Promise.resolve(0),
+      textsForDraft: unused,
       history: unused,
       fanStats: unused,
     },

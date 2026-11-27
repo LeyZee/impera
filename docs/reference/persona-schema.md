@@ -45,7 +45,7 @@ Schéma Zod : `packages/contracts/src/persona.ts` (`PersonaSchema`, types `Perso
 
 La structure reprend la fiche créatrice d'OnlyChat, onglet par onglet (décision de Charles, 17/10/2026 : « OnlyChat sont les boss »), ajustée par la méthode de chatting de l'agence (`/mnt/project-files/chatting/methode-chatting.md`, §6, hors dépôt) : curseurs en heures, pas de réglage de négociation, surnoms en liste fermée. Le formulaire du dashboard et l'agent lisent le même schéma et les mêmes listes de valeurs, avec leurs libellés français : le dashboard n'a pas sa propre copie.
 
-Exemples : `personas/messalina/v0.0.0.yaml` (placeholders, la vraie persona est hors dépôt) et `personas/demo/v0.1.0.yaml` (créatrice fictive, pour les tests, les évals et la démonstration ; `v0.2.0.yaml` est la même rangée en blocs, P5-01 ; le playground et les évals lisent `v0.4.0.yaml`, au format 2).
+Exemples : `personas/messalina/v0.0.0.yaml` (placeholders, la vraie persona est hors dépôt) et `personas/demo/v0.1.0.yaml` (créatrice fictive, pour les tests, les évals et la démonstration ; `v0.2.0.yaml` est la même rangée en blocs, P5-01 ; le playground et les évals lisent `v0.6.0.yaml`, au format 2, la même que `v0.4.0.yaml` avec une voix moins moulée et une vie plus variée).
 
 | Section | Onglet OnlyChat | Champs | Rôle |
 |---|---|---|---|

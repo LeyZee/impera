@@ -260,6 +260,9 @@ describe('Moi › Trophées, the chatter’s rank and medals (recette 16/11, CHT
     renderPage(THEO_ME);
     const hero = await screen.findByRole('region', { name: 'Série de 10' });
     expect(hero.textContent).toContain('Rang Charmeur');
+    // A refund or a corrected report can take it back down: never « ne redescend jamais ».
+    expect(hero.textContent).toContain('redescend si une vente est remboursée ou un rapport corrigé');
+    expect(hero.textContent).not.toContain('ne redescend jamais');
     expect(hero.querySelector('[data-earned="true"]')).not.toBeNull();
   });
 

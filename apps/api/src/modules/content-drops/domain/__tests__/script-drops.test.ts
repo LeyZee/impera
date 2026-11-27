@@ -40,6 +40,7 @@ const fileIn = (slotKey: string, state: DropFileState): ContentDropFile =>
     state,
     refusal: state === 'refused' ? 'Cet emplacement attend au moins 5 s' : null,
     slotKey,
+    redo: null,
   });
 
 describe('« Envoyer le script » (SC-02 lot b)', () => {

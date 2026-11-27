@@ -1,7 +1,7 @@
 import type { Me, PayPeriod, PayrollPeriod, TeamMember } from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
-import { EntryForm, type EntryAdded } from './EntryForm';
+import { EntryForm, PENALTY_KINDS, type EntryAdded } from './EntryForm';
 import { PayNav } from './PayNav';
 import { useAgencySettingsDown, useCurrentPeriod, usePayNames, type PayMember } from './data';
 import { Chip, Empty, Loading, PeriodArrows, Swatch, Unreachable } from './parts';
@@ -55,6 +55,8 @@ export function EntriesPage({
   // The quinzaine the tabs carry (GES-02); without one, the one under way.
   const period = chosen ?? current;
   const me = { id: user.id, name: user.name };
+  // A bonus and an adjustment are the owner's alone; a manager adds and cancels a penalty.
+  const owner = user.role === 'owner';
   const entries = usePayEntries(period);
   const read = usePayPeriod(period);
   const before = usePayPeriod(period === null ? null : previousPeriod(period));
@@ -109,7 +111,11 @@ export function EntriesPage({
     <PageHeader
       eyebrow="Paie"
       title="Primes et malus"
-      lead="Une prime, un malus ou un ajustement, toujours avec son motif."
+      lead={
+        owner
+          ? 'Une prime, un malus ou un ajustement, toujours avec son motif.'
+          : 'Un malus, toujours avec son motif. Les primes et les ajustements sont donnés par le propriétaire.'
+      }
       tabs={<PayNav user={user} period={period} />}
       actions={
         <>
@@ -136,10 +142,10 @@ export function EntriesPage({
               className="nv-btn nv-btn--neon nv-btn--sm"
               onClick={() => {
                 setAdded(null);
-                setAdding('bonus');
+                setAdding(owner ? 'bonus' : 'fixed');
               }}
             >
-              Ajouter une prime ou un malus
+              {owner ? 'Ajouter une prime ou un malus' : 'Ajouter un malus'}
             </button>
           }
         >
@@ -175,6 +181,7 @@ export function EntriesPage({
                       row={row}
                       member={names.member(row.memberId)}
                       own={names.member(row.memberId).userId === user.id}
+                      mayCancel={owner || row.kind !== 'bonus'}
                       frozen={frozen(row, period, statements)}
                       taken={penaltyTaken(
                         row,
@@ -212,6 +219,7 @@ export function EntriesPage({
         <EntryDialog
           kind={adding}
           onKind={setAdding}
+          kinds={owner ? undefined : PENALTY_KINDS}
           members={eligible}
           pagePeriod={period}
           busy={addBusy}
@@ -234,6 +242,7 @@ export function EntriesPage({
 function EntryDialog({
   kind,
   onKind,
+  kinds,
   members,
   pagePeriod,
   busy,
@@ -243,6 +252,7 @@ function EntryDialog({
 }: {
   kind: EntryKind;
   onKind: (kind: EntryKind) => void;
+  kinds: readonly EntryKind[] | undefined;
   members: readonly TeamMember[];
   pagePeriod: PayPeriod | null;
   busy: boolean;
@@ -267,6 +277,7 @@ function EntryDialog({
       <EntryForm
         kind={kind}
         onKind={onKind}
+        {...(kinds === undefined ? {} : { kinds })}
         members={members}
         pagePeriod={pagePeriod}
         busy={busy}
@@ -303,6 +314,7 @@ function EntryItem({
   row,
   member,
   own,
+  mayCancel,
   frozen: isFrozen,
   taken,
   corrects,
@@ -317,6 +329,8 @@ function EntryItem({
   row: EntryRow;
   member: PayMember;
   own: boolean;
+  /** False for a manager on a bonus: only the owner cancels what the owner gave. */
+  mayCancel: boolean;
   frozen: boolean;
   /** What a penalty really takes in the period, read in the member's statement. */
   taken: string | null;
@@ -367,7 +381,7 @@ function EntryItem({
       <div className="py-entry__side">
         <span className="py-entry__amount nv-num">{row.amount}</span>
         {taken === null ? null : <small className="py-entry__taken nv-num">{taken}</small>}
-        {row.cancellable && !own && !isFrozen && !armed ? (
+        {row.cancellable && mayCancel && !own && !isFrozen && !armed ? (
           <button
             ref={trigger}
             type="button"

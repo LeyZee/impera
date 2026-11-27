@@ -400,4 +400,40 @@ describe('« Détecter ses liens » (INS-02)', () => {
     await screen.findByRole('list', { name: 'Liens de redirection' });
     expect(screen.queryByRole('button', { name: 'Détecter ses liens' })).toBeNull();
   });
+
+  it('lets the owner link a link to the service, says « Relié » to all once done, and nothing to a manager', async () => {
+    const writes = serve([STORY], () => new Response(JSON.stringify({ ...STORY, attached: true })));
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /^Relier le lien « Story du jour »/u }));
+    await waitFor(() => {
+      expect(writes).toEqual([
+        { method: 'POST', path: `/v1/creators/${CREATOR}/redirect-links/${STORY.id}/attach`, body: null },
+      ]);
+    });
+    cleanup();
+    serve([{ ...STORY, attached: true }, OLD]);
+    renderSection(false);
+    await screen.findByText('Relié');
+    expect(screen.queryByRole('button', { name: /^Relier/u })).toBeNull();
+  });
+
+  it('says why a link could not be linked, in the words of the screen', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: { code: 'redirect_link_unmatched_conflict', message: 'x', details: {}, requestId: 'r2' },
+          }),
+          {
+            status: 409,
+          },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /^Relier le lien « Story du jour »/u }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Aucun lien du service de redirection n’a cette adresse.',
+    );
+  });
 });

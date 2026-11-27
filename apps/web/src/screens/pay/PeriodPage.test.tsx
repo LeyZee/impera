@@ -864,6 +864,23 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('offers « Ajuster » to the owner alone: a manager reads a validated statement, and corrects nothing (SEC-15)', async () => {
+    const validated = statementOf(THEO, OCT2, { status: 'validated', canValidate: false });
+    periods[OCT2] = periodOf(OCT2, [validated], {
+      closing: {
+        period: OCT2,
+        exchangeRates: [],
+        closedBy: OWNER_USER,
+        closedAt: '2026-11-02T08:41:00.000Z',
+      },
+    });
+    renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(await screen.findByRole('button', { name: 'Théo' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByRole('button', { name: 'Fermer' }).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByRole('button', { name: 'Ajuster' })).toBeNull();
+  });
+
   it('adjusts a validated statement on the member’s next period to validate, which it says before sending', async () => {
     const validated = statementOf(THEO, OCT2, { status: 'validated', canValidate: false });
     periods[OCT2] = periodOf(OCT2, [validated], {

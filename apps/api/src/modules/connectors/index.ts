@@ -61,6 +61,10 @@ import { createSendJournal } from './infra/db/send-journal';
 import { createDrizzleTeamImportStore, invitationChatterLinks } from './infra/db/team-import-store';
 import { createDrizzleVaultStore } from './infra/db/vault-store';
 import { createAvatarRoutes } from './infra/http/avatar-routes';
+import {
+  createCreatorEarningsReader,
+  createCreatorEarningsRoutes,
+} from './infra/http/creator-earnings-routes';
 import { createLinkServiceRoutes, type LinkServiceRoutesOptions } from './infra/http/link-service-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
@@ -244,6 +248,8 @@ export interface ConnectorsModule {
   readonly vaultFiles: VaultFiles;
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  /** `/v1/creator-space/earnings` (CR-04), behind the guard given here (creator): her part, read in her account. */
+  readonly creatorEarningsRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /**
    * Every link of the agency's account at the redirect service (ADR 0120 § 3), read now, for « Détecter ses liens »:
    * for the owner alone, never stored here.
@@ -476,6 +482,8 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     profileBioOf: (creatorId) => accounts.profileBioOf(creatorId),
     vaultFiles: createVaultFiles({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
+    creatorEarningsRoutes: (guard) =>
+      createCreatorEarningsRoutes(createCreatorEarningsReader(deps.db), guard, () => clock.now()),
     linkServiceRoutes: (options) => createLinkServiceRoutes(linkService, options),
     detectedLinks: () => linkService.detectedLinks(),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),

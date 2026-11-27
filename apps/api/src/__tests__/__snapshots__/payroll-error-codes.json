@@ -79,6 +79,11 @@
   "penalty_not_found": 404,
   "request_invalid": 400,
   "role_forbidden": 403,
+  "sale_claim_answered_conflict": 409,
+  "sale_claim_conflict": 409,
+  "sale_claim_not_found": 404,
+  "sale_claim_shift_conflict": 409,
+  "sale_claims_too_many_conflict": 409,
   "session_unauthenticated": 401,
   "team_member_not_found": 404
 }

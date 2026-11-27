@@ -149,6 +149,7 @@ const GAP_TEXTS: Readonly<Record<PreparedScriptGap['code'], string>> = {
   media_missing: 'aucun média',
   media_absent: 'un média n’est plus dans son coffre',
   media_not_described: 'un média n’a pas de description validée',
+  media_offered: 'un média a déjà été offert, il ne se revend pas',
   branch_unsettled: 'dis quand prendre cette branche',
   branch_two_defaults: 'deux branches par défaut, une seule permise',
   branch_cheaper_on_spend: 'une condition de dépense mène à une branche moins chère que celle par défaut',

@@ -1,17 +1,18 @@
 import { FanIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { DONE_KEPT_MS, drawnKey, keepsDone, reconciledDone } from './redraw';
+import { DONE_KEPT_MS, drawnKey, keepsDone } from './redraw';
 import type { GestureDone, PanelScreen } from './view';
 
 const screen = (now: string, text = ''): PanelScreen => ({
   kind: 'conversation',
   fanName: 'marc_lyon',
+  money: null,
   standing: null,
   cardOn: true,
   opensCreators: false,
   card: { fanId: FanIdSchema.parse('0199f2a0-0000-7000-8000-000000000003'), fields: [], others: [] },
-  openGroups: new Set(['him']),
+  tab: 'him',
   newSince: null,
   draft: {
     kind: 'ready',
@@ -23,6 +24,9 @@ const screen = (now: string, text = ''): PanelScreen => ({
     reason: null,
     done: null,
   },
+  assist: null,
+  discoverOpen: false,
+  signalsOpen: false,
   now: new Date(now),
 });
 
@@ -33,7 +37,7 @@ describe('what makes the panel draw again', () => {
     expect(drawnKey(screen('2026-11-08T18:00:55Z'))).toBe(base);
     expect(drawnKey(screen('2026-11-08T18:01:00Z'))).not.toBe(base);
     expect(drawnKey(screen('2026-11-08T18:00:05Z', 'coucou toi'))).toBe(base);
-    expect(base).toContain('"openGroups":["him"]');
+    expect(base).toContain('"tab":"him"');
   });
 
   // EXT-23: « Refusé… » vanished in less than 5 s with the draft.
@@ -50,24 +54,5 @@ describe('what makes the panel draw again', () => {
     expect(keepsDone(done({}), 0, DONE_KEPT_MS)).toBe(false);
     expect(keepsDone(done({ outcome: 'placed', copied: 1 }), 0, DONE_KEPT_MS * 10)).toBe(true);
     expect(keepsDone(done({ outcome: 'placed', copied: 2 }), 0, DONE_KEPT_MS)).toBe(false);
-  });
-
-  // EXT-02: the panel never said « Envoyé » after the chatter sent the draft.
-  it('says « Envoyé » once the CRM matched what left to the draft placed, a while only', () => {
-    const placed: GestureDone = {
-      outcome: 'placed',
-      bubbles: ['a', 'b'],
-      copied: 1,
-      copyFailed: false,
-      sent: 'sent',
-    };
-    const sent = reconciledDone(placed, 'draft-1', 'draft-1');
-    expect(sent).toEqual({ ...placed, sent: 'reconciled', copied: 2 });
-    if (sent === null) return;
-    expect(keepsDone(sent, 0, DONE_KEPT_MS)).toBe(false);
-    expect(reconciledDone(sent, 'draft-1', 'draft-1')).toBeNull();
-    expect(reconciledDone(placed, 'draft-1', 'draft-2')).toBeNull();
-    expect(reconciledDone(placed, 'draft-1', undefined)).toBeNull();
-    expect(reconciledDone({ ...placed, outcome: 'rejected' }, 'draft-1', 'draft-1')).toBeNull();
   });
 });

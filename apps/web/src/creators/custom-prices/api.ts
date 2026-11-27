@@ -61,9 +61,10 @@ async function call(creatorId: CreatorId, init: RequestInit = {}): Promise<Custo
 
 export const customPricesQueryKey = (creatorId: CreatorId): readonly string[] => ['custom-prices', creatorId];
 
-export function useCustomPrices(creatorId: CreatorId): UseQueryResult<CustomPriceGridView> {
+export function useCustomPrices(creatorId: CreatorId, enabled = true): UseQueryResult<CustomPriceGridView> {
   return useQuery({
     queryKey: customPricesQueryKey(creatorId),
+    enabled,
     queryFn: () => call(creatorId),
     retry: 1,
     retryDelay: 400,

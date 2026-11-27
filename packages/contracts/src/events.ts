@@ -92,11 +92,10 @@ const draftPayload = z.object({
    */
   leavesFanWaiting: z.literal(true).optional(),
   /**
-   * On `draft_approved` and `draft_edited`: reconciled with what the chatter who placed it sent himself on the platform
-   * (ADR 0086 § 5). No send follows: the fan is answered, as by a message written on the platform, and the conversation
-   * is not put in human hands. Absent everywhere else.
+   * On `draft_approved` and `draft_edited`: a chatter sent it himself on the platform, from the copilot panel, and what
+   * left decided the verdict (ADR 0086 § 5). Nothing is sent after it; the message itself already answered the fan.
    */
-  reconciled: z.literal(true).optional(),
+  sentOnPlatform: z.literal(true).optional(),
   /**
    * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
    * on the fixed help bubble, given once per episode. Absent everywhere else.

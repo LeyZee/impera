@@ -1,4 +1,10 @@
-import { ConversationIdSchema, CreatorIdSchema, CurrentUserSchema, UserIdSchema } from '@impera/contracts';
+import {
+  ConversationIdSchema,
+  CreatorIdSchema,
+  CurrentUserSchema,
+  FanTiersSettingSchema,
+  UserIdSchema,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { ConversationReader } from '../../domain/ports';
@@ -30,6 +36,10 @@ function fakeReader(options: { held?: boolean; has?: boolean } = {}) {
     list: (_creatorId, _page, reader) => {
       calls.push(`list heldOnly=${String(reader.heldOnly)}`);
       return Promise.resolve(empty);
+    },
+    toTalkCandidates: (_creatorId, reader) => {
+      calls.push(`toTalk heldOnly=${String(reader.heldOnly)}`);
+      return Promise.resolve({ candidates: [], tiers: FanTiersSettingSchema.parse({}) });
     },
     isHeldBy: () => Promise.resolve(options.held ?? false),
     holderOf: unused,
@@ -103,6 +113,18 @@ describe('conversation reads (ADR 0026 § 1)', () => {
       createConversationReads(absent.reader).messages(chatter, HER, CONVERSATION, PAGE, ORIGIN),
     ).rejects.toMatchObject({ code: 'conversation_not_found' });
     expect(absent.calls).toEqual(['trace messages']);
+  });
+
+  it('gives « À qui parler » with the list’s rule: whole creator, his own when routed, nothing elsewhere', async () => {
+    const now = new Date('2026-11-21T14:00:00Z');
+    const { reader, calls } = fakeReader();
+    const reads = createConversationReads(reader);
+    await reads.toTalk(viewer({ shiftCreators: [HER] }), HER, now);
+    await reads.toTalk(viewer({ routedCreators: [HER] }), HER, now);
+    expect(calls).toEqual(['toTalk heldOnly=false', 'toTalk heldOnly=true']);
+    await expect(reads.toTalk(viewer({ wholeCreators: [HER] }), OTHER, now)).rejects.toMatchObject({
+      code: 'creator_forbidden',
+    });
   });
 
   it('lets a member in `self` list and read only what he holds', async () => {

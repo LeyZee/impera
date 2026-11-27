@@ -78,6 +78,7 @@ const NOTHING = {
   '/v1/payroll/invoices?acceptance=contested': { today: '2026-11-05', documents: [] },
   '/v1/payroll/contractors/documents?review=pending': { documents: [], more: false },
   '/v1/backups/status': BACKUP_OK,
+  '/v1/creator-messages/waiting': { messages: [] },
 };
 
 describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
@@ -145,7 +146,7 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(true);
     await screen.findByText('Dashboard');
     await vi.waitFor(() => {
-      expect(reads).toHaveLength(4);
+      expect(reads).toHaveLength(5);
     });
     expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
     cleanup();
@@ -178,6 +179,39 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
         .getByRole('link', { name: /^1 écart à trancher/u })
         .getAttribute('href'),
     ).toBe('/equipe/rapports');
-    expect(reads.filter((read) => !read.startsWith('/v1/scheduling/shift-reports'))).toEqual([]);
+    // What her creators wrote is read too: the reviewer is an active manager, who reads it without answering.
+    expect(reads.filter((read) => !read.startsWith('/v1/scheduling/shift-reports'))).toEqual([
+      '/v1/creator-messages/waiting',
+    ]);
+  });
+
+  it('puts what a creator wrote to the agency in « À faire », with the owner’s answer box (trous béants n° 13)', async () => {
+    const message = {
+      id: '0199f2a0-0000-4000-8000-000000000901',
+      creatorId: '0199f2a0-0000-7000-8000-000000000001',
+      creatorName: 'Nora Vidal',
+      kind: 'idea',
+      body: 'Une séance au bord du lac ?',
+      createdAt: '2026-11-04T09:00:00.000Z',
+      answer: null,
+      answeredAt: null,
+    };
+    serve({ ...NOTHING, '/v1/creator-messages/waiting': { messages: [message] } });
+    renderCard(true);
+    const card = (await screen.findByRole('heading', { name: 'À faire' })).closest('section');
+    if (card === null) throw new Error('No card');
+    expect(within(card).getByText('Une créatrice t’a écrit')).toBeTruthy();
+    expect(within(card).getByText('Nora Vidal')).toBeTruthy();
+    expect(within(card).getByText('Une idée')).toBeTruthy();
+    expect(within(card).getByText('Une séance au bord du lac ?')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'Répondre' }));
+    expect(within(card).getByRole('form', { name: 'Répondre à Nora Vidal' })).toBeTruthy();
+    cleanup();
+    serve({ '/v1/creator-messages/waiting': { messages: [message] } });
+    renderCard(false, true);
+    const read = (await screen.findByRole('heading', { name: 'À faire' })).closest('section');
+    if (read === null) throw new Error('No card');
+    expect(within(read).queryByRole('button', { name: 'Répondre' })).toBeNull();
+    expect(within(read).getByText('Le propriétaire répond.')).toBeTruthy();
   });
 });

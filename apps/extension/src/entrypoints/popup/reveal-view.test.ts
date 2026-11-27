@@ -259,6 +259,7 @@ describe('the Reveal session card', () => {
           expiresAt: new Date(2026, 10, 16, 9, 5).toISOString(),
           reconnectFirst: true,
           kept: false,
+          auto: false,
         },
       },
     );
@@ -268,6 +269,25 @@ describe('the Reveal session card', () => {
     expect(card?.querySelector('.pp-sync__advice')?.textContent).toBe(
       'Pour 24 h pleines : reconnecte-toi à Reveal, puis resynchronise.',
     );
+  });
+
+  it('says a session the extension sent alone at the opening, with the hour it holds until (ADR 0147 § 6)', () => {
+    const { card } = sync(
+      { state: 'ok', accounts: [LUNE] },
+      {
+        outcome: {
+          kind: 'synced',
+          accountId: ACCOUNT_A,
+          expiresAt: new Date(2026, 10, 16, 9, 5).toISOString(),
+          reconnectFirst: false,
+          kept: false,
+          auto: true,
+        },
+      },
+    );
+    expect(card?.querySelector('.pp-sync__word')?.textContent).toBe('Synchronisée à l’ouverture');
+    expect(card?.querySelector('.pp-sync__until')?.textContent).toBe('jusqu’à demain 9 h 05');
+    expect(card?.querySelector('.pp-sync__advice')).toBeNull();
   });
 
   it('puts a failure’s cause and gesture under its own account', () => {

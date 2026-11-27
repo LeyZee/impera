@@ -349,12 +349,19 @@
   color: var(--nv-neon-ink);
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--nv-neon) 55%, transparent));
 }
-/* Dashboard: the bars grow back. */
-.is-playing .nav-b1,
-.is-playing .nav-b2,
-.is-playing .nav-b3 {
+/*
+ * The gestures (Charles, 21/11): each icon moves as the thing it draws would. What falls speeds up (--_fall), what
+ * rises slows down (--_rise), what lands gives a little and comes back. One length for all, half again a morph.
+ */
+.nav-icon {
+  --_play: calc(var(--nv-dur-morph) * 1.5);
+  --_fall: cubic-bezier(0.5, 0, 1, 0.5);
+  --_rise: cubic-bezier(0, 0.5, 0.5, 1);
+}
+/* Dashboard: each bar shoots up past its height and settles, one after the other. */
+.is-playing :is(.nav-b1, .nav-b2, .nav-b3) {
   transform-origin: 50% 17px;
-  animation: nv-nav-grow var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-grow var(--_play) linear both;
 }
 .is-playing .nav-b2 {
   animation-delay: var(--nv-stagger);
@@ -364,172 +371,450 @@
 }
 @keyframes nv-nav-grow {
   0% {
-    transform: scaleY(0.2);
+    transform: scaleY(0.1);
+    animation-timing-function: var(--_rise);
+  }
+  45% {
+    transform: scaleY(1.22);
+    animation-timing-function: ease-in-out;
+  }
+  70% {
+    transform: scaleY(0.92);
+    animation-timing-function: ease-in-out;
+  }
+  88% {
+    transform: scaleY(1.04);
   }
 }
-/* Créatrices: her star turns in. */
+/* Créatrices: her star spins in, swells and settles. */
 .is-playing .nav-star {
   transform-origin: 18px 16px;
-  animation: nv-nav-spin var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-spin var(--_play) linear both;
 }
 @keyframes nv-nav-spin {
   0% {
-    transform: rotate(-90deg) scale(0.5);
+    transform: rotate(-180deg) scale(0);
+    animation-timing-function: var(--_rise);
   }
-  70% {
-    transform: rotate(12deg) scale(1.12);
+  55% {
+    transform: rotate(20deg) scale(1.35);
+    animation-timing-function: ease-in-out;
+  }
+  80% {
+    transform: rotate(-6deg) scale(0.92);
   }
 }
-/* Trafic: the two halves of the link close on each other. */
+/* Trafic: the two halves are pulled apart, snap shut past each other, and lock. */
 .is-playing .nav-link-a {
-  animation: nv-nav-link-a var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-link-a var(--_play) linear both;
 }
 .is-playing .nav-link-b {
-  animation: nv-nav-link-b var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-link-b var(--_play) linear both;
 }
 @keyframes nv-nav-link-a {
-  0% {
-    transform: translate(2.4px, -2.4px);
+  30% {
+    transform: translate(2.8px, -2.8px);
+    animation-timing-function: var(--_fall);
+  }
+  58% {
+    transform: translate(-0.9px, 0.9px);
+    animation-timing-function: var(--_rise);
+  }
+  80% {
+    transform: translate(0.4px, -0.4px);
   }
 }
 @keyframes nv-nav-link-b {
+  30% {
+    transform: translate(-2.8px, 2.8px);
+    animation-timing-function: var(--_fall);
+  }
+  58% {
+    transform: translate(0.9px, -0.9px);
+    animation-timing-function: var(--_rise);
+  }
+  80% {
+    transform: translate(-0.4px, 0.4px);
+  }
+}
+/* Entraîner: the dumbbell is dropped, hits the floor, bounces once and comes to rest; its weights rattle. */
+.is-playing .nav-lift {
+  transform-origin: 12px 17px;
+  animation: nv-nav-lift var(--_play) linear both;
+}
+@keyframes nv-nav-lift {
   0% {
-    transform: translate(-2.4px, 2.4px);
+    transform: translateY(-8px) rotate(-16deg);
+    animation-timing-function: var(--_fall);
+  }
+  32% {
+    transform: translateY(2.5px) rotate(0deg) scaleY(0.8);
+    animation-timing-function: var(--_rise);
+  }
+  54% {
+    transform: translateY(-4px) rotate(7deg) scaleY(1.05);
+    animation-timing-function: var(--_fall);
+  }
+  74% {
+    transform: translateY(1.2px) rotate(0deg) scaleY(0.92);
+    animation-timing-function: var(--_rise);
+  }
+  88% {
+    transform: translateY(-0.8px) rotate(-1.5deg);
+    animation-timing-function: var(--_fall);
   }
 }
-/* Entraîner: the ring closes on the bull's-eye, which lands. */
-.is-playing .nav-ring {
-  transform-origin: 12px 12px;
-  animation: nv-nav-close var(--nv-dur-morph) var(--nv-ease-spring) both;
+.is-playing .nav-w1 {
+  animation: nv-nav-w1 var(--_play) linear both;
 }
-.is-playing .nav-bull {
-  transform-origin: 12px 12px;
-  animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
+.is-playing .nav-w2 {
+  animation: nv-nav-w2 var(--_play) linear both;
 }
-@keyframes nv-nav-close {
-  0% {
-    transform: scale(1.6);
-    opacity: 0;
+@keyframes nv-nav-w1 {
+  32% {
+    transform: none;
+  }
+  42% {
+    transform: translateX(-1.3px);
+  }
+  56% {
+    transform: translateX(0.5px);
+  }
+  74% {
+    transform: none;
+  }
+  80% {
+    transform: translateX(-0.6px);
   }
 }
-@keyframes nv-nav-twinkle {
-  0% {
-    opacity: 0;
-    transform: scale(0);
+@keyframes nv-nav-w2 {
+  32% {
+    transform: none;
   }
-  60% {
-    opacity: 1;
-    transform: scale(1.35);
+  42% {
+    transform: translateX(1.3px);
   }
-  100% {
-    opacity: 1;
+  56% {
+    transform: translateX(-0.5px);
+  }
+  74% {
+    transform: none;
+  }
+  80% {
+    transform: translateX(0.6px);
   }
 }
-/* Suivi: his bubble pops, hers answers. */
+/* Suivi: his bubble is blown from its tail, swells and settles; hers answers a beat later. */
 .is-playing .nav-c1 {
   transform-origin: 5.5px 15.8px;
-  animation: nv-nav-pop var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-pop var(--_play) linear both;
 }
 .is-playing .nav-c2 {
   transform-origin: 18.5px 20.6px;
-  animation: nv-nav-pop var(--nv-dur-morph) calc(2 * var(--nv-stagger)) var(--nv-ease-spring) both;
+  animation: nv-nav-pop var(--_play) calc(3 * var(--nv-stagger)) linear both;
 }
 @keyframes nv-nav-pop {
   0% {
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(0.2);
+    animation-timing-function: var(--_rise);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.16) rotate(-4deg);
+    animation-timing-function: ease-in-out;
+  }
+  70% {
+    transform: scale(0.95) rotate(2deg);
+    animation-timing-function: ease-in-out;
+  }
+  88% {
+    transform: scale(1.02);
   }
 }
-/* Réglages: the gear turns one notch. */
+/* Réglages: the gear is wound back, turns a notch with its weight, overshoots and clicks in place. */
 .is-playing .nav-gear {
   transform-origin: 12px 12px;
-  animation: nv-nav-gear var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-gear var(--_play) linear both;
 }
 @keyframes nv-nav-gear {
-  70% {
-    transform: rotate(105deg);
+  0% {
+    animation-timing-function: ease-out;
+  }
+  22% {
+    transform: rotate(-22deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.2, 1);
+  }
+  68% {
+    transform: rotate(102deg);
+    animation-timing-function: ease-in-out;
+  }
+  86% {
+    transform: rotate(87deg);
   }
   100% {
     transform: rotate(90deg);
   }
 }
-
-/* Aujourd'hui: the rays turn an eighth and come out. */
-.is-playing .nav-rays {
-  transform-origin: 12px 12px;
-  animation: nv-nav-rays var(--nv-dur-morph) var(--nv-ease-spring) both;
+/* Aujourd'hui: the walls go up, the roof drops on them and gives, then the door swings open on its hinge. */
+.is-playing .nav-walls {
+  transform-origin: 12px 20.5px;
+  animation: nv-nav-walls var(--_play) linear both;
 }
-@keyframes nv-nav-rays {
+@keyframes nv-nav-walls {
   0% {
-    transform: rotate(-45deg) scale(0.6);
+    transform: scaleY(0.3);
+    animation-timing-function: var(--_rise);
+  }
+  30% {
+    transform: scaleY(1.06);
+  }
+  /* The roof lands: the walls give under it. */
+  48% {
+    transform: scaleY(0.9);
+    animation-timing-function: var(--_rise);
+  }
+  68% {
+    transform: scaleY(1.03);
+  }
+}
+.is-playing .nav-roof {
+  animation: nv-nav-roof var(--_play) linear both;
+}
+@keyframes nv-nav-roof {
+  0% {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(-7px);
+    animation-timing-function: var(--_fall);
+  }
+  46% {
+    transform: translateY(1.6px);
+    animation-timing-function: var(--_rise);
+  }
+  66% {
+    transform: translateY(-1.4px);
+    animation-timing-function: var(--_fall);
+  }
+  82% {
+    transform: translateY(0.4px);
+  }
+}
+.is-playing .nav-door {
+  transform-origin: 10px 20.5px;
+  animation: nv-nav-door var(--_play) linear both;
+}
+@keyframes nv-nav-door {
+  0%,
+  50% {
+    transform: scaleX(0);
+    opacity: 0;
+    animation-timing-function: var(--_rise);
+  }
+  78% {
+    transform: scaleX(1.12);
+    opacity: 1;
+  }
+}
+/* Planning: the two rings are clipped on, then the day drops into its square and bounces there. */
+.is-playing .nav-pins {
+  animation: nv-nav-pins var(--_play) linear both;
+}
+@keyframes nv-nav-pins {
+  0% {
+    transform: translateY(-5px);
+    opacity: 0;
+    animation-timing-function: var(--_fall);
+  }
+  28% {
+    transform: translateY(1px);
+    opacity: 1;
+    animation-timing-function: var(--_rise);
+  }
+  44% {
+    transform: translateY(-0.8px);
+  }
+  58% {
+    transform: none;
+  }
+}
+.is-playing .nav-day {
+  transform-origin: 15.5px 16.3px;
+  animation: nv-nav-drop var(--_play) linear both;
+}
+@keyframes nv-nav-drop {
+  0%,
+  22% {
+    transform: translateY(-10px);
     opacity: 0;
   }
-}
-/* Planning: the day drops into its square. */
-.is-playing .nav-day {
-  transform-origin: 15.5px 15px;
-  animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
-}
-/* Contenu: the drop's arrow goes up. */
-.is-playing .nav-up {
-  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-/* Équipe: the headset is put on, its mic swings in. */
-.is-playing .nav-set {
-  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-.is-playing .nav-mic {
-  transform-origin: 19px 19.5px;
-  animation: nv-nav-swing var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
-}
-@keyframes nv-nav-swing {
-  0% {
-    transform: rotate(-50deg);
+  26% {
+    transform: translateY(-9px);
+    opacity: 1;
+    animation-timing-function: var(--_fall);
+  }
+  54% {
+    transform: translateY(0.4px) scale(1.25, 0.72);
+    animation-timing-function: var(--_rise);
+  }
+  72% {
+    transform: translateY(-3px) scale(0.94, 1.08);
+    animation-timing-function: var(--_fall);
+  }
+  88% {
+    transform: translateY(0.2px) scale(1.1, 0.88);
   }
 }
-/* Several people: the three hop, one after the other. */
+/* Contenu: the sun comes up over the hill, then the drop's arrow is shot up and falls back in place. */
+.is-playing .nav-sun {
+  animation: nv-nav-sunrise var(--_play) linear both;
+}
+@keyframes nv-nav-sunrise {
+  0% {
+    transform: translate(-2px, 5px);
+    opacity: 0;
+    animation-timing-function: var(--_rise);
+  }
+  50% {
+    transform: translate(0.3px, -1px);
+    opacity: 1;
+  }
+  70% {
+    transform: none;
+  }
+}
+.is-playing .nav-up {
+  animation: nv-nav-shoot var(--_play) linear both;
+}
+@keyframes nv-nav-shoot {
+  0% {
+    animation-timing-function: ease-out;
+  }
+  /* Drawn back like a bow. */
+  24% {
+    transform: translateY(2.4px);
+    animation-timing-function: var(--_rise);
+  }
+  52% {
+    transform: translateY(-4.5px);
+    animation-timing-function: var(--_fall);
+  }
+  76% {
+    transform: translateY(0.8px);
+    animation-timing-function: var(--_rise);
+  }
+  90% {
+    transform: translateY(-0.5px);
+  }
+}
+/* Several people, and « Plus »: each one crouches, jumps and lands, one after the other. */
 .is-playing :is(.nav-t1, .nav-t2, .nav-t3) {
-  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
+  transform-origin: 50% 19.5px;
+  animation: nv-nav-hop var(--_play) linear both;
 }
-.is-playing .nav-t2 {
-  animation-delay: var(--nv-stagger);
+.is-playing :is(.nav-d1, .nav-d2, .nav-d3) {
+  transform-origin: 50% 13.2px;
+  animation: nv-nav-hop var(--_play) linear both;
 }
-.is-playing .nav-t3 {
+.is-playing :is(.nav-t2, .nav-d2) {
   animation-delay: calc(2 * var(--nv-stagger));
+}
+.is-playing :is(.nav-t3, .nav-d3) {
+  animation-delay: calc(4 * var(--nv-stagger));
 }
 @keyframes nv-nav-hop {
-  35% {
-    transform: translateY(-3px);
+  0% {
+    animation-timing-function: ease-out;
+  }
+  16% {
+    transform: scaleY(0.86);
+    animation-timing-function: var(--_rise);
+  }
+  42% {
+    transform: translateY(-4px) scaleY(1.06);
+    animation-timing-function: var(--_fall);
+  }
+  64% {
+    transform: scaleY(0.88);
+    animation-timing-function: var(--_rise);
+  }
+  80% {
+    transform: translateY(-1px);
+    animation-timing-function: var(--_fall);
   }
 }
-/* Paie and Commissions: the coin flips and lands face up. */
+/* Paie, Commissions and Ventes: the coin is tossed, turns over twice in the air and lands face up. */
 .is-playing .nav-coin {
   transform-origin: 12px 12px;
-  animation: nv-nav-flip var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-flip var(--_play) linear both;
 }
 @keyframes nv-nav-flip {
-  40% {
-    transform: scaleX(0.1);
+  0% {
+    animation-timing-function: var(--_rise);
+  }
+  18% {
+    transform: translateY(-3.5px) scaleX(0.08);
+  }
+  36% {
+    transform: translateY(-5.5px) scaleX(1);
+  }
+  54% {
+    transform: translateY(-4px) scaleX(0.08);
+    animation-timing-function: var(--_fall);
+  }
+  72% {
+    transform: translateY(1px) scale(1.06, 0.9);
+    animation-timing-function: var(--_rise);
+  }
+  86% {
+    transform: translateY(-0.8px);
   }
 }
-/* Moi: a nod. */
+/* Moi: a nod, down and back up a little too far; the shoulders follow. */
 .is-playing .nav-head {
-  animation: nv-nav-nod var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-nod var(--_play) linear both;
+}
+.is-playing .nav-body {
+  animation: nv-nav-shrug var(--_play) var(--nv-stagger) linear both;
 }
 @keyframes nv-nav-nod {
-  40% {
-    transform: translateY(1.5px);
+  0% {
+    animation-timing-function: ease-in-out;
+  }
+  26% {
+    transform: translateY(2.4px);
+    animation-timing-function: ease-in-out;
+  }
+  52% {
+    transform: translateY(-1.2px);
+    animation-timing-function: ease-in-out;
+  }
+  72% {
+    transform: translateY(1.2px);
+    animation-timing-function: ease-in-out;
+  }
+  88% {
+    transform: translateY(-0.3px);
   }
 }
-/* Plus: the dots bounce in a row. */
-.is-playing :is(.nav-d1, .nav-d2, .nav-d3) {
-  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-.is-playing .nav-d2 {
-  animation-delay: var(--nv-stagger);
-}
-.is-playing .nav-d3 {
-  animation-delay: calc(2 * var(--nv-stagger));
+@keyframes nv-nav-shrug {
+  0% {
+    animation-timing-function: ease-in-out;
+  }
+  30% {
+    transform: translateY(0.9px);
+    animation-timing-function: ease-in-out;
+  }
+  58% {
+    transform: translateY(-1.5px);
+    animation-timing-function: ease-in-out;
+  }
+  80% {
+    transform: translateY(0.3px);
+  }
 }
 
 /* ── Families of the rail (ADR 0024): a quiet heading, or a gap before a lone tab ── */
@@ -1565,6 +1850,11 @@
   .nv-stage:has(> .nv-install) .nv-page--fill {
     height: calc(100dvh - var(--nv-stage-top) - var(--nv-tabbar-room) - var(--nv-install-room, 0px));
   }
+  /* The card takes its height off the page's too: a page still as tall as the stage pushed its last lines under the
+     tab bar, by the card's height less the room kept for the bar (pages of Moi, 26/11). */
+  .nv-stage:has(> .nv-install) .nv-page:not(.nv-page--fill) {
+    min-height: calc(100% - var(--nv-install-room, 0px));
+  }
 }
 
 /*
@@ -2080,4 +2370,258 @@ label.nv-notif__row {
   stroke: var(--nv-neon-ink);
   stroke-width: 1.6;
   stroke-dasharray: 3 3;
+}
+
+/* « Tes notifications » (trou 9 du 21/11): how many first, a bar of the five families, then each line by day. */
+.nv-inbox [data-family='money'] {
+  --nv-inbox-hue: var(--nv-sale);
+}
+.nv-inbox [data-family='day'] {
+  --nv-inbox-hue: var(--nv-series-1);
+}
+.nv-inbox [data-family='team'] {
+  --nv-inbox-hue: var(--nv-series-2);
+}
+.nv-inbox [data-family='alert'] {
+  --nv-inbox-hue: var(--nv-series-3);
+}
+.nv-inbox [data-family='safety'] {
+  --nv-inbox-hue: var(--nv-danger);
+}
+.nv-inbox__head {
+  display: grid;
+  gap: 12px;
+}
+.nv-inbox__answer {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.nv-inbox__big {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-large-title);
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+  color: var(--nv-ink);
+}
+.nv-inbox__small {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-body);
+}
+.nv-inbox__bar {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--nv-fill-track);
+}
+.nv-inbox__seg {
+  flex-basis: 0;
+  min-width: 6px;
+  background: var(--nv-inbox-hue);
+  transform-origin: left center;
+  animation: nv-inbox-grow var(--nv-dur-slow) var(--nv-ease-out) backwards;
+  animation-delay: calc(var(--nv-i, 0) * 70ms);
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+@keyframes nv-inbox-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.nv-inbox__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-inbox__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__key[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--nv-inbox-hue) 22%, transparent);
+  color: var(--nv-ink);
+}
+.nv-inbox__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--nv-inbox-hue);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--nv-inbox-hue) 55%, transparent));
+}
+.nv-inbox__icon .nav-icon {
+  width: 18px;
+  height: 18px;
+}
+.nv-inbox__item .nv-inbox__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nv-inbox-hue) 14%, transparent);
+}
+/* One family lit (legend hovered, touched or focused): the others step back, bar and lines alike. */
+.nv-inbox__body[data-lit] .nv-inbox__seg,
+.nv-inbox__body[data-lit] .nv-inbox__key,
+.nv-inbox__body[data-lit] .nv-inbox__item {
+  opacity: 0.32;
+}
+.nv-inbox__body[data-lit='money'] [data-family='money'],
+.nv-inbox__body[data-lit='day'] [data-family='day'],
+.nv-inbox__body[data-lit='team'] [data-family='team'],
+.nv-inbox__body[data-lit='alert'] [data-family='alert'],
+.nv-inbox__body[data-lit='safety'] [data-family='safety'] {
+  opacity: 1;
+}
+.nv-inbox__list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-inbox__list li {
+  animation: nv-shell-rise var(--nv-dur-base) var(--nv-ease-out) backwards;
+  animation-delay: calc(var(--nv-i, 0) * 40ms);
+}
+.nv-inbox__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--nv-target-min, 44px);
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: var(--nv-ink);
+  text-decoration: none;
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__item:hover,
+.nv-inbox__item:focus-visible {
+  background: var(--nv-plate-hover, var(--nv-fill-soft));
+  transform: translateX(2px);
+}
+.nv-inbox__text {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.nv-inbox__title {
+  max-width: 100%;
+  text-wrap: pretty;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.nv-inbox__tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+}
+.nv-inbox__time {
+  flex: none;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+/* A line opens its page: a chevron says so, and slides on hover. */
+.nv-inbox__go {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    stroke var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__item:hover .nv-inbox__go,
+.nv-inbox__item:focus-visible .nv-inbox__go {
+  stroke: var(--nv-ink);
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-inbox__seg,
+  .nv-inbox__list li {
+    animation: none;
+  }
+  .nv-inbox__item:hover {
+    transform: none;
+  }
+}
+/* The eyebrow sits right above the answer, no empty line between (avis Design du 21/11). */
+.nv-inbox > .nv-panel__head {
+  padding-bottom: 0;
+}
+.nv-inbox .nv-inbox__head {
+  padding-top: var(--nv-space-2, 8px);
+}
+.nv-inbox__big {
+  text-wrap: balance;
+}
+@media (max-width: 640px) {
+  .nv-inbox__big {
+    font-size: var(--nv-text-metric);
+    line-height: var(--nv-text-metric-leading);
+  }
+}
+
+/* The screen's guides under its title (demande de Charles du 21/11) : one quiet line, « Pas à pas », on a row of
+   its own; opened, the guides, each folded. Everything keeps to the page's column (recette Design du 26/11): the line's
+   14 px inset and the body's are pulled back, here only, so « Pas à pas » stands under the title's first letter and
+   the guides take the width of the screen's cards; the names of the guides follow the words, the chevron after them. */
+.nv-page__guides {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  margin-top: 12px;
+}
+.nv-page__guides > summary {
+  margin-inline: -14px;
+}
+.nv-page__guides .nv-disclosure__sum {
+  flex: 0 1 auto;
+  text-align: left;
+}
+.nv-page__guides-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--nv-ink-faint);
+}
+.nv-page__guides-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.nv-page__guides-list.nv-disclosure__body {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 0;
 }

@@ -607,6 +607,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
           ...(scripted.step !== undefined && { scriptStep: scripted.step }),
+          ...(result.copilot !== undefined && { copilot: result.copilot }),
+          // Her French for the team (ADR 0168 § 9): kept beside the draft, never in what is sent nor in its key.
+          ...(result.translation !== undefined && { translation: result.translation }),
         });
         await appendEvent(
           tx,

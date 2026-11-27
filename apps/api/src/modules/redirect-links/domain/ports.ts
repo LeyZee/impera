@@ -1,4 +1,5 @@
 import type {
+  AgencyLinkHour,
   CreatorId,
   DetectedLink,
   LinkPlacement,
@@ -55,10 +56,18 @@ export interface RedirectLinkStore {
    * her creator, with its line in the audit log. `ref` is what the server just read at the service for this link's
    * address. Refused when that link of the service is already attached to another link, hers or not.
    */
+  /** Her links' hours since `since`, oldest first, for the owner and an active manager of her list. */
+  hoursForAgency(
+    actor: RedirectLinkActor,
+    creatorId: CreatorId,
+    since: Date,
+  ): Promise<readonly AgencyLinkHour[]>;
   attach(
     actor: RedirectLinkActor,
     creatorId: CreatorId,
     id: RedirectLinkId,
+    /** The address the service was read for: a link that no longer has it is not found. */
+    address: string,
     ref: LinkRef,
   ): Promise<StoredRedirectLink>;
 }

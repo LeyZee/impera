@@ -17,7 +17,9 @@ import {
   platformScriptFingerprint,
   platformScriptGaps,
   priceWarnings,
+  stepTotalsOf,
   type KnownPlatformScript,
+  type StepMediaState,
 } from '../platform-scripts';
 
 const reveal = (id: string) => ({ platform: 'reveal' as const, id });
@@ -196,13 +198,20 @@ describe('the price warnings of P6-01, never a refusal', () => {
 });
 
 describe('what keeps a native script from being proposable', () => {
-  const inVault = { kind: 'image' as const, inVault: true, imported: true, described: true };
-  const step = (
-    _platformIndex: number,
-    ...media: (
-      typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; imported: boolean; described: boolean }
-    )[]
-  ) => ({ discounted: false, media });
+  const inVault: StepMediaState = {
+    kind: 'image',
+    inVault: true,
+    imported: true,
+    described: true,
+    offered: false,
+  };
+  const one = (fields: Partial<StepMediaState>): StepMediaState => ({ ...inVault, ...fields });
+  const step = (_platformIndex: number, ...media: StepMediaState[]) => ({
+    discounted: false,
+    paid: true,
+    media,
+    sold: media,
+  });
 
   it('needs each media in the vault and described, and the identity validated', () => {
     expect(platformScriptGaps([step(0, inVault), step(1, inVault)], true, [])).toEqual([]);
@@ -210,8 +219,8 @@ describe('what keeps a native script from being proposable', () => {
     expect(
       platformScriptGaps(
         [
-          step(0, inVault, { kind: 'image', inVault: false, imported: false, described: false }),
-          step(1, { kind: 'image', inVault: true, imported: true, described: false }),
+          step(0, inVault, one({ kind: 'image', inVault: false, imported: false, described: false })),
+          step(1, one({ kind: 'image', inVault: true, imported: true, described: false })),
         ],
         true,
         [],
@@ -222,7 +231,7 @@ describe('what keeps a native script from being proposable', () => {
   it('never offers a script whose media is in the vault but not imported into the CRM (ADR 0145 § 5)', () => {
     expect(
       platformScriptGaps(
-        [step(0, inVault, { kind: 'image', inVault: true, imported: false, described: true })],
+        [step(0, inVault, one({ kind: 'image', inVault: true, imported: false, described: true }))],
         true,
         [],
       ),
@@ -230,7 +239,7 @@ describe('what keeps a native script from being proposable', () => {
     // A voice note too: the agent does not see what is not in the CRM.
     expect(
       platformScriptGaps(
-        [step(0, { kind: 'audio', inVault: true, imported: false, described: false })],
+        [step(0, one({ kind: 'audio', inVault: true, imported: false, described: false }))],
         true,
         [],
       ),
@@ -240,7 +249,7 @@ describe('what keeps a native script from being proposable', () => {
   it('never waits for a voice note to be described: the vision never hears one', () => {
     expect(
       platformScriptGaps(
-        [step(0, { kind: 'audio', inVault: true, imported: true, described: false })],
+        [step(0, one({ kind: 'audio', inVault: true, imported: true, described: false }))],
         true,
         [],
       ),
@@ -251,6 +260,25 @@ describe('what keeps a native script from being proposable', () => {
     expect(
       platformScriptGaps([step(0, inVault), { ...step(1, inVault), discounted: true }], true, []),
     ).toEqual(['step_discounted']);
+  });
+
+  it('never sells a media offered once: a paid step with one is a gap, an offered step or a preview is not (ADR 0145 § 2)', () => {
+    const offered = one({ offered: true });
+    expect(platformScriptGaps([step(0, inVault), step(1, offered)], true, [])).toEqual(['media_offered']);
+    // Sent for free again by a free step: nothing is sold.
+    expect(platformScriptGaps([{ ...step(0, offered), paid: false }], true, [])).toEqual([]);
+    // Shown before the purchase, not sold.
+    expect(
+      platformScriptGaps(
+        [{ discounted: false, paid: true, media: [inVault, offered], sold: [inVault] }],
+        true,
+        [],
+      ),
+    ).toEqual([]);
+    // Absent from the vault: `media_absent` says it, not this.
+    expect(
+      platformScriptGaps([step(0, one({ inVault: false, imported: false, offered: true }))], true, []),
+    ).toEqual(['media_absent']);
   });
 
   it('adds what its branches lack (ADR 0112)', () => {
@@ -317,5 +345,31 @@ describe('the descriptions of a script’s media, validated as shown (ADR 0030 �
 
   it('refuses one that is not shown for a media of the script now', () => {
     expect(descriptionRefusal(['d1', 'old'], shown)).toBe('stale');
+  });
+});
+
+describe('the platform’s totals of each step (ADR 0129 § 12)', () => {
+  /** Its first step counted by the platform, the others not. */
+  const counted = (id: string, sent: number, ref = `${id}_step_0`): PlatformScript => {
+    const base = script(id);
+    return {
+      ...base,
+      steps: base.steps.map((step, index) =>
+        index === 0 ? { ...step, ref: reveal(ref), totals: { sent, purchased: 1, paidMinor: 0 } } : step,
+      ),
+    };
+  };
+
+  it('never make a new version of the script: a send more is not a change', () => {
+    expect(platformScriptFingerprint(counted('s', 3))).toBe(platformScriptFingerprint(counted('s', 4)));
+    expect(platformScriptFingerprint(counted('s', 3))).toBe(platformScriptFingerprint(script('s')));
+  });
+
+  it('are kept a step once, only where the platform gave them, never for a ref the base cannot hold', () => {
+    const tooLong = counted('l', 2, 'x'.repeat(PLATFORM_SCRIPT_REF_MAX + 1));
+    // The same step listed twice (a read that moved): the last count.
+    expect(stepTotalsOf([counted('a', 5), counted('a', 7), tooLong])).toEqual([
+      { platformStepRef: 'a_step_0', sent: 7, purchased: 1, paidMinor: 0, currency: 'EUR' },
+    ]);
   });
 });

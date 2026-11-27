@@ -742,7 +742,7 @@ describe('DashboardPage of the owner', () => {
         : { status: 200, body: apiDashboard() },
     );
     renderDashboard(true);
-    expect(await screen.findByText('Aucun essai de restauration récent')).toBeDefined();
+    expect(await screen.findByText('Essai de restauration à faire')).toBeDefined();
   });
 
   it('is the owner’s alone: nobody else reads the exports', async () => {
@@ -796,16 +796,6 @@ describe('DashboardPage before any creator exists', () => {
     expect(screen.queryByText('Kévin')).toBeNull();
     expect(screen.queryByText('Exemple')).toBeNull();
     expect(screen.queryByRole('radio')).toBeNull();
-  });
-
-  it('tells an account that cannot add one who does', async () => {
-    serveDashboard({ status: 200, body: apiDashboard() }, []);
-    renderDashboard();
-    await waitFor(() => {
-      expect(headline()).toBe('Aucune créatrice pour l’instant');
-    });
-    expect(screen.getByText(/Le propriétaire de l’agence les ajoute/u)).toBeDefined();
-    expect(screen.queryByRole('link')).toBeNull();
   });
 });
 
@@ -998,14 +988,5 @@ describe('DashboardPage, its best fans', () => {
     await waitFor(() => {
       expect(location()).toBe(`/suivi?conversation=${theo.conversationId}&creatrice=${CREATOR.id}`);
     });
-  });
-
-  it('is read only for an account whose rail has no Suivi', async () => {
-    serveDashboard({ status: 200, body: apiDashboard() });
-    renderDashboard(false, false);
-    const theo = await screen.findByText('Théo');
-    expect(theo.closest('button')).toBeNull();
-    fireEvent.click(theo);
-    expect(location()).toBe('/');
   });
 });

@@ -2,6 +2,7 @@ import {
   FanCardViewSchema,
   type FanCardField,
   type FanCardView,
+  type RetractFanCardOtherBody,
   type SetFanCardFieldBody,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -61,6 +62,35 @@ export async function setFanCardField(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!response.ok) {
+      const answer: unknown = await response.json().catch(() => null);
+      return { ok: false, message: cardError(response.status, answer) };
+    }
+    return { ok: true, view: FanCardViewSchema.parse(await response.json()) };
+  } catch {
+    return { ok: false, message: cardError(0, null) };
+  }
+}
+
+/**
+ * `POST /v1/fans/:id/card/others/retract` (trou béant 17): a line of « Autres » leaves his card, in the reader's name.
+ * Nothing is deleted; the AI no longer reads it.
+ */
+export async function retractFanCardOther(
+  creatorId: string,
+  fanId: string,
+  body: RetractFanCardOtherBody,
+): Promise<CardChange> {
+  try {
+    const response = await fetch(
+      `/v1/fans/${encodeURIComponent(fanId)}/card/others/retract?${new URLSearchParams({ creatorId }).toString()}`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
     if (!response.ok) {
       const answer: unknown = await response.json().catch(() => null);
       return { ok: false, message: cardError(response.status, answer) };

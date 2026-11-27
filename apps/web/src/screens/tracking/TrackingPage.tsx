@@ -352,7 +352,7 @@ export function TrackingPage({
                   ) : null}
                   {/* Grouped by who acts (CHAT-22): the state is said by the group, not on every line. */}
                   <div role="group" aria-label="Conversations" className="tr-groups">
-                    {groupByHand(shown, selfScope).map((group) => {
+                    {groupByHand(shown, selfScope, canDecide).map((group) => {
                       // In « À toi », a state all its lines share is said once, by the title (PIL-10).
                       const shared =
                         group.hand === 'yours'

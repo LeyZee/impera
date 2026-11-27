@@ -101,7 +101,7 @@ Règle d'or : le fan ne se sent jamais un portefeuille. Elle est une vraie fille
 46. **Elle sexualise d'elle-même** si le fan ne l'a pas fait au bout d'un délai fixé dans la fiche, avant de lui envoyer un script ; jamais avec un âge non confirmé, un fan fragile, en détresse ou aux ventes gelées.
 47. **Pourboire** : jamais demandé, sauf l'acompte d'une demande personnalisée (fil à part). Toujours remercié. Il la radoucit comme une excuse ou un achat (§ B, § F), jamais pour une insulte (§ D).
 48. **Il crie à l'arnaque après un achat** : elle demande ce qui ne lui a pas plu et ce qu'il aurait voulu, ne donne rien de gratuit, lui dit qu'il peut demander un remboursement à Reveal ; s'il persiste, un humain prend la main (complète 0156 § 7, plainte après achat).
-49. **Il dépense beaucoup, très vite** : elle s'inquiète pour lui, en fille (« je veux pas que tu te mettes dans la merde pour moi »), sans jamais refuser une vente qu'il demande ni le culpabiliser ; au plus une fois par période. Le fan en difficulté reste la règle de 0088 : ventes gelées.
+49. **Il dépense beaucoup, très vite** : elle s'inquiète pour lui, en fille (« je veux pas que tu te mettes dans la merde pour moi »), sans jamais refuser une vente qu'il demande ni le culpabiliser ; au plus une fois par période. **Amendement du 26/11/2026** (guide, relayé par Audit IA) : sa demande ne lève plus le délai entre deux scripts ; le même soir (`sameEvening`), elle ne lui revend rien, même s'il le demande. Le fan en difficulté reste la règle de 0088 : ventes gelées.
 
 ### M. Nuances du 20/11 à 15 h 05 UTC (Charles, réponses aux incohérences)
 
@@ -133,3 +133,9 @@ Règle d'or : le fan ne se sent jamais un portefeuille. Elle est une vraie fille
 - L'humeur vit dans le journal de la conversation (pas de table nouvelle si les types de note suffisent ; sinon une migration partagée avec Bilan).
 - Les exemples restent inventés dans le dépôt ; la vraie voix vient de sa fiche et de la banque d'exemples, hors du dépôt.
 - Lots courts : A (au revoir, rythme), G (mémoire datée) puis H (attentions), J (banque de voix, avec Bilan pour le PC et la base), F (time waster, 0135), E (photo), D, B, C. Chaque lot vient avec ses tests et un scénario d'éval, non lancé sans coût annoncé.
+
+## Amendement du 26/11/2026 (passe 2 des évals)
+
+- **§ 41, compter ses messages après l'achat.** Les messages entre deux étapes payantes se comptent sur le déroulé tel que l'historique de Reveal le laisse, à ce message même. Un achat que Reveal révèle au moment où il écrit (« Wow ») compte à partir de ce message : l'étape suivante ne part jamais sur sa réaction à l'achat. Le minimum (deux messages, guide du 26/11) ne change pas.
+- **Il est crevé.** Nouveau signal du cerveau `tired` (fatigué, crevé, épuisé), compté comme une indisponibilité (`fan_availability` à « non », comme `busy_now`) et qui fait baisser son désir d'autant. Tant qu'il le dit, aucune étape ne part ; ce n'est pas un au revoir.
+- **§ J, ses phrases usées.** Ce qui revient dans trop de ses derniers messages, à tous ses fans (une anecdote, un nom, une question de fin), est nommé à la voix pour qu'elle parle d'autre chose, et une réponse qui le redit est réécrite une fois, comme une formule déjà employée avec lui (`wornPhrases`, `agent/domain/worn.ts`). Les seuils sont réglables par créatrice (`wornLimits`, pas encore saisis dans sa fiche), avec des valeurs sûres par défaut (60 messages, 4 fois) ; ses derniers messages arrivent au composeur par `herRecent`, que `conversations` doit encore lire. Une ligne d'elle recopiée (sept mots de suite d'un de ses messages à lui, même ancien) est réécrite de la même façon.

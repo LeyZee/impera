@@ -1,4 +1,5 @@
 import type {
+  AnswerSaleClaimBody,
   Bonus,
   BonusId,
   BonusTierSet,
@@ -12,12 +13,14 @@ import type {
   CreatePaySaleDecisionBody,
   CreatePaySaleSignalBody,
   CreatePenaltyBody,
+  CreateSaleClaimBody,
   DomainError,
   ExchangeRate,
   ExchangeRates,
   ForeignCurrency,
   HeldSales,
   MyFigures,
+  MySaleClaims,
   MySales,
   MySalesQuery,
   PayAdjustment,
@@ -39,6 +42,9 @@ import type {
   SalesToGive,
   Penalty,
   PenaltyId,
+  PendingSaleClaims,
+  SaleClaim,
+  SaleClaimId,
   TeamMemberId,
   TeamScope,
   UpdatePayrollSettingsBody,
@@ -167,6 +173,17 @@ export interface PayrollSaleSignalStore {
   /** The member's own figures (ADR 0104 § A), from their own statements only. */
   myFigures(userId: UserId): Promise<MyFigures>;
   signal(actor: Actor, body: CreatePaySaleSignalBody): Promise<Recorded<PaySaleSignal>>;
+}
+
+/**
+ * « J'ai été décisif sur une vente » (ADR 0101 §§ 18 to 22), as the reader (`withMember`): a member writes and
+ * withdraws his own, the owner and an active manager who is not its member answer it. A claim gives no sale.
+ */
+export interface PayrollSaleClaimStore {
+  mine(userId: UserId): Promise<MySaleClaims>;
+  pending(userId: UserId): Promise<PendingSaleClaims>;
+  create(actor: Actor, body: CreateSaleClaimBody): Promise<Recorded<SaleClaim>>;
+  answer(actor: Actor, claimId: SaleClaimId, body: AnswerSaleClaimBody): Promise<SaleClaim>;
 }
 
 /**

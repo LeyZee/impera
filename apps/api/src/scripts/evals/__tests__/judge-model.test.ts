@@ -45,4 +45,9 @@ describe('evalsConfig', () => {
       expect(config.roles.voice).toEqual(DEFAULT_LLM_CONFIG.roles.voice);
     }
   });
+
+  it('leaves a thinking judge room for its thinking and its scores (PC, 21/11)', () => {
+    // Mistral Large 4 spent up to 4 618 tokens thinking on a short conversation before writing a word.
+    expect(EVALS_JUDGE_MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(4_618 + 2_000);
+  });
 });
