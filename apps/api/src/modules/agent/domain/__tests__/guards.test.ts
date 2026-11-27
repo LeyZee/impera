@@ -435,7 +435,13 @@ describe('voice guards', () => {
         'belittling_name',
         'blocking',
       ]);
-    for (const bubble of ['on dirait celle d’un petit garçon', 'comme un petit garçon'])
+    for (const bubble of [
+      'on dirait celle d’un petit garçon',
+      'comme un petit garçon',
+      't’as un corps de petit garçon',
+      'tes mains de petit garçon',
+      't’as des mains d’enfant',
+    ])
       expect(soft(bubble, { humiliationWanted: true }), bubble).toContainEqual([
         'minor_reference',
         'blocking',

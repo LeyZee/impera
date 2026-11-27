@@ -285,15 +285,17 @@ describe('permitted phrases that must always pass, output guards', () => {
     ).toEqual([]);
   });
 
-  it.each(['vilain garçon va 😏', 't’es qu’un petit garçon', 'mon petit garçon, viens là'])(
-    'belittling_name never blocks « %s »',
-    (bubble) => {
-      expect(raised(bubble)).not.toContain('minor_reference');
-      expect(
-        checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter((v) => v.severity === 'blocking'),
-      ).toEqual([]);
-    },
-  );
+  it.each([
+    'vilain garçon va 😏',
+    't’es qu’un petit garçon',
+    'mon petit garçon, viens là',
+    'ton corps me plaît, vilain garçon',
+  ])('belittling_name never blocks « %s »', (bubble) => {
+    expect(raised(bubble)).not.toContain('minor_reference');
+    expect(
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter((v) => v.severity === 'blocking'),
+    ).toEqual([]);
+  });
 
   it.each([
     '*rougit*',

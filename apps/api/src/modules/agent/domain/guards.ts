@@ -188,7 +188,11 @@ const SCHOOL_OUTFIT =
 // game when his desire map holds humiliation. Never a body compared to a child's (« on dirait celle d'un petit
 // garçon », « comme un petit garçon »), never a role where he is a child: both stay `minor_reference`.
 const BOY_NAME =
-  /(?<!\b(celle|celui|ceux|celles|taille|l'?air|digne) d'? ?(une? )?|\bon dirait (une? )?|\bcomme (une? )?)\b(petit|vilain) garcon\b/g;
+  /(?<!\b(celle|celui|ceux|celles|taille|l'?air|digne) d'? ?(une? )?|\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix) (de|d'?) ?(une? )?|\bon dirait (une? )?|\bcomme (une? )?)\b(petit|vilain) garcon\b/g;
+// His body, or a part of it, compared to a child's (Sécurité, #1054): « t'as un corps de petit garçon », « des mains
+// d'enfant ». Blocking, a `minor_reference`, whatever his desire map.
+const CHILD_BODY =
+  /\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix) (de|d'?) ?(une? |petit |petite )?(petit garcon|petite fille|enfants?|gamine?s?|gosses?|fillettes?|ados?|adolescente?s?)\b/;
 const CHILD_ROLE_FOR_HIM =
   /\b(joue|jouer|joues|jouons|sois|seras|serais|deviens|devenir|redeviens|comme si t'? ?etais|fais|faire) (le |mon |un |ton |notre )?(petit|vilain) garcon\b|\b(maman|mommy|mummy|mama|mami)\b[^.!?]{0,40}\b(petit|vilain) garcon\b|\b(petit|vilain) garcon\b[^.!?]{0,40}\b(maman|mommy|mummy|mama|mami)\b/;
 
@@ -1149,7 +1153,7 @@ export function checkVoiceOutput(
       : meetingCommitment(bubble, context.fanLastMessage);
     if (committed !== undefined)
       violations.push({ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match: committed });
-    const compared = MINOR_COMPARISON.exec(withoutBoyName(text))?.[0];
+    const compared = MINOR_COMPARISON.exec(withoutBoyName(text))?.[0] ?? CHILD_BODY.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
     // « Petit garçon » said to him: soft, his game when his map holds humiliation; blocking once he is a child in a
