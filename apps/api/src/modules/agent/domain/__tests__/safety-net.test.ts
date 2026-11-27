@@ -98,6 +98,34 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns('je suis né en 2007', now)).toEqual([]);
   });
 
+  it('lets a trade cancel a school or a minor’s word, never an age (Sécurité, #1043)', () => {
+    for (const text of [
+      'je suis au lycée, je suis prof',
+      'je suis mineur de fond',
+      'au collège, je suis surveillant',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+    for (const text of ['je suis en seconde', 'j’ai 16 ans', 'je suis mineur', 'je suis prof, j’ai 16 ans'])
+      expect(safetySigns(text), text).toContain('minor_suspected');
+  });
+
+  it('lets a set phrase about death through, and still hears distress (Sécurité, #1043)', () => {
+    for (const text of [
+      'j’ai envie de mourir de rire',
+      'je vais me tuer au boulot demain',
+      'j’ai envie de crever tellement t’es belle',
+      'je crève de chaud',
+    ])
+      expect(safetySigns(text), text).not.toContain('self_harm');
+    for (const text of [
+      'j’ai envie de me tuer',
+      'je veux en finir',
+      'je veux mourir',
+      'je meurs de rire mais je veux en finir',
+    ])
+      expect(safetySigns(text), text).toContain('self_harm');
+  });
+
   it('says both, the minor first, when he says both', () => {
     expect(safetySigns('j’ai 15 ans et je veux mourir')).toEqual(['minor_suspected', 'self_harm']);
   });

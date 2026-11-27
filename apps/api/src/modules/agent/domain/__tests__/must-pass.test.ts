@@ -225,6 +225,8 @@ describe('permitted phrases that must always pass, input nets', () => {
     'quand j’étais petit j’adorais la mer',
     't’étais comment enfant ?',
     'mon enfance à la campagne',
+    'je suis au lycée, je suis prof',
+    'je suis mineur de fond',
   ])('safetySigns finds no minor in « %s »', (text) => {
     expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).not.toContain('minor_suspected');
   });
@@ -236,6 +238,9 @@ describe('permitted phrases that must always pass, input nets', () => {
     'I’m dying to see you',
     'muoio dalla voglia di vederti',
     'me muero de ganas de verte',
+    'j’ai envie de mourir de rire',
+    'je vais me tuer au boulot demain',
+    'j’ai envie de crever tellement t’es belle',
   ])('safetySigns finds no distress in « %s »', (text) => {
     expect(safetySigns(text)).not.toContain('self_harm');
   });

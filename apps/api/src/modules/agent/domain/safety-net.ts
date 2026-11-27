@@ -39,7 +39,8 @@ const MINOR_AGE = [
 ];
 // He says he is a minor, in so many words.
 const MINOR_WORDS = [
-  /\b(?:je suis|j'?suis|chui) (?:encore )?mineure?\b/u,
+  // « Mineur de fond » is a trade.
+  /\b(?:je suis|j'?suis|chui) (?:encore )?mineure?\b(?! de fond| de charbon| dans)/u,
   /\b(?:je suis|j'?suis|chui) (?:encore )?(?:au college|en (?:6|5|4|3)e?me\b|en (?:sixieme|cinquieme|quatrieme|troisieme)\b|en seconde\b(?!\s+(?:position|place|fois|main|zone|chance|partie)))/u,
   /\bj(?:'| )?ai pas (?:encore )?18 ans\b/u,
   /\bpas encore majeure?\b/u,
@@ -66,6 +67,12 @@ function bornMinor(text: string, year: number): boolean {
   const born = /\bnee? en ((?:19|20)\d\d)\b/u.exec(text)?.[1];
   return born !== undefined && Number(born) >= year - 18 && Number(born) <= year;
 }
+// His trade at a school or a minor's word that is a trade: « je suis prof », « je bosse au lycée », « surveillant ».
+const HIS_TRADE =
+  /\b(?:je suis|j'?suis|jsuis|chui|je bosse|je travaille|je taffe)(?: (?:comme|en tant que))? (?:prof|professeur|professeure|enseignant|enseignante|surveillant|surveillante|cpe|proviseur|principal|principale|documentaliste|aed|instit|maitre|maitresse|agent|cuisinier|cuisiniere|infirmier|infirmiere)\b|\b(?:je bosse|je travaille|je taffe|j'?enseigne) (?:au|dans un|dans une|en) (?:lycee|college|ecole)\b/u;
+// Set phrases that name death or harm without meaning it.
+const SET_PHRASES =
+  /\b(?:mourir|crever|me tuer|creve|meurs) (?:de (?:rire|chaud|faim|fatigue|froid|soif|honte|envie)|au (?:boulot|travail|taf|sport)|a la (?:salle|tache)|tellement)\b/gu;
 // He speaks of ending his life or hurting himself, in his own words.
 const SELF_HARM = [
   /\b(?:me|m') ?suicider\b/u,
@@ -182,15 +189,22 @@ export function safetySigns(fanText: string, now: Date = new Date()): SafetySign
   const text = normalise(fanText);
   const signs: SafetySign[] = [];
   const his = clausesOfHis(text);
+  // A trade said in the same message cancels a school or a minor's word (Sécurité, #1043): « je suis au lycée, je
+  // suis prof ». An age under 18 still counts.
+  const atWork = HIS_TRADE.test(text);
   if (
-    [...MINOR_AGE, ...MINOR_WORDS].some((pattern) => pattern.test(text)) ||
-    his.some(
-      (clause) =>
-        MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
-    )
+    MINOR_AGE.some((pattern) => pattern.test(text)) ||
+    (!atWork &&
+      (MINOR_WORDS.some((pattern) => pattern.test(text)) ||
+        his.some(
+          (clause) =>
+            MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
+        )))
   )
     signs.push('minor_suspected');
   if (minorFantasy(fanText)) signs.push('minor_fantasy');
-  if (SELF_HARM.some((pattern) => pattern.test(text))) signs.push('self_harm');
+  // Set phrases are no distress (Sécurité, #1043): « mourir de rire », « me tuer au boulot », « crever de chaud »,
+  // « crever tellement t'es belle ». Everything else still alerts.
+  if (SELF_HARM.some((pattern) => pattern.test(text.replace(SET_PHRASES, ' ')))) signs.push('self_harm');
   return signs;
 }
