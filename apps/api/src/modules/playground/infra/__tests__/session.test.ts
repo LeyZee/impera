@@ -420,7 +420,7 @@ describe('persona file', () => {
     const persona = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-17');
     expect(persona.creatorName).toBe('Elena');
     // Her pace of scripts and the heat they wait for come from her persona, for the policy (strategies.script_launch).
-    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75 });
+    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75, afterPurchaseHours: 48 });
     expect(persona.sexualizationLimits.minDesireToOpen).toBe(45);
     expect(persona.forbiddenTerms).toEqual([
       'Insultes',
@@ -468,7 +468,7 @@ describe('persona file', () => {
 
   it('gives the code her pace, her pet names and whether she splits her messages', () => {
     const persona = readPersonaFile(read('demo/v0.1.0.yaml'), 'X', '2026-10-17');
-    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75 });
+    expect(persona.offerLimits).toEqual({ cooldownHours: 12, minDesire: 75, afterPurchaseHours: 48 });
     expect(persona.splitMessages).toBe(true);
     expect(persona.petNames).toEqual(['Toi', 'Beau gosse', 'Mon grand']);
   });

@@ -42,6 +42,7 @@ export const GUIDES_BESIDE: Readonly<Record<string, Partial<Record<HelpAudience,
   '/entrainer/playground': { manager: ['corriger-l-ia'] },
 
   '/reglages/consommation-ia': { owner: ['surveiller-le-cout-de-l-ia'] },
+  '/reglages/agents-connectes': { owner: ['brancher-un-agent-ia'] },
   '/reglages/securite': { owner: ['ton-code-a-deux-facteurs'] },
   '/planning': { chatter: ['echanger-un-shift', 'demander-un-conge', 'tes-shifts-dans-ton-calendrier'] },
   '/commissions': { chatter: ['ta-commission-et-tes-factures'] },

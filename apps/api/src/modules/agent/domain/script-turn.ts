@@ -47,6 +47,18 @@ export interface ScriptTurnInput extends Omit<NextScriptStepInput, 'latest'> {
    * that failed): the run still follows his message and Reveal, but no step goes.
    */
   readonly mayAct: boolean;
+  /**
+   * When each of his messages was written, his last one included: the ones since his last purchase are counted on the
+   * run as Reveal's history leaves it, a purchase seen at this very message included (passe 2 du 26/11, « Wow » then
+   * the next step at once). Absent: `hisMessagesSinceBought` as given.
+   */
+  readonly hisMessagesAt?: readonly Date[];
+}
+
+/** His messages since the last paid step bought in the run, on the run as reconciled; undefined without one. */
+function messagesSinceBought(run: ScriptRun | null, at: readonly Date[]): number | undefined {
+  const boughtAt = run?.steps.findLast((step) => step.outcome === 'bought')?.at;
+  return boughtAt === undefined ? undefined : at.filter((sent) => sent >= boughtAt).length;
 }
 
 /** A run that changed at this message, with the events that say how. */
@@ -154,7 +166,15 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
     }
   }
   const latest = run === null || storedScript === null ? null : { run, script: storedScript };
-  const next = nextScriptStep({ ...input, latest });
+  const since =
+    input.hisMessagesAt === undefined
+      ? input.hisMessagesSinceBought
+      : messagesSinceBought(run, input.hisMessagesAt);
+  const next = nextScriptStep({
+    ...input,
+    latest,
+    ...(since !== undefined && { hisMessagesSinceBought: since }),
+  });
   // After he came, she gives him tenderness, never the step he left (ADR 0158 § 44).
   const decided: ScriptStepDecision =
     input.heCame === true && next.kind === 'end' ? { kind: 'end', status: next.status } : next;

@@ -72,8 +72,10 @@ scripts:
         outcome: sent
       - index: 1
         outcome: bought
+      # Bought just before his first message: only Reveal's history says so yet (`bought` below), as for a real fan,
+      # so the purchase is seen at that message (passe 2 du 26/11 : la dernière étape partait sur son premier message).
       - index: 2
-        outcome: bought
+        outcome: sent
     started_minutes_ago: 26
   history:
     - script: soiree-demo

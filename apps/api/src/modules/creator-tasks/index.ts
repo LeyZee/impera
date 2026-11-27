@@ -21,6 +21,7 @@ import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 export type {
   GuardedShoot,
   HerWeekFrame,
+  HerWeekRead,
   ShootGuardFault,
   ShootSuggestion,
   WeekAgendaStore,

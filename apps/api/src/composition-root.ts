@@ -82,6 +82,8 @@ import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
+import { wireCreatorLimits } from './wiring/creator-limits';
+import { wireCreatorMessages } from './wiring/creator-messages';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireCreatorWeek } from './wiring/creator-week';
 import { wireCustomOrders } from './wiring/custom-orders';
@@ -412,6 +414,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
+  const creatorLimits = wireCreatorLimits(shared);
+  const creatorMessages = wireCreatorMessages(shared, { allCreatorIds: persona.allCreatorIds });
   const creatorDecisions = createCreatorDecisionsModule({
     db: shared.db,
     requireRole: shared.requireRole,
@@ -494,7 +498,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     activePersona: persona.activePersona,
     connectors: connectors.module,
     scripts: scripts.module,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.5.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.6.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
@@ -733,12 +737,15 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         },
         // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
         async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+        agent.personaLanguagesOf,
       ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
       ...redirectLinks.routes,
+      ...creatorLimits.routes,
+      ...creatorMessages.routes,
       ...customOrders.routes,
       ...creatorTasks.routes,
       ...creatorWeek.routes,

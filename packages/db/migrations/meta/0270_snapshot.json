@@ -1,5 +1,5 @@
 {
-  "id": "390dae18-e733-4fc8-b41d-ab3e85df0691",
+  "id": "1a70179f-f05c-4a56-a600-5214e2d33ce5",
   "prevId": "ccf6c1f5-a726-4861-9ea3-f750a4cb34c4",
   "version": "7",
   "dialect": "postgresql",
@@ -1908,12 +1908,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "ready_video_id": {
-          "name": "ready_video_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2115,10 +2109,6 @@
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
           "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
-        },
-        "content_drops_ready_video_check": {
-          "name": "content_drops_ready_video_check",
-          "value": "\"content_drops\".\"ready_video_id\" is null or (\"content_drops\".\"category\" = 'sale_video' and \"content_drops\".\"ready_video_id\" ~ '^rv_[0-9a-f]{8}$')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
@@ -3863,6 +3853,296 @@
         "script_runs_ended_check": {
           "name": "script_runs_ended_check",
           "value": "(\"script_runs\".\"status\" = 'open') = (\"script_runs\".\"ended_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_absences": {
+      "name": "creator_absences",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_by": {
+          "name": "cancelled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "creator_absences_creator_ends_idx": {
+          "name": "creator_absences_creator_ends_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_absences_creator_id_creators_id_fk": {
+          "name": "creator_absences_creator_id_creators_id_fk",
+          "tableFrom": "creator_absences",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_absences_created_by_user_id_fk": {
+          "name": "creator_absences_created_by_user_id_fk",
+          "tableFrom": "creator_absences",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_absences_cancelled_by_user_id_fk": {
+          "name": "creator_absences_cancelled_by_user_id_fk",
+          "tableFrom": "creator_absences",
+          "tableTo": "user",
+          "columnsFrom": ["cancelled_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "tenant_read": {
+          "name": "tenant_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_absences\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_absences\".\"cancelled_at\" is null"
+        },
+        "creator_update": {
+          "name": "creator_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_absences\".\"cancelled_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "creator_absences_days_check": {
+          "name": "creator_absences_days_check",
+          "value": "\"creator_absences\".\"starts_on\" <= \"creator_absences\".\"ends_on\""
+        },
+        "creator_absences_span_check": {
+          "name": "creator_absences_span_check",
+          "value": "\"creator_absences\".\"ends_on\" - \"creator_absences\".\"starts_on\" < 60"
+        },
+        "creator_absences_note_check": {
+          "name": "creator_absences_note_check",
+          "value": "char_length(\"creator_absences\".\"note\") <= 200"
+        },
+        "creator_absences_cancel_check": {
+          "name": "creator_absences_cancel_check",
+          "value": "(\"creator_absences\".\"cancelled_at\" is null) = (\"creator_absences\".\"cancelled_by\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_stops": {
+      "name": "creator_stops",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "what": {
+          "name": "what",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "withdrawn_by": {
+          "name": "withdrawn_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "creator_stops_creator_idx": {
+          "name": "creator_stops_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_stops_creator_id_creators_id_fk": {
+          "name": "creator_stops_creator_id_creators_id_fk",
+          "tableFrom": "creator_stops",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_stops_created_by_user_id_fk": {
+          "name": "creator_stops_created_by_user_id_fk",
+          "tableFrom": "creator_stops",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_stops_withdrawn_by_user_id_fk": {
+          "name": "creator_stops_withdrawn_by_user_id_fk",
+          "tableFrom": "creator_stops",
+          "tableTo": "user",
+          "columnsFrom": ["withdrawn_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "tenant_read": {
+          "name": "tenant_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_stops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_stops\".\"withdrawn_at\" is null"
+        },
+        "creator_update": {
+          "name": "creator_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_stops\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "creator_stops_what_check": {
+          "name": "creator_stops_what_check",
+          "value": "char_length(\"creator_stops\".\"what\") between 1 and 200"
+        },
+        "creator_stops_withdraw_check": {
+          "name": "creator_stops_withdraw_check",
+          "value": "(\"creator_stops\".\"withdrawn_at\" is null) = (\"creator_stops\".\"withdrawn_by\" is null)"
         }
       },
       "isRLSEnabled": false

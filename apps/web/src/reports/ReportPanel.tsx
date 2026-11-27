@@ -9,6 +9,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX, type ReactNode } from 'react';
 
+import { FeedbackPanel } from './FeedbackPanel';
 import { useAppHold, type HoldResult } from './Hold';
 import {
   changeReport,
@@ -150,6 +151,8 @@ function titleOf(
   if (memberName !== undefined) return `Corriger le rapport de ${memberName}`;
   if (correcting) return 'Corriger mon rapport';
   const report = data === undefined ? null : reportOf(data.reports, data.shift.id);
+  // Sales read by the connector: the mini feedback, never a report (ADR 0050 § 10).
+  if (report === null && data?.rules?.earningsSource === 'detected') return 'Mon retour de fin de shift';
   if (report === null) return 'Faire mon rapport';
   if (report.status === 'validated' || withoutPayEffect(report)) return 'Mon rapport';
   if (report.status === 'rejected') return 'Reprendre mon rapport';
@@ -222,6 +225,8 @@ function Body({
         </Notice>
       );
     }
+    // The member's mini feedback replaces the report there (ADR 0050 § 10, trous béants n° 1).
+    if (agency === null) return <FeedbackPanel data={data} zone={zone} onClose={onClose} />;
     return (
       <Notice tone="info" onClose={onClose} title="Rien à déclarer">
         Sur la quinzaine {periodLine(data.period)}, la paie de ce compte lit les ventes relevées par le

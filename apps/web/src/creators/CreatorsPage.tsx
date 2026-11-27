@@ -13,6 +13,7 @@ import { CopilotSection } from './copilot/CopilotSection';
 import { CustomOrdersSection } from './custom-orders/CustomOrdersSection';
 import { CustomPricesSection } from './custom-prices/CustomPricesSection';
 import { DropsSection } from './drops/DropsSection';
+import { FanTiersSection } from './fan-tiers/FanTiersSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
@@ -393,6 +394,11 @@ export function CreatorsPage({
               onDirty={setRateDirty}
             />
           </div>
+          {isOwner ? (
+            <div id="paliers" className="cr-account__card">
+              <FanTiersSection creatorId={current.id} />
+            </div>
+          ) : null}
           <div id={accountCardId('profile')} className="cr-account__card">
             <ProfileSection creatorId={current.id} creatorName={current.displayName} />
           </div>

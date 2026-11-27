@@ -37,6 +37,7 @@ export function SalesToGivePanel({
   me,
   reads,
   owner,
+  startDay,
 }: {
   period: PayPeriod;
   /** No closing has closed the period: a sale may still be given there. */
@@ -48,10 +49,14 @@ export function SalesToGivePanel({
   /** The owner or an active manager. */
   reads: boolean;
   owner: boolean;
+  /** The day to open on, from « Voir les ventes de ce shift » (ADR 0101 § 19); the last day otherwise. */
+  startDay?: string | undefined;
 }): JSX.Element | null {
   const first = period;
   const last = payPeriodLastDay(period) < today ? payPeriodLastDay(period) : today;
-  const [day, setDay] = useState(last);
+  const [day, setDay] = useState(
+    startDay !== undefined && startDay >= first && startDay <= last ? startDay : last,
+  );
   const shown = open && reads && first <= today;
   const settings = useSchedulingSettings();
   const zone = settings.data?.timeZone ?? null;

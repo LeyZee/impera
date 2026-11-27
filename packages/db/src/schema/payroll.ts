@@ -14,7 +14,9 @@ import {
   PAYOUT_DELAY_MAX_BUSINESS_DAYS,
   PENALTY_KINDS,
   PlatformSchema,
+  SALE_CLAIM_NOTE_MAX,
   SALE_HELD_REASONS,
+  SaleClaimOutcomeSchema,
   SALE_WHOLE_BP,
   SaleDecisionOutcomeSchema,
   SaleExcludeReasonSchema,
@@ -42,7 +44,7 @@ import {
 
 import { user } from './auth';
 import { createdAt, enumCheck, id, timestampTz, updatedAt } from './columns';
-import { shiftReports } from './scheduling';
+import { shiftReports, shifts } from './scheduling';
 import { teamMembers } from './team';
 import { creators, platformAccounts } from './tenancy';
 
@@ -934,6 +936,109 @@ export const paySaleSignals = pgTable(
     pgPolicy('member_insert', {
       for: 'insert',
       withCheck: sql`${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
+    }),
+  ],
+);
+
+const claimNoteMax = sql.raw(String(SALE_CLAIM_NOTE_MAX));
+
+/**
+ * A chatter's « J'ai été décisif sur une vente » (ADR 0101 § 18, trou 15): one of his ended shifts and his note,
+ * never a sale. One per shift. Added only: its answer lives in `pay_sale_claim_answers`. The member writes his own;
+ * he and the owner and an active manager read it. A claim gives no sale by itself: « Donner à … » does.
+ */
+export const paySaleClaims = pgTable(
+  'pay_sale_claims',
+  {
+    id: id(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    shiftId: uuid('shift_id').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    /** The pay period its shift starts in, in the agency's zone, as read when it was made. */
+    period: date('period').notNull(),
+    /**
+     * Its shift as the member read it when he made it: hours (its stop when stopped), account and creator, for both
+     * sides to read without crossing creators. Never a sale.
+     */
+    shiftStartsAt: timestampTz('shift_starts_at').notNull(),
+    shiftEndsAt: timestampTz('shift_ends_at').notNull(),
+    platform: text('platform').notNull(),
+    handle: text('handle').notNull(),
+    creatorName: text('creator_name').notNull(),
+    note: text('note').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // His own shift, on its account: the base holds it, whatever the store read.
+    foreignKey({
+      name: 'pay_sale_claims_shift_fk',
+      columns: [t.shiftId, t.creatorId, t.platformAccountId, t.memberId],
+      foreignColumns: [shifts.id, shifts.creatorId, shifts.platformAccountId, shifts.memberId],
+    }),
+    unique('pay_sale_claims_shift_unique').on(t.shiftId),
+    index('pay_sale_claims_member_idx').on(t.memberId, t.createdAt),
+    periodCheck('pay_sale_claims_period_check', t.period),
+    enumCheck('pay_sale_claims', t.platform, PlatformSchema.options),
+    check('pay_sale_claims_hours_check', sql`${t.shiftStartsAt} < ${t.shiftEndsAt}`),
+    check(
+      'pay_sale_claims_names_check',
+      sql`char_length(${t.handle}) between 1 and 200 and char_length(${t.creatorName}) between 1 and 200`,
+    ),
+    check('pay_sale_claims_note_check', sql`char_length(${t.note}) between 1 and ${claimNoteMax}`),
+    // Inside the claim's creator (Sécurité, #1026): the team reads it there, a manager only within his creators, which
+    // the store checks against his list as for the shift feedbacks; a member reads his own and writes it while active.
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and (${readsTeam} or ${isMine(t.memberId)})`,
+    }),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${t.createdBy} = ${currentUser} and exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser} and m.status = 'active')`,
+    }),
+  ],
+);
+
+/**
+ * The one answer of a claim (ADR 0101 §§ 19, 20): its member withdraws it while it waits, or the owner or an active
+ * manager who is not its member settles it or does not retain it, with a word. Added only, once per claim.
+ */
+export const paySaleClaimAnswers = pgTable(
+  'pay_sale_claim_answers',
+  {
+    claimId: uuid('claim_id')
+      .primaryKey()
+      .references(() => paySaleClaims.id),
+    outcome: text('outcome').notNull(),
+    note: text('note'),
+    answeredBy: text('answered_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    enumCheck('pay_sale_claim_answers', t.outcome, SaleClaimOutcomeSchema.options),
+    check(
+      'pay_sale_claim_answers_note_check',
+      sql`(${t.note} is null or char_length(${t.note}) between 1 and ${claimNoteMax}) and (${t.outcome} <> 'not_retained' or ${t.note} is not null)`,
+    ),
+    pgPolicy('member_read', {
+      for: 'select',
+      // The claim as its own policy shows it, so inside its creator: an answer is read where its claim is.
+      using: sql`exists (select 1 from pay_sale_claims c where c.id = ${t.claimId})`,
+    }),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${t.answeredBy} = ${currentUser} and exists (select 1 from pay_sale_claims c where c.id = ${t.claimId} and case when ${t.outcome} = 'withdrawn' then ${isMine(sql`c.member_id`)} else ${readsTeam} and not ${isMine(sql`c.member_id`)} end)`,
     }),
   ],
 );

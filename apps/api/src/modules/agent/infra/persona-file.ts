@@ -8,6 +8,8 @@ import {
   sectionAnswers,
   StoredPersonaSchema,
   type KycSlot,
+  type Language,
+  type LanguageExamples,
   type ObjectionReplies,
   type PersonaSheet,
   type PersonaStrategies,
@@ -18,6 +20,7 @@ import { parse, stringify } from 'yaml';
 import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain/desire';
 import { DEFAULT_GUARD_SETTINGS, type GuardSettings } from '../domain/guards';
 import { askableSlots } from '../domain/kyc';
+import { DEFAULT_AFTER_PURCHASE_HOURS } from '../domain/policy';
 import type { OfferLimits } from '../domain/policy';
 import type { SexualizationLimits } from '../domain/sexualization';
 
@@ -57,6 +60,10 @@ export interface PersonaForModels {
    * in a prompt.
    */
   readonly objectionReplies: ObjectionReplies;
+  /** Her languages (`spoken_languages`), in her order: code decides the language of each answer among them (ADR 0168). */
+  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  /** Her messages per language (`agent.language_examples`), read by the voice only in that language (ADR 0168 § 3). */
+  readonly languageExamples?: LanguageExamples;
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
@@ -168,6 +175,7 @@ export function personaForModels(
     offerLimits: {
       cooldownHours: agent.strategies.script_launch.cooldown_hours,
       minDesire: scriptMinDesire,
+      afterPurchaseHours: agent.strategies.script_launch.after_purchase_hours ?? DEFAULT_AFTER_PURCHASE_HOURS,
     },
     sexualizationLimits: {
       initiateAfterHours: agent.strategies.sexualization.initiate_after_hours,
@@ -189,7 +197,15 @@ export function personaForModels(
     forbiddenEmojis: rules.emojis_forbidden,
     kycSlots,
     objectionReplies: agent.objection_replies,
+    spokenLanguages: spokenOf(sheet.identity.spoken_languages),
+    languageExamples: agent.language_examples,
   };
+}
+
+/** Her languages as code reads them: the sheet requires one, French when a list arrives empty all the same. */
+function spokenOf(languages: readonly Language[]): readonly [Language, ...Language[]] {
+  const [first, ...rest] = languages;
+  return first === undefined ? ['french'] : [first, ...rest];
 }
 
 /** The guards with her disgusts, her forbidden words and emojis, and her pet names. */

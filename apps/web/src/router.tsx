@@ -74,6 +74,7 @@ import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
 import { parseSalesSearch } from './screens/sales/view';
 import {
   AiModelsPage,
+  AgentsPage,
   AiUsagePage,
   AlertsPage,
   BackupsPage,
@@ -1124,6 +1125,18 @@ const aiUsage = createRoute({
   },
   component: AiUsagePage,
 });
+/** Réglages › Agents connectés: the owner's alone, like the routes it calls (ADR 0026 § 3). */
+const agents = createRoute({
+  getParentRoute: () => settings,
+  path: '/agents-connectes',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: AgentsPage,
+});
 const salesFeeds = createRoute({
   getParentRoute: () => settings,
   path: '/ventes',
@@ -1369,6 +1382,7 @@ const routeTree = rootRoute.addChildren([
     aiModels,
     salesFeeds,
     aiUsage,
+    agents,
     alerts,
     telegram,
     payRules,

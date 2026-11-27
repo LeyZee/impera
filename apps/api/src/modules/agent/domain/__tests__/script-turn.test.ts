@@ -332,3 +332,47 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(turn.moved).toBeNull();
   });
 });
+
+describe('the next paid step waits in the tension after a purchase (passe 2 du 26/11, 43 and 46)', () => {
+  const minutes = (count: number) => new Date(NOW.getTime() - count * 60_000);
+
+  it('counts his messages on the run Reveal leaves: a purchase seen at this message is his first message after it', () => {
+    // He just bought the step waiting; only Reveal says so, at this message (« Wow »).
+    const turn = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1], [1]),
+      reply: 'answers_step',
+      hisMessagesAt: [minutes(30), minutes(25), NOW],
+    });
+
+    expect(turn.decision).toEqual({ kind: 'none', reason: 'in_tension' });
+  });
+
+  it('lets the next step go once he wrote a few messages since the purchase', () => {
+    const bought = played([
+      { type: 'step_sent', stepIndex: 0, at: BEFORE },
+      { type: 'step_sent', stepIndex: 1, at: BEFORE },
+      { type: 'step_bought', stepIndex: 1, at: minutes(10) },
+    ]);
+    const turn = scriptTurn({
+      ...input,
+      latest: bought,
+      history: history([0, 1], [1]),
+      hisMessagesAt: [minutes(12), minutes(5), NOW],
+    });
+
+    expect(turn.decision).toMatchObject({ kind: 'send_step', step: { stepIndex: 2 } });
+  });
+
+  it('keeps the count given when his messages’ times are not', () => {
+    const turn = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1], [1]),
+      hisMessagesSinceBought: 3,
+    });
+
+    expect(turn.decision).toMatchObject({ kind: 'send_step', step: { stepIndex: 2 } });
+  });
+});

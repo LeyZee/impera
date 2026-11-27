@@ -58,6 +58,9 @@ const MODULE_DEPENDENCIES = {
   // ADR 0140: her week, computed out of her agenda and written in it through its own door (`week`, § 22); her stock
   // and drops are read through what the composition root plugs, never their tables.
   'creator-week': ['scheduling', 'creator-tasks'],
+  // Charles, 21/11: her absences and what she no longer does, told by her; reads her day with the scheduling helpers.
+  'creator-limits': ['scheduling'],
+  'creator-messages': [],
   // ADR 0164: « À décider », hers. It asks and keeps the answer; the code that asked reads it through its door.
   'creator-decisions': [],
   // INS-05 lot b: the captions proposed for a Reel she dropped ask her through a decision (ADR 0164 § 9).

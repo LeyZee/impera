@@ -150,6 +150,11 @@ export const BriefFromModelSchema = BriefSchema.extend({
 
 export const VoiceOutputSchema = z.object({
   bubbles: z.array(z.string().min(1)).min(1).max(6),
+  /**
+   * Her answer in French, one bubble per bubble, when she writes in another language (ADR 0168 § 9): for the team
+   * only. Loose on purpose: a translation that does not fit is dropped by the code, never the answer.
+   */
+  translation: z.array(z.string()).optional(),
 });
 export type VoiceOutput = z.infer<typeof VoiceOutputSchema>;
 

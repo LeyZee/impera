@@ -358,10 +358,16 @@ describe('the captions proposed for her Reels (ADR 0164 § 9)', () => {
     expect(seen).toHaveLength(before);
   });
 
-  it('proposes nothing for a photo, a drop withdrawn, nor a medium of another creator', async () => {
+  it('proposes nothing for a photo, a drop withdrawn, a medium to redo, nor a medium of another creator', async () => {
     const before = seen.length;
     expect(await propose((await drop('instagram_post')).mediaAssetId)).toBe('nothing');
     expect(await propose((await drop('instagram_reel', 'withdrawn')).mediaAssetId)).toBe('nothing');
+    const redone = await drop('instagram_reel');
+    await test.admin.db
+      .update(schema.contentDropFiles)
+      .set({ redoSentence: 'Trop sombre', redoAt: NOW, redoBy: noraUser })
+      .where(eq(schema.contentDropFiles.mediaAssetId, redone.mediaAssetId));
+    expect(await propose(redone.mediaAssetId)).toBe('nothing');
     const { mediaAssetId } = await drop('instagram_reel');
     expect(
       await app.modules.instagramCaptions.jobs.propose(newId(CreatorIdSchema), mediaAssetId, 'test'),
