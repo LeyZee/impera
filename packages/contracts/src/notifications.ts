@@ -145,6 +145,11 @@ export const NOTIFICATION_REASONS = [
    * asked, held in the quiet hours, within the daily cap like a reminder.
    */
   'decision',
+  /**
+   * A member's « Où te verser » changed (ADR 0165 § 5), to his own devices: it rings even in the quiet hours and outside
+   * the daily cap, so that a change he did not make is heard before a transfer.
+   */
+  'payout_change',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;

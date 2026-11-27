@@ -965,6 +965,17 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     (d, c) =>
       `a modifié le dossier de prestataire de ${c.member(c.entityId)}${fieldsCount(d.changed)}${d.checkCleared === true ? ', vérification à refaire' : ''}`,
   ),
+  // « Où te verser » (ADR 0165 § 5): the way he receives and the version written, never the beneficiary nor a number.
+  'payout_destination.update': action(
+    'money',
+    z.object({ method: code, version: id }),
+    (_d, c) => `a changé les coordonnées de versement de ${c.member(c.entityId)}`,
+  ),
+  'payout_destination.reveal': action(
+    'money',
+    none,
+    (_d, c) => `a affiché les coordonnées de versement de ${c.member(c.entityId)}`,
+  ),
   'contractor_profile.verify': action(
     'money',
     none,
