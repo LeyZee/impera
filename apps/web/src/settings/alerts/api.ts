@@ -5,6 +5,7 @@ import {
   ApiErrorSchema,
   CustomAlertGroupSchema,
   NotTakenDelaySchema,
+  SessionReminderSchema,
   SystemAlertSettingSchema,
   type AlertErrorCode,
   type AlertTestBody,
@@ -15,6 +16,7 @@ import {
   type CustomAlertGroup,
   type CustomAlertGroupId,
   type NotTakenDelay,
+  type SessionReminder,
   type SetSystemAlertBody,
   type SystemAlertCode,
   type SystemAlertSetting,
@@ -164,6 +166,23 @@ export function useNotTakenDelay(): UseQueryResult<NotTakenDelay> {
 /** Writes the delay, or `null` to stop the signal; the same body sent again answers what is stored. */
 export const saveNotTakenDelay = (body: NotTakenDelay): Promise<NotTakenDelay> =>
   call('/v1/scheduling/not-taken-delay', (answer) => NotTakenDelaySchema.safeParse(answer), {
+    method: 'PUT',
+    ...json(body),
+  });
+
+export const SESSION_REMINDER_QUERY_KEY = ['scheduling', 'session-reminder'] as const;
+
+/** The daily reminder to reconnect the AI's sessions (décision du 27/11/2026): the agency's minute, 18 h by default. */
+export function useSessionReminder(): UseQueryResult<SessionReminder> {
+  return useQuery({
+    queryKey: SESSION_REMINDER_QUERY_KEY,
+    queryFn: () => call('/v1/scheduling/session-reminder', (body) => SessionReminderSchema.safeParse(body)),
+  });
+}
+
+/** Writes the minute; the same body sent again answers what is stored. */
+export const saveSessionReminder = (body: SessionReminder): Promise<SessionReminder> =>
+  call('/v1/scheduling/session-reminder', (answer) => SessionReminderSchema.safeParse(answer), {
     method: 'PUT',
     ...json(body),
   });

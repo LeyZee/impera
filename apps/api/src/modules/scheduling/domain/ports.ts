@@ -21,6 +21,7 @@ import type {
   Platform,
   PlatformAccountId,
   NotTakenDelay,
+  SessionReminder,
   ReportGapThreshold,
   ReportSignal,
   SchedulingSettings,
@@ -625,6 +626,10 @@ export interface ShiftReportStore {
   notTakenDelay(actor: UserId): Promise<NotTakenDelay>;
   /** The owner's, `forbidden` to anyone else. */
   saveNotTakenDelay(actor: Actor, delay: NotTakenDelay): Promise<NotTakenDelay>;
+  /** The daily reminder to reconnect the AI's sessions (décision du 27/11/2026): the agency's minute, 18 h by default. */
+  sessionReminder(actor: UserId): Promise<SessionReminder>;
+  /** The owner's, `forbidden` to anyone else. */
+  saveSessionReminder(actor: Actor, reminder: SessionReminder): Promise<SessionReminder>;
 }
 
 /** An account's pay rules as stored (EQ-03): added only, never changed. */

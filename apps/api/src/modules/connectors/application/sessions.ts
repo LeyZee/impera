@@ -1,4 +1,10 @@
-import type { CreatorId, Platform, PlatformAccountId } from '@impera/contracts';
+import {
+  PlatformSchema,
+  type CreatorId,
+  type Platform,
+  type PlatformAccountId,
+  type SessionState,
+} from '@impera/contracts';
 
 import {
   PlatformAccountNotFound,
@@ -10,6 +16,19 @@ import {
 } from '../domain/errors';
 import type { AccountStore, Clock, JobLogger, SessionShapes, SessionVault } from '../domain/ports';
 import { sessionLife, type SessionLife } from '../domain/session-life';
+
+/**
+ * An account's session as the reminder to reconnect reads it (décision du 27/11/2026): whose account, what its state
+ * says, and when its token dies. Never the session.
+ */
+interface SessionClock {
+  readonly platformAccountId: PlatformAccountId;
+  readonly platform: Platform;
+  readonly creatorName: string;
+  readonly state: Exclude<SessionState, 'none'>;
+  /** The token's own expiry; `null` when it carries none we can read, or it no longer opens. */
+  readonly expiresAt: Date | null;
+}
 
 /** What a « Sync » left in place: the session sent, or the one kept because it lives longer (ADR 0147 § 7). */
 type SessionStored = SessionLife & { readonly kept: boolean };
@@ -42,13 +61,25 @@ export interface ConnectorSessions {
     platformAccountId: PlatformAccountId,
     correlationId: string,
   ): Promise<void>;
+  /**
+   * Every account holding a session (`valid`, `warning` or `expired`) of a creator not archived, on each platform that
+   * takes one, with its token's own expiry (the daily reminder to reconnect, décision du 27/11/2026). An account with
+   * no session (`none`: never synced, or released) is left out. Never a value of the session.
+   */
+  clocks(): Promise<SessionClock[]>;
 }
 
 /** Platform sessions at rest (security.md, ADR 0008): AES-256-GCM bound to the account id. */
 export function createConnectorSessions(deps: {
   readonly accounts: Pick<
     AccountStore,
-    'creatorOf' | 'get' | 'sessionOf' | 'storeSession' | 'setSessionState' | 'recordRefusedSession'
+    | 'creatorOf'
+    | 'get'
+    | 'listSyncable'
+    | 'sessionOf'
+    | 'storeSession'
+    | 'setSessionState'
+    | 'recordRefusedSession'
   >;
   readonly vault: SessionVault | null;
   readonly clock: Clock;
@@ -185,6 +216,28 @@ export function createConnectorSessions(deps: {
         correlationId,
         at: deps.clock.now(),
       }),
+    async clocks() {
+      const clocks: SessionClock[] = [];
+      for (const platform of PlatformSchema.options) {
+        const shape = deps.shapes[platform];
+        if (shape === undefined) continue;
+        for (const account of await deps.accounts.listSyncable(platform)) {
+          if (account.sessionState === 'none') continue;
+          const owner = await deps.accounts.creatorOf(account.id);
+          const sealed = owner === null ? null : await deps.accounts.sessionOf(owner.creatorId, account.id);
+          const session =
+            sealed === null || deps.vault === null ? null : openOrNull(deps.vault, account.id, sealed);
+          clocks.push({
+            platformAccountId: account.id,
+            platform,
+            creatorName: account.creatorName,
+            state: account.sessionState,
+            expiresAt: session === null ? null : (shape(session)?.expiresAt ?? null),
+          });
+        }
+      }
+      return clocks;
+    },
   };
 }
 

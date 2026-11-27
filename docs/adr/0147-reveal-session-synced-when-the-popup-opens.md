@@ -50,3 +50,14 @@ Une connexion automatique à Reveal est exclue : elle demanderait de garder les 
 - Écoute permanente des requêtes de Reveal en tâche de fond : elle lirait l'onglet sans que personne ne l'ait demandé. L'ouverture du popup est un geste du propriétaire.
 - Recharger l'onglet en automatique, comme au clic : c'est une action sur Reveal que personne n'a demandée.
 - Renouveler le jeton par une route de Reveal : aucune n'est connue, et ce serait un appel de plus vers Reveal.
+
+### Avenant du 27/11/2026 : le rappel quotidien de reconnexion
+
+Décision de Charles du 27/11/2026 (« oki parfait pour le 3 », audit de robustesse R3) : la reconnexion quotidienne qui reste (Conséquences, « Négatives ») est rappelée par Impera, puisqu'aucune route de Reveal ne renouvelle le jeton.
+
+- À l'heure de l'agence réglée dans Réglages › Alertes › Pilotage (« Reconnexion Reveal », 18 h par défaut, jamais éteinte), chaque propriétaire reçoit une notification pour chaque compte dont le jeton ne tiendra pas jusqu'au lendemain : moins de 20 h devant lui, expiré, ou sans échéance lisible.
+- Une heure après, si rien n'a bougé, la notification revient une fois.
+- 2 h avant la fin d'un jeton, une relance part, sauf si l'heure du rappel tombe dans ces 2 h : le rappel du jour suffit alors.
+- Ces notifications sont des alertes de l'agence (`agency_alert`, ADR 0176 § 3) : hors plafond du jour, retenues pendant les heures calmes. Une session qui expire la nuit ne réveille personne tant que Charles n'a pas tranché ce point.
+- Le message dit le geste avec le compte du « bot », jamais le sien (P2-02). Rien ne part sans notifications activées sur au moins un appareil d'un propriétaire.
+- La connexion automatique à Reveal par le serveur reste écartée (Alternatives rejetées). Elle se rediscute après une à deux semaines de vrai fonctionnement, sur le mot écrit de Charles.

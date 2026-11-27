@@ -1,5 +1,5 @@
 # OPS-22 Un worker arrêté se voit de l'extérieur, et le compte de l'IA se corrige
-Statut : review
+Statut : done
 Phase : exploitation
 Dépend de : OPS-19 (mise en service), `docs/runbooks/deploy.md` § 1.6
 Branche : claude/project-thread-v4lgkv (branche imposée par la session)

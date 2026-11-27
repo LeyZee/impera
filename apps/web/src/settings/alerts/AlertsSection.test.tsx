@@ -87,6 +87,7 @@ const BASE = {
   'GET /v1/creators': ok({ creators: CREATORS }),
   'GET /v1/alerts': ok({ custom: [ALERT], system: SYSTEM }),
   'GET /v1/scheduling/not-taken-delay': ok({ minutes: null }),
+  'GET /v1/scheduling/session-reminder': ok({ minute: 1080 }),
 };
 
 function renderSection(): void {
@@ -600,6 +601,68 @@ describe('« Chatteur pas là » (ADR 0094, lot b)', () => {
       expect(calls.filter((call) => call.method === 'PUT').map((call) => call.body)).toEqual([
         { minutes: null },
         { minutes: null },
+      ]);
+    });
+  });
+});
+
+describe('« Reconnexion Reveal » (décision du 27/11/2026)', () => {
+  const reminderLine = async (): Promise<HTMLElement> => {
+    const title = await screen.findByText('Reconnexion Reveal', { selector: '.al-line__name' });
+    const item = title.closest('li');
+    if (item === null) throw new Error('no line for Reconnexion Reveal');
+    return item;
+  };
+
+  it('says the hour of the agency, 18 h by default, and saves the one typed', async () => {
+    let stored: unknown = { minute: 1080 };
+    const calls = serve({
+      ...BASE,
+      'GET /v1/scheduling/session-reminder': () => ({ status: 200, body: stored }),
+      'PUT /v1/scheduling/session-reminder': (body) => {
+        stored = body;
+        return { status: 200, body };
+      },
+    });
+    renderSection();
+    const item = await reminderLine();
+    expect(await within(item).findByText('Chaque jour à 18 h, heure de l’agence')).toBeTruthy();
+    fireEvent.click(within(item).getByRole('button', { name: 'Changer' }));
+    expect(within(item).getByLabelText<HTMLInputElement>('Heure du rappel').value).toBe('18 h');
+    // Never off: no button to stop it, and nothing to go back to at 18 h.
+    expect(within(item).queryByRole('button', { name: 'Revenir à 18 h' })).toBeNull();
+    fireEvent.change(within(item).getByLabelText('Heure du rappel'), { target: { value: '25 h' } });
+    fireEvent.click(within(item).getByRole('button', { name: 'Enregistrer' }));
+    expect(within(item).getByText('Une heure de la journée, par exemple 18 h ou 18 h 30.')).toBeTruthy();
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    fireEvent.change(within(item).getByLabelText('Heure du rappel'), { target: { value: '17h30' } });
+    fireEvent.click(within(item).getByRole('button', { name: 'Enregistrer' }));
+    expect(await within(item).findByText('Chaque jour à 17 h 30, heure de l’agence')).toBeTruthy();
+    expect(calls.filter((call) => call.method === 'PUT').map((call) => call.body)).toEqual([
+      { minute: 1050 },
+    ]);
+  });
+
+  it('goes back to 18 h in one touch, and says when the server does not answer', async () => {
+    let put: Reply = { status: 503 };
+    const calls = serve({
+      ...BASE,
+      'GET /v1/scheduling/session-reminder': ok({ minute: 1050 }),
+      'PUT /v1/scheduling/session-reminder': () => put,
+    });
+    renderSection();
+    const item = await reminderLine();
+    fireEvent.click(await within(item).findByRole('button', { name: 'Changer' }));
+    fireEvent.click(within(item).getByRole('button', { name: 'Revenir à 18 h' }));
+    expect((await within(item).findByRole('alert')).textContent).toBe(
+      'Le serveur ne répond pas. Réessaie dans un instant.',
+    );
+    put = { status: 200, body: { minute: 1080 } };
+    fireEvent.click(within(item).getByRole('button', { name: 'Revenir à 18 h' }));
+    await waitFor(() => {
+      expect(calls.filter((call) => call.method === 'PUT').map((call) => call.body)).toEqual([
+        { minute: 1080 },
+        { minute: 1080 },
       ]);
     });
   });

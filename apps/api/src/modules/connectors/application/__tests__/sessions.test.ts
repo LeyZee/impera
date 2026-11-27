@@ -19,10 +19,17 @@ const unexpected = (): Promise<never> => Promise.reject(new Error('a refusal nev
 /** The account, no stored session, and a line that cannot be written. */
 const accounts: Pick<
   AccountStore,
-  'creatorOf' | 'get' | 'sessionOf' | 'storeSession' | 'setSessionState' | 'recordRefusedSession'
+  | 'creatorOf'
+  | 'get'
+  | 'listSyncable'
+  | 'sessionOf'
+  | 'storeSession'
+  | 'setSessionState'
+  | 'recordRefusedSession'
 > = {
   creatorOf: () => Promise.resolve({ creatorId, platform: 'reveal' }),
   get: unexpected,
+  listSyncable: () => Promise.resolve([]),
   sessionOf: () => Promise.resolve(null),
   storeSession: unexpected,
   setSessionState: unexpected,
@@ -227,5 +234,91 @@ describe('a session that still holds (ADR 0147 § 7)', () => {
         SessionShapeUnprocessable,
       );
     expect(stored).toEqual([]);
+  });
+});
+
+describe('the sessions’ clocks, for the reminder to reconnect (27/11/2026)', () => {
+  const syncable = (id: string, sessionState: 'none' | 'valid' | 'warning' | 'expired') => ({
+    id: PlatformAccountIdSchema.parse(id),
+    platform: 'reveal' as const,
+    handle: `handle-${sessionState}`,
+    creatorName: 'Créatrice Démo',
+    sessionState,
+    sessionUpdatedAt: null,
+    modelId: null,
+  });
+  const ids = {
+    valid: '018f0000-0000-7000-8000-0000000000a1',
+    expired: '018f0000-0000-7000-8000-0000000000a2',
+    none: '018f0000-0000-7000-8000-0000000000a3',
+    unread: '018f0000-0000-7000-8000-0000000000a4',
+  };
+
+  it('gives each account holding a session its token’s expiry, never the session, and leaves out one with none', async () => {
+    const sealed = new Map<string, string>([
+      [ids.valid, 'member-test-a|model-test-a|2026-11-28T17:00:00Z'],
+      [ids.expired, 'member-test-a|model-test-b|2026-11-26T17:00:00Z'],
+      [ids.unread, 'not-a-session'],
+    ]);
+    const sessions = createConnectorSessions({
+      accounts: {
+        ...accounts,
+        listSyncable: () =>
+          Promise.resolve([
+            syncable(ids.valid, 'valid'),
+            syncable(ids.expired, 'expired'),
+            syncable(ids.none, 'none'),
+            syncable(ids.unread, 'warning'),
+          ]),
+        sessionOf: (_creator, id) => {
+          const session = sealed.get(id);
+          return Promise.resolve(session === undefined ? null : Buffer.from(session));
+        },
+      },
+      vault: plainVault,
+      clock: { now: () => new Date('2026-11-27T18:00:00Z') },
+      shapes: { reveal: testShape },
+      modelLinks: () => Promise.resolve(new Map()),
+    });
+    const clocks = await sessions.clocks();
+    expect(clocks).toEqual([
+      {
+        platformAccountId: ids.valid,
+        platform: 'reveal',
+        creatorName: 'Créatrice Démo',
+        state: 'valid',
+        expiresAt: new Date('2026-11-28T17:00:00Z'),
+      },
+      {
+        platformAccountId: ids.expired,
+        platform: 'reveal',
+        creatorName: 'Créatrice Démo',
+        state: 'expired',
+        expiresAt: new Date('2026-11-26T17:00:00Z'),
+      },
+      {
+        platformAccountId: ids.unread,
+        platform: 'reveal',
+        creatorName: 'Créatrice Démo',
+        state: 'warning',
+        expiresAt: null,
+      },
+    ]);
+    expect(JSON.stringify(clocks)).not.toContain('member-test-a');
+  });
+
+  it('reads no expiry without the vault', async () => {
+    const sessions = createConnectorSessions({
+      accounts: {
+        ...accounts,
+        listSyncable: () => Promise.resolve([syncable(ids.valid, 'valid')]),
+        sessionOf: () => Promise.resolve(Buffer.from('member-test-a|model-test-a|2026-11-28T17:00:00Z')),
+      },
+      vault: null,
+      clock: { now: () => new Date('2026-11-27T18:00:00Z') },
+      shapes: { reveal: testShape },
+      modelLinks: () => Promise.resolve(new Map()),
+    });
+    expect((await sessions.clocks()).map((clock) => clock.expiresAt)).toEqual([null]);
   });
 });

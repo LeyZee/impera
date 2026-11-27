@@ -9,6 +9,7 @@ import {
   PayPeriodSchema,
   PlatformAccountIdSchema,
   PlatformSchema,
+  SESSION_REMINDER_MINUTE_DEFAULT,
   ShiftIdSchema,
   ShiftSlotsSchema,
   ShiftTemplateIdSchema,
@@ -581,6 +582,22 @@ export const agencyZone = sql<string>`coalesce((select ${schedulingSettings.time
  * The agency's zone, which the pay periods follow (ADR 0023): the planning's, or its default until the owner sets it.
  * Every team scope reads the settings.
  */
+/**
+ * The daily reminder to reconnect the AI's platform sessions (décision du 27/11/2026): its minute of the agency's day,
+ * the default until the owner sets one, and the agency's clock it is read on.
+ */
+export async function sessionReminderClock(
+  tx: Transaction,
+): Promise<{ readonly minute: number; readonly timeZone: string }> {
+  const [row] = await tx
+    .select({ minute: schedulingSettings.sessionReminderMinute, timeZone: schedulingSettings.timeZone })
+    .from(schedulingSettings);
+  return {
+    minute: row?.minute ?? SESSION_REMINDER_MINUTE_DEFAULT,
+    timeZone: row?.timeZone ?? DEFAULT_SCHEDULING_SETTINGS.timeZone,
+  };
+}
+
 export async function agencyTimeZone(tx: Transaction): Promise<string> {
   const result = await tx.execute<{ zone: string }>(sql`select ${agencyZone} as zone`);
   return result.rows[0]?.zone ?? DEFAULT_SCHEDULING_SETTINGS.timeZone;

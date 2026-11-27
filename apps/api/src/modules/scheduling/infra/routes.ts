@@ -35,6 +35,7 @@ import {
   PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
   NotTakenDelaySchema,
+  SessionReminderSchema,
   ReportGapThresholdSchema,
   SchedulingSettingsInputSchema,
   SchedulingSettingsQuerySchema,
@@ -650,6 +651,23 @@ export function createSchedulingRoutes(
       '/scheduling/not-taken-delay',
       { preValidation: owner, schema: { body: NotTakenDelaySchema, response: { 200: NotTakenDelaySchema } } },
       (request) => reports.saveNotTakenDelay(actorOf(request), request.body),
+    );
+
+    // The daily reminder to reconnect the AI's sessions (décision du 27/11/2026): read by the agency, set by the owner.
+    // A reminder's hour, not a rate: no password asked again.
+    app.get(
+      '/scheduling/session-reminder',
+      { preValidation: ownerOrMember, schema: { response: { 200: SessionReminderSchema } } },
+      (request) => reports.sessionReminder(userOf(request)),
+    );
+
+    app.put(
+      '/scheduling/session-reminder',
+      {
+        preValidation: owner,
+        schema: { body: SessionReminderSchema, response: { 200: SessionReminderSchema } },
+      },
+      (request) => reports.saveSessionReminder(actorOf(request), request.body),
     );
 
     // The accounts' pay rules, which the reports read in their own transaction, at the address the contract gives.

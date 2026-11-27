@@ -9,6 +9,7 @@ Depuis le 27/11/2026, tout ce qui demande un humain sonne en notification Impera
 | **Relais de sécurité** (mineur possible, non-consentement, détresse, rencontre, manipulation) | Ouvrir tout de suite. L'agent n'écrit plus à ce fan. Prendre la conversation (« Reprendre la main ») : la relance s'arrête. Sans prise en main, elle sonne de nouveau toutes les 5 minutes pendant une heure. Mineur ou non-consentement : ne rien envoyer, prévenir Charles. |
 | **URGENT**, alerte de sécurité | Un acte sur un compte (nouvel appareil, refus répétés, deuxième facteur remis à zéro, persona activée, Automatique allumé, session Reveal remplacée). Si ce n'est pas toi ou quelqu'un de l'équipe : Réglages › Sécurité, fermer les sessions, puis `rotate-secrets.md`. |
 | **URGENT**, quota IA épuisé | L'agent répond avec son modèle de secours. Recharger ou attendre la remise à zéro du quota. |
+| **Reconnexion Reveal** (chaque jour à l'heure réglée, encore une heure après, 2 h avant la fin d'un jeton) | Dans le profil Chrome de l'IA, reconnecter le « bot » sur Reveal puis « Synchroniser » dans l'extension (`session-expired.md`, étapes 1 et 2). L'heure se règle dans Réglages › Alertes › Pilotage. |
 | **Important** (passage à l'humain, plafond IA, session Reveal, panne, factures, sauvegarde, ventes) | Ouvrir quand possible. Session Reveal : suivre `session-expired.md`. |
 
 ## Quand rien ne sonne la nuit
