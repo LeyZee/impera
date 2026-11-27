@@ -625,7 +625,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       const voice = await gateway.voice(input);
       const written = voice.ok ? voice.value.output.bubbles : [];
       const violations = checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history));
-      const bubbles = asSent(written, deps.splitMessages);
+      const bubbles = asSent(written, deps.splitMessages, deps.guardSettings.form);
       return {
         bubbles,
         violations,

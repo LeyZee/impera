@@ -331,6 +331,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       if (!parsed.success) return null;
       return { kind: 'agency_share_changed', ...parsed.data };
     }
+    case 'account_uncovered': {
+      const parsed = EVENT_PAYLOADS.account_uncovered.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'account_uncovered', ...parsed.data };
+    }
     case 'connection_state_changed': {
       const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);
       if (!parsed.success) return null;

@@ -53,6 +53,7 @@ describe('notifyCreatorSale (CRM-04 lot d2)', () => {
         objectKey: 'sale-1',
         timeZone: 'Europe/Paris',
         message: creatorSaleMessage(1240, 'EUR'),
+        kind: 'earnings',
       })),
     );
   });

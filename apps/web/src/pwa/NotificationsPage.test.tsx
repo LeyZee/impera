@@ -24,6 +24,7 @@ vi.mock('./push', () => ({
 
 const SERVER_KEY = new Uint8Array(new ArrayBuffer(65)).fill(4);
 
+const ALL_ON = { agency_request: true, week_to_validate: true, earnings: true, lives: true };
 const DEFAULTS = { quietHours: { startMinute: 1320, endMinute: 480 }, dailyCap: 6 };
 
 interface Call {
@@ -35,9 +36,10 @@ interface Call {
 const EMPTY_INBOX = { items: [] };
 
 /** The server: preferences kept as written, the test send answered with `testStatus`, the inbox as given. */
-function serve(testStatus = 200, inbox: unknown = EMPTY_INBOX): Call[] {
+function serve(testStatus = 200, inbox: unknown = EMPTY_INBOX, kindsPutStatus = 200): Call[] {
   const calls: Call[] = [];
   let saved: unknown = DEFAULTS;
+  let kinds: unknown = ALL_ON;
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
@@ -47,6 +49,13 @@ function serve(testStatus = 200, inbox: unknown = EMPTY_INBOX): Call[] {
       if (url === '/v1/notifications/preferences') {
         if (method === 'PUT') saved = body;
         return Promise.resolve(new Response(JSON.stringify(saved), { status: 200 }));
+      }
+      if (url === '/v1/notifications/kinds') {
+        if (method === 'PUT') {
+          if (kindsPutStatus !== 200) return Promise.resolve(new Response(null, { status: kindsPutStatus }));
+          kinds = body;
+        }
+        return Promise.resolve(new Response(JSON.stringify(kinds), { status: 200 }));
       }
       if (url === '/v1/notifications/inbox') {
         return Promise.resolve(new Response(JSON.stringify(inbox), { status: 200 }));
@@ -208,6 +217,58 @@ describe('Notifications, when it rings', () => {
     await waitFor(() => {
       expect(save()).toHaveProperty('disabled', true);
     });
+  });
+
+  it('lets the creator turn a sort off for herself, saved at once (ADR 0150 § 16 ter)', async () => {
+    const calls = serve();
+    deviceIs('unsupported');
+    renderPage(true);
+    const gains = await screen.findByRole('switch', { name: /^Tes gains/u });
+    expect(gains).toHaveProperty('checked', true);
+    expect(screen.getByText('Toi seule vois ces choix ; l’agence ne les voit pas.')).toBeTruthy();
+    fireEvent.click(gains);
+    expect(await screen.findByText('Tes gains : coupés.')).toBeTruthy();
+    expect(
+      calls.find((call) => call.method === 'PUT' && call.url === '/v1/notifications/kinds')?.body,
+    ).toEqual({
+      ...ALL_ON,
+      earnings: false,
+    });
+    expect(screen.getByRole('switch', { name: /^Tes gains/u })).toHaveProperty('checked', false);
+  });
+
+  it.each([
+    [/^Demandes de l’agence/u, 'Demandes de l’agence : coupées.', 'Demandes de l’agence : activées.'],
+    [/^Ta semaine à valider/u, 'Ta semaine à valider : coupée.', 'Ta semaine à valider : activée.'],
+    [/^Tes gains/u, 'Tes gains : coupés.', 'Tes gains : activés.'],
+    [/^Tes lives/u, 'Tes lives : coupés.', 'Tes lives : activés.'],
+  ])('says each sort off and back on in its own agreement (%s)', async (name, off, on) => {
+    serve();
+    deviceIs('unsupported');
+    renderPage(true);
+    fireEvent.click(await screen.findByRole('switch', { name }));
+    expect(await screen.findByText(off)).toBeTruthy();
+    fireEvent.click(screen.getByRole('switch', { name }));
+    expect(await screen.findByText(on)).toBeTruthy();
+  });
+
+  it('puts a sort back and says so when the save is refused', async () => {
+    serve(200, EMPTY_INBOX, 503);
+    deviceIs('unsupported');
+    renderPage(true);
+    fireEvent.click(await screen.findByRole('switch', { name: /^Tes lives/u }));
+    expect((await screen.findByText('Pas enregistré. Réessaie dans un instant.')).getAttribute('role')).toBe(
+      'alert',
+    );
+    expect(screen.getByRole('switch', { name: /^Tes lives/u })).toHaveProperty('checked', true);
+  });
+
+  it('shows no sorts to the team, whose alerts are set by the owner', async () => {
+    serve();
+    deviceIs('unsupported');
+    renderPage();
+    expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();
+    expect(screen.queryByText('Ce que tu reçois')).toBeNull();
   });
 
   it('never speaks of a shift to the creator, who has none (CREA-12)', async () => {

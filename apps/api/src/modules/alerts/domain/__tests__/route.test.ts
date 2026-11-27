@@ -18,6 +18,34 @@ describe('who an alert reaches (ADR 0150 § A)', () => {
     ]);
   });
 
+  it('never reaches a chatter with a steering alert, whatever line is handed over (ADR 0094 § 3)', () => {
+    expect(modesFor('uncovered_account', [])).toEqual({
+      owner: 'deliver',
+      manager: 'deliver',
+      chatter_on_shift: 'off',
+    });
+    const forced = creatorAlertLines([]).map((line) =>
+      line.code === 'uncovered_account'
+        ? { ...line, routes: { owner: 'muted', manager: 'off', chatter_on_shift: 'deliver' } as const }
+        : line,
+    );
+    expect(modesFor('uncovered_account', forced)).toEqual({
+      owner: 'muted',
+      manager: 'off',
+      chatter_on_shift: 'off',
+    });
+    // A row the base would refuse is read « rien » for the chatters all the same.
+    const stored = creatorAlertLines([
+      { alertCode: 'uncovered_account', role: 'chatter_on_shift', mode: 'deliver' },
+    ]).find((line) => line.code === 'uncovered_account');
+    expect(stored?.routes.chatter_on_shift).toBe('off');
+    expect(stored?.chattersClosed).toBe(true);
+    expect(alertMessage('uncovered_account', 'Nora', null, false)).toMatchObject({
+      title: 'Nora · Compte sans personne',
+      url: '/equipe/planning',
+    });
+  });
+
   it('takes, for an alert of the agency, the loudest choice of her creators', () => {
     const quiet = creatorAlertLines([
       { alertCode: 'ai_budget', role: 'owner', mode: 'off' },

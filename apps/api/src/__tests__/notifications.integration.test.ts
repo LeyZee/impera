@@ -3,6 +3,7 @@ import { createDecipheriv, createECDH, createHmac, randomBytes } from 'node:cryp
 import {
   CreatorIdSchema,
   newId,
+  NotificationKindsSchema,
   NotificationInboxSchema,
   NotificationPreferencesSchema,
   PushPublicKeySchema,
@@ -241,6 +242,32 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
     expect(ErrorBodySchema.parse(wrong.json()).error.code).toBe('request_invalid');
   });
 
+  it('keeps her sorts on until she turns one off, for herself only (ADR 0150 § 16 ter)', async () => {
+    const read = async () =>
+      NotificationKindsSchema.parse((await call('GET', '/v1/notifications/kinds', creator)).json());
+    const allOn = { agency_request: true, week_to_validate: true, earnings: true, lives: true };
+    expect(await read()).toEqual(allOn);
+    const noLives = { ...allOn, lives: false };
+    expect((await call('PUT', '/v1/notifications/kinds', creator, noLives)).statusCode).toBe(200);
+    expect(await read()).toEqual(noLives);
+    // Replayed: the same choices, no new row.
+    expect((await call('PUT', '/v1/notifications/kinds', creator, noLives)).statusCode).toBe(200);
+    const rows = await test.admin.db
+      .select()
+      .from(schema.notificationKindPreferences)
+      .where(eq(schema.notificationKindPreferences.userId, creatorId));
+    expect(rows).toHaveLength(4);
+    // A sort she does not have, or one missing: refused.
+    const extra = await call('PUT', '/v1/notifications/kinds', creator, { ...noLives, shifts: true });
+    expect(extra.statusCode).toBe(400);
+    const missing = { agency_request: true, week_to_validate: true, earnings: true };
+    expect((await call('PUT', '/v1/notifications/kinds', creator, missing)).statusCode).toBe(400);
+    // The agency never reads nor sets them.
+    expect((await call('GET', '/v1/notifications/kinds', owner)).statusCode).toBe(403);
+    expect((await call('PUT', '/v1/notifications/kinds', owner, allOn)).statusCode).toBe(403);
+    expect((await call('PUT', '/v1/notifications/kinds', creator, allOn)).statusCode).toBe(200);
+  });
+
   describe('notify (once, quiet hours, cap, bursts)', () => {
     const PARIS = 'Europe/Paris';
     // Only what reaches this phone: the account has the earlier test's device too.
@@ -340,6 +367,30 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
       expect(await ask('sale', 'sale-6', '2026-11-06T12:05:00Z')).toBe('rang');
       expect(sent).toHaveLength(6);
       expect(open(sent[3]?.body ?? Buffer.alloc(0), phone)).toMatchObject({ tag: 'sales-burst' });
+    });
+
+    it('keeps a sort she turned off silent, and rings it again once she turns it back on', async () => {
+      const earnings = (objectKey: string, at: string) =>
+        notify(
+          {
+            userId: creatorId,
+            reason: 'sale',
+            objectKey,
+            timeZone: PARIS,
+            message: { title: objectKey, url: '/' },
+            kind: 'earnings',
+          },
+          new Date(at),
+        );
+      const allOn = { agency_request: true, week_to_validate: true, earnings: true, lives: true };
+      await call('PUT', '/v1/notifications/kinds', creator, { ...allOn, earnings: false });
+      expect(await earnings('sale-off', '2026-11-07T12:00:00Z')).toBe('silent');
+      // Not even at night: nothing waits for the recap.
+      expect(await earnings('sale-off-night', '2026-11-07T23:00:00Z')).toBe('silent');
+      expect(sent).toHaveLength(0);
+      await call('PUT', '/v1/notifications/kinds', creator, allOn);
+      expect(await earnings('sale-on', '2026-11-08T12:00:00Z')).toBe('rang');
+      expect(sent).toHaveLength(1);
     });
 
     it('lists the account’s own notifications of the last days, rung or kept quiet (trou 9 du 21/11)', async () => {
