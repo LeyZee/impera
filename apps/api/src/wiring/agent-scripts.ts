@@ -127,7 +127,7 @@ interface AgentScriptsDeps {
 
 /** The fan on the platform: his account and his platform id. A fan of another account is refused (fail closed). */
 async function platformFanOf(
-  deps: AgentScriptsDeps,
+  deps: Pick<AgentScriptsDeps, 'fans'>,
   creatorId: string,
   fanId: string,
 ): Promise<{ readonly platformAccountId: string; readonly platformFanId: string }> {
@@ -176,5 +176,16 @@ export function createLastOfferAt(
     const scripts = await deps.scripts.accountScripts(CreatorIdSchema.parse(creatorId), accountId);
     if (!scripts.some((script) => agentScriptViewOf(script) !== null)) return null;
     return deps.reads.lastOfferAt(accountId, fan.platformFanId);
+  };
+}
+
+/** When he last bought a priced bundle of hers (ADR 0128 § 1), read like `createLastOfferAt`. */
+export function createLastPurchaseAt(deps: {
+  readonly reads: Pick<ConnectorsModule['platformReads'], 'lastPurchaseAt'>;
+  readonly fans: Pick<FansModule, 'getFan'>;
+}): (creatorId: string, fanId: string) => Promise<Date | null> {
+  return async (creatorId, fanId) => {
+    const fan = await platformFanOf(deps, creatorId, fanId);
+    return deps.reads.lastPurchaseAt(PlatformAccountIdSchema.parse(fan.platformAccountId), fan.platformFanId);
   };
 }

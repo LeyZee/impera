@@ -86,6 +86,13 @@ Chaque effet est une valeur que le code lit ou un texte versionné que le code c
 
 23. **Au bout de 30 jours**, Charles décide : garder, ajuster les seuils ou arrêter. Le témoin peut ensuite descendre à 5 % pour garder un repère.
 
+## Précisions de Charles (26/11/2026 à 23 h 50 et 27/11/2026 de 0 h 32 à 0 h 34, fil « Adapter l'IA aux baleines et time wasters »)
+
+- **Deux profils.** `slowed` (« hésitant ») : il lui manque la confiance ou le temps ; elle continue de chercher ce qui le retient, crée un peu de proximité, un peu moins disponible. `dormant` (« vraiment pénible ») : réponses rares jusqu'à un achat, un pourboire ou des excuses. Payeurs et baleines passent toujours avant.
+- **Qui est `dormant`** (remplace le « double des seuils » du § 2) : au moins **trois fois** le nombre de scripts sans achat du niveau `slowed`, sans aucune dépense, **et** au moins **deux signes différents** sur 14 jours, lus par le code : (1) il redemande une preuve après un refus ; (2) il marchande ou demande une remise ; (3) il réclame du gratuit après une offre refusée ; (4) il insulte ou met la pression ; (5) il insiste pour un contact personnel ou une rencontre, deux fois ou plus ; (6) il part en plein script juste après une étape payante vue, sans avoir jamais acheté ; (7) il promet d'acheter plus tard et ne le fait pas, deux fois.
+- **Sortie.** Un achat ou un pourboire : rythme normal sur-le-champ (§ 13). Des **excuses** pour son comportement : retour à `slowed`, pas plus.
+- **Mise en œuvre** (PR #1045) : l'attente est décidée avant tout appel d'IA, dans le job de réponse (`reply_deferred`, raison `time_waster`) ; les réglages vivent dans `creators.settings.timeWaster`, sans valeur dans le dépôt ; sans réglage, personne n'est classé. Le signe (6) se lit dans les déroulés ; les autres attendent leur journal (`fan_signs_seen`, migration à numéroter par Bilan).
+
 ## Partage du travail
 
 | Lot | Contenu | Fil |
