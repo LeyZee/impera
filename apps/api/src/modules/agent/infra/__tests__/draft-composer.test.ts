@@ -23,6 +23,7 @@ import type { AlertSettings } from '../../domain/alerts';
 import { helpBubble } from '../../domain/care';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
+import { FRENCH_ONLY } from '../compose';
 import {
   createDraftComposer,
   type AgentComposeInput,
@@ -33,6 +34,9 @@ import {
   type ScriptSource,
 } from '../draft-composer';
 import type { FanLimits } from '../fan-limits';
+
+/** Her languages where the test means French only, as `composeTurn` requires them said. */
+const FRENCH = { spokenLanguages: FRENCH_ONLY, languageExamples: {} };
 
 const PHOTO: MediaDescription = {
   vocabularyVersion: '1.0.0',
@@ -113,7 +117,7 @@ function composer(
   const draftComposer = createDraftComposer({
     onDroppedNotes: (event) => seen.dropped?.push(event),
     gateway: gateway(script, seen),
-    persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+    persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS, ...FRENCH },
     timeZoneOf: () => Promise.resolve('Europe/Paris'),
     voicePrompt: '1.2.0',
     ...(sight !== undefined && { sight }),
@@ -189,6 +193,7 @@ describe('createDraftComposer', () => {
         creatorName: 'Lina',
         personaSheet: 'fiche',
         guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
         voiceExamples: [
           { id: 'example-2', text: 'Hey toi' },
           { id: 'example-1', text: 'Coucou toi' },
@@ -523,7 +528,12 @@ describe('createDraftComposer', () => {
     const asked: string[] = [];
     const draftComposer = createDraftComposer({
       gateway: gateway({}, { voiceCalls: 0, traces: [] }),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: (creatorId) => {
         asked.push(creatorId);
         return Promise.resolve('America/Montreal');
@@ -966,7 +976,12 @@ describe('createDraftComposer, her alerts (P4-01)', () => {
     const { alerts, chatter } = options;
     const draftComposer = createDraftComposer({
       gateway: gateway(options.script ?? {}, seen),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       alertKeywords: keywords,
@@ -2003,7 +2018,12 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     const notSaved: { conversationId: string; limit: string }[] = [];
     const draftComposer = createDraftComposer({
       gateway: gateway({ brief: AGE }, { voiceCalls: 0, traces: [] }),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       limits: limitsOf({}, { failWrite: true }).limits,
@@ -2259,6 +2279,7 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
       creatorName: 'Nora',
       personaSheet: 'fiche active de Nora',
       guardSettings: DEFAULT_GUARD_SETTINGS,
+      ...FRENCH,
     },
     followUpSpirit: null,
     offerLimits: { cooldownHours: 10, minDesire: 70 },
@@ -2272,7 +2293,12 @@ describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () =>
     const draftComposer = createDraftComposer({
       gateway: gateway({}, seen),
       // The fixed persona is never read once hers is: a test that sees « Lina » fails.
-      persona: { creatorName: 'Lina', personaSheet: 'fiche fixe', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche fixe',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       ...(personaOf !== undefined && {
         personaOf: (creatorId, now) => {
           asked.push(creatorId);
@@ -2515,7 +2541,12 @@ describe('createDraftComposer, his custom order kept box by box (ADR 0159 § A.2
         },
         seen,
       ),
-      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        ...FRENCH,
+      },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
       limits: limitsOf(options.flags ?? adult).limits,
@@ -2642,6 +2673,7 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
           ...DEFAULT_GUARD_SETTINGS,
           ...(options.neverDo !== undefined && { neverDo: options.neverDo }),
         },
+        ...FRENCH,
       },
       timeZoneOf: () => Promise.resolve('Europe/Paris'),
       voicePrompt: '1.2.0',
@@ -2743,7 +2775,12 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       gateway: gateway({ brief: { ...BRIEF, intent: 'price_objection', objection: 'too_expensive' } }, seen),
       personaOf: () =>
         Promise.resolve({
-          persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+          persona: {
+            creatorName: 'Lina',
+            personaSheet: 'fiche',
+            guardSettings: DEFAULT_GUARD_SETTINGS,
+            ...FRENCH,
+          },
           followUpSpirit: null,
           offerLimits: { cooldownHours: 10, minDesire: 70 },
           sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
@@ -2772,7 +2809,12 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
         gateway: gateway({ brief: { ...BRIEF, intent: 'small_talk' } }, seen),
         personaOf: () =>
           Promise.resolve({
-            persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+            persona: {
+              creatorName: 'Lina',
+              personaSheet: 'fiche',
+              guardSettings: DEFAULT_GUARD_SETTINGS,
+              ...FRENCH,
+            },
             followUpSpirit: null,
             offerLimits: { cooldownHours: 10, minDesire: 70 },
             sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },

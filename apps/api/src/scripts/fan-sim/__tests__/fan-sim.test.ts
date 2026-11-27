@@ -11,7 +11,7 @@ import type {
 } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
-import { guardSettingsOf } from '../../../modules/agent/index';
+import { guardSettingsOf, languagesOf } from '../../../modules/agent/index';
 import { createPlaygroundSession, readPersonaFile } from '../../../modules/playground/index';
 import { parseSimCatalogue, playgroundScriptsOf } from '../catalogue';
 import { fanSheetText, parseFanSheet, sessionMinute, type FanSheet } from '../fan-sheet';
@@ -349,6 +349,7 @@ describe('Julien against the real playground session', () => {
       personaSheet: persona.personaSheet,
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
+      languages: languagesOf(persona),
       timeZone: 'Europe/Paris',
       now: () => sessionTime(first),
       offerLimits: persona.offerLimits,

@@ -61,9 +61,23 @@ export interface PersonaForModels {
    */
   readonly objectionReplies: ObjectionReplies;
   /** Her languages (`spoken_languages`), in her order: code decides the language of each answer among them (ADR 0168). */
-  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  readonly spokenLanguages: readonly [Language, ...Language[]];
   /** Her messages per language (`agent.language_examples`), read by the voice only in that language (ADR 0168 § 3). */
-  readonly languageExamples?: LanguageExamples;
+  readonly languageExamples: LanguageExamples;
+}
+
+/** Her languages and her messages in each, as every caller of `composeTurn` gives them (ADR 0168). */
+export interface PersonaLanguages {
+  readonly spokenLanguages: readonly [Language, ...Language[]];
+  readonly languageExamples: LanguageExamples;
+}
+
+/**
+ * Her languages for the composer, read the same way by the drafts, the playground and the evals: a caller that forgot
+ * them made her answer in French only (l1-l3 of the evals failed for that).
+ */
+export function languagesOf(persona: PersonaForModels): PersonaLanguages {
+  return { spokenLanguages: persona.spokenLanguages, languageExamples: persona.languageExamples };
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');

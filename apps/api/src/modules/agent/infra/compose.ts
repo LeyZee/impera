@@ -148,20 +148,24 @@ export interface ComposerPersona {
   readonly voiceExamples?: readonly VoiceExample[];
   /** When a phrase of hers is worn across her fans (`wornPhrases`); absent, the safe defaults. */
   readonly wornLimits?: WornLimits;
-  /** Her languages, in her order (ADR 0168): absent, French only. */
-  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  /**
+   * Her languages, in her order (ADR 0168), required: a caller that forgot them once made her answer in French only.
+   * `FRENCH_ONLY` for a persona that speaks nothing else.
+   */
+  readonly spokenLanguages: readonly [Language, ...Language[]];
   /** Her messages per language, given to the voice only in the language it writes in (ADR 0168 § 3). */
-  readonly languageExamples?: LanguageExamples;
+  readonly languageExamples: LanguageExamples;
 }
 
-const FRENCH_ONLY: readonly [Language, ...Language[]] = ['french'];
+/** The languages of a persona that speaks French only. */
+export const FRENCH_ONLY: readonly [Language, ...Language[]] = ['french'];
 
 /**
  * The language of this turn, decided by code (ADR 0168 § 2): on his messages for an answer, on his kept language for a
  * follow-up or her word after a sale.
  */
 function languageOfTurn(persona: ComposerPersona, input: ComposeTurnInput): LanguageDecision {
-  const spoken = persona.spokenLanguages ?? FRENCH_ONLY;
+  const spoken = persona.spokenLanguages;
   const kept = input.keptLanguage ?? null;
   const herLastText = input.history.findLast((turn) => turn.from === 'creator')?.text;
   if (input.followUp !== undefined || input.aftercare !== undefined)
@@ -180,7 +184,7 @@ function languageOfTurn(persona: ComposerPersona, input: ComposeTurnInput): Lang
 
 /** The language as the voice reads it: the decided one, his she does not speak, her examples in hers. */
 function voiceLanguageOf(persona: ComposerPersona, decision: LanguageDecision): VoiceLanguage {
-  const examples = persona.languageExamples?.[decision.reply] ?? [];
+  const examples = persona.languageExamples[decision.reply] ?? [];
   return {
     reply: decision.reply,
     notSpoken: decision.notSpoken,
@@ -892,7 +896,7 @@ function translationOfVoice(
 
 /** The languages her output guard lets through (ADR 0168 § 4): hers that the guards cover. */
 function guardLanguages(persona: ComposerPersona): readonly Language[] {
-  return (persona.spokenLanguages ?? FRENCH_ONLY).filter(isGuardedLanguage);
+  return persona.spokenLanguages.filter(isGuardedLanguage);
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
