@@ -396,6 +396,7 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
         target: 1,
         done: n <= done ? 1 : 0,
         essential: true,
+        source: 'tick',
       })),
     });
     const withDay = (done: number): void => {

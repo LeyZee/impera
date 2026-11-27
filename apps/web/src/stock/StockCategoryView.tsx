@@ -12,6 +12,7 @@ import {
   STOCK_NAMES,
   STOCK_RULES,
   STOCK_USES,
+  HER_USES,
   droppedOnLabel,
   durationLabel,
   filtered,
@@ -94,7 +95,7 @@ export function StockCategoryView({
           <p className="st-cat__use">
             {category === null
               ? 'Ce que l’IA a écrit et que personne n’a encore relu. Les chatteurs et l’IA de chatting lisent ces textes.'
-              : STOCK_USES[category]}
+              : (her ? HER_USES : STOCK_USES)[category]}
             {rule === undefined ? null : <span className="st-rule">{rule}</span>}
           </p>
         </div>
@@ -138,9 +139,13 @@ export function StockCategoryView({
       {groups.length === 0 ? (
         <Empty title={filter === 'all' ? 'Rien ici pour l’instant.' : 'Rien sous ce filtre.'}>
           {filter === 'all'
-            ? her
-              ? 'Ce que tu déposes dans Contenu arrive ici.'
-              : 'Ce qu’elle dépose dans Contenu arrive ici.'
+            ? category === 'script'
+              ? her
+                ? 'Tes scripts arrivent ici quand tu réponds à une demande de l’agence.'
+                : 'Ses scripts arrivent ici quand elle répond à une demande de l’agence.'
+              : her
+                ? 'Ce que tu déposes dans Contenu arrive ici.'
+                : 'Ce qu’elle dépose dans Contenu arrive ici.'
             : 'Choisis « Tout » pour revoir chaque média.'}
         </Empty>
       ) : (

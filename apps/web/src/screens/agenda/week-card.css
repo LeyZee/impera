@@ -874,3 +874,33 @@
     transition: none;
   }
 }
+
+/* A line her coffre does (avenant du 27/11): its tick drawn, nothing to tap, and why; else « Déposer ». */
+.dy-dropped {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin-top: 3px;
+}
+.dy-tick--still {
+  margin-top: 0;
+  background: var(--wk-c);
+  cursor: default;
+}
+.dy-tick--still::before {
+  content: none;
+}
+.dy-tick--still svg {
+  opacity: 1;
+}
+.dy-dropped__word {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+.dy-drop {
+  flex: none;
+  align-self: center;
+}

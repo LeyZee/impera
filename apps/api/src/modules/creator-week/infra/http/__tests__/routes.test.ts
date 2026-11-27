@@ -28,7 +28,7 @@ async function serve(read: WeekDraftStore['read']) {
     days: { read: unused, write: unused, teamDays: unused },
     agenda: { suggestWeek: unused, herWeek: unused, tickLine: unused, teamWeek: unused },
     accept: unused,
-    facts: { arrivals: unused, teamArrivals: unused },
+    facts: { arrivals: unused, teamArrivals: unused, videos: unused, teamVideos: unused },
     requireRole: () => (request) => {
       request.user = {
         id: 'owner-1',

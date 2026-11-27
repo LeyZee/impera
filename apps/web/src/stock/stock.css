@@ -822,3 +822,9 @@
     transform: none;
   }
 }
+/* On a phone the figures above filter alike, each on and off at a tap: five labels in one bar overlap (recette MOD-10). */
+@media (max-width: 640px) {
+  .st-toolbar .st-filter {
+    display: none;
+  }
+}

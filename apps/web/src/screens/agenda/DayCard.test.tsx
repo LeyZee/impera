@@ -24,6 +24,8 @@ const line = (
   target,
   done,
   essential,
+  // Her video of the day is done by her coffre (ADR 0140, avenant du 27/11).
+  source: item === 'reveal_video' ? 'drop' : 'tick',
 });
 const day = (essentialsDone: boolean) => ({
   day: TODAY,
@@ -96,6 +98,15 @@ describe('her day', () => {
     serve(day(true));
     show();
     expect(await screen.findByText(/L’essentiel est fait/)).toBeTruthy();
+  });
+
+  it('shows her video of the day done by her coffre, with nothing to tick (avenant du 27/11)', async () => {
+    serve(day(false));
+    show();
+    const lead = await screen.findByRole('region', { name: 'L’essentiel du jour' });
+    const video = within(lead).getAllByRole('listitem')[1];
+    expect(video?.textContent).toContain('Dans ton coffre');
+    expect(within(video ?? lead).queryByRole('button', { name: /Cocher/u })).toBeNull();
   });
 
   it('ticks a line of one, and a line of several up to the mark she taps', async () => {

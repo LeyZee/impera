@@ -1,10 +1,11 @@
 import { DAY_ITEM_LATE_UNPROCESSABLE, type DayLine, type DayPlatform } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { NOT_SENT, type Outcome } from './api';
 import { readDayAgain, tickDayItem, useCreatorDay } from './day-api';
-import { doneAfterTap, firstSentence, kindOf, PLATFORM_WORDS, tallyOf } from './day-model';
+import { doneAfterTap, DROP_FOR, firstSentence, kindOf, PLATFORM_WORDS, tallyOf } from './day-model';
 import { useWide } from './useWide';
 import { colorVars, useWeekColors, type ColorKind } from './week-colors';
 import { Icon, Palette } from './week-parts';
@@ -22,7 +23,8 @@ function failureOf(outcome: Exclude<Outcome<null>, { kind: 'ok' }>): string {
 
 /**
  * Her day (ADR 0140, second avenant): what she posts today, to tick as she goes (Charles, 20/11). The essentials lead,
- * large; the rest is a bonus, grouped by network, never in red. Nothing is ever published for her: these are her lists.
+ * large; the rest is a bonus, grouped by network, never in red. Her video of the day is done by her coffre, never
+ * ticked (avenant du 27/11 : « elle dépose, Impera planifie »): « Déposer » until it is there.
  * Each line opens a sentence or two on what it is for; her story that leads to Reveal says why it matters most.
  */
 export function DayCard(): JSX.Element | null {
@@ -201,34 +203,68 @@ function DayRow({
         </summary>
         <p className="wk-line__text">{line.sheet}</p>
       </details>
-      <span className="dy-marks" data-many={line.target > 1 || undefined}>
-        {marks.map((index) => {
-          const on = index < line.done;
-          const words =
-            line.target === 1
-              ? `${on ? 'Décocher' : 'Cocher'} ${line.label}`
-              : `${line.label} : ${String(index + 1)} sur ${String(line.target)}`;
-          return (
-            <button
-              key={index}
-              type="button"
-              className="wk-tick dy-tick"
-              aria-pressed={on}
-              aria-busy={busy === `${line.item}:${String(index)}`}
-              disabled={busy !== null}
-              aria-label={words}
-              onClick={() => {
-                onTap(line, index);
-              }}
-            >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="m3.5 8.5 3 3 6-7" />
-              </svg>
-            </button>
-          );
-        })}
-      </span>
+      {line.source === 'drop' ? (
+        <DroppedMark line={line} />
+      ) : (
+        <span className="dy-marks" data-many={line.target > 1 || undefined}>
+          {marks.map((index) => {
+            const on = index < line.done;
+            const words =
+              line.target === 1
+                ? `${on ? 'Décocher' : 'Cocher'} ${line.label}`
+                : `${line.label} : ${String(index + 1)} sur ${String(line.target)}`;
+            return (
+              <button
+                key={index}
+                type="button"
+                className="wk-tick dy-tick"
+                aria-pressed={on}
+                aria-busy={busy === `${line.item}:${String(index)}`}
+                disabled={busy !== null}
+                aria-label={words}
+                onClick={() => {
+                  onTap(line, index);
+                }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="m3.5 8.5 3 3 6-7" />
+                </svg>
+              </button>
+            );
+          })}
+        </span>
+      )}
     </li>
+  );
+}
+
+/**
+ * A line her coffre does: done, its tick drawn and nothing to tap (« Dans ton coffre »); not yet, « Déposer », which
+ * opens Contenu on its tile.
+ */
+function DroppedMark({ line }: { line: DayLine }): JSX.Element | null {
+  if (line.done >= line.target)
+    return (
+      <span className="dy-dropped">
+        <span className="wk-tick dy-tick dy-tick--still" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path d="m3.5 8.5 3 3 6-7" />
+          </svg>
+        </span>
+        <span className="dy-dropped__word">Dans ton coffre</span>
+      </span>
+    );
+  const category = DROP_FOR[line.item];
+  if (category === undefined) return null;
+  return (
+    <Link
+      to="/contenu"
+      search={{ depot: category }}
+      className="nv-btn nv-btn--soft nv-btn--sm dy-drop"
+      aria-label={`Déposer ${line.label}`}
+    >
+      Déposer
+    </Link>
   );
 }
 
