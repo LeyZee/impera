@@ -164,6 +164,7 @@ Branche : task/<id>-<slug>
 | DSH-07 | Le Dashboard de l'agence liste les remboursements un par un | API CRM | in-progress | DSH-06, ADR 0092 § 4 |
 | DSH-08 | Le Dashboard de l'agence suit les objectifs mensuels par créatrice | API CRM | in-progress | DSH-07, ADR 0092 § 6 |
 | DSH-09 | Le pilotage de l'agence : objectif du jour, trafic, gros fans, IA | API CRM | in-progress | DSH-08, ADR 0092 (avenant du 21/11/2026) |
+| DSH-10 | Le Dashboard du propriétaire : l'argent d'abord, le reste replié | Web | review | DSH-09, ADR 0092 (avenant du 27/11/2026) |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |

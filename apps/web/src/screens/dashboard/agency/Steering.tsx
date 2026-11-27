@@ -281,7 +281,7 @@ function trafficSteps(traffic: SteeringTraffic): {
   };
 }
 
-function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: FloatingTip }): JSX.Element {
+export function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: FloatingTip }): JSX.Element {
   const { labels, counts, before, colours } = trafficSteps(traffic);
   if (counts.every((count) => count === 0))
     return <p className="nv-plate ins-empty">Aucun abonné ni acheteur lu sur les 30 derniers jours.</p>;
@@ -361,7 +361,7 @@ function spreadHero(dependency: SteeringDependency): { readonly figure: string; 
   return { figure: `${String(five)} %`, words: 'du chiffre vient de cinq fans : bien réparti.' };
 }
 
-function DependencyCard({
+export function DependencyCard({
   steering,
   opensTracking,
   tip,

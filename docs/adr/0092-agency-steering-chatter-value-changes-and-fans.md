@@ -60,3 +60,12 @@ Le 21/11/2026, Charles choisit « les 4 cartes + corrections » après un audit 
 5. **Un changement sans couleur sur trop peu de ventes** : en dessous du seuil du § 5, la pastille d'écart d'une période garde son chiffre et perd le vert ou l'ambre.
 6. **L'IA rapporte-t-elle ?** : coût de l'IA en pourcentage des ventes, par créatrice, repère d'une commission de chatteur à 15 %, lu dans le calcul de Réglages › Consommation IA (pas de second calcul). Elle arrive après celui-ci.
 7. **Les fans qui attendent en tête** (grande recette du 21/11, point 2, validé par Charles) : « À traiter » de toutes les créatrices suivies, rouge pour une ligne grave, ambre sinon, trois au plus avec « Tout voir » vers Suivi.
+
+## Avenant du 27/11/2026 : le Dashboard du propriétaire, l'argent d'abord, le reste replié
+
+Le 27/11/2026, Charles valide la maquette du Dashboard du propriétaire (« ok maquette »). Elle amende les points 1 et 2 de l'avenant du 21/11 ; le reste tient.
+
+1. **Ordre de lecture** : la période en haut de l'écran, puis « À toi » (ce qui attend, point 7 ; rien quand rien n'attend), puis « L'argent », puis « Pour creuser ». Le pilotage ne passe plus avant les chiffres : il est replié sous eux.
+2. **L'argent** : le chiffre d'affaires de la période, l'objectif du mois (§ 6) avec sa barre, le trait de là où le mois devrait en être, la pastille « Dans les clous », « En retard », « Objectif atteint » ou « Objectif manqué » et la fin du mois à ce rythme ; rien de tout cela sans objectif fixé (un bouton pour le fixer, au mois et pour le propriétaire seulement). Une seule courbe : le cumul, le rythme de l'objectif en tirets, la période comparée en pointillé. Dessous : aujourd'hui (et hier), où va l'argent en trois parts, l'écart avec la période comparée. L'« Objectif du jour » en carte disparaît de cet écran ; son chiffre du jour reste.
+3. **Pour creuser** : chaque analyse sur une ligne qui donne déjà sa réponse, ouverte à la demande. Une analyse qui n'a rien à dire n'a pas de carte vide : elle est nommée sur une ligne discrète.
+4. **Plus tard** (deuxième lot, après la mise en ligne) : une phrase de verdict qui ne dit « tout va bien » que sur preuve, les cartes « En ce moment » (équipe, IA face aux chatteurs, créatrices, nouveaux abonnés, fans brûlés) et la version courte du manager.

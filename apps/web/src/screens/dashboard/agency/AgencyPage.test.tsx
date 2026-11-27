@@ -97,6 +97,16 @@ function show(page: () => ReactNode): void {
   );
 }
 
+/** Opens a fold of « Pour creuser » by its title: its body mounts then. */
+async function dig(title: string): Promise<HTMLElement> {
+  const name = await screen.findByText(title, { selector: '.nv-disclosure__title' });
+  const fold = name.closest('details');
+  if (fold === null) throw new Error(title);
+  fold.open = true;
+  fireEvent(fold, new Event('toggle'));
+  return fold;
+}
+
 describe('the agency’s Dashboard (ADR 0078)', () => {
   it('opens on the agency’s figures, the choice of a creator left to the menu’s selector (ADR 0134 § 3)', async () => {
     serve();
@@ -111,7 +121,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
         canAddCreator
       />
     ));
-    expect(await screen.findByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /L’argent/u })).toBeTruthy();
     // A title, as on every screen (recette visuelle 16/11, PIL-04).
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
     // No chips of its own any more: one selector, in the menu.
@@ -154,7 +164,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       />
     ));
     expect(await screen.findByRole('link', { name: 'Aller à Créatrices' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: /L’agence en chiffres/u })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /L’argent/u })).toBeNull();
   });
 
   it('puts the figures before what the agency runs, the AI budget last (PIL-04)', async () => {
@@ -171,7 +181,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       />
     ));
     const budget = await screen.findByRole('complementary', { name: 'Budget IA du jour, toutes créatrices' });
-    const figures = await screen.findByRole('heading', { name: /L’agence en chiffres/u });
+    const figures = await screen.findByRole('heading', { name: /L’argent/u });
     expect(figures.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -219,19 +229,19 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(screen.queryByRole('heading', { name: /Ventes lues chez/u })).toBeNull();
   });
 
-  it('steers before the figures: the day, traffic to money, the fans it hangs on (pilotage 21/11)', async () => {
+  it('says the money first, then folds the rest on lines that already answer (maquette du 27/11)', async () => {
     serve();
     show(agencyPage);
-    const day = await screen.findByRole('heading', { name: /Objectif du jour/u });
-    const figures = await screen.findByRole('heading', { name: /L’agence en chiffres/u });
-    expect(day.compareDocumentPosition(figures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // 300 € a day, 273 € expected at this pace: behind by 27 €, its tag in amber.
-    const verdict = await screen.findByText(/Il manquerait 27 €/u);
-    expect(verdict.getAttribute('data-tone')).toBe('down');
-    expect(screen.getAllByRole('button', { name: /^\d+ (oct|nov)\./u })).toHaveLength(30);
-    expect(screen.getByText('Jours tenus sur les 29 derniers')).toBeTruthy();
-    // The path, every step the server counted.
-    const path = document.querySelector('.stg-traffic');
+    const money = await screen.findByRole('heading', { name: /L’argent/u });
+    const folds = await screen.findByRole('heading', { name: /Pour creuser/u });
+    expect(money.compareDocumentPosition(folds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Today read in the steering, not a second objective of the day.
+    expect(screen.queryByRole('heading', { name: /Objectif du jour/u })).toBeNull();
+    expect(await screen.findByText('Aujourd’hui')).toBeTruthy();
+    // Each fold answers without opening; its body mounts on demand.
+    expect(document.querySelector('.stg-traffic')).toBeNull();
+    const traffic = await dig('Du trafic à l’argent');
+    const path = traffic.querySelector('.stg-traffic');
     expect(Array.from(path?.querySelectorAll('.nv-funnel__name') ?? [], (name) => name.textContent)).toEqual([
       'Nouveaux abonnés',
       'Ont écrit',
@@ -239,6 +249,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       'Payeurs réguliers',
     ]);
     // Five fans make 51 %: fairly concentrated; never a ten that would say 100 %.
+    await dig('Gros fans');
     expect(
       screen.getByRole('heading', { name: '51 % du chiffre vient de cinq fans : assez concentré.' }),
     ).toBeTruthy();
@@ -246,15 +257,62 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
   });
 
-  it('leaves the day’s ring empty without an objective, and says where to set it (audit 27/11)', async () => {
-    serve([CREATOR], {
-      steering: { status: 200, body: { ...STEERING, daily: { ...STEERING.daily, targetMinor: null } } },
-    });
+  it('names the quiet blocks in one line instead of empty cards', async () => {
+    serve();
     show(agencyPage);
-    await screen.findByText(/Pas encore d’objectif ce mois-ci/u);
-    // A full ring would read « objectif atteint »: only the track is drawn.
-    expect(document.querySelector('.stg-gauge .nv-donut__track')).not.toBeNull();
-    expect(document.querySelectorAll('.stg-gauge .nv-donut__arc')).toHaveLength(0);
+    const quiet = await screen.findByText(/Se montreront quand ils auront de quoi dire/u);
+    expect(quiet.closest('p')?.textContent).toMatch(/fans brûlés/u);
+  });
+
+  it('says no pace without an objective, and offers to set the month’s on the money itself (audit 27/11)', async () => {
+    serveDashboard(
+      (url) => {
+        if (url.pathname === '/v1/dashboard/agency')
+          return { status: 200, body: { ...AGENCY_WEEK, span: { ...AGENCY_WEEK.span, unit: 'month' } } };
+        if (url.pathname === '/v1/dashboard/agency/steering') return { status: 200, body: STEERING };
+        if (url.pathname === '/v1/dashboard/todos') return { status: 200, body: NO_TODOS };
+        return { status: 200, body: apiDashboard() };
+      },
+      [CREATOR],
+    );
+    show(agencyPage);
+    const set = await screen.findByRole('button', { name: 'Fixer l’objectif du mois' });
+    // Never « Dans les clous » or « En retard » against nothing.
+    expect(screen.queryByText(/Dans les clous|En retard/u)).toBeNull();
+    expect(document.querySelector('.own-pace')).toBeNull();
+    fireEvent.click(set);
+    await vi.waitFor(() => {
+      expect(document.querySelector<HTMLDetailsElement>('#creuser-creators')?.open).toBe(true);
+    });
+  });
+
+  it('reads the month against its objective: the pill, the bar and the end at this pace', async () => {
+    const objectives = {
+      month: '2026-11-01',
+      daysGone: 6,
+      days: 30,
+      creators: [],
+      objectiveMinor: 600_000,
+      revenueMinor: 184_600,
+      projectedMinor: 923_000,
+    };
+    serveDashboard(
+      (url) => {
+        if (url.pathname === '/v1/dashboard/agency')
+          return {
+            status: 200,
+            body: { ...AGENCY_WEEK, span: { ...AGENCY_WEEK.span, unit: 'month' }, objectives },
+          };
+        if (url.pathname === '/v1/dashboard/agency/steering') return { status: 200, body: STEERING };
+        if (url.pathname === '/v1/dashboard/todos') return { status: 200, body: NO_TODOS };
+        return { status: 200, body: apiDashboard() };
+      },
+      [CREATOR],
+    );
+    show(agencyPage);
+    expect(await screen.findByText('Dans les clous')).toBeTruthy();
+    expect(document.querySelector('.own-pace')?.getAttribute('data-tone')).toBe('up');
+    expect(screen.queryByRole('button', { name: 'Fixer l’objectif du mois' })).toBeNull();
   });
 
   it('never says a share above 100 % when the buyers outnumber the new subscribers read (recette 27/11, C1)', async () => {
@@ -274,8 +332,9 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       },
     });
     show(agencyPage);
+    const traffic = await dig('Du trafic à l’argent');
     await screen.findByText('fans ont acheté pour la première fois');
-    const path = document.querySelector('.stg-traffic');
+    const path = traffic.querySelector('.stg-traffic');
     expect(Array.from(path?.querySelectorAll('.nv-funnel__rate') ?? [], (rate) => rate.textContent)).toEqual([
       '',
       '',
@@ -288,6 +347,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
   it('names the payers who stopped, and opens the conversation of one Impera reads (ADR 0092 § 3)', async () => {
     serve();
     show(agencyPage);
+    await dig('Gros fans');
     const lapsed = (await screen.findByRole('heading', { name: /Ont décroché/u })).closest('article');
     // Euros without cents, the thousands apart as the app writes them.
     expect(lapsed?.textContent).toMatch(/1\s840\u00a0€/u);
@@ -306,10 +366,10 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
   it('says nothing of the steering to an account whose scope is its own', async () => {
     serve([CREATOR], { steering: { status: 403, body: { error: 'creator_forbidden' } } });
     show(agencyPage);
-    await screen.findByRole('heading', { name: /L’agence en chiffres/u });
-    await vi.waitFor(() => {
-      expect(screen.queryByRole('heading', { name: /Objectif du jour/u })).toBeNull();
-    });
+    await screen.findByRole('heading', { name: /L’argent/u });
+    await screen.findByRole('heading', { name: /Pour creuser/u });
+    expect(screen.queryByText('Du trafic à l’argent')).toBeNull();
+    expect(screen.queryByText('Gros fans')).toBeNull();
   });
 
   it('opens on the fans who wait, a grave one in red, before any figure (grande recette 21/11, point 2)', async () => {
@@ -332,7 +392,7 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(urgent.getAttribute('data-tone')).toBe('bad');
     expect(within(urgent).getByText('dont 1 grave')).toBeTruthy();
     expect(within(urgent).getByText('depuis 14 min')).toBeTruthy();
-    const figures = await screen.findByRole('heading', { name: /Objectif du jour/u });
+    const figures = await screen.findByRole('heading', { name: /L’argent/u });
     expect(urgent.compareDocumentPosition(figures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

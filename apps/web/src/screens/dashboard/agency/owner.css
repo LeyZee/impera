@@ -1,0 +1,434 @@
+/*
+ * The owner's Dashboard (maquette du 27/11, lot 1): « À toi », the money band, the folded cards. Tokens only; the
+ * curve reuses the lead curve's classes (`ins-curve`), drawn in by a clip and still under reduced motion.
+ */
+
+/* « À toi » says nothing when nothing waits: its heading goes with its last card. */
+.own-todo:not(:has(.own-todo__body > *)) {
+  display: none;
+}
+.own-todo__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-card-gap);
+}
+
+.own-loading {
+  min-height: 320px;
+}
+
+/* ── L'argent: one figure, its objective and its pace, one curve, then three small figures. */
+.own-money {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px 26px 22px;
+}
+.own-money__top {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 34px;
+  align-items: stretch;
+}
+.own-money__lead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+.own-money__eyebrow {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.own-money__big {
+  margin: 10px 0 6px;
+  font-size: 60px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.own-money__goal {
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink-muted);
+}
+.own-money__goal b,
+.own-money__then b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.own-money__set {
+  margin-top: 16px;
+}
+.own-money__pill {
+  --_c: var(--nv-trend-up);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  margin-top: 16px;
+  padding: 0 12px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  color: var(--nv-trend-up-text);
+  background: color-mix(in srgb, var(--_c) 14%, transparent);
+}
+.own-money__pill[data-tone='down'] {
+  --_c: var(--nv-trend-down);
+  color: var(--nv-trend-down-text);
+}
+.own-money__pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.own-money__then {
+  margin-top: 8px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+/* The bar of the month: its fill grows in, the mark says where the month should be by now. */
+.own-pace {
+  --_c: var(--nv-trend-up);
+  align-self: stretch;
+  margin-top: 18px;
+}
+.own-pace[data-tone='down'] {
+  --_c: var(--nv-trend-down);
+}
+.own-pace__bar {
+  position: relative;
+  height: 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+}
+.own-pace__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--_w);
+  border-radius: inherit;
+  background: var(--_c);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--_c) 50%, transparent);
+  transform-origin: left;
+  animation: own-grow var(--nv-dur-data) var(--nv-ease-out) 150ms backwards;
+}
+.own-pace__mark {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  left: var(--_x);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--nv-ink);
+  opacity: 0.7;
+}
+.own-pace__legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+@keyframes own-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* The running total: the lead curve's look, a taller plot, the pace dashed, the period compared dotted. */
+.own-curve {
+  min-height: 220px;
+}
+.own-curve__read {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  min-height: 20px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.own-curve__read b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.own-curve__gap[data-tone='up'] {
+  color: var(--nv-trend-up-text);
+  font-weight: 650;
+}
+.own-curve__gap[data-tone='down'] {
+  color: var(--nv-trend-down-text);
+  font-weight: 650;
+}
+.own-curve__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.own-curve__key::before {
+  content: '';
+  width: 14px;
+  border-top: 2.5px solid var(--_trend);
+}
+.own-curve__key--pace::before {
+  border-top: 2px dashed var(--nv-ink-faint);
+}
+.own-curve__key--before::before {
+  border-top: 2px dotted var(--nv-series-other);
+}
+.own-curve__plot {
+  flex: 1 1 170px;
+  min-height: 170px;
+  border-radius: var(--nv-radius-sm);
+}
+.own-curve__plot:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 4px;
+}
+.own-curve .ins-curve__line {
+  stroke-width: 2.5;
+}
+.own-curve__pace {
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+.own-curve__before {
+  fill: none;
+  stroke: var(--nv-series-other);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+}
+.own-curve__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.own-curve__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+
+/* The three small figures under the band: today, where the money goes, the change. */
+.own-money__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--nv-hairline);
+}
+.own-fig,
+.own-split {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: var(--nv-radius-md);
+}
+.own-fig__label {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.own-fig__value {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.own-fig__value--delta .nv-delta {
+  height: 26px;
+  font-size: var(--nv-text-callout);
+}
+.own-fig__sub {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.own-split [data-part='rest'] {
+  --_c: var(--nv-series-other);
+}
+.own-split__bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin: 8px 0 10px;
+  overflow: hidden;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+}
+.own-split__part {
+  min-width: 3px;
+  background: var(--_c);
+  transform-origin: left;
+  animation: own-grow var(--nv-dur-data) var(--nv-ease-out) 250ms backwards;
+  transition: filter var(--nv-dur-fast) var(--nv-ease-out);
+}
+.own-split__part:hover {
+  filter: brightness(1.15);
+}
+.own-split__part[data-part='rest'],
+.own-split__key[data-part='rest'] {
+  background: repeating-linear-gradient(135deg, var(--_c) 0 3px, transparent 3px 6px);
+}
+.own-split__keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.own-split__keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--nv-radius-xs);
+  cursor: default;
+}
+.own-split__keys li:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.own-split__keys b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.own-split__key {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--_c);
+}
+
+/* ── Pour creuser: one line each, its answer on the right, its body when open. */
+.own-dig {
+  padding: 4px;
+}
+.own-dig__item + .own-dig__item {
+  border-top: 1px solid var(--nv-hairline);
+}
+.own-dig__item > summary {
+  min-height: 52px;
+}
+.own-dig__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+}
+.own-dig__icon svg {
+  width: 15px;
+  height: 15px;
+}
+.own-dig__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.own-dig__answer {
+  color: var(--nv-ink-muted);
+}
+.own-dig__answer-m {
+  display: none;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.own-dig__body {
+  padding: 6px 14px 18px 52px;
+}
+.own-dig__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-card-gap);
+}
+/* Inside a fold the cards lose their own plate: the fold is the plate. */
+.own-dig__body > .nv-plate,
+.own-dig__stack > .nv-plate {
+  background: none;
+  box-shadow: none;
+}
+.own-quiet {
+  margin: 0 4px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+.own-quiet em {
+  font-family: var(--nv-font-serif);
+  font-size: 15px;
+}
+
+@media (max-width: 1100px) {
+  .own-money__top {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+@media (max-width: 720px) {
+  .own-money {
+    padding: 20px 18px 18px;
+  }
+  .own-money__big {
+    font-size: 50px;
+  }
+  .own-curve {
+    min-height: 180px;
+  }
+  .own-money__row {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 16px;
+  }
+  .own-split {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+  .own-split__keys {
+    flex-direction: column;
+  }
+  .own-dig__answer {
+    display: none;
+  }
+  .own-dig__text {
+    flex: 1;
+  }
+  .own-dig__answer-m {
+    display: block;
+  }
+  .own-dig__body {
+    padding: 4px 8px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .own-pace__fill,
+  .own-split__part {
+    animation: none;
+  }
+}
