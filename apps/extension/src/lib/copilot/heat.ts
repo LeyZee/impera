@@ -33,7 +33,7 @@ export interface Heat {
   readonly lit: boolean;
   /** After a purchase: neutral, the pause. */
   readonly rest: boolean;
-  /** « chaud », « brûlant », « après achat · pause 48 h ». */
+  /** « chaud », « brûlant », « après achat · en pause ». */
   readonly word: string;
   /** What is missing to sell, said under the track when there is one (« il manque sa dispo »). */
   readonly note: string | null;
@@ -58,15 +58,19 @@ export function heatOf({ standing, money, assist, cut, now }: HeatInput): Heat |
   const verdict = assist?.saleMoment?.verdict ?? null;
   const offering = assist?.nextMove?.kind === 'offer_step';
   // A step bought tonight with the next one offered: the script goes on, no pause yet.
-  if (recentPurchase(money, now) && !offering && verdict !== 'good')
+  // The server's pause wins when it says one (its length is the creator's setting); else the panel's own reading.
+  const paused =
+    assist?.nextMove?.block === 'after_purchase' ||
+    (recentPurchase(money, now) && !offering && verdict !== 'good');
+  if (paused)
     return {
       level: REST,
       color: null,
       lit: false,
       rest: true,
-      word: 'après achat · pause 48 h',
+      word: 'après achat · en pause',
       note: null,
-      label: 'Son envie : après un achat, pause de 48 heures',
+      label: 'Son envie : en pause après un achat',
     };
   if (verdict === 'good')
     return {

@@ -102,10 +102,18 @@ describe('his desire as fire (maquette v4, 27/11)', () => {
       rest: true,
       lit: false,
       color: null,
-      word: 'après achat · pause 48 h',
+      word: 'après achat · en pause',
     });
     expect(heatOf(input({ money: bought, assist: good }))?.lit).toBe(true);
     expect(heatOf(input({ money: money('2026-11-25T20:00:00Z') }))?.rest).toBe(false);
+  });
+
+  it('rests when the server says the pause after a purchase, whatever its length', () => {
+    const paused = assist({
+      nextMove: { kind: 'no_sale', label: 'Ne rien vendre', priceMinor: null, block: 'after_purchase' },
+    });
+    // Bought three days ago: past the panel's own 48 h, but the creator's pause is longer.
+    expect(heatOf(input({ money: money('2026-11-24T20:00:00Z'), assist: paused }))?.rest).toBe(true);
   });
 
   it('says nothing of his desire under a cut, a contested age, or before his band is known', () => {
