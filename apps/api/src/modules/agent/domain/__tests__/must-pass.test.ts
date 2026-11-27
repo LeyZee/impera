@@ -170,12 +170,16 @@ describe('permitted phrases that must always pass, output guards', () => {
     );
   });
 
-  it.each(['je fais pas de promo', 'pas de réduc avec moi 😌', 'il me reste 10 % de batterie'])(
-    'discount lets « %s » through',
-    (bubble) => {
-      expect(raised(bubble)).not.toContain('discount');
-    },
-  );
+  it.each([
+    'je fais pas de promo',
+    'pas de réduc avec moi 😌',
+    'il me reste 10 % de batterie',
+    'c’est les soldes, tout est à moitié prix chez zara',
+    'promo -20 % sur les jeans ce week-end',
+    'en promo à -30 % sur les pulls',
+  ])('discount lets « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('discount');
+  });
 
   it.each(['pas besoin de payer pour me parler', 'je suis là pour toi'])(
     'payment_lie lets « %s » through',

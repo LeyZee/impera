@@ -366,13 +366,14 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'discount',
     pattern:
-      /\b(je (te|vous) (fais|fait|ferai|ferais|laisse|propose|offre) (un|une|le|la) (petit |petite |bon |super )?(prix|remise|reduc|reduction|ristourne|promo|rabais|geste)|(un|une|le) (prix d'ami|prix special|petit prix|code promo)|a moitie prix|\d+ ?% de (remise|reduc|reduction|rabais)|je (te |vous )?(baisse|descends|brade) (le|mon|son|ce) prix|au lieu de \d+ ?(€|euros?|balles)|je (te |vous )?(le|la|les) (laisse|fais) (a|pour) \d+|on (peut )?(negocie|negocier|s'arrange|s'arranger) (sur|pour) le prix)/,
+      /\b(je (te|vous) (fais|fait|ferai|ferais|laisse|propose|offre) (un|une|le|la) (petit |petite |bon |super )?(prix|remise|reduc|reduction|ristourne|promo|rabais|geste)|(un|une|le) (prix d'ami|prix special|petit prix|code promo)|a moitie prix(?! (chez|au|aux|a la|dans|en ligne|sur (vinted|amazon|le site|internet)))|(moitie prix|half price|meta prezzo|mitad de precio) (pour toi|for you|per te|para ti)|je te (la |le |les |l')?(fais|laisse|donne) (gratuit|gratuite|gratuits|gratuites|gratos|pour rien|a l'?oeil)|\d+ ?% de (remise|reduc|reduction|rabais)|je (te |vous )?(baisse|descends|brade) (le|mon|son|ce) prix|au lieu de \d+ ?(€|euros?|balles)|je (te |vous )?(le|la|les) (laisse|fais) (a|pour) \d+|on (peut )?(negocie|negocier|s'arrange|s'arranger) (sur|pour) le prix)/,
   },
-  // A percentage off, said about a price: « -30 % sur le pack », « 20 % de moins pour toi ». « -10 % de batterie » passes.
+  // A percentage off, said about a price: « -30 % sur le pack », « 20 % de moins pour toi ». « -10 % de batterie » passes,
+  // and so do the shops' sales: « promo -20 % sur les jeans », « à moitié prix chez zara » (Sécurité, #1043).
   {
     code: 'discount',
     pattern:
-      /(^|\s)(moins |-) ?\d+ ?% (sur (le|la|les|ce|cette|ces|mon|ma|mes|ton|ta|tes|tout)|pour toi|de remise|de reduc|si tu)|\b\d+ ?% (de moins|moins cher) (sur|pour)\b/,
+      /(?<!\b(promo|promos|solde|soldes|reduc|black friday)( a)? ?:? ?)(^|\s)(moins |-) ?\d+ ?% (sur (le|la|les|ce|cette|ces|mon|ma|mes|ton|ta|tes|tout)|pour toi|de remise|de reduc|si tu)|\b\d+ ?% (de moins|moins cher) (sur|pour)\b/,
   },
 ];
 

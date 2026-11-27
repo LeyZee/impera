@@ -722,6 +722,17 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
       ['espèce de radin', 't’es qu’un crevard', 'sale rapiat', 't’es un gros radin', 'quel mendiant'],
     ],
     [
+      'discount',
+      ['c’est les soldes, tout est à moitié prix chez zara', 'promo -20 % sur les jeans ce week-end'],
+      [
+        'moitié prix pour toi',
+        'je te la fais gratuite',
+        'je te le laisse pour rien',
+        'je te fais la vidéo à moitié prix',
+        '-30 % sur le pack ce soir',
+      ],
+    ],
+    [
       'ai_disclosure',
       [
         't’as essayé chatgpt pour ton taf ?',
