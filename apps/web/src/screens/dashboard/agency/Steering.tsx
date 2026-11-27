@@ -16,7 +16,7 @@ import { CountUp, Section, type FloatingTip } from '../parts';
 import { Comparable, Ring } from './AgencyInsights';
 import { NotYours, useAgencySteering } from './api';
 import { TOO_FEW_TO_CONCLUDE } from './period';
-import { euros, exactEuros, shareOf, shortDay, shortEuros, type Slice } from './view';
+import { euros, exactEuros, frNumber, shareOf, shortDay, shortEuros, type Slice } from './view';
 import './steering.css';
 
 import { Columns, Donut, Meter } from '@/shell/figures/figures';
@@ -31,7 +31,7 @@ import { Failure } from '@/shell/states';
 /** Whole euros on the cards: the cents are in the bars' tips. */
 const wholeEuros = (cents: number): string => euros(Math.round(cents / 100) * 100);
 const formatEuros = wholeEuros;
-const formatCount = (value: number): string => Math.round(value).toLocaleString('fr-FR');
+const formatCount = (value: number): string => frNumber(Math.round(value));
 
 /** « Ça casse ici » needs enough fans in both windows to mean something (ADR 0092 § 5). */
 const FUNNEL_MIN_FIRST = 30;
@@ -281,7 +281,7 @@ function trafficSteps(traffic: SteeringTraffic): {
   };
 }
 
-function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: FloatingTip }): JSX.Element {
+export function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: FloatingTip }): JSX.Element {
   const { labels, counts, before, colours } = trafficSteps(traffic);
   if (counts.every((count) => count === 0))
     return <p className="nv-plate ins-empty">Aucun abonné ni acheteur lu sur les 30 derniers jours.</p>;
@@ -303,12 +303,12 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
         <b className="stg-hero__figure">
           {rate === null
             ? String(bought)
-            : `${rate.toLocaleString('fr-FR', { maximumFractionDigits: rate < 10 ? 1 : 0 })} %`}
+            : `${frNumber(rate, { maximumFractionDigits: rate < 10 ? 1 : 0 })} %`}
         </b>
         <span className="stg-hero__words">
           {rate === null
             ? `fan${bought > 1 ? 's' : ''} ${bought > 1 ? 'ont' : 'a'} acheté pour la première fois`
-            : `des nouveaux abonnés achètent : ${String(bought)} sur ${top.toLocaleString('fr-FR')}`}
+            : `des nouveaux abonnés achètent : ${String(bought)} sur ${frNumber(top)}`}
         </span>
       </p>
       <FunnelPanel
@@ -361,7 +361,7 @@ function spreadHero(dependency: SteeringDependency): { readonly figure: string; 
   return { figure: `${String(five)} %`, words: 'du chiffre vient de cinq fans : bien réparti.' };
 }
 
-function DependencyCard({
+export function DependencyCard({
   steering,
   opensTracking,
   tip,

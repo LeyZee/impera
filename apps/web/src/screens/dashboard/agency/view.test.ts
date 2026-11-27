@@ -32,7 +32,7 @@ import {
 
 describe('the agency’s figures as the screen says them (ADR 0078)', () => {
   it('writes euros from cents, the cents only when there are some', () => {
-    expect(euros(184_600)).toBe('1 846 €');
+    expect(euros(184_600)).toBe('1\u00a0846 €');
     expect(euros(1_050)).toBe('10,50 €');
     expect(shortEuros(184_600)).toBe('1,8 k€');
     expect(shortEuros(4_000)).toBe('40 €');
@@ -151,7 +151,7 @@ describe('subscribers helpers', () => {
   });
 
   it('explains a money figure to the cent, beside the period before, its share of the revenue and of the net (ADR 0106 § 12)', () => {
-    expect(exactEuros(184_600)).toBe('1\u202f846,00\u00a0€');
+    expect(exactEuros(184_600)).toBe('1\u00a0846,00\u00a0€');
     const tip = moneyTip({
       title: 'Part de l’agence',
       cents: 3_200,

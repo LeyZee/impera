@@ -57,6 +57,7 @@ import {
   refundDelayLabel,
   refundsKept,
   sellerKeyOf,
+  frNumber,
   SELLER_NOTES,
   sellerRanking,
   shareOf,
@@ -84,9 +85,9 @@ import { Failure } from '@/shell/states';
  */
 
 /** « 20 % »: the transfers' VAT rate as the code holds it (ADR 0106 § 7), never written twice. */
-const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00a0%`;
+const VAT_RATE = `${frNumber(AGENCY_TRANSFER_VAT_BPS / 100)}\u00a0%`;
 const formatEuros = (cents: number): string => euros(Math.round(cents));
-const formatCount = (n: number): string => Math.round(n).toLocaleString('fr-FR');
+const formatCount = (n: number): string => frNumber(Math.round(n));
 
 /**
  * Whether the register reaches back to the comparison's first day (ADR 0146 § 4): when it does not, no percentage of
@@ -97,13 +98,13 @@ export const Comparable = createContext(true);
  * Whether the period has enough sales to judge a change (ADR 0092 § 5): below, a change keeps its figure but loses its
  * colour, so three sales against two never read as a victory (pilotage 21/11).
  */
-const Settled = createContext(true);
+export const Settled = createContext(true);
 
 /**
  * « +18 % » in the colour of better or worse; nothing when there is nothing to compare with, nor when nothing then and
  * nothing now: a « 0 % » next to a zero is noise (recette 11/11, ADM-07).
  */
-function Delta({
+export function Delta({
   current,
   previous,
   lowerIsBetter = false,
@@ -139,7 +140,7 @@ interface CurvePoint {
  * that day (the compared line stops where the register begins, never falls to zero); one day read hour by hour.
  */
 /** The first day the curves draw (ADR 0146 § 5): the register's first day when it falls in the period, else the first. */
-function firstDrawn(insights: AgencyInsights): number {
+export function firstDrawn(insights: AgencyInsights): number {
   const since = insights.registerSince;
   if (since === null || since <= insights.from) return 0;
   return Math.max(
@@ -498,14 +499,18 @@ function leadNote(insights: AgencyInsights): string {
   return `${against} (${euros(previous.revenueMinor)})`;
 }
 
-function Figures({
+export function Figures({
   insights,
   several,
   tip,
+  detailOnly = false,
 }: {
   insights: AgencyInsights;
   several: boolean;
   tip: FloatingTip;
+  /** The owner's Dashboard says the revenue, its curve and where it goes once, above (D2, maquette du 27/11): here
+      only the tiles under them, the net, the parts, the transfers' VAT, the sales and the refunds. */
+  detailOnly?: boolean;
 }): JSX.Element {
   const { current, previous } = insights.totals;
   const fansVat = current.revenueMinor - current.revenueExclVatMinor;
@@ -613,13 +618,13 @@ function Figures({
   const activity: readonly Tile[] = [
     {
       label: 'Ventes',
-      value: current.sales.toLocaleString('fr-FR'),
+      value: frNumber(current.sales),
       note: 'abonnements, PPV, tips… une ligne chacune',
       delta: [current.sales, previous.sales],
     },
     {
       label: 'Remboursements',
-      value: current.refunds.toLocaleString('fr-FR'),
+      value: frNumber(current.refunds),
       // A zero says itself: « aucun remboursement » under it would say it twice (PIL-21).
       note:
         current.sales === 0
@@ -631,6 +636,14 @@ function Figures({
       lowerIsBetter: true,
     },
   ];
+  if (detailOnly) {
+    return (
+      <div className="ins-figures-stack">
+        <Tiles tiles={money} from={1} label="L’argent" tip={tip} />
+        <Tiles tiles={activity} from={5} label="Les ventes" tip={tip} pair />
+      </div>
+    );
+  }
   return (
     <div className="ins-figures-stack">
       <div className="ins-figures">
@@ -911,7 +924,7 @@ const SELLER_MARK: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
   unlinked: '?',
   none: '–',
 };
-const SELLER_NAME: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
+export const SELLER_NAME: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
   agent: 'Agent IA',
   unlinked: 'Chatteur non relié',
   none: 'Sans chatteur',
@@ -921,7 +934,7 @@ const SELLER_NAME: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
  * Who sold, one line each, bars from the same start: widths are shares of the biggest line's revenue. The sellers come
  * first, ranked; the sales of no seller after them, unranked, under a rule (recette visuelle 16/11, PIL-03).
  */
-function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
+export function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const best = Math.max(0, ...insights.sellers.map((seller) => seller.revenueMinor));
   if (insights.sellers.length === 0)
     return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
@@ -947,10 +960,8 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
               rows: [
                 ['Chiffre d’affaires', euros(one.revenueMinor)],
                 ['Part de l’agence', euros(one.agencyMinor)],
-                ['Ventes', one.sales.toLocaleString('fr-FR')],
-                ...(one.refunds > 0
-                  ? [['Remboursements', one.refunds.toLocaleString('fr-FR')] as const]
-                  : []),
+                ['Ventes', frNumber(one.sales)],
+                ...(one.refunds > 0 ? [['Remboursements', frNumber(one.refunds)] as const] : []),
                 ...(average === null ? [] : [['Panier moyen', euros(average)] as const]),
               ],
               ...(one.seller.kind === 'member' ? {} : { note: SELLER_NOTES[one.seller.kind] }),
@@ -966,7 +977,7 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
               <span className="ins-rank__name">{name}</span>
               <span className="ins-rank__line">
                 <span className="ins-nowrap">
-                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
+                  {frNumber(one.sales)} vente{one.sales > 1 ? 's' : ''}
                 </span>
                 {average === null ? null : (
                   <>
@@ -993,8 +1004,8 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
             {one.seller.kind === 'unlinked' ? (
               <span className="ins-rank__fix">
                 <span>
-                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''} d’un compte Reveal que
-                  personne n’a relié à un membre.
+                  {frNumber(one.sales)} vente{one.sales > 1 ? 's' : ''} d’un compte Reveal que personne n’a
+                  relié à un membre.
                 </span>
                 <Link to="/equipe/reveal" className="nv-btn nv-btn--soft nv-btn--sm">
                   Relier
@@ -1009,7 +1020,7 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
 }
 
 /** The creators side by side, a click opens hers. */
-function Creators({
+export function Creators({
   insights,
   onCreator,
   tip,
@@ -1038,7 +1049,7 @@ function Creators({
                   ['Chiffre d’affaires', euros(one.revenueMinor)],
                   ['Part de l’agence', euros(one.agencyMinor)],
                   ['Net', euros(one.netMinor)],
-                  ['Ventes', one.sales.toLocaleString('fr-FR')],
+                  ['Ventes', frNumber(one.sales)],
                 ],
                 note: 'Ouvrir son Dashboard',
               })}
@@ -1068,7 +1079,7 @@ function Creators({
  * « Quand ça vend »: a day-of-the-week by hour map, darker where the money comes in. One stop for the keyboard, as the
  * chart's columns: the arrows walk the hours and the days, each cell says its hour and its amount (ADM-09).
  */
-function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
+export function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const max = Math.max(0, ...insights.hours.flat());
   const all = insights.hours.flat().reduce((sum, cents) => sum + cents, 0);
   const peak = busiest(insights.hours);
@@ -1194,7 +1205,7 @@ const sellerLabel = (seller: AgencyInsights['refundList'][number]['seller']): st
  * The period's refunds one by one (ADR 0092 § 4): when, whose, what, how much, who sold it and how long after the sale.
  * Read only; filtered by creator and by the sale's chatter, each filter shown only when it has a choice to make.
  */
-function Refunds({ insights }: { insights: AgencyInsights }): JSX.Element {
+export function Refunds({ insights }: { insights: AgencyInsights }): JSX.Element {
   const [creatorId, setCreatorId] = useState<string>(ALL);
   const [seller, setSeller] = useState<string>(ALL);
   const list = insights.refundList;
@@ -1285,7 +1296,7 @@ function Refunds({ insights }: { insights: AgencyInsights }): JSX.Element {
 
 /** A count of the snapshot: « en calcul » while the platform has not computed it. */
 const LATER = 'en calcul chez Reveal';
-const countText = (n: number | null): string => (n === null ? '—' : n.toLocaleString('fr-FR'));
+const countText = (n: number | null): string => (n === null ? '—' : frNumber(n));
 
 type SubscriberDays = NonNullable<AgencyInsights['subscribers']>['days'];
 
@@ -1336,8 +1347,8 @@ function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): 
     const i = days.findIndex((one) => one.active === value);
     return `${String(((points[i]?.y ?? 0) / frame.height) * 100)}%`;
   };
-  const first = read[0]?.toLocaleString('fr-FR') ?? '';
-  const last = read.at(-1)?.toLocaleString('fr-FR') ?? '';
+  const first = read[0] === undefined ? '' : frNumber(read[0]);
+  const last = read.at(-1) === undefined ? '' : frNumber(read.at(-1) ?? 0);
   const missing =
     unread === 0
       ? ''
@@ -1350,9 +1361,9 @@ function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): 
     >
       <div className="ins-subs__scale" aria-hidden="true">
         {/* In the flow, unseen: it gives the column the width of the widest number. */}
-        <i className="ins-subs__sizer">{high.toLocaleString('fr-FR')}</i>
-        <span style={{ top: at(high) }}>{high.toLocaleString('fr-FR')}</span>
-        {low === high ? null : <span style={{ top: at(low) }}>{low.toLocaleString('fr-FR')}</span>}
+        <i className="ins-subs__sizer">{frNumber(high)}</i>
+        <span style={{ top: at(high) }}>{frNumber(high)}</span>
+        {low === high ? null : <span style={{ top: at(low) }}>{frNumber(low)}</span>}
       </div>
       <div className="ins-subs__plot">
         <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
@@ -1398,7 +1409,7 @@ function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): 
                   title: dayLabel(one.day),
                   ...(one.active === null
                     ? { text: 'Pas encore lu chez Reveal.' }
-                    : { rows: [['Abonnés actifs, en fin de journée', one.active.toLocaleString('fr-FR')]] }),
+                    : { rows: [['Abonnés actifs, en fin de journée', frNumber(one.active)]] }),
                 },
                 { above: true },
               )}
@@ -1427,7 +1438,7 @@ function PointsDelta({ current, previous }: { current: number; previous: number 
  * Subscribers, PPV and messages (ADR 0081): the daily snapshot of the platform's statistics, never money. A day not
  * read is never a zero, and a count the platform still computes says so.
  */
-function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
+export function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const subs = insights.subscribers;
   if (subs === null) {
     return (

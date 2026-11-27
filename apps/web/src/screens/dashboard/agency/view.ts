@@ -28,10 +28,19 @@ export const SERIES = [
 ] as const;
 export const OTHER = 'var(--nv-series-other)';
 
+/**
+ * A number in French, its thousands apart with a no-break space: the narrow one `toLocaleString` writes all but
+ * vanishes in Geist at small sizes (« 2185,12 € » beside « 6 828,50 € », Design 27/11). Every figure of the
+ * Dashboard goes through here.
+ */
+export function frNumber(value: number, options?: Intl.NumberFormatOptions): string {
+  return value.toLocaleString('fr-FR', options).replace(/\u202f/gu, '\u00a0');
+}
+
 /** « 1 846 € », « 10,50 € » from cents: the cents only when there are some (ADR 0011: exact money). */
 export function euros(cents: number): string {
   const digits = cents % 100 === 0 ? 0 : 2;
-  return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}\u00a0€`;
+  return `${frNumber(cents / 100, { minimumFractionDigits: digits, maximumFractionDigits: digits })}\u00a0€`;
 }
 
 /** « 1,2 k€ », « 18 k€ »: an axis label, never a figure to read. */
@@ -39,9 +48,9 @@ export function shortEuros(cents: number): string {
   const value = cents / 100;
   if (Math.abs(value) >= 1000) {
     const thousands = value / 1000;
-    return `${thousands.toLocaleString('fr-FR', { maximumFractionDigits: Math.abs(thousands) < 10 ? 1 : 0 })}\u00a0k€`;
+    return `${frNumber(thousands, { maximumFractionDigits: Math.abs(thousands) < 10 ? 1 : 0 })}\u00a0k€`;
   }
-  return `${Math.round(value).toLocaleString('fr-FR')}\u00a0€`;
+  return `${frNumber(Math.round(value))}\u00a0€`;
 }
 
 /** The change against the period before, in %, rounded; `null` when there was nothing before to compare with. */
@@ -87,12 +96,12 @@ export function sharesOf(parts: readonly number[], whole: number, points = 100):
 
 /** « 37,5 % », « 62 % »: a share with its tenth when it has one, a non-breaking space before the sign. */
 export function percentText(share: number): string {
-  return `${share.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u00a0%`;
+  return `${frNumber(share, { maximumFractionDigits: 1 })}\u00a0%`;
 }
 
 /** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
 export function exactEuros(cents: number): string {
-  return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+  return `${frNumber(cents / 100, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
 }
 
 type MoneyFigures = Pick<
@@ -445,7 +454,7 @@ export function ppvRate(sent: number | null, purchased: number): number | null {
 
 /** « +12 », « −3 », « 0 »: a change in subscribers, the true minus sign. */
 export function signedCount(n: number): string {
-  const text = Math.abs(n).toLocaleString('fr-FR');
+  const text = frNumber(Math.abs(n));
   return n > 0 ? `+${text}` : n < 0 ? `−${text}` : '0';
 }
 
@@ -465,7 +474,7 @@ export const REFUND_KIND: Readonly<Record<AgencySaleKind, string>> = {
 export function refundDelayLabel(days: number | null): string {
   if (days === null) return 'vente hors registre';
   if (days === 0) return 'le jour même';
-  return `${days.toLocaleString('fr-FR')} jour${days > 1 ? 's' : ''} après`;
+  return `${frNumber(days)} jour${days > 1 ? 's' : ''} après`;
 }
 
 /** When a refund came, always with its day: « 6 nov., 14 h 05 », in the platform's zone. */

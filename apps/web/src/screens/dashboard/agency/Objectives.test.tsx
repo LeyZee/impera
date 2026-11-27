@@ -63,7 +63,7 @@ describe('objectiveVerdict', () => {
     expect(short?.text).toBe('À ce rythme : environ 600\u00a0€, il manquerait environ 400\u00a0€');
     expect(
       objectiveVerdict({ objectiveMinor: 100_000, revenueMinor: 49_900, projectedMinor: 99_800 })?.text,
-    ).toBe('À ce rythme : environ 1\u202f000\u00a0€, il manquerait moins de 10\u00a0€');
+    ).toBe('À ce rythme : environ 1\u00a0000\u00a0€, il manquerait moins de 10\u00a0€');
     expect(
       objectiveVerdict({ objectiveMinor: 100_000, revenueMinor: 100_000, projectedMinor: null }),
     ).toEqual({
@@ -78,11 +78,11 @@ describe('objectiveVerdict', () => {
 
 describe('the card’s figures', () => {
   it('says what is done in whole euros and a projection to ten euros', () => {
-    expect(wholeEuros(161_880)).toBe('1\u202f619\u00a0€');
+    expect(wholeEuros(161_880)).toBe('1\u00a0619\u00a0€');
     // An objective typed to the cent keeps it (PRO1-17).
-    expect(objectiveEuros(150_050)).toBe('1\u202f500,50\u00a0€');
-    expect(objectiveEuros(150_000)).toBe('1\u202f500\u00a0€');
-    expect(aboutEuros(505_875)).toBe('environ 5\u202f060\u00a0€');
+    expect(objectiveEuros(150_050)).toBe('1\u00a0500,50\u00a0€');
+    expect(objectiveEuros(150_000)).toBe('1\u00a0500\u00a0€');
+    expect(aboutEuros(505_875)).toBe('environ 5\u00a0060\u00a0€');
     expect(objectivesSub(OBJECTIVES)).toBe('Novembre 2026 · jour 15 sur 30 · interne à l’agence');
     expect(objectivesSub({ ...OBJECTIVES, daysGone: 30 })).toBe(
       'Novembre 2026 · mois terminé · interne à l’agence',
