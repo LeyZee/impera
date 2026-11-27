@@ -43,7 +43,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # Typed lint of apps/api ran out of Node's default heap (4 GB) on 27/11 while turbo ran typecheck beside it;
+      # the runner has 16 GB.
       - run: pnpm check
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
   # The tests in parallel, so that a pull request waits about a quarter of the time (Charles, 20/11/2026: the merge
   # queue was slow, never by taking a test out). Every test still runs on every pull request: the unit tests and the
