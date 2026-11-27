@@ -1,0 +1,227 @@
+/* « Où te verser » (ADR 0165): the member's card in Moi › Dossier, and the owner's line beside « Marquer payé ». Each
+   way of receiving has its colour of the categorical palette (--_c); amber says what is missing or changed lately. */
+
+.po-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: 4px var(--nv-plate-pad) var(--nv-plate-pad);
+}
+
+.po-icon {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The answer first, large, with its pictogram. */
+.po-answer {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.po-answer__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--_c, var(--nv-series-1)) 16%, transparent);
+  color: var(--_c, var(--nv-series-1));
+}
+.po-answer__value {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.po-answer__sub {
+  margin: 2px 0 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.po-answer[data-tone='warn'] {
+  display: block;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+}
+.po-answer[data-tone='warn'] .po-answer__value {
+  color: var(--nv-warning);
+}
+
+/* The details: label faded, value in full ink, aligned on one column. */
+.po-lines {
+  display: grid;
+  gap: var(--nv-space-2);
+  margin: 0;
+}
+.po-lines > div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) 1fr;
+  gap: var(--nv-space-3);
+  align-items: baseline;
+}
+.po-lines dt {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.po-lines dd {
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The form: three tiles for the way of receiving, then its fields. */
+.po-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.po-methods {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.po-methods__row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-2);
+}
+.po-method {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 76px;
+  padding: var(--nv-space-3) var(--nv-space-2);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 30%, transparent);
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.po-method .po-icon {
+  color: var(--_c);
+}
+@media (hover: hover) {
+  .po-method:hover:not([aria-pressed='true']) {
+    background: color-mix(in srgb, var(--_c) 10%, var(--nv-glass-fill));
+    color: var(--nv-ink);
+  }
+}
+.po-method:active {
+  transform: scale(0.98);
+}
+.po-method[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--_c) 18%, transparent);
+  box-shadow: inset 0 0 0 2px var(--_c);
+  color: var(--nv-ink);
+}
+.po-method:focus-visible {
+  outline: 2px solid var(--nv-focus, var(--_c));
+  outline-offset: 2px;
+}
+.po-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--nv-space-3);
+}
+.po-optional {
+  margin-left: 4px;
+  color: var(--nv-ink-muted);
+  font-weight: 500;
+}
+.po-form__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+/* Beside « Marquer payé »: one line, its pictogram, its gesture on the right. */
+.po-to {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.po-to[data-tone='warn'] {
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+}
+.po-to[data-tone='warn'] .po-to__title {
+  color: var(--nv-warning);
+}
+.po-to__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.po-to__what {
+  flex: 1;
+  min-width: 0;
+}
+.po-to__title {
+  margin: 0;
+  font-weight: 650;
+}
+.po-to__changed {
+  margin: 2px 0 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.po-to .tm-hint {
+  margin: 2px 0 0;
+}
+.po-to__shown {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  animation: po-in var(--nv-dur-base, 220ms) var(--nv-ease-out) both;
+}
+
+@keyframes po-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (max-width: 520px) {
+  .po-pair {
+    grid-template-columns: 1fr;
+  }
+  .po-lines > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .po-method,
+  .po-to__shown {
+    transition: none;
+    animation: none;
+  }
+}
