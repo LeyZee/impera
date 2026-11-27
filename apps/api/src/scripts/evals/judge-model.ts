@@ -25,19 +25,32 @@ const INDEPENDENT_JUDGES: readonly (readonly [keyof ProviderCredentials, ModelRe
   ['LLM_GOOGLE_API_KEY', { provider: 'google', model: 'gemini-3.8-flash' }],
 ];
 
+/** The judges a run may name with `--judge`. */
+export const JUDGE_CHOICES = ['mistral', 'google'] as const;
+export type JudgeChoice = (typeof JUDGE_CHOICES)[number];
+
 /**
  * The evals' configuration: the judge moves to the first provider other than the voice's that has a key, and waits
- * `EVALS_JUDGE_TIMEOUT_MS`.
- * `isIndependent` is false when only the voice's provider has one: the scores are then read with that bias.
+ * `EVALS_JUDGE_TIMEOUT_MS`. A run that names its judge (`--judge`) gets that one if its key is there: while the voice
+ * answers on its Mistral fallback (xAI out of quota until 01/12/2026), Gemini keeps the judge out of the voice's family.
+ * `isIndependent` is false when the judge shares a provider with the voice or with its fallback: the scores are then
+ * read with that bias.
  */
 export function evalsConfig(
   config: LlmConfig,
   credentials: ProviderCredentials,
+  chosen?: JudgeChoice,
 ): { readonly config: LlmConfig; readonly isIndependent: boolean } {
   const voice = config.roles.voice.provider;
-  const judge = INDEPENDENT_JUDGES.find(
-    ([key, ref]) => ref.provider !== voice && credentials[key] !== undefined && credentials[key] !== '',
-  );
+  const fallback = config.roles.voice.fallback?.provider;
+  const hasKey = ([key]: (typeof INDEPENDENT_JUDGES)[number]): boolean =>
+    credentials[key] !== undefined && credentials[key] !== '';
+  const judge =
+    chosen === undefined
+      ? INDEPENDENT_JUDGES.find((entry) => entry[1].provider !== voice && hasKey(entry))
+      : INDEPENDENT_JUDGES.find((entry) => entry[1].provider === chosen && hasKey(entry));
+  if (chosen !== undefined && judge === undefined)
+    throw new Error(`evals --judge ${chosen} : pas de clé pour ce fournisseur dans l’environnement.`);
   const withJudge = (ref?: ModelRef): LlmConfig => ({
     ...config,
     roles: {
@@ -53,5 +66,8 @@ export function evalsConfig(
   if (judge === undefined)
     return { config: withJudge(), isIndependent: config.roles.judge.provider !== voice };
   const [, ref] = judge;
-  return { config: withJudge(ref), isIndependent: true };
+  return {
+    config: withJudge(ref),
+    isIndependent: ref.provider !== voice && (chosen === undefined || ref.provider !== fallback),
+  };
 }
