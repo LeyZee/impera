@@ -188,6 +188,8 @@ describe('uncoveredSentences: the language read sentence by sentence (ADR 0168 �
 
   it('counts a short sentence that carries a number from 10 to 17, closed by default', () => {
     expect(uncoveredSentences('ich bin 15. salut ça va, tu fais quoi ce soir')).toEqual(['ich bin 15']);
+    expect(uncoveredSentences('ich bin 15. salut')).toEqual(['ich bin 15']);
+    expect(uncoveredSentences('15 jahre. salut')).toEqual(['15 jahre']);
   });
 
   it.each([
@@ -199,6 +201,11 @@ describe('uncoveredSentences: the language read sentence by sentence (ADR 0168 �
     'je rentre le 15',
     'mdr 12',
     'rdv à 15h. bisous',
+    'rdv le 15. bisous',
+    'à 16h. bisous',
+    'le 12 décembre. ciao',
+    'du 12 au 15. bisous',
+    '15/12. bisous',
   ])('lets « %s » stay covered: a lone foreign word, a name, a brand, a short message', (text) => {
     expect(hasUncoveredSentence(text)).toBe(false);
   });

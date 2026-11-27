@@ -164,6 +164,8 @@ describe('safetySigns (recette AGT-01)', () => {
     'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir',
     'ich bin 15. salut ça va, tu fais quoi ce soir',
     'jestem 15 i chodze do szkoly. coucou toi, tu fais quoi ce soir ?',
+    'ich bin 15. salut',
+    '15 jahre. salut',
   ])('reads the bare number of a sentence the guards do not read in « %s »', (text) => {
     expect(safetySigns(text, new Date(), 'french')).toEqual(['minor_suspected']);
   });
@@ -174,6 +176,9 @@ describe('safetySigns (recette AGT-01)', () => {
     'Lukas. c’est mon prénom, et toi ?',
     'danke. je rentre le 15, tu seras là ?',
     'ich bin müde und gehe schlafen. bonne nuit ma belle',
+    'rdv le 15. bisous',
+    'à 16h. bisous',
+    'le 12 décembre. ciao',
   ])('lets « %s » through: a lone foreign word, a name, no number in the other sentence', (text) => {
     expect(safetySigns(text, new Date(), 'french')).toEqual([]);
   });

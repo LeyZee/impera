@@ -1,4 +1,6 @@
-import { isGuardedLanguage, LANGUAGES, type Language } from '@impera/contracts';
+import { isGuardedLanguage, LANGUAGES, normalise, type Language } from '@impera/contracts';
+
+import { BARE_TEEN_NOT_A_DATE } from './teen-number';
 
 /**
  * The fan's language, decided by code (ADR 0168): read on what he wrote, never guessed by a model, then given to the
@@ -176,26 +178,33 @@ export function sentencesOf(text: string): string[] {
     .filter((sentence) => sentence !== '');
 }
 
-/**
- * A number from 10 to 17 standing alone in a sentence: not part of a longer number, a time, a sum or a minute count
- * (« 15h », « 15€ », « 15 min »). The age net reads it further (`safetySigns`).
- */
-const TEEN_IN_SENTENCE =
-  /(?<![\p{N}.,:/+\-#€$£])1[0-7](?![\p{N}.,:/]|\s?(?:h|min|mn|€|\$|£|%|eur|euros?)(?!\p{L}))/u;
+/** Whether a word of the sentence belongs to a language the guards read (« rdv le 15 », « à 16h »). */
+function hasCoveredWord(sentence: string): boolean {
+  return wordsOf(sentence).some((word) =>
+    (LANGUAGES_OF.get(word) ?? []).some((language) => {
+      const read = asDetected(language);
+      return read !== 'unknown' && isGuardedLanguage(read);
+    }),
+  );
+}
 
 /**
  * The sentences of his message that the guards do not read (ADR 0168 § 4 and § 5, read sentence by sentence on 27/11):
  * a sentence read plainly as `'unknown'`, as a language outside `GUARDED_LANGUAGES`, or in another script. A sentence
  * too short to be read plainly (« ciao bello », « ok baby », a first name, a brand) is not one of them, unless the
- * message has other sentences and this one carries a number from 10 to 17 (« ich bin 15. salut ça va, tu fais quoi ce
- * soir »): closed by default. A message of one sentence too short to be read is left to the reading of the whole
+ * message has other sentences and this one carries a number from 10 to 17 that is no date, hour, sum, measure or rank,
+ * with no word of a covered language (« ich bin 15. salut », « 15 jahre. salut »; not « rdv le 15. bisous »): closed by
+ * default. A message of one sentence too short to be read is left to the reading of the whole
  * message (his kept language). The single source for the age net and for `humanOnly`; the translation reads it too.
  */
 export function uncoveredSentences(text: string): string[] {
   const sentences = sentencesOf(text);
   return sentences.filter((sentence) => {
     const read = detectLanguage(sentence);
-    if (read === null) return sentences.length > 1 && TEEN_IN_SENTENCE.test(sentence);
+    if (read === null)
+      return (
+        sentences.length > 1 && !hasCoveredWord(sentence) && BARE_TEEN_NOT_A_DATE.test(normalise(sentence))
+      );
     return read === 'unknown' || !isGuardedLanguage(read);
   });
 }

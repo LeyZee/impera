@@ -1,6 +1,7 @@
 import { isGuardedLanguage, normalise, type Language } from '@impera/contracts';
 
 import { detectLanguage, isMostlyLatin, uncoveredSentences } from './language';
+import { BARE_TEEN, NOT_AGE_ANY, TEEN_NOT_A_THING, UNIT } from './teen-number';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -24,10 +25,6 @@ const ANY_UNDER_18 =
   '1[0-7]|[1-9]|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|once|doce|trece|catorce|quince|dieciseis|diecisiete|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen';
 const ANY_TEENS =
   '1[0-7]|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|once|doce|trece|catorce|quince|dieciseis|diecisiete|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen';
-const UNIT = '(?:anni|anos|ans?|years?|yrs?|yo|y\\/o)\\b';
-// Not his age: « di esperienza », « de casado », « of experience », « fa » (ago). « De edad », « di età », « of age »
-// are.
-const NOT_AGE_ANY = "di (?!eta)|d'|de (?!edad)|d |che |que |qu'|of (?!age)|since |ago\\b|fa\\b";
 const NOT_AGE_AFTER = `(?!\\s*(?:${NOT_AGE_ANY}))`;
 // What a number is when it is not an age: an hour, a sum, a length.
 const NOT_A_NUMBER_OF_YEARS =
@@ -166,32 +163,6 @@ const SELF_HARM = [
     'u',
   ),
 ];
-
-/**
- * A number from 10 to 17 that is not a thing (ADR 0168 § 4): not an hour, a sum, a measure, a rank, a count of
- * objects, nor years of something else (« 15h », « 15 € », « 15 cm », « 15/20 », « 15 photos », « 16 anni di
- * esperienza »).
- */
-const TEEN_NOT_A_THING =
-  '\\b1[0-7]\\b' +
-  '(?![.,:/\\-]?\\d)(?!\\s*(?:h\\b|h\\d|%|€|\\$|£|°|x\\b|e\\b|eme\\b|er\\b|th\\b|st\\b|' +
-  '(?:min|mins|minut\\w*|sec\\w*|s|cm|mm|m|km|kg|g|l|ml|cl|euros?|eur|dollars?|usd|bucks|pounds?|zl\\w*|' +
-  'reais|lei|kr|chf|hours?|heures?|ore|horas?|uhr|stunden?|godz\\w*|jours?|days?|giorni|dias|tage|fois|times|' +
-  'volte|veces|mal|pages?|photos?|pics?|videos?|messages?|followers?|likes?)\\b))' +
-  // Years of something else, not his age: « 16 anni di esperienza », « 15 años de casado ».
-  `(?!\\s*${UNIT}\\s*(?:${NOT_AGE_ANY}))`;
-
-/**
- * A bare number from 10 to 17 in a message whose language the guards do not read (ADR 0168 § 4, closed by default):
- * without a word of his language to say it is an age, it is one until a human says otherwise.
- */
-const BARE_TEEN = new RegExp(
-  '(?<![\\d.,:/+\\-x#€$£])' +
-    '(?<!\\b(?:a|at|alle|alla|a las|las|um|vers|top|no|nr|n|num|numero|page|p|dans|in|tra|fra|en|entre|between|' +
-    'after|apres|dopo|despues|until|avant|before)\\s)' +
-    TEEN_NOT_A_THING,
-  'u',
-);
 
 /** Not a count of people, pets or money after « j'ai » or « presque » (« j'ai 15 potes », « tengo 15 amigos », « yo 15 dolares »). */
 const NOT_COUNTED =

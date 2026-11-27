@@ -2,6 +2,6 @@
 Fait : `uncoveredSentences` et `hasUncoveredSentence` (`language.ts`), source unique de la lecture phrase par phrase. Le filet du nombre de 10 à 17 s'applique à toute phrase non couverte d'un message mêlé (« ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va… »). Une seule phrase non couverte pose `humanOnly`. Une phrase trop courte ne bascule que si elle porte un nombre de 10 à 17 et que le message a d'autres phrases. Un mot étranger isolé, un prénom ou une marque laissent le message couvert.
 Pas fait : la décision de traduction (#1055) lira la même fonction à sa fusion.
 Décisions : ADR 0168 § 4 et § 5, ligne du 27/11.
-Découvertes : une phrase courte qui porte une date dans un message de plusieurs phrases (« rdv le 15. bisous ») peut lever le doute d'âge : c'est le prix du « fermé par défaut », à suivre au calibrage.
+Découvertes : la première version faisait lever le doute d'âge à une phrase courte portant une date (« rdv le 15. bisous ») ; corrigé : une phrase courte ne bascule que si son nombre n'est ni une date, ni une heure, ni une somme, ni une mesure, ni un rang (exclusions partagées dans `teen-number.ts`), et si aucun mot d'une langue couverte ne s'y trouve.
 Candidats à suppression : aucun.
 Vérifié : tests unitaires agent et playground de l'api ; `pnpm check`.
