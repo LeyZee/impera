@@ -1,5 +1,13 @@
 import type {
   AuditEntryId,
+  Currency,
+  FanId,
+  FaultCode,
+  MessageId,
+  MissedSource,
+  ReviewExcerptLine,
+  RuleRef,
+  ShiftId,
   CommissionPreset,
   CommissionPresetId,
   CommissionRate,
@@ -183,3 +191,53 @@ export type CreatorNames = (ids: readonly CreatorId[]) => Promise<ReadonlyMap<Cr
 export interface InvitationLinkDirectory {
   live(memberIds: readonly TeamMemberId[]): Promise<ReadonlyMap<string, { readonly expiresAt: Date }>>;
 }
+
+/**
+ * A remark of the agent's review of a shift (ADR 0170 §§ 8 and 32), as the `agent` module gives it. A fault's level is
+ * never in it: the `team` module reads it from its code.
+ */
+export interface ShiftRemark {
+  readonly id: string;
+  readonly kind: 'fault' | 'well_done';
+  readonly creatorId: CreatorId;
+  readonly shiftId: ShiftId;
+  readonly chatterId: TeamMemberId;
+  readonly fanId: FanId;
+  /** Null if and only if well done. */
+  readonly faultCode: FaultCode | null;
+  readonly messageIds: readonly MessageId[];
+  readonly occurredAt: Date;
+  readonly fanFeeling: string;
+  readonly missedMinor: number | null;
+  readonly missedSource: MissedSource | null;
+  readonly earnedMinor: number | null;
+  readonly currency: Currency | null;
+  readonly alternative: readonly string[];
+  readonly ruleRef: RuleRef;
+  /** The Reveal member tied to the chatter, or deduced from the shift on the account (§ 7). */
+  readonly author: 'member' | 'deduced';
+}
+
+/** The agent's remarks, read under the creator (the `agent` module's, injected by the composition root). */
+export interface ShiftRemarkSource {
+  remarksFor(input: {
+    readonly creatorId: CreatorId;
+    readonly shiftId: ShiftId;
+  }): Promise<readonly ShiftRemark[]>;
+  /** Every remark of a chatter for a creator since `since`: the count of § 29. */
+  remarksOfChatter(input: {
+    readonly creatorId: CreatorId;
+    readonly chatterId: TeamMemberId;
+    readonly since: Date;
+  }): Promise<readonly ShiftRemark[]>;
+  remark(input: { readonly creatorId: CreatorId; readonly remarkId: string }): Promise<ShiftRemark | null>;
+}
+
+/**
+ * The messages a remark quotes, redrawn from the base (ADR 0170 § 12), the `conversations` module's: who wrote each
+ * (the fan or the creator's side) and its text; the fan's pseudonym never.
+ */
+export type RemarkExcerpts = (
+  creatorId: CreatorId,
+  messageIds: readonly MessageId[],
+) => Promise<readonly ReviewExcerptLine[]>;
