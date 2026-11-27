@@ -139,14 +139,20 @@ jobs:
     needs: [test-part]
     if: always()
     steps:
-      # On a draft the parts are skipped by design, and this required name stays green; anywhere else they must pass.
+      # Green means the tests passed on this commit, never less: on a draft the parts are skipped, so this required name
+      # fails on purpose. Otherwise a draft's green would stay the last result on the same commit for the minutes the
+      # ready run takes to start this job, and main's protection would let an untested pull request through (Sécurité, 27/11).
       - name: Every part passed
         env:
           RESULT: ${{ needs.test-part.result }}
           DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
         run: |
           echo "test-part: $RESULT (draft: $DRAFT)"
-          if [ "$DRAFT" = true ]; then test "$RESULT" = skipped; else test "$RESULT" = success; fi
+          if [ "$DRAFT" = true ]; then
+            echo "::error::Brouillon : tests non lancés. Passe la PR en « prête » pour les lancer."
+            exit 1
+          fi
+          test "$RESULT" = success
 
   audit:
     name: Dependency audit
