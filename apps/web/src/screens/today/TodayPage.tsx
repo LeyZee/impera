@@ -171,6 +171,7 @@ function Day({
             onReport={() => {
               if (heroShift !== null) onReport(heroShift.id);
             }}
+            onFeedbackDue={onReport}
           />
         ) : (
           <MyAwayCard status={away} />
@@ -220,6 +221,7 @@ function Hero({
   today,
   report,
   onReport,
+  onFeedbackDue,
 }: {
   state: DayState;
   now: Date;
@@ -227,6 +229,8 @@ function Hero({
   today: string;
   report: HeroReport;
   onReport: () => void;
+  /** The feedback of his last shift, owed before « Je prends mon poste » (retour léger, 26/11): it opens at once. */
+  onFeedbackDue: (shiftId: string) => void;
 }): JSX.Element {
   if (state.kind === 'none') {
     return (
@@ -352,7 +356,7 @@ function Hero({
               Faire mon rapport
             </button>
           ) : null}
-          {toTake ? <CheckIn shiftId={shift.id} /> : null}
+          {toTake ? <CheckIn shiftId={shift.id} onFeedbackDue={onFeedbackDue} /> : null}
           {/* The report or the check-in, when due, takes the light; otherwise Suivi does, the shift's work being there. */}
           <Link
             to="/suivi"
@@ -393,7 +397,13 @@ function Hero({
  * « Je prends mon poste » (EQ-12): one tap dates the real start of the shift, the server holding the window and the
  * member's own shift. A second tap answers the first instant; a refusal is said under the button, never in silence.
  */
-function CheckIn({ shiftId }: { shiftId: string }): JSX.Element {
+function CheckIn({
+  shiftId,
+  onFeedbackDue,
+}: {
+  shiftId: string;
+  onFeedbackDue: (shiftId: string) => void;
+}): JSX.Element {
   const refresh = useRefreshPlanning();
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -406,6 +416,14 @@ function CheckIn({ shiftId }: { shiftId: string }): JSX.Element {
       await refresh();
       setBusy(false);
       return;
+    }
+    if (
+      outcome.kind === 'refused' &&
+      outcome.code === 'shift_check_in_feedback_due_conflict' &&
+      outcome.shiftId !== null
+    ) {
+      // The feedback of his last shift first: its panel opens, and the button waits for him to come back.
+      onFeedbackDue(outcome.shiftId);
     }
     setSaid(
       outcome.kind === 'refused'

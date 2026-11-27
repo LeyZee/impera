@@ -1,6 +1,7 @@
 import { createRequireRecentLogin } from '../../auth';
 import { createLogger } from '../../logger';
 import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../../modules/connectors';
+import { conversationReadsForShifts } from '../../modules/conversations';
 import { enqueuePayRecalculation, payReadsForPayRules } from '../../modules/payroll';
 import { createSchedulingModule } from '../../modules/scheduling';
 import { buildServer, type Server } from '../../server';
@@ -34,6 +35,7 @@ export async function clockedScheduling(team: PayrollTeam, now: () => Date): Pro
     periodClosedFrom: payReadsForPayRules.closedFrom,
     salesTotalsOf: salesFeedTotals.totalsOf,
     shiftSalesOf: salesFeedReadsForReports.shiftSales,
+    shiftActivityOf: conversationReadsForShifts.activity,
     creatorAgendaFeed: app.modules.creatorTasks.feedOf,
     notify: app.modules.notifications.notify,
     now,

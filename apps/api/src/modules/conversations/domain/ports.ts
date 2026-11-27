@@ -1,11 +1,14 @@
 import type {
   Actor,
   FanStanding,
+  FanTier,
   FanTiersSetting,
+  TimeWasterSetting,
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
   CopilotTrace,
+  DraftTranslation,
   CustomAlertGroupId,
   CustomAlertId,
   EventId,
@@ -215,7 +218,8 @@ interface MessageRepository {
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
-  fanStats(fanId: FanId): Promise<FanStats>;
+  /** His spend and first message; his tier and last purchase from her sales register (ADR 0132, 0128) at `now`. */
+  fanStats(fanId: FanId, now: Date): Promise<FanStats>;
 }
 
 /** The voice prompt version and the model that wrote a draft: what the live rate is read by (ADR 0019). */
@@ -256,6 +260,8 @@ interface DraftRepository {
     scriptStep?: DraftScriptStep;
     /** What the code decided with it, as the copilot panel reads it (ADR 0141 lot a). */
     copilot?: CopilotTrace;
+    /** Its French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+    translation?: DraftTranslation;
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
   /**
@@ -478,6 +484,8 @@ interface ScriptRunRepository {
   save(stored: StoredScriptRun): Promise<boolean>;
   /** His runs that went cold (`stalled`), latest first: a run he left there makes her tease him (Charles 20/11). */
   stalled(conversationId: ConversationId): Promise<StoredScriptRun[]>;
+  /** His ended runs where he bought nothing: her scripts he never entered (ADR 0135 § 1). */
+  unbought(conversationId: ConversationId): Promise<number>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -646,6 +654,14 @@ interface FanStats {
   /** Paid messages (PPV bought), in minor units. */
   readonly spentMinor: number;
   readonly firstMessageAt: Date | null;
+  /** His tier from her sales register and her thresholds (`fanTierOf`); absent when it cannot be read. */
+  readonly tier?: FanTier | null;
+  /** His last purchase in her sales register (ADR 0128 § 1); `null` never; absent, not read. */
+  readonly lastPurchaseAt?: Date | null;
+  /** What he spent in her sales register, refunds out (ADR 0132 § 1); absent, not read. */
+  readonly registerSpentMinor?: number;
+  /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */
+  readonly timeWaster?: TimeWasterSetting;
 }
 
 interface FanContext extends FanStats {
@@ -669,6 +685,8 @@ export interface ProposedFact {
 }
 
 export interface ComposeInput {
+  /** He is a time-waster at this level (ADR 0135), as code read it before the AI: she writes short, busy, kind. */
+  readonly timeWaster?: 'slowed' | 'dormant';
   readonly creatorId: CreatorId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;
@@ -825,6 +843,8 @@ export type ComposeResult =
       readonly care?: ComposedCare;
       /** What the code decided with it, kept with the draft for the copilot panel (ADR 0141 lot a). */
       readonly copilot?: CopilotTrace;
+      /** Its French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+      readonly translation?: DraftTranslation;
     }
   | {
       readonly kind: 'held';
@@ -1055,6 +1075,8 @@ export interface CopilotRead {
     readonly bubbles: readonly string[];
     readonly createdAt: Date;
     readonly placedAt: Date | null;
+    /** Its French for the team (ADR 0168 § 9); `null` without one. */
+    readonly translation: DraftTranslation | null;
   } | null;
   /** What the code decided and what holds now, for the panel's lines (ADR 0141 lot a). */
   readonly live: CopilotLive;

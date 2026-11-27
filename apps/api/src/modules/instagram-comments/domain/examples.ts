@@ -65,3 +65,27 @@ export function nearExamples(
   }
   return picked;
 }
+
+/** The shape her reply takes on this kind of comment: how many emojis, and whether it exclaims. */
+export interface ReplyShape {
+  readonly emojis: 0 | 1 | 2;
+  readonly exclaims: boolean;
+  /** Her words in that reply, one at least: the model was twice as long as she is. */
+  readonly words: number;
+}
+
+/**
+ * The shape of her reply to the closest comment (calibration of 26/11): the model put one emoji on every reply and
+ * hardly a « ! », where she varies. Taking the shape of her closest reply gives her own variety, decided by the code.
+ * Null without an example: the model then follows the prompt alone.
+ */
+export function replyShapeOf(near: readonly CommentExample[]): ReplyShape | null {
+  const closest = near[0];
+  if (closest === undefined) return null;
+  const count = (closest.reply.match(/\p{Extended_Pictographic}/gu) ?? []).length;
+  return {
+    emojis: count === 0 ? 0 : count === 1 ? 1 : 2,
+    exclaims: closest.reply.normalize('NFKC').includes('!'),
+    words: Math.max(1, closest.reply.split(/\s+/u).filter((word) => /[\p{L}\p{N}]/u.test(word)).length),
+  };
+}

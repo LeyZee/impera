@@ -20,6 +20,7 @@ import {
 import {
   createJsonlCalibrationStore,
   guardSettingsOf,
+  languagesOf,
   describeSituation,
   isTimeZone,
   nextLocalTime,
@@ -110,6 +111,7 @@ const session = createPlaygroundSession({
   guardSettings: guardSettingsOf(persona),
   splitMessages: persona.splitMessages,
   voiceExamples: examples,
+  languages: languagesOf(persona),
   timeZone: values.fuseau,
   offerLimits: persona.offerLimits,
   sexualizationLimits: persona.sexualizationLimits,

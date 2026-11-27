@@ -83,6 +83,28 @@ describe('voice guards', () => {
     expect(codes(['Je passe chez toi ce soir'])).toEqual(['meeting_promise']);
   });
 
+  it('lets « on se retrouve demain » go as she says goodnight, to talk again here (passe 2, conversation 40)', () => {
+    expect(codes(['Dors bien toi', 'on se retrouve demain 😘'])).toEqual([]);
+    expect(codes(['Bonne nuit, on se retrouve demain'])).toEqual([]);
+    expect(codes(['on se retrouve demain ici 😌'])).toEqual([]);
+  });
+
+  it('still blocks a real meeting said with a goodnight', () => {
+    for (const meeting of [
+      'Bonne nuit, on se retrouve demain au café',
+      'Dors bien, on se retrouve demain chez toi',
+      'Bonne nuit, on se retrouve demain à 20 h',
+      'Bonne nuit, on se retrouve demain à Lyon',
+      'Bonne nuit, on se voit demain',
+      'Bonne nuit, on se retrouve samedi',
+      'Bonne nuit 😘 viens chez moi demain',
+    ]) {
+      expect(codes([meeting]), meeting).toContain('meeting_promise');
+    }
+    // Without a goodnight nor « ici », the day alone stays a meeting.
+    expect(codes(['on se retrouve demain'])).toContain('meeting_promise');
+  });
+
   it('lets ordinary jobs and sexting through', () => {
     expect(codes(['Je suis modèle photo, et toi ?'])).toEqual([]);
     expect(codes(['Avant je suis assistante dentaire, tu imagines'])).toEqual([]);
@@ -658,6 +680,12 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
         'j’ai pas snap désolé',
         't’as vu ma story insta ?',
         'discord c’est pour les gamers non ?',
+        'whatsapp è comodo',
+        'telegram es para frikis',
+        'ven aquí conmigo',
+        'vieni qui da me',
+        'no tengo instagram',
+        'non uso whatsapp',
       ],
       [
         'discord c’est lina_92',
@@ -668,6 +696,10 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
         'rejoins-moi sur discord',
         'je suis sur insta',
         'écris-moi @lina_xx',
+        'scrivimi su whatsapp',
+        'aggiungimi su snap',
+        'escríbeme por telegram',
+        'agrégame en insta',
       ],
     ],
     [

@@ -114,6 +114,10 @@ describe('permitted phrases that must always pass, output guards', () => {
     'discord c’est pour les gamers non ?',
     'ci sentiamo qui',
     'hablamos aquí',
+    'whatsapp è comodo',
+    'telegram es para frikis',
+    'no tengo instagram',
+    'non uso whatsapp',
   ])('contact_info lets « %s » through', (bubble) => {
     expect(raised(bubble)).not.toContain('contact_info');
   });

@@ -11,6 +11,11 @@ export interface OfferLimits {
   readonly cooldownHours: number;
   /** His desire score before a script may go out (persona `strategies.script_launch.min_desire`, default 70). */
   readonly minDesire: number;
+  /**
+   * The pause after a purchase (ADR 0128 § 1): this many hours after his last purchase she opens no script herself.
+   * Persona `strategies.script_launch.after_purchase_hours`, 24 to 72, 48 by default. Absent, no pause.
+   */
+  readonly afterPurchaseHours?: number;
 }
 
 export interface OfferContext {
@@ -24,6 +29,13 @@ export interface OfferContext {
    * are lifted.
    */
   readonly fanAsksForPaid: boolean;
+  /**
+   * He makes a sexual advance himself (`offerSignals`): it lifts the pause after a purchase for this session (ADR 0128
+   * § 3), never anything else. Absent, he does not.
+   */
+  readonly fanSexualizes?: boolean;
+  /** When he last bought a paid step of hers (ADR 0128 § 1); `null` never; absent, not known: no pause. */
+  readonly lastPurchaseAt?: Date | null;
   /** Set by code when he says he cannot pay; lifted only when he comes back to paid content himself. */
   readonly hasNoBudget: boolean;
   readonly risks: readonly string[];
@@ -36,7 +48,14 @@ export interface OfferContext {
 }
 
 export type OfferBlock =
-  'do_not_contact' | 'risk' | 'sales_frozen' | 'age_unconfirmed' | 'no_budget' | 'cooldown' | 'low_desire';
+  | 'do_not_contact'
+  | 'risk'
+  | 'sales_frozen'
+  | 'age_unconfirmed'
+  | 'no_budget'
+  | 'cooldown'
+  | 'after_purchase'
+  | 'low_desire';
 
 export type OfferDecision =
   { readonly allowed: true } | { readonly allowed: false; readonly reason: OfferBlock };
@@ -55,6 +74,9 @@ export const NO_SALE_RISKS: readonly string[] = [
 ];
 
 const HOUR_MS = 3_600_000;
+
+/** The pause after a purchase when her persona sets none (ADR 0128 § 1, « ok recommandations » 16/11). */
+export const DEFAULT_AFTER_PURCHASE_HOURS = 48;
 
 /**
  * « Jamais deux scripts le même soir » (ADR 0158 § 42, guide 26/11): the same evening lasts at least her cooldown
@@ -101,9 +123,25 @@ export function offerDecision(context: OfferContext): OfferDecision {
   // He came back to paid content himself: no waiting on his budget nor his heat.
   if (context.fanAsksForPaid) return { allowed: true };
   if (noBudget) return { allowed: false, reason: 'no_budget' };
+  // He just bought (ADR 0128 § 1-3): relation, not another sale, unless he takes her there himself.
+  if (context.fanSexualizes !== true && inPauseAfterPurchase(context))
+    return { allowed: false, reason: 'after_purchase' };
   // His heat replaces « he sexualizes now » (P3-12): a single flirty line is not a hot fan.
   if (context.desire < limits.minDesire) return { allowed: false, reason: 'low_desire' };
   return { allowed: true };
+}
+
+/**
+ * Still inside the pause after his last purchase (ADR 0128 § 1): it runs from his last purchase, on top of the cooldown
+ * between two scripts, which does not change. Without a known purchase or a pause set, there is none.
+ */
+export function inPauseAfterPurchase(
+  context: Pick<OfferContext, 'now' | 'lastPurchaseAt' | 'limits'>,
+): boolean {
+  const hours = context.limits.afterPurchaseHours;
+  if (hours === undefined || context.lastPurchaseAt === undefined || context.lastPurchaseAt === null)
+    return false;
+  return context.now.getTime() - context.lastPurchaseAt.getTime() < hours * HOUR_MS;
 }
 
 /**

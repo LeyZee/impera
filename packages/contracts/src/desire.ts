@@ -51,6 +51,8 @@ export const DESIRE_BRAIN_SIGNALS = [
   'someone_nearby',
   'leaving_soon',
   'says_goodnight',
+  // He says he is tired, worn out (passe 2 du 26/11): no step of a script goes while he says so.
+  'tired',
 ] as const;
 
 /**

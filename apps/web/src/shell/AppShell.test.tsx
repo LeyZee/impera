@@ -243,6 +243,7 @@ describe('Réglages › Sauvegardes', () => {
       'Bots Telegram',
       'Modèles IA',
       'Consommation IA',
+      'Agents connectés',
       'Règles de paie',
       'Facturation',
       'Alertes',

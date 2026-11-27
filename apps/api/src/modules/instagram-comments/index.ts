@@ -38,7 +38,9 @@ export {
   type AutonomyThresholds,
 } from './domain/autonomy';
 /** @public Her real replies as examples, picked by closeness of text, wired with the jobs at lot b. */
-export { nearExamples, type CommentExample } from './domain/examples';
+export { nearExamples, replyShapeOf, type CommentExample, type ReplyShape } from './domain/examples';
+/** @public A declaration of love gets emojis only, wired with the jobs at lot b. */
+export { declaresLove, emojisOnly } from './domain/love';
 /** @public Her questions in public, one reply in a few at most, wired with the jobs at lot b. */
 export {
   asksAQuestion,

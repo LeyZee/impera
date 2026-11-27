@@ -5,6 +5,7 @@ import {
   type FanId,
   type FanStanding,
   type FanTiersSetting,
+  type TimeWasterSetting,
 } from '@impera/contracts';
 import { eq, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
@@ -45,6 +46,19 @@ export async function tiersAndRate(
     tiers: (settings.success ? settings.data : CreatorSettingsSchema.parse({})).fanTiers,
     rateMicros: RateRowsSchema.parse(rate.rows)[0]?.rate_micros ?? null,
   };
+}
+
+/** Her time-waster rule (ADR 0135), or `undefined` when the agency set none or it no longer reads. */
+export async function timeWasterSettingOf(
+  tx: Transaction,
+  creatorId: CreatorId,
+): Promise<TimeWasterSetting | undefined> {
+  const [creator] = await tx
+    .select({ settings: schema.creators.settings })
+    .from(schema.creators)
+    .where(eq(schema.creators.id, creatorId));
+  const settings = CreatorSettingsSchema.safeParse(creator?.settings ?? {});
+  return settings.success ? settings.data.timeWaster : undefined;
 }
 
 /** His euros and his dollars at that rate, in euro cents, never below zero. */
