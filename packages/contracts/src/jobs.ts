@@ -64,6 +64,7 @@ export const JOB_NAMES = [
   'notifications.recap',
   'alerts.route',
   'notifications.creator_sale',
+  'notifications.creator_notices',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
   'creator_week.plan',
@@ -152,6 +153,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.recap': 'Récapitulatif des notifications',
   'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
+  'notifications.creator_notices': 'Demandes, propositions et semaine dites à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
   'creator_week.plan': 'Semaine de la créatrice',
@@ -334,6 +336,12 @@ export const JOB_PAYLOADS = {
    * part and its currency from the event, never its seller.
    */
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
+  /**
+   * Every five minutes (trou 9 du 21/11): what the agency asked of a creator in the last half hour (a request for
+   * content, a script, a proposition for her agenda, her week validated) told to her accounts, once each, on the sort
+   * she may turn off. A run missed is caught by the next one within the half hour.
+   */
+  'notifications.creator_notices': z.object({}),
   /**
    * The reminder she chose for a task at an hour (CR-05 lot b3): enqueued with the task's write under the key
    * `creator_tasks.remind:<taskId>`, at its start less her minutes. `startsAt` is the start it was scheduled for: a
@@ -678,6 +686,8 @@ export const JOB_MAX_ATTEMPTS = {
   'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
+  // Every five minutes, and each notification rings once: the next run is the retry.
+  'notifications.creator_notices': 1,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
