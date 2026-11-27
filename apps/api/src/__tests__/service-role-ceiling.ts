@@ -41,7 +41,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // across creators, bounded to the members named; read only.
   // +1 for « compte sans personne » (ADR 0094 § 1): its job reads every creator's planning, agent and last fan
   // message to publish one event per account and créneau.
-  'modules/scheduling': 31,
+  // +1 for « chatteur pas là » (ADR 0094 § 1, lot b): its job reads the agency's delay and every creator's shifts begun
+  // that long ago, never taken, to publish one event per shift; it writes nothing but the outbox.
+  'modules/scheduling': 32,
   'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,

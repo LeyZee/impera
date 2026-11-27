@@ -17,6 +17,7 @@ import type {
   PayPeriod,
   Platform,
   PlatformAccountId,
+  NotTakenDelay,
   ReportGapThreshold,
   ReportSignal,
   SchedulingSettings,
@@ -617,6 +618,10 @@ export interface ShiftReportStore {
   reportGap(actor: UserId): Promise<ReportGapThreshold>;
   /** The owner's, `forbidden` to anyone else. */
   saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
+  /** « Chatteur pas là » (ADR 0094 § 1, lot b): the owner's delay, `null` while unset. */
+  notTakenDelay(actor: UserId): Promise<NotTakenDelay>;
+  /** The owner's, `forbidden` to anyone else. */
+  saveNotTakenDelay(actor: Actor, delay: NotTakenDelay): Promise<NotTakenDelay>;
 }
 
 /** An account's pay rules as stored (EQ-03): added only, never changed. */

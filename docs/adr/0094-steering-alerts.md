@@ -42,3 +42,9 @@ Lots :
 - **b** : « Chatteur pas là », quand la prise de poste (EQ-12) existe.
 - **c** : « Créatrice qui décroche » et « Remboursements », avec la table des réglages par créatrice et par signal.
 - **d** : la ligne dans « À faire » du Dashboard, réservée au propriétaire et aux managers.
+
+### Avenant du 27/11/2026 : lot b versé
+
+« Chatteur pas là » se lit sur la prise de poste (EQ-12, « Je prends mon poste ») et non sur la présence en ligne : un shift non annulé, ni pris ni arrêté, tenu par un membre actif qui suit encore la créatrice, dont le début remonte au délai réglé et qui n'est pas fini. La présence en ligne se fausse en ouvrant le CRM ; la prise de poste est un geste daté. Un shift dont le membre n'est plus actif ou ne suit plus la créatrice est déjà « à pourvoir » : c'est « Compte sans personne » qui le dit.
+
+Le délai est, pour ce lot, un seul réglage de l'agence (Réglages › Alertes, section « Pilotage »), entre 5 et 240 minutes, réglé par le propriétaire. Il n'a pas de valeur par défaut : tant qu'il n'est pas choisi, rien ne part, et l'écran le dit en ambre. Un délai par créatrice viendra avec la table de réglages du lot c. Un événement `shift_not_taken` par shift (index unique) ; le job relit la demi-heure écoulée toutes les cinq minutes. Restent pour plus tard : l'avis « arrivé à 14 h 22 » quand le membre prend son poste en retard, et la liste des membres libres sur le créneau (EQ-12).

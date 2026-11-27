@@ -260,6 +260,22 @@ export type Signal =
       readonly slotStartsAt: string;
       readonly slotEndsAt: string;
       readonly timeZone: string;
+    }
+  | {
+      /**
+       * A shift began the agency's delay ago and its member has not taken it (ADR 0094 § 1, « chatteur pas là »). For
+       * the owner and the managers: the member's display name, never a fan.
+       */
+      readonly kind: 'shift_not_taken';
+      readonly creatorId: CreatorId;
+      readonly platform: Platform;
+      readonly platformAccountId: string;
+      readonly shiftId: string;
+      readonly memberId: string;
+      readonly memberName: string;
+      readonly startsAt: string;
+      readonly endsAt: string;
+      readonly timeZone: string;
     };
 
 export interface ScannedEvent {

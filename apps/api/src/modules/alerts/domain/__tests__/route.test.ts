@@ -44,6 +44,15 @@ describe('who an alert reaches (ADR 0150 § A)', () => {
       title: 'Nora · Compte sans personne',
       url: '/equipe/planning',
     });
+    expect(modesFor('shift_not_taken', [])).toEqual({
+      owner: 'deliver',
+      manager: 'deliver',
+      chatter_on_shift: 'off',
+    });
+    expect(alertMessage('shift_not_taken', 'Nora', null, false)).toMatchObject({
+      title: 'Nora · Shift non pris',
+      url: '/equipe/planning',
+    });
   });
 
   it('takes, for an alert of the agency, the loudest choice of her creators', () => {

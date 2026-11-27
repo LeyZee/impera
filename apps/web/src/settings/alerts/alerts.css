@@ -335,3 +335,19 @@
 .al-try__warning {
   color: var(--nv-warning);
 }
+
+/* ── « Chatteur pas là »: the agency's delay, edited in place ── */
+.al-delay {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.al-delay__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.al-delay__row .al-delay__input {
+  flex: none;
+  width: 96px;
+}

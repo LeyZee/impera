@@ -45,6 +45,7 @@ export const ROUTED_EVENT_TYPES = [
   'scripts_exhausted',
   'offer_proposed',
   'account_uncovered',
+  'shift_not_taken',
 ] as const;
 
 /** The alert an event is, or null when it is none of the tab's (or its payload does not read). */
@@ -91,6 +92,10 @@ export function classifyEvent(type: string, payload: unknown): ClassifiedAlert |
     case 'account_uncovered':
       return EVENT_PAYLOADS.account_uncovered.safeParse(payload).success
         ? { code: 'uncovered_account', conversationId: null }
+        : null;
+    case 'shift_not_taken':
+      return EVENT_PAYLOADS.shift_not_taken.safeParse(payload).success
+        ? { code: 'shift_not_taken', conversationId: null }
         : null;
     default:
       return null;
