@@ -141,10 +141,10 @@ function guardClicksAfterClose(): void {
     event.preventDefault();
     event.stopPropagation();
   };
-  // The window it listens on, kept: the timer may fire after a test tore the page down.
-  const target = window;
-  target.addEventListener('click', swallow, true);
-  target.setTimeout(() => {
-    target.removeEventListener('click', swallow, true);
+  // Removed by its own signal: the timer may fire after a test tore the page down, when the window's methods are gone.
+  const guard = new AbortController();
+  window.addEventListener('click', swallow, { capture: true, signal: guard.signal });
+  setTimeout(() => {
+    guard.abort();
   }, CLOSE_GUARD_MS);
 }
