@@ -94,7 +94,8 @@ Branche : task/<id>-<slug>
 | EQ-22 | Donner ou partager une vente avec le chatteur qui a été décisif | équipe | in_progress | ADR 0101, CRM-03, CRM-05 |
 | EQ-23 | Retour de fin de shift et suivi de ses incidents | équipe | in_review | ADR 0050 § 10, EQ-03, CR-01 |
 | EQ-25 | « J'ai été décisif sur une vente » : le chatteur signale son shift, le manager répond | équipe | in_review | ADR 0101 §§ 18 à 22, EQ-22 |
-| EQ-27 | Retour de fin de shift léger | équipe | in_review | ADR 0170, EQ-23 |
+| EQ-27 | Retour de fin de shift léger | équipe | done | ADR 0170, EQ-23 |
+| EQ-28 | Mon bilan : cartes de faute, niveaux, contestation | équipe | in_progress | ADR 0170, EQ-27 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
