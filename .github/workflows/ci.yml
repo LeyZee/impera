@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+    # ready_for_review: a draft that becomes ready runs the heavy jobs at once, without waiting for its next push.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   schedule:
@@ -55,6 +57,9 @@ jobs:
   # Postgres. `Tests (unit + integration)` below waits for them all, under the name the branch protection requires.
   test-part:
     name: Tests (${{ matrix.part }})
+    # Heavy jobs skip a draft pull request (27/11/2026, cost of a private repository): the pre-push hook already runs
+    # `pnpm check` and `pnpm test` on the contributor's machine, and the static check and gitleaks still run here.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -134,15 +139,24 @@ jobs:
     needs: [test-part]
     if: always()
     steps:
+      # Green means the tests passed on this commit, never less: on a draft the parts are skipped, so this required name
+      # fails on purpose. Otherwise a draft's green would stay the last result on the same commit for the minutes the
+      # ready run takes to start this job, and main's protection would let an untested pull request through (Sécurité, 27/11).
       - name: Every part passed
         env:
           RESULT: ${{ needs.test-part.result }}
+          DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
         run: |
-          echo "test-part: $RESULT"
+          echo "test-part: $RESULT (draft: $DRAFT)"
+          if [ "$DRAFT" = true ]; then
+            echo "::error::Brouillon : tests non lancés. Passe la PR en « prête » pour les lancer."
+            exit 1
+          fi
           test "$RESULT" = success
 
   audit:
     name: Dependency audit
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -155,6 +169,7 @@ jobs:
 
   build:
     name: Build
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [check]
@@ -168,6 +183,7 @@ jobs:
 
   images:
     name: Docker images (build and boot)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [check]

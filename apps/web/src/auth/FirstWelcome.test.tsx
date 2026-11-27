@@ -54,6 +54,14 @@ describe('the welcome of a first sign-in (recette 27/11, P1)', () => {
     const onGo = show({ ...base, name: 'Nora', role: 'creator', team: null }, 'creator');
     expect(screen.getByText('Active les notifications')).toBeTruthy();
     expect(screen.getByText('Connexion avec Face ID')).toBeTruthy();
+    // Impera on her home screen before the notifications: on an iPhone they only arrive there (MOD-03, 27/11).
+    const steps = [...document.querySelectorAll('.fw__step b')].map((step) => step.textContent);
+    expect(steps).toEqual([
+      'Connexion avec Face ID',
+      'Mets Impera sur ton écran d’accueil',
+      'Active les notifications',
+    ]);
+    expect(screen.getByText('Ce qui n’est pas fait t’attendra dans Moi › Préférences.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Voir ma journée' }));
     expect(onGo).toHaveBeenCalledWith('/aujourdhui');
   });

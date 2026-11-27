@@ -31,6 +31,7 @@ Chaque commit écrit par une session se termine par ses deux lignes d'attributio
 - Corps : le template `.github/pull_request_template.md`. « Avant » / « Après » en français simple, puis « Comment », puis la checklist. Le corps se termine par la mention « Generated with Claude Code » et le lien de session fournis à la session.
 - Petites : < 500 lignes de diff hors tests et fichiers générés. Au-delà, on découpe. Exception : les fiches de bootstrap (P0-01, P0-03) qui créent la structure ; leur revue porte sur la structure et les conventions.
 - La session ouvre la PR en brouillon (`gh pr create --draft`) dès que la branche compile, et la passe en « prête » quand `pnpm check` et `pnpm test` sont verts.
+- Sur un brouillon, la CI ne lance que le check statique et gitleaks ; les tests, l'audit, le build et les images partent quand la PR passe en « prête », puis à chaque push, et sur `main` (27/11/2026 : coût d'un dépôt privé ; le hook pre-push lance déjà `pnpm check` et `pnpm test` en local). Sur un brouillon, le job requis « Tests (unit + integration) » est **rouge exprès** (« Brouillon : tests non lancés ») : ce n'est pas une panne à corriger, il passe au vert quand la PR est « prête » et que les tests ont tourné. Ainsi, vert veut toujours dire « tests passés sur ce commit ».
 - Une PR = une fiche. Pas de « tant que j'y étais ».
 - Fusion par squash, message = titre de la PR. *(Avenant du 27/11/2026 : en pratique le fil Bilan fusionne par commit de fusion ; c'est lui qui décide.)*
 
