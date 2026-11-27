@@ -1,0 +1,64 @@
+# Plainte sur un achat avec demande de remboursement (ADR 0158 § 48, avenant du 27/11) : il est déçu et demande à être remboursé ; elle lui dit que ça se fait sur Reveal, sans le rembourser elle-même ni promettre qu'il le sera, sans cadeau ni nouvelle vente. Fan, messages, script et prix fictifs (ADR 0010).
+description: >-
+  Il a acheté l’étape, se plaint et demande à être remboursé ; elle répond une fois elle-même que ça se fait sur Reveal, sans rien promettre ni revendre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+situation:
+  availability: confirmed
+  sexualized: true
+  known_hours: 72
+  spent_euros: 15
+  age_confirmed: true
+  local_time: '22:30'
+  desire: 55
+history:
+  - from: creator
+    text: Je t’ai préparé la suite, tu me dis 😇
+    minutes_ago: 15
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+  run:
+    script: soiree-demo
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: bought
+    ignored_messages: 0
+  history:
+    - script: soiree-demo
+      sent: [0, 1]
+      bought: [1]
+inbound: Franchement déçu, 15 balles pour trois photos que j’avais presque déjà vues, je veux être remboursé
+expect:
+  brief:
+    intent_in:
+      - complaint
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 3
+    must_match_any:
+      - \breveal\b
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \bje (vais |peux )?(te |t[’'])rembours\w*
+      - \btu (seras|vas être) rembours\w*
+      - \bje (te )?rends (ton|tes) (argent|sous|fric)\b
+      - \d+\s?(€|euros?)
+      - \b(t’as tort|t'as tort|tant pis pour toi)\b
