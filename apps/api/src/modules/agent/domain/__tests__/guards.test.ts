@@ -7,6 +7,7 @@ import {
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
   touchesTerm,
+  asksPrice,
   sumsMinorOf,
   type GuardCode,
   type GuardContext,
@@ -734,5 +735,38 @@ describe('price_outside_offer, a price of hers only (Charles 27/11)', () => {
 
   it('reads the sums he wrote', () => {
     expect(sumsMinorOf('je te donne 20 € ou 12,50 euros, pas 30 balles')).toEqual([2_000, 1_250, 3_000]);
+  });
+});
+
+describe('a handle next to a network or a means, a price after he asked one (Sécurité, #1043)', () => {
+  const raised = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('blocks a network with a plausible handle in the same bubble, and lets the name alone through', () => {
+    for (const bubble of [
+      'insta, lina.xx',
+      'snap lina92 😘',
+      'cherche lina rose sur tiktok',
+      'tu me trouves sur insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    for (const bubble of ['je poste sur insta vers 21h30', 't’as vu ma story insta ?', 'je scrollais insta'])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
+  });
+
+  it('blocks a means of paying with an identifier, and lets the word alone through', () => {
+    expect(raised('paypal lina.xx@exemple.test')).toContain('off_platform_payment');
+    expect(raised('lydia lina_rose')).toContain('off_platform_payment');
+    expect(raised('pas de paypal ici')).not.toContain('off_platform_payment');
+  });
+
+  it('reads a sum alone, or a sum right after he asked a price, as a price of hers', () => {
+    expect(raised('15 euros')).toContain('price_outside_offer');
+    expect(raised('15€ 😘')).toContain('price_outside_offer');
+    expect(raised('ah ben 30 €, pas mal', { fanAskedPrice: true })).toContain('price_outside_offer');
+    expect(raised('15 euros', { allowedPriceMinor: 1_500 })).not.toContain('price_outside_offer');
+    expect(raised('j’ai payé 30 € mes places hier')).not.toContain('price_outside_offer');
+    expect(asksPrice('c’est combien ?')).toBe(true);
+    expect(asksPrice('tu fais quoi ce soir ?')).toBe(false);
   });
 });

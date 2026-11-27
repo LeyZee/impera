@@ -110,6 +110,7 @@ describe('permitted phrases that must always pass, output guards', () => {
     'je scrollais insta',
     'j’ai pas snap désolé',
     't’as vu ma story insta ?',
+    'je poste sur insta vers 21h30',
     'ci sentiamo qui',
     'hablamos aquí',
   ])('contact_info lets « %s » through', (bubble) => {

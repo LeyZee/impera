@@ -57,6 +57,8 @@ export interface GuardContext {
    * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
    */
   readonly fanAmountsMinor?: readonly number[];
+  /** He asked a price since her last answer (Sécurité, #1043): a sum she writes now is a price of hers. */
+  readonly fanAskedPrice?: boolean;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -129,9 +131,13 @@ function minorNamed(bubble: string): string | undefined {
 // A means of paying outside Reveal (recette MOT-04). « Wise » counts only as a means: « that's wise » is innocent.
 const PAYMENT_MEANS =
   '(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)';
+// A plausible handle or identifier: a dot or an underscore inside a word, letters then digits, an « @ ».
+const HANDLE = '(?<![\\w@])[a-z][a-z0-9]*([._][a-z0-9]+)+|(?<![\\w@])[a-z]{3,}\\d{2,}\\b|@[a-z0-9_.]{2,}';
+// Two words after « cherche », « tape »: a name to type in a search (« cherche lina rose »).
+const SEARCH_TWO_WORDS = '\\b(cherche|tape|search|type|cerca|busca|scrivi)( moi)? [a-z0-9]+ [a-z0-9]+';
 // A network or another platform, where he could find or pay her elsewhere.
 const NETWORK =
-  '(snap(chat)?|whatsapp|insta(gram)?|telegram|fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)';
+  '(snap(chat)?|whatsapp|insta(gram)?|telegram|tik ?tok|twitter|facebook|messenger|fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)';
 
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
@@ -274,6 +280,14 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
       ].join('|'),
     ),
   },
+  // A network named with a plausible handle in the same bubble (Sécurité, #1043): « insta, lina.xx », « snap lina92 »,
+  // « cherche lina rose sur tiktok », or « tu me trouves sur … ». Handles and addresses in tests are invented.
+  {
+    code: 'contact_info',
+    pattern: new RegExp(
+      `^(?=[\\s\\S]*\\b${NETWORK}\\b)[\\s\\S]*?(${HANDLE}|${SEARCH_TWO_WORDS}|\\btu me trouve(s|ras)?\\b)`,
+    ),
+  },
   // A link without its scheme: « monsite.com », « linktr.ee/lina », « t.me/lina ». Endings that are also French words
   // (« .me », « .co », « .de ») are read only with a path.
   {
@@ -327,6 +341,11 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
         `\\b(t'?as|tu as|on|got) wise\\b|\\bwise (transfer|account|compte|tag)\\b`,
       ].join('|'),
     ),
+  },
+  // A means of paying named with an identifier in the same bubble (Sécurité, #1043): « paypal x@… », « lydia lina.xx ».
+  {
+    code: 'off_platform_payment',
+    pattern: new RegExp(`^(?=[\\s\\S]*\\b${PAYMENT_MEANS}\\b)[\\s\\S]*?(${HANDLE})`),
   },
   // A price is the script's, set in code and carried by the offer itself: never a sum in her words (recette MOT-04,
   // Charles 05/11). Her thanks for a tip (« merci pour les 20 € 🥰 ») pass.
@@ -773,6 +792,17 @@ const CUSTOM_WORDS =
 const AGREEMENT_WORDS =
   /\b(ok|okay|d'?accord|dac|deal|va pour|vendu|ca marche|c'?est bon|allez|banco|marche)\b/;
 
+// A sentence that is a sum alone, a sign or an emoji around it: « 15 euros », « 15€ 😘 ».
+const BARE_SUM = /^[^\p{L}\d]*\d+([.,]\d{1,2})? ?(€|\$|euros?|eur|balles|dollars?|usd)?[^\p{L}\d]*$/u;
+// He asks a price: « c'est combien ? », « quel prix ? », « how much? », « quanto costa? », « ¿cuánto? ».
+const ASKS_PRICE =
+  /\b(combien|quel prix|le prix|ton prix|tes prix|tarifs?|how much|price|quanto|cuanto|precio|prezzo)\b/;
+
+/** Whether his message asks her a price. */
+export function asksPrice(written: string): boolean {
+  return ASKS_PRICE.test(normalise(written));
+}
+
 /** The sentence of a text around a position: what a sum is said with. */
 function sentenceAround(text: string, at: number): string {
   const start = Math.max(...['.', '!', '?', '\n'].map((mark) => text.lastIndexOf(mark, at - 1))) + 1;
@@ -795,7 +825,9 @@ function priceOutsideOffer(
   if (CUSTOM_WORDS.test(sentence)) return true;
   const offered = amount !== undefined && amount === context.allowedPriceMinor;
   if (AGREEMENT_WORDS.test(sentence)) return !offered;
-  if (!SALE_WORDS.test(sentence)) return false;
+  // A bubble of a sum alone (« 15 euros »), or a sum right after he asked a price, is a price of hers (Sécurité).
+  const priced = SALE_WORDS.test(sentence) || BARE_SUM.test(sentence) || context.fanAskedPrice === true;
+  if (!priced) return false;
   return !offered && !(amount !== undefined && (context.fanAmountsMinor ?? []).includes(amount));
 }
 

@@ -72,6 +72,7 @@ import {
   checkVoiceOutput,
   checkYouthWords,
   sumsMinorOf,
+  asksPrice,
   previousTurnsOf,
   touchesTerm,
   type GuardContext,
@@ -879,6 +880,9 @@ export function guardContextOf(
   hasMedia = false,
   allowedPriceMinor?: number,
 ): GuardContext {
+  const hisSinceHer = history
+    .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
+    .filter((turn) => turn.from === 'fan');
   return {
     hasMedia,
     ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
@@ -887,10 +891,9 @@ export function guardContextOf(
     ),
     sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
     // The sums he wrote since her last answer: she may say one back without agreeing to it (Charles 27/11).
-    fanAmountsMinor: history
-      .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
-      .filter((turn) => turn.from === 'fan')
-      .flatMap((turn) => sumsMinorOf(turn.text)),
+    fanAmountsMinor: hisSinceHer.flatMap((turn) => sumsMinorOf(turn.text)),
+    // He just asked a price: a sum she writes now is a price of hers (Sécurité, #1043).
+    fanAskedPrice: hisSinceHer.some((turn) => asksPrice(turn.text)),
   };
 }
 
