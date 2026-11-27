@@ -173,6 +173,8 @@ describe('permitted phrases that must always pass, output guards', () => {
     ['ok mais non', 'samedi à lyon ?'],
     ['ok trop bien', 'samedi je suis à lyon pour le taf'],
     ['avec plaisir', 'on se voit dans tes rêves ce soir ?'],
+    ['bonne nuit à demain', 'bonne nuit ma belle'],
+    ['bonne nuit, on se retrouve demain', 'bonne nuit ma belle'],
   ] as const)('meeting_promise lets her « %s » to « %s » through', (bubble, fan) => {
     expect(meetingCommitment(bubble, fan)).toBeUndefined();
   });

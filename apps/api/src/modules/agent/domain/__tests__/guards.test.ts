@@ -107,6 +107,23 @@ describe('voice guards', () => {
     expect(meetingCommitment('on se retrouve demain')).toBeDefined();
   });
 
+  it('takes « bonne nuit, on se retrouve demain » as her yes after a concrete meeting he proposed (Sécurité, #1048)', () => {
+    const proposed = 'on se voit demain 18h à la gare ?';
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', proposed)).toBeDefined();
+    expect(
+      checkVoiceOutput(['bonne nuit, on se retrouve demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: proposed,
+      }).map((v) => v.code),
+    ).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(meetingCommitment('bonne nuit à demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(
+      checkVoiceOutput(['bonne nuit à demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: 'bonne nuit ma belle',
+      }),
+    ).toEqual([]);
+  });
+
   it('still blocks a real meeting said with a goodnight', () => {
     for (const meeting of [
       'Bonne nuit, on se retrouve demain au café',

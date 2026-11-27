@@ -1110,11 +1110,13 @@ export function meetingCommitment(
   const said = normalise(text);
   // « On se retrouve demain » said as she goes to bed is a chat goodbye (`chatGoodbye`): to talk again here, never an
   // invitation. A place, an hour, a day of the week or « on se voit » after it still count.
+  // Never after a concrete meeting he proposed (Sécurité, #1048): « bonne nuit, on se retrouve demain » is her yes.
   const whole = message ?? said;
+  const heProposed = fanLastMessage !== undefined && fanProposesMeeting(fanLastMessage);
   const read = said.replace(
     /on se retrouve (demain|plus tard|tout a l'heure)/g,
     (match, _moment, index: number) =>
-      chatGoodbye(said, match, index, whole) ? ' '.repeat(match.length) : match,
+      !heProposed && chatGoodbye(said, match, index, whole) ? ' '.repeat(match.length) : match,
   );
   const concrete = sentencesOf(read)
     .map(concreteMeeting)
