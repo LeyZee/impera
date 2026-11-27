@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { TeamMemberIdSchema } from './ids';
+import { PayoutCountrySchema } from './payout-countries';
 
 /**
  * « Où te verser » (ADR 0165, trou n° 5 de la grande recette du 21/11): where a member receives his transfers. He writes
@@ -13,10 +14,13 @@ export const PAYOUT_RECEIVE_METHODS = ['mobile_money', 'bank_account', 'cash_pic
 export const PayoutReceiveMethodSchema = z.enum(PAYOUT_RECEIVE_METHODS);
 export type PayoutReceiveMethod = z.infer<typeof PayoutReceiveMethodSchema>;
 
-export const PAYOUT_BENEFICIARY_MAX = 120;
+/** A first name or a last name, as written on his ID (WorldRemit pays only that name). */
+export const PAYOUT_NAME_MAX = 60;
 export const PAYOUT_ORGANISATION_MAX = 60;
+export const PAYOUT_CITY_MAX = 60;
+export const PAYOUT_EMAIL_MAX = 254;
 export const PAYOUT_NOTE_MAX = 200;
-/** An account number or an IBAN, its spaces removed: 6 to 34 letters and digits. */
+/** An IBAN, or a national account number (in Benin the RIB, 23 characters): its spaces removed, 6 to 34 letters and digits. */
 export const PAYOUT_ACCOUNT_PATTERN = '^[A-Z0-9]{6,34}$';
 /** A phone number in international form, `+` then 8 to 15 digits, its spaces removed. */
 export const PAYOUT_PHONE_PATTERN = '^\\+[1-9][0-9]{7,14}$';
@@ -29,41 +33,50 @@ const line = (max: number) => z.string().trim().min(1).max(max);
 const compact = (value: string): string => value.replace(/[\s.-]/g, '').toUpperCase();
 
 const note = line(PAYOUT_NOTE_MAX).nullable();
-const beneficiary = line(PAYOUT_BENEFICIARY_MAX);
 
 const phone = z.string().regex(new RegExp(PAYOUT_PHONE_PATTERN), 'Un numéro au format +229…');
-const account = z.string().regex(new RegExp(PAYOUT_ACCOUNT_PATTERN), 'Un IBAN ou un numéro de compte');
+const account = z.string().regex(new RegExp(PAYOUT_ACCOUNT_PATTERN), 'Un IBAN ou un RIB');
+const email = z.email('Une adresse e-mail').max(PAYOUT_EMAIL_MAX).nullable();
 
 /**
- * What is sealed: the beneficiary, the number and who holds it, and a short note. Never logged, never in the audit. The
- * body takes the number as typed (`normalised`: spaces, dots and dashes dropped, in capitals); what is kept and given
- * back is already compact.
+ * What is sealed: what a WorldRemit transfer asks of the one who receives it (its pages for Benin, read on 21/11), and a
+ * short note. For every way: the country, the first and last names as on his ID, the city (never a full address), a
+ * phone to reach him and, if he wants, an email. Then the mobile money number and its operator, or the bank and the
+ * account; cash needs nothing more. Never logged, never in the audit, never used to write to him: the app reaches him
+ * by his account. The body takes the numbers as typed (`normalised`: spaces, dots and dashes dropped, in capitals);
+ * what is kept and given back is already compact.
  */
 function details(normalised: boolean) {
   const typed = (pattern: z.ZodString) =>
     normalised ? z.string().transform(compact).pipe(pattern) : pattern;
+  const who = {
+    country: PayoutCountrySchema,
+    firstName: line(PAYOUT_NAME_MAX),
+    lastName: line(PAYOUT_NAME_MAX),
+    city: line(PAYOUT_CITY_MAX),
+    /** To reach him about a transfer: WorldRemit sends him its reference there. */
+    contactPhone: typed(phone),
+    email: normalised ? z.string().trim().toLowerCase().pipe(email.unwrap()).nullable() : email,
+    note,
+  };
   return z.discriminatedUnion('method', [
     z.object({
       method: z.literal('mobile_money'),
-      beneficiary,
+      ...who,
+      /** The mobile money account's number, which may differ from the contact phone. */
       phone: typed(phone),
       /** The operator (MTN, Moov…). */
       operator: line(PAYOUT_ORGANISATION_MAX),
-      note,
     }),
     z.object({
       method: z.literal('bank_account'),
-      beneficiary,
+      ...who,
       account: typed(account),
       bank: line(PAYOUT_ORGANISATION_MAX),
-      note,
     }),
     z.object({
       method: z.literal('cash_pickup'),
-      beneficiary,
-      /** The town he picks the cash up in. */
-      city: line(PAYOUT_ORGANISATION_MAX),
-      note,
+      ...who,
     }),
   ]);
 }

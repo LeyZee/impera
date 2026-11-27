@@ -21,25 +21,50 @@ const KEYS = `v1:${Buffer.alloc(32, 7).toString('base64')}`;
 
 const THEO_MOMO: PayoutDetails = {
   method: 'mobile_money',
-  beneficiary: 'Théo Inventé',
+  country: 'BJ',
+  firstName: 'Théo',
+  lastName: 'Inventé',
+  city: 'Ville fictive',
+  contactPhone: '+229 00 00 00 09',
+  email: 'theo@example.test',
   phone: '+229 00 00 00 01',
   operator: 'Opérateur fictif',
   note: null,
 };
 const THEO_BANK: PayoutDetails = {
   method: 'bank_account',
-  beneficiary: 'Théo Inventé',
+  country: 'BJ',
+  firstName: 'Théo',
+  lastName: 'Inventé',
+  city: 'Ville fictive',
+  contactPhone: '+229 00 00 00 09',
+  email: 'theo@example.test',
   account: 'ZZ00 1234 5678 9012',
   bank: 'Banque imaginaire',
   note: 'Compte courant',
 };
 /** Strings that must never leave the sealed block: not in the audit log, not in a list. */
-const SECRETS = ['Inventé', '22900000001', '00000001', 'ZZ001234', 'Banque imaginaire', 'Compte courant'];
+const SECRETS = [
+  'Inventé',
+  '22900000001',
+  '00000001',
+  '22900000009',
+  'theo@example.test',
+  'Ville fictive',
+  '"BJ"',
+  'ZZ001234',
+  'Banque imaginaire',
+  'Compte courant',
+];
 
 const LOU_CASH: PayoutDetails = {
   method: 'cash_pickup',
-  beneficiary: 'Lou Inventée',
+  country: 'MG',
+  firstName: 'Lou',
+  lastName: 'Inventée',
   city: 'Ville fictive',
+  contactPhone: '+261 00 00 00 09',
+  email: null,
   note: null,
 };
 
@@ -92,7 +117,7 @@ describe('« Où te verser » : le membre écrit, le propriétaire révèle, un 
     expect(created.headers['cache-control']).toBe('private, no-store');
     const written = PayoutDestinationSchema.parse(created.json());
     // Spaces dropped from the number, the rest as written.
-    expect(written.details).toEqual({ ...THEO_MOMO, phone: '+22900000001' });
+    expect(written.details).toEqual({ ...THEO_MOMO, phone: '+22900000001', contactPhone: '+22900000009' });
 
     // The same details again: nothing written, nothing told.
     const again = await write(theo, theoCookie, THEO_MOMO);
@@ -238,7 +263,16 @@ describe('« Où te verser » : le membre écrit, le propriétaire révèle, un 
   it('allows three changes a day, and refuses the fourth', async () => {
     const bodies: PayoutDetails[] = [
       THEO_BANK,
-      { method: 'cash_pickup', beneficiary: 'Théo Inventé', city: 'Ville fictive', note: null },
+      {
+        method: 'cash_pickup',
+        country: 'BJ',
+        firstName: 'Théo',
+        lastName: 'Inventé',
+        city: 'Ville fictive',
+        contactPhone: '+22900000009',
+        email: null,
+        note: null,
+      },
     ];
     for (const body of bodies) {
       const changed = await write(theo, theoCookie, body);
@@ -277,6 +311,25 @@ describe('« Où te verser » : le membre écrit, le propriétaire révèle, un 
     expect(rewritten.statusCode, rewritten.body).toBe(201);
     const read = await readOwn(lou, louCookie);
     expect(read.statusCode, read.body).toBe(200);
+  });
+
+  it('seals the longest details under the size the base allows', async () => {
+    // Three bytes a character: the most a name of `PAYOUT_NAME_MAX` code units weighs in UTF-8.
+    const long = (n: number) => '€'.repeat(n);
+    const longest = {
+      method: 'bank_account',
+      country: 'BJ',
+      firstName: long(60),
+      lastName: long(60),
+      city: long(60),
+      contactPhone: '+229000000000000',
+      email: `${'a'.repeat(64)}@${'b'.repeat(55)}.${'c'.repeat(55)}.${'d'.repeat(55)}.example`,
+      account: 'Z'.repeat(34),
+      bank: long(60),
+      note: long(200),
+    } satisfies PutPayoutDetailsBody;
+    const written = await write(lou, louCookie, longest);
+    expect(written.statusCode, written.body).toBe(201);
   });
 
   it('refuses to check or re-seal on a connection that row-level security would leave blind', async () => {

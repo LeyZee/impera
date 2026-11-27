@@ -1,6 +1,7 @@
 import {
   ApiErrorSchema,
   PAYOUT_DESTINATION_ERROR_CODES,
+  PAYOUT_DIAL_CODES,
   PAYOUT_RECENT_CHANGE_DAYS,
   PayoutDestinationListSchema,
   PayoutDestinationSchema,
@@ -8,6 +9,7 @@ import {
   type PayoutDestination,
   type PayoutDestinationErrorCode,
   type PayoutDestinationList,
+  type PayoutCountry,
   type PayoutDetails,
   type PayoutReceiveMethod,
   type PutPayoutDetailsBody,
@@ -100,7 +102,7 @@ export const PAYOUT_ERRORS: Readonly<Record<PayoutRefusalCode, string>> = {
   payout_destination_limited: 'Trois changements par jour au plus : réessaie demain.',
   payout_destination_unavailable:
     'Ces coordonnées ne peuvent pas être lues ni gardées ici pour l’instant : préviens le propriétaire.',
-  request_invalid: 'Vérifie le numéro et les champs.',
+  request_invalid: 'Vérifie les numéros et les champs.',
   team_member_not_found: 'Cette fiche n’existe plus.',
 };
 
@@ -113,16 +115,23 @@ export const RECEIVE_METHODS: Readonly<
   cash_pickup: { label: 'Retrait en espèces', short: 'Espèces', series: 3 },
 };
 
-/** The number as one reads it, by fours (an IBAN) or by twos after the country code (a phone). */
-export function numberOf(details: PayoutDetails): string {
-  if (details.method === 'mobile_money') {
-    const digits = details.phone.slice(1);
-    const country = digits.length > 10 ? digits.slice(0, 3) : digits.slice(0, 2);
-    const rest = digits.slice(country.length).match(/.{1,2}/gu) ?? [];
-    return `+${country} ${rest.join(' ')}`;
-  }
+/** The prefix a phone of this country starts with, as the form puts it first: « +229 ». */
+export const dialPrefix = (country: PayoutCountry): string => `+${PAYOUT_DIAL_CODES[country]}`;
+
+/** A phone as one reads it: its country code, then the rest by twos. */
+export function phoneLine(phone: string, country: PayoutCountry): string {
+  const prefix = dialPrefix(country);
+  const known = phone.startsWith(prefix);
+  const head = known ? prefix : phone.slice(0, 4);
+  const rest = phone.slice(head.length).match(/.{1,2}/gu) ?? [];
+  return [head, ...rest].join(' ');
+}
+
+/** The number the transfer goes to, as one reads it: the wallet by twos, the account by fours; none for cash. */
+export function numberOf(details: PayoutDetails): string | null {
+  if (details.method === 'mobile_money') return phoneLine(details.phone, details.country);
   if (details.method === 'bank_account') return (details.account.match(/.{1,4}/gu) ?? []).join(' ');
-  return details.city;
+  return null;
 }
 
 /** Who holds it: the operator, the bank, or nothing for a pickup. */
@@ -131,7 +140,6 @@ export function holderOf(details: PayoutDetails): string | null {
   if (details.method === 'bank_account') return details.bank;
   return null;
 }
-
 /** A change younger than `PAYOUT_RECENT_CHANGE_DAYS`, said in amber beside « Marquer payé » (ADR 0165 § 5). */
 export function changedRecently(changedAt: string | null, now: Date): boolean {
   if (changedAt === null) return false;
