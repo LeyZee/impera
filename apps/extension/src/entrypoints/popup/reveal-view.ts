@@ -164,7 +164,7 @@ export function failureOf(
   failure: SyncFailure,
   crm: string,
   shows?: string,
-): { readonly cause: string; readonly gesture: string } {
+): { readonly cause: string; readonly gesture: string; readonly otherwise?: string } {
   switch (failure) {
     case 'other-account':
       return {
@@ -210,8 +210,9 @@ export function failureOf(
       return {
         cause:
           'Cet onglet est connecté avec un autre membre que celui retenu pour l’IA à la première synchro.',
-        gesture:
-          'Connecte-toi à Reveal avec le « bot », puis resynchronise. Si la première synchro s’était faite avec un autre compte, l’agence libère le compte de l’IA sur le serveur, puis tu refais la première synchro avec le « bot ».',
+        gesture: 'Connecte-toi à Reveal avec le « bot », puis resynchronise.',
+        otherwise:
+          'Si la première synchro a été faite avec un autre compte, demande à un propriétaire de libérer le compte de l’IA, puis refais-la avec le « bot ».',
       };
     case 'refused':
       return {
@@ -341,13 +342,15 @@ function statusLine(account: Account, row: RowState, now: Date): HTMLElement {
 function adviceLine(row: RowState, crm: string): HTMLElement | null {
   if (row.phase !== null) return null;
   if (row.failure !== null) {
-    const { cause, gesture } = failureOf(row.failure, crm, row.shows);
+    const { cause, gesture, otherwise } = failureOf(row.failure, crm, row.shows);
+    // The way out a member cannot take alone, on its own line under the gesture he can (avis Design du 27/11).
     return h(
       'p',
       { class: 'pp-sync__fail', role: 'status' },
       h('span', { class: 'pp-sync__cause' }, cause),
       ' ',
       gesture,
+      otherwise === undefined ? null : h('span', { class: 'pp-sync__otherwise' }, otherwise),
     );
   }
   if (row.synced?.kept === true)
@@ -422,7 +425,7 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
       : text(
           confirm.seen === 'same'
             ? `Cet onglet montre le même modèle qu’à la dernière synchro de ${named(account)}.`
-            : `Première synchro de ce compte : vérifie que cet onglet montre bien ${named(account)}, et qu’il est connecté avec le compte Reveal créé pour l’IA (le «\u00a0bot\u00a0»), jamais le tien ni celui d’un chatteur. Ce compte deviendra celui de l’IA : ses messages et ses ventes seront à son nom.`,
+            : `Première synchro de ce compte : vérifie que cet onglet montre bien ${named(account)}.`,
         );
   return [
     h(
@@ -432,6 +435,22 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
       h('span', { class: 'pp-sync__handle' }, `@${account.handle}`),
     ),
     sentence,
+    // The gravest warning of the popup, read before the button (avis Design du 27/11): the first « Sync » pins the
+    // Reveal member the AI will speak and sell as.
+    ...(confirm.seen === 'unknown'
+      ? [
+          h(
+            'div',
+            { class: 'nv-note nv-note--warn', role: 'note' },
+            h(
+              'p',
+              { class: 'nv-note__title' },
+              'Connecte-toi avec le « bot », jamais ton compte ni celui d’un chatteur.',
+            ),
+            h('span', {}, 'Ce compte deviendra celui de l’IA : ses messages et ses ventes seront à son nom.'),
+          ),
+        ]
+      : []),
     h(
       'div',
       { class: 'pp-actions pp-actions--row' },

@@ -350,6 +350,10 @@ describe('failureOf', () => {
       expect(gesture.endsWith('.')).toBe(true);
     }
     expect(failureOf('refused', 'crm.test').gesture).not.toContain('bien connecté');
+    // The gesture a member makes alone, and apart the way out only an owner opens (avis Design du 27/11).
+    const member = failureOf('other-member', 'crm.test');
+    expect(member.gesture).toContain('puis resynchronise');
+    expect(member.otherwise).toContain('demande à un propriétaire de libérer le compte de l’IA');
   });
 
   // Retour PC du 19/11: a silent worker after a reload read « Le CRM ne répond pas » while the CRM answered.
@@ -369,8 +373,9 @@ describe('before a session leaves (demande de Sécurité)', () => {
     const text = card?.textContent ?? '';
     expect(text).toContain('Première synchro de ce compte');
     // The first « Sync » pins the platform member the AI speaks and sells as (audit de robustesse, 27/11).
-    expect(text).toContain('compte Reveal créé pour l’IA');
-    expect(text).toContain('Ce compte deviendra celui de l’IA');
+    const warning = card?.querySelector('.nv-note--warn');
+    expect(warning?.textContent).toContain('jamais ton compte ni celui d’un chatteur');
+    expect(warning?.textContent).toContain('Ce compte deviendra celui de l’IA');
     expect(text).toContain('Soleil (@soleil.noir)');
     expect(text).not.toContain('Lune');
     expect(text).not.toContain('Garde la messagerie Reveal ouverte');
