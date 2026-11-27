@@ -1,9 +1,11 @@
-import type { ShiftReport } from '@impera/contracts';
+import type { OnDuty, ShiftReport } from '@impera/contracts';
 
 import type { BackupBanner } from './backups';
 import type { PaperworkLine } from './paperwork';
 
 import { awaitsDecision, gapWaits, hasGap } from '@/reports/model';
+import { lateCheckIn, lateWords } from '@/scheduling/model';
+import { firstPayoutSummary, gapCount, type FirstPayoutGaps } from '@/setup/first-payout';
 
 /**
  * « À faire » on the Dashboard of the owner and of an active manager (pilotage 12/11, W3): what waits on the reader,
@@ -15,7 +17,8 @@ import { awaitsDecision, gapWaits, hasGap } from '@/reports/model';
 export type TodoTone = 'danger' | 'warn' | 'neutral';
 
 /** Where a line is settled; a line of documents leads to each member's file instead. */
-export type TodoTarget = '/paie/factures' | '/equipe/rapports' | '/reglages/sauvegardes';
+export type TodoTarget =
+  '/paie/factures' | '/paie/quinzaine' | '/equipe/rapports' | '/equipe/planning' | '/reglages/sauvegardes';
 
 export interface TodoItem {
   readonly key: string;
@@ -77,6 +80,53 @@ export function reportItems(reports: readonly ShiftReport[], now: Date): TodoIte
   ];
 }
 
+/**
+ * « Avant ton premier versement » (recette PARC-01): one amber line while anything would hold a transfer back, the
+ * agency's gaps under it, then who else has some; the whole list, each member's file one tap away, is on top of Paie.
+ */
+export function firstPayoutItem(gaps: FirstPayoutGaps | null): TodoItem | null {
+  if (gaps === null) return null;
+  const count = gapCount(gaps);
+  const summary = firstPayoutSummary(gaps);
+  if (summary === null) return null;
+  return {
+    key: 'first-payout',
+    tone: 'warn',
+    title: `Avant ton premier versement : ${plural(count, 'chose', 'choses')} à régler`,
+    // The whole line leads to Paie, where each member opens his file: no link inside a link.
+    detail: [summary],
+    to: '/paie/quinzaine',
+    where: 'Paie',
+    members: [],
+    more: false,
+  };
+}
+
+/**
+ * A planned member who has not taken his post (recette MAN-02), once the agency's delay of « chatteur pas là » has
+ * passed (Réglages › Alertes, ADR 0094 § 1): one amber line each, leading to the planning, where it is said from the
+ * first minute. None while the agency has set no delay: the signal is off.
+ */
+export function lateItems(onDuty: readonly OnDuty[], now: Date, delayMinutes: number | null): TodoItem[] {
+  if (delayMinutes === null) return [];
+  return onDuty.flatMap((one): TodoItem[] => {
+    const late = lateCheckIn(one, now);
+    if (late === null || late < delayMinutes * 60_000) return [];
+    return [
+      {
+        key: `late-${one.shiftId}`,
+        tone: 'warn',
+        title: `${one.member.displayName} : ${lateWords(late)}`,
+        detail: [],
+        to: '/equipe/planning',
+        where: 'Planning',
+        members: [],
+        more: false,
+      },
+    ];
+  });
+}
+
 /** How many lines the card shows before « Et N autres »: the figures stay close under it on a busy day. */
 export const TODO_SHOWN = 4;
 
@@ -85,8 +135,13 @@ export function todoItems(
   backup: BackupBanner | null,
   paperwork: readonly PaperworkLine[],
   reports: readonly TodoItem[],
+  firstPayout: TodoItem | null = null,
+  late: readonly TodoItem[] = [],
 ): TodoItem[] {
   const items: TodoItem[] = [
+    // Someone missing on a shift under way comes first among the warnings: it costs now.
+    ...late,
+    ...(firstPayout === null ? [] : [firstPayout]),
     ...paperwork.map((line, index): TodoItem => ({
       key: `paper-${String(index)}`,
       tone: line.tone,

@@ -38,6 +38,7 @@ import {
 import {
   accountLine,
   ERROR_MESSAGES,
+  lateCheckIn,
   phaseOf,
   templateLine,
   unheldReader,
@@ -109,6 +110,8 @@ export function ShiftSheet({
   const phase = phaseOf(shift, now);
   // His status when he is away, or her taken off his list: nobody holds the shift (recette EQP-03, EQU-01).
   const unheld = unheldReader(planning, now)(shift);
+  // Planned is not on post (recette MAN-02): under way without his « Je prends mon poste ».
+  const late = unheld === null ? lateCheckIn(shift, now) : null;
   // The reader's own shift: a manager who chats (EQP-02). The owner has no record, so never one.
   const mine = record !== null && record.userId === userId;
   const report = reports === null ? null : reportOf(reports, shift.id);
@@ -207,9 +210,11 @@ export function ShiftSheet({
       <div className="tm-dialog__body">
         <div className="sc-sheet__when">
           <span
-            className="sc-swatch"
+            className={late === null ? 'sc-swatch' : 'sc-swatch sc-swatch--late'}
             style={
-              shown?.color === undefined || shown.color === null ? undefined : { '--sc-color': shown.color }
+              late !== null || shown?.color === undefined || shown.color === null
+                ? undefined
+                : { '--sc-color': shown.color }
             }
             aria-hidden="true"
           />
@@ -222,10 +227,14 @@ export function ShiftSheet({
           </div>
           <span className={`nv-status sc-phase sc-phase--${phase}`}>
             <span
-              className={`nv-dot${phase === 'live' && unheld === null ? ' nv-tone--ok nv-dot--live' : ''}`}
+              className={`nv-dot${late !== null ? ' nv-tone--warn' : phase === 'live' && unheld === null ? ' nv-tone--ok nv-dot--live' : ''}`}
             />
-            {/* Under way with nobody holding it: nobody is « en poste » (EQP-03). */}
-            {phase === 'live' && unheld !== null ? 'En cours' : PHASE_LABELS[phase]}
+            {/* Under way with nobody holding it: nobody is « en poste » (EQP-03); nor a member who has not taken it. */}
+            {phase === 'live' && unheld !== null
+              ? 'En cours'
+              : late !== null
+                ? 'Pas encore en poste'
+                : PHASE_LABELS[phase]}
           </span>
         </div>
         {unheld === null || phase === 'past' ? null : (

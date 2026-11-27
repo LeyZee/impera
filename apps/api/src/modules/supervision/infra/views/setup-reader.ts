@@ -16,7 +16,7 @@ import type { CreatorSetupFacts, Invitation, MemberSetupFacts } from '../../doma
 export type PushOn = () => boolean;
 
 /**
- * What stops the first invoice of each member on `day` (invoicing's `invoiceReadiness`), `null` when it could go out.
+ * What stops the first invoice of each member on `day` (invoicing's `invoiceGaps`), every gap, none when it could go out.
  * A port: supervision reads no invoicing table itself.
  */
 export type BillingReadiness = (
@@ -252,7 +252,7 @@ export function createSetupReader(
           creators: row.creators,
           hasShift: row.shift,
           paid: row.paid,
-          billing: blocked.get(row.id) ?? null,
+          billing: blocked.get(row.id) ?? [],
         },
       }));
     },

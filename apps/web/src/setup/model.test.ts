@@ -103,8 +103,16 @@ describe('« Mise en route » words', () => {
 
   it('says what holds his first invoice and where it is settled', () => {
     const [file, agency] = memberLines(THEO, [
-      { key: 'billing', state: 'todo', note: { kind: 'billing', reason: 'no_mandate' } },
-      { key: 'billing', state: 'todo', note: { kind: 'billing', reason: 'agency_missing' } },
+      {
+        key: 'billing',
+        state: 'todo',
+        note: { kind: 'billing', reason: 'no_mandate', reasons: ['no_mandate'] },
+      },
+      {
+        key: 'billing',
+        state: 'todo',
+        note: { kind: 'billing', reason: 'agency_missing', reasons: ['agency_missing'] },
+      },
     ]);
     expect(file?.hint).toBe(
       'Sa première facture ne partirait pas : le membre n’a pas encore accepté son mandat de facturation.',
@@ -112,7 +120,11 @@ describe('« Mise en route » words', () => {
     expect(file?.target).toEqual({ kind: 'file', memberId: THEO });
     expect(agency?.target).toEqual({ kind: 'page', to: '/reglages/facturation' });
     const [residence] = memberLines(THEO, [
-      { key: 'billing', state: 'todo', note: { kind: 'billing', reason: 'tax_residence_missing' } },
+      {
+        key: 'billing',
+        state: 'todo',
+        note: { kind: 'billing', reason: 'tax_residence_missing', reasons: ['tax_residence_missing'] },
+      },
     ]);
     expect(residence?.hint).toBe(
       'Son premier versement serait bloqué : son attestation de résidence fiscale manque.',

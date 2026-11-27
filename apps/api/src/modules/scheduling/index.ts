@@ -347,6 +347,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
         switchFactsOf: deps.switchFactsOf,
         periodClosedFrom: deps.periodClosedFrom,
         enqueuePayRecalculation: deps.enqueuePayRecalculation,
+        salesTotalsOf: deps.salesTotalsOf,
       }),
       deps.creators,
       now,

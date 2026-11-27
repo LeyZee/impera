@@ -11,7 +11,7 @@ import {
   taxResidenceOf,
   type BillingRegime,
 } from '../../../contractors/domain/billing';
-import { issueDecision, type IssueFacts } from '../billing';
+import { issueDecision, issueGaps, type IssueFacts } from '../billing';
 
 /** Regimes as the owner would set them; their mentions are data, here short invented ones. */
 const ABROAD: BillingRegime = {
@@ -495,5 +495,56 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     expect(taxResidenceOf([next], '2026')).toEqual({ state: 'missing' });
     expect(taxResidenceOf([next], '2027')).toEqual({ state: 'covered', document: next });
     expect(taxResidenceOf([], '2026')).toEqual({ state: 'missing' });
+  });
+});
+
+describe('every gap before the first transfer, at once (recette PARC-01)', () => {
+  it('lists none when the invoice goes out', () => {
+    expect(issueGaps(facts())).toEqual([]);
+  });
+
+  it('lists every gap of a fresh agency and member, in the order the validation would give them', () => {
+    const fresh = facts({
+      agency: null,
+      mandate: { acceptedVersion: null, currentVersion: 0 },
+      assignments: [],
+      identity: null,
+      identityVerified: false,
+      prefix: null,
+    });
+    expect(issueGaps(fresh)).toEqual([
+      'agency_missing',
+      'mandate_unpublished',
+      'no_regime',
+      'identity_unverified',
+      'prefix_missing',
+    ]);
+    // Published, not accepted: his acceptance is then what lacks, never « not published » again (recette PARC-05).
+    const published = facts({ mandate: { acceptedVersion: null, currentVersion: 1 }, prefix: null });
+    expect(issueGaps(published)).toEqual(['no_mandate', 'prefix_missing']);
+  });
+
+  it('judges the regime’s country and the identity it prints only once he has a regime', () => {
+    expect(issueGaps(facts({ regimesOfCountry: new Set(), identity: null }))).toEqual([
+      'regime_country_mismatch',
+      'identity_incomplete',
+    ]);
+  });
+
+  it('always starts with the reason the validation gives', () => {
+    const cases: Partial<IssueFacts>[] = [
+      { agency: null, prefix: null },
+      { mandate: { acceptedVersion: null, currentVersion: 0 }, identityVerified: false },
+      { mandate: { acceptedVersion: null, currentVersion: 2 }, assignments: [] },
+      { assignments: [], prefix: null },
+      { regimesOfCountry: new Set(), identityVerified: false },
+      { identity: null, prefix: null },
+      { identityVerified: false, prefix: null },
+      { prefix: null },
+    ];
+    for (const patch of cases) {
+      const decision = issueDecision(facts(patch));
+      expect(decision.kind === 'none' ? decision.reason : null).toBe(issueGaps(facts(patch))[0]);
+    }
   });
 });

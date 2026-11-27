@@ -111,6 +111,16 @@ export const ReauthenticateBodySchema = z.object({
 });
 export type ReauthenticateBody = z.infer<typeof ReauthenticateBodySchema>;
 
+/**
+ * `GET /v1/auth/reauthenticate`: until when this session's confirmation holds, or `null` when a sensitive action would
+ * be refused now (recette navigation PARC-02). The page asks for the password and the code at the click, before a
+ * hold's countdown, instead of after it; the server's guard stays the rule.
+ */
+export const ReauthenticationStateSchema = z.object({
+  confirmedUntil: z.iso.datetime({ offset: true }).nullable(),
+});
+export type ReauthenticationState = z.infer<typeof ReauthenticationStateSchema>;
+
 /** Error code of every route but the activation's for an account whose second factor is not active yet (ADR 0046 § 1). */
 export const SECOND_FACTOR_ERROR_CODE = 'second_factor_forbidden';
 

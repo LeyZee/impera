@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+import { AccountPayRulesSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PayRulesSection } from './PayRulesSection';
+import { PayRulesSection, vatGapOf } from './PayRulesSection';
 
 import { SCHEDULING_SETTINGS } from '@/test/pay';
 import { chooseValue, valuesOf } from '@/test/select';
@@ -48,6 +49,7 @@ const account = (n: number, creatorName: string, handle: string) => ({
   handle,
   archived: false,
 });
+const parseRules = (value: unknown) => AccountPayRulesSchema.parse(value);
 const rules = (n: number, accountN: number, fromPeriod: string, patch: Record<string, unknown> = {}) => ({
   id: id(500 + n),
   platformAccountId: id(10 + accountN),
@@ -133,6 +135,41 @@ afterEach(() => {
 });
 
 describe('Réglages › Règles de paie', () => {
+  it('warns in amber when the VAT of the rules in force is not the one Reveal reads, and changes nothing (recette PARC-10)', async () => {
+    accounts = [
+      {
+        account: account(1, 'Anna Lys', 'anna'),
+        rules: [rules(1, 1, '2026-10-01', { vatBps: 0 })],
+        checkedPeriod: null,
+        observedVatBps: 2_000,
+      },
+      // The same VAT, or none read: nothing said.
+      {
+        account: account(2, 'Inès Moreau', 'ines'),
+        rules: [rules(2, 2, '2026-10-01')],
+        checkedPeriod: null,
+        observedVatBps: 2_000,
+      },
+    ];
+    renderSection();
+    const note = await screen.findByText('TVA différente de celle de Reveal');
+    const block = note.closest('.nv-note');
+    expect(plain(block?.textContent)).toContain(
+      'Les règles prennent 0 % de TVA ; Reveal en lit 20 % sur ses ventes des 30 derniers jours. La paie garde tes règles : à vérifier.',
+    );
+    expect(screen.getAllByText('TVA différente de celle de Reveal')).toHaveLength(1);
+    expect(writes).toEqual([]);
+  });
+
+  it('says no VAT gap on the platform’s net, nor under a point', () => {
+    const declared = { ...rules(1, 1, '2026-10-01', { vatBps: 0 }), earningsSource: 'declared' as const };
+    expect(vatGapOf(parseRules(declared), 'reveal', 2_000)).toEqual({ rules: 0, read: 2_000 });
+    expect(vatGapOf(parseRules({ ...declared, vatBps: 1_950 }), 'reveal', 2_000)).toBeNull();
+    expect(vatGapOf(parseRules({ ...declared, earningsSource: 'detected' }), 'reveal', 2_000)).toBeNull();
+    expect(vatGapOf(parseRules(declared), 'reveal', null)).toBeNull();
+    expect(vatGapOf(null, 'reveal', 2_000)).toBeNull();
+  });
+
   it('asks for nothing the page cannot do when there is no account yet', async () => {
     accounts = [];
     renderSection();

@@ -134,8 +134,8 @@ export interface MemberSetupFacts {
   readonly hasShift: boolean;
   /** A chatter, or a manager with a rate or a share of the team's net in force: his pay is invoiced. */
   readonly paid: boolean;
-  /** What stops his first invoice today, `null` when it could go out (`invoiceReadiness`). */
-  readonly billing: Exclude<InvoiceNotIssuedReason, 'no_invoice_to_credit'> | null;
+  /** What stops his first invoice or transfer today, every gap at once, none when both could go (`invoiceGaps`). */
+  readonly billing: readonly Exclude<InvoiceNotIssuedReason, 'no_invoice_to_credit'>[];
 }
 
 export function memberSetup(facts: MemberSetupFacts): MemberSetupStep[] {
@@ -151,11 +151,12 @@ export function memberSetup(facts: MemberSetupFacts): MemberSetupStep[] {
   if (facts.teamRole === 'chatter') steps.push(step('first_shift', doneIf(facts.hasShift)));
   // Learnt on the 16th when paying otherwise: what stops his first invoice, and so who has to act.
   if (facts.paid) {
+    const [first] = facts.billing;
     steps.push(
       step(
         'billing',
-        doneIf(facts.billing === null),
-        facts.billing === null ? null : { kind: 'billing', reason: facts.billing },
+        doneIf(first === undefined),
+        first === undefined ? null : { kind: 'billing', reason: first, reasons: [...facts.billing] },
       ),
     );
   }

@@ -32,11 +32,12 @@ async function read<T>(url: string, parse: (body: unknown) => T): Promise<T> {
 }
 
 /** The member's own, with its details. */
-export function useOwnPayout(memberId: string): UseQueryResult<PayoutDestination> {
+export function useOwnPayout(memberId: string, enabled = true): UseQueryResult<PayoutDestination> {
   return useQuery({
     queryKey: [...KEY, 'own', memberId],
     queryFn: () => read(base(memberId), (body) => PayoutDestinationSchema.parse(body)),
     gcTime: 0,
+    enabled,
   });
 }
 

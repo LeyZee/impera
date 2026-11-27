@@ -24,6 +24,7 @@ const MOMO = {
 let stored: Record<string, unknown> | null;
 let reauthOnce: boolean;
 let listFails: boolean;
+let confirmedUntil: string | null;
 const writes: { method: string; path: string; body: unknown }[] = [];
 
 function serve(): void {
@@ -63,6 +64,7 @@ function serve(): void {
           201,
         );
       }
+      if (url.pathname === '/v1/auth/reauthenticate') return json({ confirmedUntil });
       if (url.pathname === '/v1/payroll/payout-destinations') {
         if (listFails) return json(null, 500);
         return json({ destinations: [{ memberId: MEMBER, method: null, changedAt: null }] });
@@ -91,6 +93,7 @@ beforeEach(() => {
   stored = null;
   reauthOnce = false;
   listFails = false;
+  confirmedUntil = new Date(Date.now() + 9 * 60_000).toISOString();
   writes.length = 0;
   serve();
 });
@@ -178,6 +181,19 @@ describe('Moi › Dossier : « Où te verser » (ADR 0165)', () => {
     fireEvent.change(screen.getByLabelText('Numéro mobile money'), { target: { value: '+22900000001' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByText(/touche à l’argent/u)).toBeTruthy();
+  });
+
+  it('asks the password and the code at the click, before sending, when the confirmation is old (recette PARC-02)', async () => {
+    confirmedUntil = null;
+    wrap(<MyPayoutCard memberId={MEMBER} zone="Europe/Paris" />);
+    await screen.findByText('À remplir');
+    fillWho();
+    fireEvent.change(screen.getByLabelText('Téléphone de contact'), { target: { value: '+22900000002' } });
+    fireEvent.change(screen.getByLabelText('Numéro mobile money'), { target: { value: '+22900000001' } });
+    fireEvent.change(screen.getByLabelText('Opérateur'), { target: { value: 'Opérateur fictif' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(await screen.findByText(/touche à l’argent/u)).toBeTruthy();
+    expect(writes).toEqual([]);
   });
 });
 

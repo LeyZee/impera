@@ -325,7 +325,18 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
       billing: 'todo',
     });
     const billing = members.find((m) => m.memberId === theo)?.steps.find((s) => s.key === 'billing');
-    expect(billing?.note?.kind).toBe('billing');
+    // Every gap at once, the agency's first (recette PARC-01): nothing filled, nothing published, nothing given.
+    expect(billing?.note).toEqual({
+      kind: 'billing',
+      reason: 'agency_missing',
+      reasons: [
+        'agency_missing',
+        'mandate_unpublished',
+        'no_regime',
+        'identity_unverified',
+        'prefix_missing',
+      ],
+    });
   });
 
   it('says a transfer under a tax treaty would wait for the residence certificate', async () => {
@@ -417,7 +428,7 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
     expect(billing).toEqual({
       key: 'billing',
       state: 'todo',
-      note: { kind: 'billing', reason: 'tax_residence_missing' },
+      note: { kind: 'billing', reason: 'tax_residence_missing', reasons: ['tax_residence_missing'] },
     });
   });
 

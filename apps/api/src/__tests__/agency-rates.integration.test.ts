@@ -1,4 +1,5 @@
 import {
+  AccountPayRulesListSchema,
   ApiErrorSchema,
   CreatorAgencyRateIdSchema,
   CreatorAgencyRateListSchema,
@@ -255,7 +256,8 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
       platformChatterId: null,
       platformFanId: 'fan_test_01',
       currency: 'EUR' as const,
-      grossInclVatMinor: netMinor * 2,
+      // 20 % of VAT on what the fan paid (recette PARC-10): 9,60 € for 8,00 € before it.
+      grossInclVatMinor: netMinor * 2.4,
       grossExclVatMinor: netMinor * 2,
       netMinor,
       agencyMinor,
@@ -288,6 +290,9 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
     expect(observed.fortnights[0]?.to).toBe(parisDay(0));
     // Never a fan, a chatter nor a sale: sums and a ratio.
     expect(JSON.stringify(observed)).not.toMatch(/fan|chatter|sale_rate/iu);
+    // The VAT Reveal read on them, beside the pay rules, for the owner to compare (recette PARC-10).
+    const payRules = AccountPayRulesListSchema.parse((await call('GET', '/team/pay-rules', owner)).json());
+    expect(payRules.accounts.find((one) => one.account.id === account)?.observedVatBps).toBe(2000);
     expect(
       await test.admin.db
         .select()

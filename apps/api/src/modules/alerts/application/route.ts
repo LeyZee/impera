@@ -61,6 +61,8 @@ export interface RouterReads {
   managers(): Promise<readonly Manager[]>;
   /** The accounts of these team members, active ones only, each in his own time zone. */
   members(memberIds: readonly string[]): Promise<readonly Recipient[]>;
+  /** The name the team gives a member, `null` for one unknown: who sold, in a sale's notification (recette G19). */
+  memberName(memberId: string): Promise<string | null>;
 }
 
 export interface RouterDeps {
@@ -165,6 +167,9 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
       }
     }
     const creatorName = event.creatorId === null ? null : (nameOf.get(event.creatorId) ?? null);
+    // Who sold, by his name (recette 27/11, G19); a read that fails says « le chatteur en poste », never no notification.
+    const sellerId = alert.sale?.memberId ?? null;
+    const sellerName = sellerId === null ? null : await deps.reads.memberName(sellerId).catch(() => null);
     // A safety relay rings through the quiet hours and outside the daily cap (ADR 0150 § 6: « partent toujours »).
     const reason = isCreatorAlertLocked(alert.code) ? 'safety_alert' : 'creator_alert';
     for (const { recipient, silent } of loudest.values()) {
@@ -175,7 +180,14 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
             reason,
             objectKey: event.id,
             timeZone: recipient.timeZone,
-            message: alertMessage(alert.code, creatorName, alert.conversationId, silent, alert.sale),
+            message: alertMessage(
+              alert.code,
+              creatorName,
+              alert.conversationId,
+              silent,
+              alert.sale,
+              sellerName,
+            ),
           },
           now,
         );

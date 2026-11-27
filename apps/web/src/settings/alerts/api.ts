@@ -154,10 +154,11 @@ export const setSystemAlert = (
 export const NOT_TAKEN_DELAY_QUERY_KEY = ['scheduling', 'not-taken-delay'] as const;
 
 /** « Chatteur pas là » (ADR 0094 § 1, lot b): the agency's delay after a shift's start; `null` means nothing is sent. */
-export function useNotTakenDelay(): UseQueryResult<NotTakenDelay> {
+export function useNotTakenDelay(enabled = true): UseQueryResult<NotTakenDelay> {
   return useQuery({
     queryKey: NOT_TAKEN_DELAY_QUERY_KEY,
     queryFn: () => call('/v1/scheduling/not-taken-delay', (body) => NotTakenDelaySchema.safeParse(body)),
+    enabled,
   });
 }
 

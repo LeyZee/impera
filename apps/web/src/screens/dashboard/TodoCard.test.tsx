@@ -7,13 +7,13 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TodoCard } from './TodoCard';
 
 import { documentOf } from '@/test/contractors';
-import { invoiceOf, LOU, OCT1, OCT2, THEO } from '@/test/pay';
+import { invoiceOf, LOU, MEMBERS, OCT1, OCT2, THEO } from '@/test/pay';
 import { PAST, sent, WITHIN } from '@/test/reports';
 
 const reads: string[] = [];
@@ -79,6 +79,11 @@ const NOTHING = {
   '/v1/payroll/contractors/documents?review=pending': { documents: [], more: false },
   '/v1/backups/status': BACKUP_OK,
   '/v1/creator-messages/waiting': { messages: [] },
+  '/v1/dashboard/setup/members': { members: [] },
+  '/v1/payroll/payout-destinations': { destinations: [] },
+  '/v1/team/members': { members: MEMBERS },
+  '/v1/scheduling/on-duty': { onDuty: [] },
+  '/v1/scheduling/not-taken-delay': { minutes: 10 },
 };
 
 describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
@@ -146,7 +151,7 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(true);
     await screen.findByText('Dashboard');
     await vi.waitFor(() => {
-      expect(reads).toHaveLength(5);
+      expect(reads).toHaveLength(10);
     });
     expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
     cleanup();
@@ -154,6 +159,44 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(false);
     await screen.findByText('Dashboard');
     expect(reads).toEqual([]);
+  });
+
+  it('says what would hold the first transfer back in one amber line, then who else has some (recette PARC-01)', async () => {
+    serve({
+      ...NOTHING,
+      '/v1/dashboard/setup/members': {
+        members: [
+          {
+            memberId: THEO.id,
+            teamRole: 'chatter',
+            steps: [
+              {
+                key: 'billing',
+                state: 'todo',
+                note: {
+                  kind: 'billing',
+                  reason: 'mandate_unpublished',
+                  reasons: ['mandate_unpublished', 'prefix_missing'],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      '/v1/payroll/payout-destinations': {
+        destinations: [{ memberId: THEO.id, method: null, changedAt: null }],
+      },
+    });
+    renderCard(true);
+    const card = (await screen.findByRole('heading', { name: 'À faire' })).closest('section');
+    if (card === null) throw new Error('No card');
+    const line = await within(card).findByRole('link', {
+      name: /^Avant ton premier versement : 3 choses à régler/u,
+    });
+    expect(line.getAttribute('href')).toBe('/paie/quinzaine');
+    expect(line.closest('li')?.dataset['tone']).toBe('warn');
+    // The first gap with whose it is, then how many are left for whom (Design, 27/11).
+    expect(line.textContent).toContain('L’agence : le mandat de facturation n’est pas publié · 2 pour Théo');
   });
 
   it('gives the reviewer of the reports their lines only, without reading the owner’s lists (ADR 0073)', async () => {
@@ -179,10 +222,70 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
         .getByRole('link', { name: /^1 écart à trancher/u })
         .getAttribute('href'),
     ).toBe('/equipe/rapports');
-    // What her creators wrote is read too: the reviewer is an active manager, who reads it without answering.
+    // What her creators wrote is read too: the reviewer is an active manager, who reads it without answering; and who
+    // is on shift now, to say who has not taken his post (recette MAN-02).
     expect(reads.filter((read) => !read.startsWith('/v1/scheduling/shift-reports'))).toEqual([
       '/v1/creator-messages/waiting',
+      '/v1/scheduling/on-duty',
+      '/v1/scheduling/not-taken-delay',
     ]);
+  });
+
+  const started = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const lateShift = (id: string, minutes: number, checkedInAt: string | null) => ({
+    creatorId: '0199f2a0-0000-4000-8000-000000000001',
+    platformAccountId: '0199f2a0-0000-4000-8000-000000000011',
+    member: { id: THEO.id, displayName: 'Théo', color: null },
+    shiftId: id,
+    startsAt: started(minutes),
+    endsAt: started(-120),
+    checkedInAt,
+  });
+
+  it('says nothing of a late member while the agency has set no delay of « chatteur pas là » (ADR 0094 § 1)', async () => {
+    serve({
+      ...NOTHING,
+      '/v1/scheduling/not-taken-delay': { minutes: null },
+      '/v1/scheduling/on-duty': { onDuty: [lateShift('0199f2a0-0000-4000-8000-000000000101', 90, null)] },
+    });
+    renderCard(false, true);
+    await waitFor(() => {
+      expect(reads).toContain('/v1/scheduling/not-taken-delay');
+    });
+    expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
+  });
+
+  it('says a planned member not on post past the agency’s delay, in amber, leading to the planning (recette MAN-02)', async () => {
+    const started = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+    const shift = (id: string, minutes: number, checkedInAt: string | null) => ({
+      creatorId: '0199f2a0-0000-4000-8000-000000000001',
+      platformAccountId: '0199f2a0-0000-4000-8000-000000000011',
+      member: { id: THEO.id, displayName: 'Théo', color: null },
+      shiftId: id,
+      startsAt: started(minutes),
+      endsAt: started(-120),
+      checkedInAt,
+    });
+    serve({
+      ...NOTHING,
+      '/v1/scheduling/on-duty': {
+        onDuty: [
+          shift('0199f2a0-0000-4000-8000-000000000101', 25, null),
+          // Five minutes late is not yet a line; on post is never one.
+          shift('0199f2a0-0000-4000-8000-000000000102', 5, null),
+          shift('0199f2a0-0000-4000-8000-000000000103', 25, started(24)),
+        ],
+      },
+    });
+    renderCard(false, true);
+    const card = (await screen.findByRole('heading', { name: 'À faire' })).closest('section');
+    if (card === null) throw new Error('No card');
+    const line = within(card).getByRole('link', {
+      name: /^Théo : prévu, pas encore en poste depuis 25\smin/u,
+    });
+    expect(line.getAttribute('href')).toBe('/equipe/planning');
+    expect(line.closest('li')?.dataset['tone']).toBe('warn');
+    expect(within(card).getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('puts what a creator wrote to the agency in « À faire », with the owner’s answer box (trous béants n° 13)', async () => {

@@ -88,6 +88,12 @@ export const AccountPayRulesListSchema = z.object({
       account: PlanningAccountSchema,
       rules: z.array(AccountPayRulesSchema),
       checkedPeriod: PayPeriodSchema.nullable(),
+      /**
+       * The VAT its platform read on its sales of the last 30 days, in basis points (recette PARC-10): what the screen
+       * compares with the rules' `vatBps` to warn the owner, never what pay reads. `null` without sales, and always for a
+       * manager.
+       */
+      observedVatBps: BasisPointsSchema.nullable().default(null),
     }),
   ),
 });

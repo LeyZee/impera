@@ -78,8 +78,15 @@ export const SetupNoteSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('share_read_on_platform') }),
   /** An invitation link was made, none is alive any more and no password was chosen: it has to be sent again. */
   z.object({ kind: z.literal('invitation_expired') }),
-  /** What stops his first invoice today, the reason the validation would give (`invoice_not_issued`). */
-  z.object({ kind: z.literal('billing'), reason: InvoiceNotIssuedReasonSchema }),
+  /**
+   * What stops his first invoice today, the reason the validation would give (`invoice_not_issued`); `reasons`, every
+   * gap at once, that one first (recette PARC-01).
+   */
+  z.object({
+    kind: z.literal('billing'),
+    reason: InvoiceNotIssuedReasonSchema,
+    reasons: z.array(InvoiceNotIssuedReasonSchema).min(1),
+  }),
 ]);
 export type SetupNote = z.infer<typeof SetupNoteSchema>;
 

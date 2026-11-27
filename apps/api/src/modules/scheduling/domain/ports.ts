@@ -666,7 +666,13 @@ export interface PayRulesStore {
     now: Date,
   ): Promise<{
     currentPeriod: PayPeriod;
-    accounts: { account: StoredAccount; rules: StoredPayRules[]; checkedPeriod: PayPeriod | null }[];
+    accounts: {
+      account: StoredAccount;
+      rules: StoredPayRules[];
+      checkedPeriod: PayPeriod | null;
+      /** The VAT its platform read on its sales of the last 30 days (recette PARC-10), the owner's alone. */
+      observedVatBps: number | null;
+    }[];
   }>;
   /** Owner; `created` is false when the same rules were already recorded. */
   create(actor: Actor, rules: NewPayRules, now: Date): Promise<{ rules: StoredPayRules; created: boolean }>;

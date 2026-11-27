@@ -39,6 +39,7 @@ import {
   REPORT_ERRORS,
   signedAmountText,
   toDecideText,
+  waitingSplit,
   toneOf,
   withoutPayEffect,
   lateFor,
@@ -469,6 +470,8 @@ function ToValidate({
       : toDecide === 0
         ? ', aucun à décider maintenant'
         : `, dont ${toDecideText(toDecide)}`;
+  // Why the numbers of the page differ, said once under them (recette MAN-09).
+  const split = waitingSplit(waiting, held, now);
   // No waiting report is compared with the platform's sales (no key yet, ADR 0073 § 7): said once, so that nobody
   // waits for a validation by itself that cannot come (recette EQP-05, « ok ligne-aucune-vente »).
   const reports = waiting.filter((one) => one.correctsId === null);
@@ -501,6 +504,7 @@ function ToValidate({
             )}
           </div>
         )}
+        {split === null ? null : <p className="rp-validate__split nv-num">{split}</p>}
         {unread ? (
           <p className="rp-validate__unread">
             Les ventes de Reveal ne sont pas encore lues : rien n’est validé sans toi.

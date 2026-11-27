@@ -53,6 +53,8 @@ import {
   conflictLines,
   conflictTitle,
   gridOf,
+  lateCheckIn,
+  lateWords,
   leftOf,
   phaseOf,
   slotRowOf,
@@ -386,6 +388,7 @@ export function PlanningPage({
               list={onDuty.data ?? null}
               planning={data}
               zone={zone}
+              now={now}
               onShow={(id) => {
                 setOpen({ kind: 'shift', id });
               }}
@@ -699,11 +702,13 @@ function OnDutyStrip({
   list,
   planning,
   zone,
+  now,
   onShow,
 }: {
   list: readonly OnDuty[] | null;
   planning: Planning;
   zone: string;
+  now: Date;
   onShow: (shiftId: string) => void;
 }): JSX.Element | null {
   if (list === null) return null;
@@ -722,16 +727,26 @@ function OnDutyStrip({
         <ul className="sc-duty__list">
           {list.map((one) => {
             const account = accounts.get(one.platformAccountId);
+            // Planned is not on post (recette MAN-02): who has not taken it, and since when.
+            const late = lateCheckIn(one, now);
             const body = (
               <>
                 <span
-                  className="sc-swatch"
-                  style={one.member.color === null ? undefined : { '--sc-color': one.member.color }}
+                  className={late === null ? 'sc-swatch' : 'sc-swatch sc-swatch--late'}
+                  style={
+                    late !== null || one.member.color === null
+                      ? undefined
+                      : { '--sc-color': one.member.color }
+                  }
                   aria-hidden="true"
                 />
                 <span className="sc-duty__who">{one.member.displayName}</span>
                 <span className="sc-duty__where">{account?.creatorName ?? 'Une créatrice'}</span>
-                <span className="sc-duty__until nv-num">jusqu’à {clockAt(one.endsAt, zone)}</span>
+                {late === null ? (
+                  <span className="sc-duty__until nv-num">jusqu’à {clockAt(one.endsAt, zone)}</span>
+                ) : (
+                  <span className="sc-duty__late nv-num">{lateWords(late)}</span>
+                )}
               </>
             );
             return (
@@ -1349,6 +1364,8 @@ function ShiftChip({
   const overnight = chip.overnight && !earlier;
   // Under way with nobody on it (EQP-03): neither « en poste » nor the time left.
   const onShift = phase === 'live' && unheld === null;
+  // Planned is not on post (recette MAN-02): under way without his « Je prends mon poste », said in amber.
+  const late = onShift ? lateCheckIn(shift, now) : null;
   if (carried) {
     // Drawn whole on its first créneau of the day: here it only goes on, greyed, its name and « suite », never its
     // hours again, as on the team's calendar (recette visuelle 16/11, GES-05).
@@ -1380,9 +1397,14 @@ function ShiftChip({
       data-incident={incident ? 'true' : undefined}
       data-away={unheld === null ? undefined : 'true'}
       data-repeat={shift.templateId === null ? undefined : 'true'}
-      data-color={member?.color === null || member === null ? undefined : 'true'}
-      style={member?.color === null || member === null ? undefined : { '--sc-color': member.color }}
-      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${onShift ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}${unheld === null || phase === 'past' ? '' : `, ${unheldLabel(unheld).toLowerCase()}, à pourvoir`}`}
+      data-late={late === null ? undefined : 'true'}
+      data-color={late !== null || member?.color === null || member === null ? undefined : 'true'}
+      style={
+        late !== null || member?.color === null || member === null
+          ? undefined
+          : { '--sc-color': member.color }
+      }
+      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${onShift ? (late === null ? `, en poste, ${leftOf(shift, now)}` : `, ${lateWords(late)}`) : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}${unheld === null || phase === 'past' ? '' : `, ${unheldLabel(unheld).toLowerCase()}, à pourvoir`}`}
       onClick={() => {
         onShow(shift.id);
       }}
@@ -1398,7 +1420,13 @@ function ShiftChip({
         {overnight ? <span className="sc-chip__night"> +1</span> : null}
       </span>
       {/* The shift under way: its edge breathes in the member's colour (CSS) and says what is left. */}
-      {onShift ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
+      {!onShift ? null : late === null ? (
+        <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span>
+      ) : (
+        <span className="sc-chip__away" aria-hidden="true">
+          Pas en poste
+        </span>
+      )}
       {/* Nobody holds it (EQP-03): said in words, its places counted « à pourvoir ». Gone by, it is only history. */}
       {unheld === null || phase === 'past' ? null : (
         <span className="sc-chip__away" aria-hidden="true">

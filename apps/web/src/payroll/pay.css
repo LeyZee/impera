@@ -1612,3 +1612,13 @@
   align-items: center;
   gap: var(--nv-space-2);
 }
+
+/* « Où te verser » empty under an amount to pay (recette CH-03): the design system's amber note, its button under the
+   words. */
+.py-payout-note__text {
+  margin: 0;
+}
+.py-payout-note__go {
+  justify-self: start;
+  margin-top: var(--nv-space-2);
+}

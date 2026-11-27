@@ -108,6 +108,8 @@ export function alertMessage(
   conversationId: string | null,
   silent: boolean,
   sale?: SaleSaid,
+  /** The name of the member who sold, `null` when none is known: then « le chatteur en poste » (recette G19). */
+  sellerName: string | null = null,
 ): PushMessage {
   // A sale says its amount in its title: fifteen « Vente détectée » alike said nothing (recette 27/11, G19).
   const what =
@@ -116,7 +118,12 @@ export function alertMessage(
       : TITLES[code];
   return {
     title: (creatorName === null ? what : `${creatorName} · ${what}`).slice(0, PUSH_TITLE_MAX),
-    body: code === 'sale' && sale !== undefined ? SOLD_BY[sale.by] : BODIES[code],
+    body:
+      code === 'sale' && sale !== undefined
+        ? sale.by === 'member' && sellerName !== null
+          ? `Vendue par ${sellerName}.`
+          : SOLD_BY[sale.by]
+        : BODIES[code],
     url: urlOf(code, conversationId),
     ...(silent && { silent: true }),
   };

@@ -7,6 +7,7 @@ import { routeAlerts, type RoutedEventRow, type RouterReads } from '../route';
 const NORA = CreatorIdSchema.parse('01900000-0000-7000-8000-000000000010');
 const IRIS = '01900000-0000-7000-8000-000000000012';
 const CONVERSATION = '01900000-0000-7000-8000-000000000020';
+const SELLER = '01900000-0000-7000-8000-000000000060';
 const NOW = new Date('2026-11-19T15:00:00Z');
 
 function harness(options: {
@@ -43,6 +44,7 @@ function harness(options: {
       fails('members')
         ? down()
         : Promise.resolve(ids.map((id) => ({ userId: `user-of-${id}`, timeZone: 'Africa/Porto-Novo' }))),
+    memberName: (id) => Promise.resolve(id === SELLER ? 'Basile' : null),
   };
   const unread: unknown[] = [];
   const failures: string[] = [];
@@ -90,6 +92,33 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     const h = harness({ events: [sale] });
     await h.run();
     expect(new Set(h.asked.map((r) => r.reason))).toEqual(new Set(['creator_alert']));
+  });
+
+  it('names the member who sold in a sale’s notification (recette 27/11, G19)', async () => {
+    const sale: RoutedEventRow = {
+      id: 'event-6',
+      creatorId: NORA,
+      type: 'sale_detected',
+      payload: {
+        saleId: '01900000-0000-7000-8000-000000000051',
+        platform: 'reveal',
+        platformAccountId: '01900000-0000-7000-8000-000000000040',
+        saleType: 'ppv',
+        occurredAt: '2026-11-19T14:00:00.000Z',
+        currency: 'EUR',
+        grossInclVatMinor: 2_500,
+        netMinor: 2_000,
+        agencyMinor: 1_000,
+        creatorMinor: 1_000,
+        seller: { kind: 'member', memberId: SELLER },
+      },
+    };
+    const h = harness({ events: [sale] });
+    await h.run();
+    expect(h.asked[0]?.message).toMatchObject({
+      title: 'Nora · Vente de 25,00\u00a0€',
+      body: 'Vendue par Basile.',
+    });
   });
 
   it('routes the safety relays read apart even when the other events cannot be read (relecture Sécurité)', async () => {

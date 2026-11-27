@@ -59,6 +59,7 @@ import {
   payoutBlockPlace,
   payoutBlockText,
   payRefusalText,
+  afterBusinessDays,
   payoutDelayText,
   penaltyTaken,
   periodAmount,
@@ -1549,9 +1550,13 @@ describe('Commissions, as the member reads them', () => {
       'Calculé à 10 h 07 sur tes rapports validés. L’agence valide, puis le versement suit, en général 1 jour ouvré après la validation.',
     ]);
     const validated = statement({ status: 'validated', validatedAt: '2026-11-16T09:41:00.000Z' });
+    // Validated: the day it should leave, three business days on, on a condition (recette CH-03).
     expect(notes(validated, true, 3)).toEqual([
-      'Validé le lundi 16 novembre à 10 h 41. En général, le versement part 3 jours ouvrés après la validation.',
+      'Validé le lundi 16 novembre à 10 h 41. Versé vers le jeudi 19 novembre si ton dossier est complet.',
     ]);
+    // Over a weekend: Friday and one business day is Monday.
+    expect(afterBusinessDays('2026-11-20', 1)).toBe('2026-11-23');
+    expect(afterBusinessDays('2026-11-16', 3)).toBe('2026-11-19');
     // Nothing to pay: no delay to announce.
     expect(notes(statement({ ...validated, payableMinor: 0 }), true, 3)).toEqual([
       'Validé le lundi 16 novembre à 10 h 41.',

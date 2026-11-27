@@ -6,6 +6,7 @@ import { payoutDecision } from '../domain/payouts';
 
 import { enqueueDocumentSettle, enqueueInvoiceIssue } from './invoice-queue';
 import { payoutFactsOf } from './payout-facts';
+import { invoiceGaps } from './readiness';
 
 const { domainEvents } = schema;
 
@@ -32,9 +33,10 @@ export const payoutGate: PayoutGate = {
     return verdicts;
   },
 
-  // Through the events' partial index, by member: the newest said wins, its invoice's before a credit note's of the same
-  // run. A rerun says only a new reason (`publishNotIssued`), so the newest is the one in force.
-  async notIssuedReasonsUnscoped(adminTx, statements) {
+  // What stands now first (recette PARC-05): a past run's reason outlives what it said, the mandate published since or
+  // the identity checked. Then through the events' partial index, by member: the newest said wins, its invoice's before
+  // a credit note's of the same run; only a credit note no invoice can take is still worth saying once all is settled.
+  async notIssuedReasonsUnscoped(adminTx, statements, day) {
     const reasons = new Map<string, InvoiceNotIssuedReason>();
     if (statements.length === 0) return reasons;
     const wanted = new Set(statements.map((one) => one.statementId));
@@ -55,10 +57,20 @@ export const payoutGate: PayoutGate = {
       .orderBy(
         sql`${domainEvents.createdAt} desc, (${domainEvents.payload}->>'document' = 'invoice') desc, ${domainEvents.id} desc`,
       );
+    const said = new Map<string, InvoiceNotIssuedReason>();
     for (const row of rows) {
-      const said = EVENT_PAYLOADS.invoice_not_issued.parse(row.payload);
-      if (wanted.has(said.statementId) && !reasons.has(said.statementId))
-        reasons.set(said.statementId, said.reason);
+      const one = EVENT_PAYLOADS.invoice_not_issued.parse(row.payload);
+      if (wanted.has(one.statementId) && !said.has(one.statementId)) said.set(one.statementId, one.reason);
+    }
+    const now = new Map<string, InvoiceNotIssuedReason | undefined>();
+    for (const memberId of new Set(statements.map((one) => one.memberId))) {
+      now.set(memberId, (await invoiceGaps(adminTx, memberId, day))[0]);
+    }
+    for (const { memberId, statementId } of statements) {
+      const standing = now.get(memberId);
+      const last = said.get(statementId);
+      if (standing !== undefined) reasons.set(statementId, standing);
+      else if (last === 'no_invoice_to_credit') reasons.set(statementId, last);
     }
     return reasons;
   },

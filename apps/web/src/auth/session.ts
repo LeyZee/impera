@@ -1,6 +1,7 @@
 import {
   ApiErrorSchema,
   DashboardSessionSchema,
+  ReauthenticationStateSchema,
   SecondFactorSetupSchema,
   SignInAnswerSchema,
   type Me,
@@ -186,6 +187,19 @@ export async function reauthenticate(password: string, code: string): Promise<Re
   if (response.status === 401) return 'session_expired';
   if (response.status === 429) return 'too_many_attempts';
   return 'unavailable';
+}
+
+/**
+ * Whether this session's confirmation still holds `forMs` from now (recette navigation PARC-02): read before a gesture
+ * that waits (a hold's countdown), so the password and the code are asked at the click. Unknown counts as not held: the
+ * prompt shows once too often rather than a refusal after the countdown.
+ */
+export async function confirmationHolds(forMs: number, now: Date = new Date()): Promise<boolean> {
+  const response = await fetch('/v1/auth/reauthenticate', { credentials: 'include' }).catch(() => null);
+  if (!response?.ok) return false;
+  const parsed = ReauthenticationStateSchema.safeParse(await response.json().catch(() => null));
+  if (!parsed.success || parsed.data.confirmedUntil === null) return false;
+  return new Date(parsed.data.confirmedUntil).getTime() - now.getTime() >= forMs;
 }
 
 /** Throws when the server did not close the session (no answer, or a refusal): the screen must say so. */

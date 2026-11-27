@@ -54,6 +54,8 @@ let down: boolean;
 /** A period whose own read fails, the list still answering. */
 let periodDown: string | null;
 let delay: number | null;
+/** His own « Où te verser »: its method, `null` while empty; `undefined` leaves the read unanswered (404). */
+let payoutMethod: 'mobile_money' | null | undefined;
 /** The member's own line of the team, all `/v1/team/members` gives a chatter (scope `self`). */
 let mine: TeamMember;
 const asked: string[] = [];
@@ -117,6 +119,8 @@ function serve(): void {
       if (period !== undefined && period === periodDown)
         return json({ error: { code: 'internal', message: 'down', details: {}, requestId: 'req-1' } }, 500);
       if (period !== undefined) return json(periods[period] ?? periodOf(period, [], { window: null }));
+      if (url.pathname.endsWith('/payout-destination') && payoutMethod !== undefined)
+        return json({ memberId: THEO.id, method: payoutMethod, changedAt: null, details: null });
       switch (url.pathname) {
         case '/v1/payroll/periods':
           return json({
@@ -195,6 +199,7 @@ beforeEach(() => {
   down = false;
   periodDown = null;
   delay = null;
+  payoutMethod = undefined;
   mine = THEO;
   asked.length = 0;
   mySales = {};
@@ -256,6 +261,29 @@ afterEach(() => {
 });
 
 describe('CommissionsPage', () => {
+  it('warns in amber, with the way to his file, while « Où te verser » is empty (recette CH-03)', async () => {
+    payoutMethod = null;
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(hero)).toContain('Tu n’as pas encore dit où te verser');
+    });
+    expect(text(hero)).toContain('Ton versement ne partira pas tant que tu ne l’as pas rempli.');
+    expect(within(hero).getByRole('link', { name: 'Ouvrir mon dossier' }).getAttribute('href')).toBe(
+      '/moi/dossier',
+    );
+  });
+
+  it('says nothing of « Où te verser » once it is filled', async () => {
+    payoutMethod = 'mobile_money';
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(asked.some((path) => path.endsWith('/payout-destination'))).toBe(true);
+    });
+    expect(text(hero)).not.toContain('Où te verser');
+  });
+
   it('opens on the money on its way, and says what is left in the period under way, never the team’s amounts', async () => {
     renderPage();
     const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });

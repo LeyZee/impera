@@ -48,6 +48,7 @@ import {
   salesFor,
   tierProgress,
 } from '@/payroll/model';
+import { useOwnPayout } from '@/payroll/payout';
 import '@/payroll/pay.css';
 import { useReports } from '@/reports/api';
 import '@/reports/reports.css';
@@ -437,6 +438,7 @@ function Hero({
         </p>
       )}
       {words.hold === null ? null : <MyHoldNotice hold={words.hold} />}
+      <EmptyPayoutNotice statement={statement} />
     </section>
   );
 }
@@ -464,6 +466,25 @@ function MyHoldNotice({ hold }: { hold: MyPayoutHold }): JSX.Element {
           Ouvrir mon dossier
         </Link>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * « Où te verser » empty under an amount still to pay (recette CH-03), in amber, with the way to his file: without it
+ * nothing leaves, whatever the agency validates. Nothing while it is unread, once paid, or with nothing to pay.
+ */
+function EmptyPayoutNotice({ statement }: { statement: CommissionStatement }): JSX.Element | null {
+  const due = statement.payment === null && statement.payableMinor > 0;
+  const payout = useOwnPayout(statement.memberId, due);
+  if (!due || payout.data?.method !== null) return null;
+  return (
+    <div className="nv-note nv-note--warn py-payout-note nv-enter" role="status">
+      <p className="nv-note__title">Tu n’as pas encore dit où te verser</p>
+      <p className="py-payout-note__text">Ton versement ne partira pas tant que tu ne l’as pas rempli.</p>
+      <Link to="/moi/dossier" className="nv-btn nv-btn--soft nv-btn--sm py-payout-note__go">
+        Ouvrir mon dossier
+      </Link>
     </div>
   );
 }
@@ -809,6 +830,7 @@ function MyStatementDialog({
               ))}
             </div>
             {words.hold === null ? null : <MyHoldNotice hold={words.hold} />}
+            <EmptyPayoutNotice statement={statement} />
             <MoneyPath statement={statement} names={names} you payLabel={words.label} />
           </>
         )}

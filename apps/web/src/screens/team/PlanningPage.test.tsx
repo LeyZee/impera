@@ -58,6 +58,8 @@ const member = (patch: Record<string, unknown>): TeamMember =>
     ...patch,
   });
 
+/** He took his post two minutes early: « en poste » (EQ-12). */
+const NIGHT_CHECK_IN: string | null = '2026-10-27T21:58:00Z';
 const night = {
   id: NIGHT,
   creatorId: NORA,
@@ -67,8 +69,10 @@ const night = {
   endsAt: '2026-10-28T04:00:00Z',
   templateId: TEMPLATE,
   stoppedAt: null,
-  checkedInAt: null,
+  checkedInAt: NIGHT_CHECK_IN,
 };
+/** The check-in the on-duty read gives for the night shift; `null` for a member who has not taken his post. */
+let onDutyCheckedIn: string | null = night.checkedInAt;
 
 const ACCOUNTS = [
   {
@@ -230,7 +234,9 @@ function serve(
                 platformAccountId: NORA_REVEAL,
                 member: { id: THEO, displayName: 'Théo', color: '#c2410c' },
                 shiftId: NIGHT,
+                startsAt: night.startsAt,
                 endsAt: night.endsAt,
+                checkedInAt: onDutyCheckedIn,
               },
             ],
           },
@@ -391,6 +397,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
   reader.zone = 'Europe/Paris';
+  onDutyCheckedIn = night.checkedInAt;
 });
 
 afterEach(() => {
@@ -423,6 +430,21 @@ describe('Équipe › Planning', () => {
     const duty = screen.getByRole('region', { name: 'En poste maintenant' });
     expect(duty.textContent).toContain('ThéoNora Vidaljusqu’à 5 h');
     expect(screen.getByText('1 shift · 6 h')).toBeTruthy();
+  });
+
+  it('says a planned member who has not taken his post, and since when, never « en poste » (recette MAN-02)', async () => {
+    onDutyCheckedIn = null;
+    serve({ planning: planning([], [{ ...night, checkedInAt: null }]) });
+    renderPage();
+    const chip = await screen.findByRole(
+      'button',
+      { name: /^Théo, 23\sh – 5\sh, jusqu’au lendemain, prévu, pas encore en poste depuis 2\sh$/u },
+      { timeout: 4_000 },
+    );
+    expect(chip.textContent).toContain('Pas en poste');
+    const duty = screen.getByRole('region', { name: 'En poste maintenant' });
+    expect(duty.textContent).toMatch(/ThéoNora Vidalprévu, pas encore en poste depuis 2\sh/u);
+    expect(duty.textContent).not.toContain('jusqu’à');
   });
 
   it('lines the agency’s créneaux up and says an empty one ahead « À pourvoir » (EQ-01)', async () => {

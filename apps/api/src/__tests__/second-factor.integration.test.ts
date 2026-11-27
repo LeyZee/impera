@@ -266,6 +266,10 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     const refused = await removeKey(session);
     expect(refused.statusCode).toBe(403);
     expect(codeOf(refused)).toBe('reauthentication_forbidden');
+    // The page reads it before asking (recette navigation PARC-02): nothing confirmed yet.
+    const state = async () =>
+      (await get('/v1/auth/reauthenticate', session)).json<{ confirmedUntil: string | null }>();
+    expect(await state()).toEqual({ confirmedUntil: null });
 
     // The confirmation: a wrong code or a wrong password, one answer; then both right.
     const confirm = (payload: Json) => post('/v1/auth/reauthenticate', payload, session);
@@ -279,6 +283,8 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     }
     expect((await confirm({ password: dina.password, code: codeFor(dina.email) })).statusCode).toBe(204);
     expect((await removeKey(session)).statusCode).toBe(200);
+    const until = (await state()).confirmedUntil;
+    expect(until === null ? 0 : new Date(until).getTime() - Date.now()).toBeGreaterThan(9 * 60_000);
 
     // Ten minutes later, asked again.
     await test.admin.db
@@ -286,6 +292,7 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
       .set({ reauthenticatedAt: sql`now() - interval '11 minutes'` })
       .where(eq(schema.session.userId, userId));
     expect(codeOf(await removeKey(session))).toBe('reauthentication_forbidden');
+    expect(await state()).toEqual({ confirmedUntil: null });
   });
 
   it('confirms with a backup code too, and never spends one on a wrong password', async () => {

@@ -119,3 +119,19 @@
 .su-step--warning .su-step__hint {
   color: var(--nv-warning);
 }
+
+/* « Avant ton premier versement » (recette PARC-01): every gap of a row, one per line, under its name. */
+.fp-gaps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fp-lead {
+  margin: 0;
+}
+.fp-row {
+  align-items: start;
+}

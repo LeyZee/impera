@@ -584,7 +584,11 @@ export const OnDutySchema = z.object({
   platformAccountId: PlatformAccountIdSchema,
   member: PlanningMemberSchema,
   shiftId: ShiftIdSchema,
+  /** Its planned start: from it, a member who has not taken his post is late (recette MAN-02). */
+  startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
+  /** When he said « Je prends mon poste » (EQ-12), or `null`: planned is not on post. */
+  checkedInAt: z.iso.datetime().nullable(),
 });
 export type OnDuty = z.infer<typeof OnDutySchema>;
 

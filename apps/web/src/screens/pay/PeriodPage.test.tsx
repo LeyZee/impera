@@ -88,6 +88,8 @@ let settingsDown: boolean;
 let team: readonly TeamMember[];
 /** The platform's team as Équipe › Comptes Reveal reads it (ADR 0076); `'down'` answers a refused list. */
 let revealTeam: { platformChatterId: string; firstName: string; lastName: string }[] | 'down';
+/** Until when the session's confirmation holds, as `GET /v1/auth/reauthenticate` says it (recette PARC-02). */
+let confirmedUntil: string | null;
 
 function serve(): void {
   vi.stubGlobal(
@@ -102,6 +104,7 @@ function serve(): void {
         const answered = answer(url.pathname);
         return json(answered.body, answered.status);
       }
+      if (url.pathname === '/v1/auth/reauthenticate') return json({ confirmedUntil });
       reads.push(`${url.pathname}${url.search}`);
       const giving = /^\/v1\/payroll\/periods\/([^/]+)\/sales-to-give$/u.exec(url.pathname)?.[1];
       if (giving !== undefined) {
@@ -278,6 +281,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-02T09:00:00Z'));
   writes.length = 0;
   gate = null;
+  confirmedUntil = '2026-11-02T09:09:00.000Z';
   settingsDown = false;
   team = MEMBERS;
   revealTeam = [];
@@ -492,6 +496,36 @@ describe('Paie › Quinzaine', () => {
     expect(said).toContain('Basile : Ce relevé a changé depuis que tu l’as ouvert.');
   });
 
+  it('asks for the password and the code at the click, before the countdown, when the confirmation is old (recette PARC-02)', async () => {
+    confirmedUntil = null;
+    answer = () => ({ status: 200, body: statementOf(THEO, OCT2, { status: 'validated' }) });
+    confirmIdentity.mockImplementation(() => Promise.resolve('ok'));
+    renderPage(OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: 'Valider (4)' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clore et valider 4 relevés' }),
+    );
+    // Asked at once: no countdown runs while the password is missing, nothing is written.
+    const dialog = await screen.findByRole('dialog', { name: 'Valider les relevés' });
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(writes).toEqual([]);
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
+    // Then the hold, then the four.
+    expect(text(await screen.findByRole('status'))).toContain('Validation de 4 relevés');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await waitFor(() => {
+      expect(writes).toHaveLength(4);
+    });
+  });
+
   it('sends every held validation at once when the tab closes, the count saying what is being validated (recette 27/11, C4)', async () => {
     answer = () => ({ status: 200, body: statementOf(THEO, OCT2, { status: 'validated' }) });
     renderPage(OWNER);
@@ -535,6 +569,30 @@ describe('Paie › Quinzaine', () => {
       'Ce relevéce que tu valides maintenant21,25 €',
     ]);
     expect(within(dialog).getByRole('button', { name: 'Clore et valider le relevé' })).toBeTruthy();
+  });
+
+  it('opens a manager’s fortnight with nothing ticked: the first validation closes it for the team (recette MAN-11)', async () => {
+    periods[OCT2] = periodOf(OCT2, [
+      statementOf(BASILE, OCT2),
+      statementOf(LOU, OCT2),
+      statementOf(IRIS, OCT2, { canValidate: false }),
+    ]);
+    renderPage(IRIS_ME);
+    const all = await screen.findByRole('checkbox', { name: /Tout sélectionner/u });
+    // Three to validate, his own among them, which another member validates (recette MAN-09).
+    expect(document.body.textContent).toContain(
+      '3 relevés à valider, dont le tien : un autre membre de l’agence le valide',
+    );
+    const ticked = (box: HTMLElement): boolean => box instanceof HTMLInputElement && box.checked;
+    expect(ticked(all)).toBe(false);
+    const ones = screen.getAllByRole('checkbox').filter((box) => box !== all);
+    expect(ones.map(ticked)).toEqual([false, false, false]);
+    expect(screen.queryByRole('button', { name: /^Valider \(/u })).toBeNull();
+    const [first] = ones;
+    if (first === undefined) throw new Error('No row to tick');
+    fireEvent.click(first);
+    expect(await screen.findByRole('button', { name: 'Valider (1)' })).toBeTruthy();
+    expect(writes).toEqual([]);
   });
 
   it('says what blocks the period, and offers nothing to validate meanwhile, the manager’s own row locked', async () => {

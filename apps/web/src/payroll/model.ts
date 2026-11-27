@@ -44,7 +44,7 @@ import {
   signedAmountText,
 } from '@/reports/model';
 import { platformName } from '@/scheduling/model';
-import { clockAt, dayOf, daysFrom, longDay, withFirstOfMonth } from '@/scheduling/time';
+import { addDays, clockAt, dayOf, daysFrom, longDay, weekdayOf, withFirstOfMonth } from '@/scheduling/time';
 
 /**
  * Pay without React (EQ-05): what a statement and a period say, how the money runs from the sales to what is paid,
@@ -1573,7 +1573,8 @@ export const PAID_BY: Readonly<Record<PaymentMethod, string>> = {
 
 /**
  * The words around a member's own statement: computed, being validated, validated or paid, in the second person and
- * in the past once paid. Never a date of payment to come: the agency pays after it validates.
+ * in the past once paid. A date of payment to come only once validated, from the delay the owner announced, and on a
+ * condition (recette CH-03): « Versé vers le … si ton dossier est complet ».
  */
 export function myStatementWords(
   statement: CommissionStatement,
@@ -1611,7 +1612,13 @@ export function myStatementWords(
       notes: withCarry([
         statement.payableMinor === 0 || hold !== null
           ? `Validé le ${momentAt(statement.validatedAt, zone)}.`
-          : `Validé le ${momentAt(statement.validatedAt, zone)}. ${delay ?? 'Le versement suit.'}`,
+          : `Validé le ${momentAt(statement.validatedAt, zone)}. ${
+              payoutDelayBusinessDays === null
+                ? 'Le versement suit.'
+                : `Versé vers le ${longDay(
+                    afterBusinessDays(dayOf(statement.validatedAt, zone), payoutDelayBusinessDays),
+                  )} si ton dossier est complet.`
+            }`,
       ]),
       hold,
     };
@@ -1723,6 +1730,17 @@ export function rulePeriods(today: string, count: number): PayPeriod[] {
   )
     periods.push(one);
   return periods;
+}
+
+/** The day `count` business days after `day` (Monday to Friday; public holidays are not known here). */
+export function afterBusinessDays(day: string, count: number): string {
+  let at = day;
+  let left = count;
+  while (left > 0) {
+    at = addDays(at, 1);
+    if (weekdayOf(at) <= 5) left -= 1;
+  }
+  return at;
 }
 
 /** « 3 jours ouvrés après la validation » (PAIE-32): the delay the owner announced, in words. */
