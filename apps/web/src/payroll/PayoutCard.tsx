@@ -32,6 +32,7 @@ import {
   type PayoutOutcome,
 } from './payout';
 import './payout.css';
+import '@/scheduling/exchanges.css';
 
 import { countryFlag, countryName } from '@/lib/country';
 import { dayOf, longDay } from '@/scheduling/time';
@@ -380,14 +381,16 @@ function PayoutForm({
     <form className="po-form" noValidate onSubmit={submit} aria-busy={busy}>
       <fieldset className="po-methods">
         <legend className="nv-field__label">Comment tu reçois l’argent</legend>
-        <div className="po-methods__row">
+        {/* The choice brick of Planning (sc-options, Design 27/11), each way with its colour on its pictogram. */}
+        <div className="sc-options po-methods__row" role="radiogroup" aria-label="Comment tu reçois l’argent">
           {PAYOUT_RECEIVE_METHODS.map((method) => (
             <button
               key={method}
               type="button"
-              className="po-method"
+              role="radio"
+              className="sc-option po-method"
               style={{ '--_c': `var(--nv-series-${String(RECEIVE_METHODS[method].series)})` }}
-              aria-pressed={draft.method === method}
+              aria-checked={draft.method === method}
               onClick={() => {
                 if (draft.method === method) return;
                 setDraft({
@@ -399,7 +402,7 @@ function PayoutForm({
               }}
             >
               <MethodIcon method={method} />
-              <span>{RECEIVE_METHODS[method].label}</span>
+              <span className="sc-option__title">{RECEIVE_METHODS[method].label}</span>
             </button>
           ))}
         </div>
@@ -564,9 +567,9 @@ function Answer({ destination, zone }: { destination: PayoutDestination; zone: s
   const details = destination.details;
   if (details === null) {
     return (
-      <div className="po-answer" data-tone="warn">
-        <p className="po-answer__value">À remplir</p>
-        <p className="po-answer__sub">Sans ça, l’agence ne peut pas t’envoyer ta commission.</p>
+      <div className="nv-note nv-note--warn">
+        <p className="nv-note__title">À remplir</p>
+        <span>Sans ça, l’agence ne peut pas t’envoyer ta commission.</span>
       </div>
     );
   }
@@ -702,11 +705,9 @@ export function PayoutTo({
 
   if (summary?.method == null) {
     return (
-      <div className="po-to" data-tone="warn">
-        <p className="po-to__title">Où le verser : pas encore rempli</p>
-        <p className="tm-hint">
-          {memberName} le remplit dans Moi › Dossier ; toi, tu ne peux pas le saisir pour lui.
-        </p>
+      <div className="nv-note nv-note--warn">
+        <p className="nv-note__title">Où le verser : pas encore rempli</p>
+        <span>{memberName} le remplit dans Moi › Dossier ; toi, tu ne peux pas le saisir pour lui.</span>
       </div>
     );
   }
@@ -739,7 +740,7 @@ export function PayoutTo({
       {prompt}
       {refusal === null ? null : <p className="tm-hint tm-hint--error">{refusal}</p>}
       {shown === null ? null : (
-        <div className="po-to__shown">
+        <div className="po-to__shown nv-enter">
           <DetailsLines details={shown} copyable />
         </div>
       )}

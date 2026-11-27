@@ -110,7 +110,7 @@ describe('Moi › Dossier : « Où te verser » (ADR 0165)', () => {
   it('asks what WorldRemit asks, the country’s code already in both phones, and sends them as typed', async () => {
     wrap(<MyPayoutCard memberId={MEMBER} zone="Europe/Paris" />);
     expect(await screen.findByText('À remplir')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mobile money' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('radio', { name: 'Mobile money' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByLabelText('Téléphone de contact')).toHaveProperty('value', '+229 ');
     expect(screen.getByLabelText('Numéro mobile money')).toHaveProperty('value', '+229 ');
     fillWho();
@@ -137,7 +137,7 @@ describe('Moi › Dossier : « Où te verser » (ADR 0165)', () => {
   it('asks nothing more for cash than who he is and where, and refuses an email in the wrong form', async () => {
     wrap(<MyPayoutCard memberId={MEMBER} zone="Europe/Paris" />);
     await screen.findByText('À remplir');
-    fireEvent.click(screen.getByRole('button', { name: 'Retrait en espèces' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Retrait en espèces' }));
     expect(screen.queryByLabelText('Numéro mobile money')).toBe(null);
     expect(screen.queryByLabelText('IBAN ou RIB')).toBe(null);
     fillWho();
