@@ -141,16 +141,16 @@ export const CreatorTodoCountSchema = z.object({
 export type CreatorTodoCount = z.infer<typeof CreatorTodoCountSchema>;
 
 /**
- * `GET /v1/dashboard/todos`: « À traiter » of every creator the person follows (every creator for the owner, those of
- * the account otherwise), the gravest first then the longest waiting, and the count of each creator in her order.
- */
-/**
  * No model answers the agent now (recette 27/11, A9, PARC-04): since when, from the first call that failed after the last
  * one that answered; `since` is `null` when no call says it (no key at all). `null` while the models answer.
  */
 export const AiOutageSchema = z.object({ since: at.nullable() });
 export type AiOutage = z.infer<typeof AiOutageSchema>;
 
+/**
+ * `GET /v1/dashboard/todos`: « À traiter » of every creator the person follows (every creator for the owner, those of
+ * the account otherwise), the gravest first then the longest waiting, and the count of each creator in her order.
+ */
 export const TodosAcrossCreatorsSchema = z.object({
   items: z.array(CreatorTodoSchema),
   creators: z.array(CreatorTodoCountSchema),
