@@ -73,6 +73,19 @@ export function bindScriptRuns(tx: DbTransaction, creatorId: string): Transactio
         .limit(20);
       return rows.map(toStored);
     },
+    async unbought(conversationId) {
+      const [row] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(scriptRuns)
+        .where(
+          and(
+            eq(scriptRuns.conversationId, conversationId),
+            sql`${scriptRuns.status} <> 'open'`,
+            sql`not exists (select 1 from jsonb_array_elements(${scriptRuns.steps}) as step where step ->> 'outcome' = 'bought')`,
+          ),
+        );
+      return row?.count ?? 0;
+    },
     async open(conversationId, run) {
       // One open run per conversation: a second answers « no » by opening nothing.
       const [row] = await tx

@@ -18,7 +18,13 @@ import { addMinutes } from './time';
 /** What the platform read for the shift, as the connectors answer it (`salesFeedReadsForReports.shiftSales`). */
 export type ShiftSalesRead =
   | { readonly feed: 'none' | 'off' | 'model_unlinked' | 'chatter_unlinked' }
-  | { readonly feed: 'read'; readonly grossInclVatMinor: number; readonly caughtUpAt: Date | null };
+  | {
+      readonly feed: 'read';
+      readonly grossInclVatMinor: number;
+      /** How many sales, for the feedback's figures (ADR 0170 § 1); the check reads the amount only. */
+      readonly saleCount: number;
+      readonly caughtUpAt: Date | null;
+    };
 
 /** The instants the sales are read over: the shift's access window (ADR 0025), `[from, to)`. */
 export function checkWindow(shift: ShiftTimes, marginMinutes: number): { from: Date; to: Date } {

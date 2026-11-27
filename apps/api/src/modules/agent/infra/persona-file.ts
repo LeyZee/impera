@@ -20,6 +20,7 @@ import { parse, stringify } from 'yaml';
 import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain/desire';
 import { DEFAULT_GUARD_SETTINGS, type GuardSettings } from '../domain/guards';
 import { askableSlots } from '../domain/kyc';
+import { DEFAULT_AFTER_PURCHASE_HOURS } from '../domain/policy';
 import type { OfferLimits } from '../domain/policy';
 import type { SexualizationLimits } from '../domain/sexualization';
 
@@ -60,9 +61,23 @@ export interface PersonaForModels {
    */
   readonly objectionReplies: ObjectionReplies;
   /** Her languages (`spoken_languages`), in her order: code decides the language of each answer among them (ADR 0168). */
-  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  readonly spokenLanguages: readonly [Language, ...Language[]];
   /** Her messages per language (`agent.language_examples`), read by the voice only in that language (ADR 0168 § 3). */
-  readonly languageExamples?: LanguageExamples;
+  readonly languageExamples: LanguageExamples;
+}
+
+/** Her languages and her messages in each, as every caller of `composeTurn` gives them (ADR 0168). */
+export interface PersonaLanguages {
+  readonly spokenLanguages: readonly [Language, ...Language[]];
+  readonly languageExamples: LanguageExamples;
+}
+
+/**
+ * Her languages for the composer, read the same way by the drafts, the playground and the evals: a caller that forgot
+ * them made her answer in French only (l1-l3 of the evals failed for that).
+ */
+export function languagesOf(persona: PersonaForModels): PersonaLanguages {
+  return { spokenLanguages: persona.spokenLanguages, languageExamples: persona.languageExamples };
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
@@ -174,6 +189,7 @@ export function personaForModels(
     offerLimits: {
       cooldownHours: agent.strategies.script_launch.cooldown_hours,
       minDesire: scriptMinDesire,
+      afterPurchaseHours: agent.strategies.script_launch.after_purchase_hours ?? DEFAULT_AFTER_PURCHASE_HOURS,
     },
     sexualizationLimits: {
       initiateAfterHours: agent.strategies.sexualization.initiate_after_hours,

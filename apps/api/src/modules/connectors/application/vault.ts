@@ -5,6 +5,7 @@ import {
   VaultMediaSchema,
   VaultViewSchema,
   type CreatorId,
+  type FanPpvStats,
   type JobPayload,
   type Platform,
   type PlatformAccountId,
@@ -236,6 +237,23 @@ export interface PlatformReads {
    */
   scriptHistory(platformAccountId: PlatformAccountId, platformFanId: string): Promise<SentScriptStep[]>;
   lastOfferAt(platformAccountId: PlatformAccountId, platformFanId: string): Promise<Date | null>;
+  /**
+   * When he last bought a priced bundle (`getFanPpvStats`), for the pause after a purchase (ADR 0128 § 1); `null` when
+   * he never bought one. Reveal dates a bundle when it is sent, not when it is bought: the pause runs from that send,
+   * a little shorter than from the purchase itself.
+   */
+  lastPurchaseAt(platformAccountId: PlatformAccountId, platformFanId: string): Promise<Date | null>;
+}
+
+/** The newest priced bundle he bought, by when it was sent to him; `null` when none. */
+export function lastPurchaseOf(stats: Pick<FanPpvStats, 'bundles'>): Date | null {
+  const bought = stats.bundles
+    .filter((bundle) => bundle.priceMinor > 0 && bundle.isPaid)
+    .reduce<string | null>(
+      (last, bundle) => (last === null || bundle.sentAt > last ? bundle.sentAt : last),
+      null,
+    );
+  return bought === null ? null : new Date(bought);
 }
 
 export function createPlatformReads(deps: Omit<VaultDeps, 'store'>): PlatformReads {
@@ -295,6 +313,15 @@ export function createPlatformReads(deps: Omit<VaultDeps, 'store'>): PlatformRea
       const fanRef = { platform: account.platform, id: platformFanId };
       const { lastOfferAt } = await read(async () => FanPpvStatsSchema.parse(await stats(fanRef)));
       return lastOfferAt === null ? null : new Date(lastOfferAt);
+    },
+    async lastPurchaseAt(platformAccountId, platformFanId) {
+      const { account, connector } = await connectorOf(platformAccountId);
+      if (!connector.capabilities.ppvStats || connector.getFanPpvStats === undefined) {
+        throw new PlatformReadUnavailable('unsupported');
+      }
+      const stats = connector.getFanPpvStats.bind(connector);
+      const fanRef = { platform: account.platform, id: platformFanId };
+      return lastPurchaseOf(await read(async () => FanPpvStatsSchema.parse(await stats(fanRef))));
     },
   };
 }
