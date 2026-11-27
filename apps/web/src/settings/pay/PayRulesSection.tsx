@@ -31,7 +31,7 @@ import {
   startablePeriods,
 } from '@/reports/model';
 import '@/reports/reports.css';
-import { accountLine } from '@/scheduling/model';
+import { accountLine, platformName } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
@@ -59,6 +59,22 @@ const rulesLine = (rules: AccountPayRules, platform: Platform): string =>
         SOURCE_LABELS[rules.earningsSource].toLowerCase(),
       ]
   ).join(' · ');
+
+/**
+ * The VAT the rules in force take off, when the platform reads another one on the account's sales of the last 30 days
+ * (recette PARC-10): a point apart or more, on the chain that uses it (never on the platform's net). A signal only:
+ * pay keeps the owner's rules, and whether to change them is his.
+ */
+export function vatGapOf(
+  inForce: AccountPayRules | null,
+  platform: Platform,
+  observedVatBps: number | null,
+): { readonly rules: number; readonly read: number } | null {
+  if (inForce === null || observedVatBps === null) return null;
+  if (earningsBaseOf(platform, inForce.earningsSource) === 'platform_net') return null;
+  if (Math.abs(inForce.vatBps - observedVatBps) < 100) return null;
+  return { rules: inForce.vatBps, read: observedVatBps };
+}
 
 /**
  * The periods new rules of an account may start with (EQ-03, ADR 0084): those that have not begun (the current one too
@@ -188,6 +204,7 @@ function AccountRules({
     .filter((one) => one.fromPeriod > currentPeriod)
     .toSorted((a, b) => a.fromPeriod.localeCompare(b.fromPeriod));
   const past = entry.rules.filter((one) => one.fromPeriod <= currentPeriod && one.id !== inForce?.id);
+  const vatGap = vatGapOf(inForce, entry.account.platform, entry.observedVatBps);
   return (
     <li className="nv-plate rp-account nv-enter" style={{ '--nv-i': Math.min(index + 1, 8) }}>
       <div className="rp-account__head">
@@ -210,6 +227,16 @@ function AccountRules({
           <p className="rp-account__since">
             depuis la quinzaine {periodLineFrom(inForce.fromPeriod, currentPeriod)}
           </p>
+        </div>
+      )}
+      {vatGap === null ? null : (
+        <div className="nv-note nv-note--warn rp-account__vat" role="status">
+          <p className="nv-note__title">TVA différente de celle de {platformName(entry.account.platform)}</p>
+          <span className="nv-num">
+            Les règles prennent {percentText(vatGap.rules)} de TVA ; {platformName(entry.account.platform)} en
+            lit {percentText(vatGap.read)} sur ses ventes des 30 derniers jours. La paie garde tes règles : à
+            vérifier.
+          </span>
         </div>
       )}
       {entry.checkedPeriod === null ? null : (

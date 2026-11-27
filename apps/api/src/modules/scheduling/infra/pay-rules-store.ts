@@ -30,6 +30,7 @@ import {
   PayRulesPeriodConflict,
   PlatformAccountNotFound,
 } from '../domain/errors';
+import { OBSERVED_VAT_DAYS, observedVatBps } from '../domain/observed-vat';
 import {
   assertRulesStart,
   assertSourceSwitchable,
@@ -38,8 +39,9 @@ import {
   type SwitchFacts,
 } from '../domain/pay-rules';
 import type { PayRulesStore, StoredAccount, StoredPayRules } from '../domain/ports';
-import { calendarDayIn } from '../domain/time';
+import { addDays, calendarDayIn } from '../domain/time';
 
+import type { SalesTotalsRead } from './agency-share-check';
 import type { EnqueuePayRecalculation } from './pay-reads';
 import { agencyTimeZone, audit, creatorOfUnscoped, pgErrorOf, StoredAccountSchema } from './rows';
 
@@ -108,9 +110,11 @@ export function createDrizzlePayRulesStore(
     readonly switchFactsOf: SwitchFactsRead;
     readonly periodClosedFrom: PeriodClosedFrom;
     readonly enqueuePayRecalculation: EnqueuePayRecalculation;
+    /** The register's totals (the `connectors` module's), for the VAT the platform reads (recette PARC-10). */
+    readonly salesTotalsOf: SalesTotalsRead;
   },
 ): PayRulesStore {
-  const { switchFactsOf, periodClosedFrom, enqueuePayRecalculation } = reads;
+  const { switchFactsOf, periodClosedFrom, enqueuePayRecalculation, salesTotalsOf } = reads;
 
   /** The fortnight the owner may switch an account from although it began (ADR 0084), as the list gives it. */
   const checkedPeriodFor = async (
@@ -136,10 +140,14 @@ export function createDrizzlePayRulesStore(
             );
           }
           const currentPeriod = await currentPeriodIn(tx, now);
+          // The last 30 days in the agency's zone, for the VAT the platform reads (recette PARC-10): the owner's alone.
+          const today = calendarDayIn(now, await agencyTimeZone(tx));
+          const since = addDays(today, -(OBSERVED_VAT_DAYS - 1));
           const accounts: {
             account: StoredAccount;
             rules: StoredPayRules[];
             checkedPeriod: PayPeriod | null;
+            observedVatBps: number | null;
           }[] = [];
           for (const creatorId of creatorIds) {
             await enterCreator(tx, creatorId, creatorIds);
@@ -152,6 +160,10 @@ export function createDrizzlePayRulesStore(
               })
               .from(platformAccounts);
             const rules = (await tx.select(payRulesColumns).from(accountPayRules)).map(toPayRules);
+            const totals =
+              scope === 'owner' && rows.length > 0
+                ? (await salesTotalsOf(tx, { creatorId, from: since, to: today })).rows
+                : [];
             for (const row of rows) {
               const account = StoredAccountSchema.parse(row);
               const own = rules.filter((one) => one.platformAccountId === account.id).toSorted(newestFirst);
@@ -160,6 +172,7 @@ export function createDrizzlePayRulesStore(
                 rules: own,
                 // The owner alone sets rules: a manager is never offered a fortnight to switch from.
                 checkedPeriod: scope === 'owner' ? await checkedPeriodFor(tx, account, own) : null,
+                observedVatBps: observedVatBps(totals, account.id),
               });
             }
           }
