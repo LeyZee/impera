@@ -1,6 +1,7 @@
 import type {
   Actor,
   FanStanding,
+  FanSign,
   FanTier,
   FanTiersSetting,
   TimeWasterSetting,
@@ -300,6 +301,11 @@ interface EventWriter {
   list(conversationId: ConversationId): Promise<readonly StoredEvent[]>;
   /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
+  /** The signs of a time-waster journaled since `since` (`fan_signs_seen`, ADR 0135), each with its moment. */
+  fanSignsSince(
+    conversationId: ConversationId,
+    since: Date,
+  ): Promise<readonly { readonly sign: FanSign; readonly at: Date }[]>;
   /**
    * Whether the team already knows no script is left for him (ADR 0150 § 9): a `scripts_exhausted` with no
    * `script_started` since. The episode lives in his journal, never in memory.
@@ -840,6 +846,8 @@ export type ComposeResult =
       readonly saleTrouble?: SaleTroubleKind;
       /** She teased him about the run he left: one `script_abandon_teased` on that run (Charles 20/11). */
       readonly abandonTeased?: true;
+      /** What code read in a time-waster's turn (ADR 0135): journaled as `fan_signs_seen`. */
+      readonly fanSigns?: readonly FanSign[];
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;
@@ -869,6 +877,7 @@ export type ComposeResult =
       readonly desire?: ComposedDesire;
       readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
+      readonly fanSigns?: readonly FanSign[];
       readonly customOrderOpened?: true;
       readonly customOrderTurn?: KeptCustomOrderTurn;
       readonly scriptsExhausted?: true;

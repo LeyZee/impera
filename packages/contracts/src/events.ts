@@ -130,6 +130,22 @@ const controlPayload = z.object({
 });
 
 /** What went wrong with a sale of his that she answers once before a human (ADR 0156 § 4 and § 7). */
+/**
+ * The signs of a tiresome time-waster that code reads in his turn (ADR 0135, Charles 27/11), and his apology, which
+ * brings him back to « slowed ». Codes only, never his words.
+ */
+export const FAN_SIGNS = [
+  'proof_again',
+  'haggles',
+  'free_after_refusal',
+  'pressure',
+  'contact_insistence',
+  'purchase_promise',
+  'apologised',
+] as const;
+export const FanSignSchema = z.enum(FAN_SIGNS);
+export type FanSign = z.infer<typeof FanSignSchema>;
+
 export const SALE_TROUBLE_KINDS = ['payment_help', 'purchase_complaint'] as const;
 export type SaleTroubleKind = (typeof SALE_TROUBLE_KINDS)[number];
 
@@ -253,6 +269,7 @@ export const EVENT_TYPES = [
   'objection_reply_used',
   'reply_skipped',
   'reply_deferred',
+  'fan_signs_seen',
   'desire_scored',
   'fan_availability_changed',
   'care_opened',
@@ -419,6 +436,8 @@ export const EVENT_PAYLOADS = {
    * turn (ADR 0135 § 6), the same way.
    */
   reply_deferred: z.object({ reason: z.enum(['outside_hours', 'time_waster']), until: z.iso.datetime() }),
+  /** What code read in a time-waster's turn (ADR 0135, Charles 27/11): codes only, never his words. */
+  fan_signs_seen: z.object({ signs: z.array(FanSignSchema).min(1).max(FAN_SIGNS.length) }),
   /**
    * The engine's desire score of the fan changed (P3-12): written with the result it came with, only when it moved.
    * The conversation projects the last one; `before` is the stored score cooled down to that moment, `null` for the
@@ -831,6 +850,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('objection_reply_used'),
   typedEvent('reply_skipped'),
   typedEvent('reply_deferred'),
+  typedEvent('fan_signs_seen'),
   typedEvent('desire_scored'),
   typedEvent('fan_availability_changed'),
   typedEvent('care_opened'),

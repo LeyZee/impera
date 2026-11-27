@@ -1,4 +1,4 @@
-import type { FanFlags, TimeWasterSetting } from '@impera/contracts';
+import type { FanFlags, FanSign, TimeWasterSetting } from '@impera/contracts';
 
 import {
   fanStanding,
@@ -29,6 +29,8 @@ export interface TimeWasterRead {
   readonly unboughtRuns: number;
   /** His runs left in plan (`stalled`), latest first. */
   readonly stalledRuns: readonly StoredScriptRun[];
+  /** The signs journaled these last days (`fan_signs_seen`), oldest first. */
+  readonly fanSigns: readonly { readonly sign: FanSign; readonly at: Date }[];
   readonly history: readonly { readonly author: string; readonly at: Date }[];
 }
 
@@ -89,16 +91,41 @@ export function timeWasterWait(read: TimeWasterRead): TimeWasterWait | null {
   return { level, until };
 }
 
+/** From when the signs count (ADR 0135, 14 days). */
+export function signsSince(now: Date): Date {
+  return new Date(now.getTime() - TIRESOME_WINDOW_MS);
+}
+
+/** A purchase promised is broken once this old with nothing bought (Charles, 27/11). */
+const PROMISE_KEPT_WITHIN_MS = 48 * HOUR_MS;
+/** Signs that count only when seen this many times (Charles, 27/11: twice or more). */
+const REPEATED_SIGNS: ReadonlySet<FanSign> = new Set(['contact_insistence', 'purchase_promise']);
+const REPEATS = 2;
+
 /**
- * The different signs of a tiresome fan in the last 14 days that code reads today: he left a script just after its
- * paid step, never having bought (Charles, 27/11). The signs the AI reads in his words join with their journal.
+ * The different signs of a tiresome fan in the last 14 days, since his last apology (Charles, 27/11): an apology
+ * starts them again, which brings him back to « slowed ». A contact asked for and a purchase promised and not kept
+ * count from the second; he left a script just after its paid step, never having bought, is read in his runs.
  */
 function tiresomeSigns(read: TimeWasterRead): Set<string> {
-  const signs = new Set<string>();
-  const since = read.now.getTime() - TIRESOME_WINDOW_MS;
+  const window = signsSince(read.now).getTime();
+  const apology = read.fanSigns.findLast(({ sign }) => sign === 'apologised')?.at.getTime() ?? 0;
+  const since = Math.max(window, apology);
+  const seen = read.fanSigns.filter(({ sign, at }) => sign !== 'apologised' && at.getTime() > since);
+  const counts = new Map<FanSign, number>();
+  for (const { sign, at } of seen) {
+    // A promise counts once it is broken: old enough, and nothing bought since.
+    if (sign === 'purchase_promise' && read.now.getTime() - at.getTime() < PROMISE_KEPT_WITHIN_MS) continue;
+    counts.set(sign, (counts.get(sign) ?? 0) + 1);
+  }
+  const signs = new Set<string>(
+    [...counts]
+      .filter(([sign, count]) => !REPEATED_SIGNS.has(sign) || count >= REPEATS)
+      .map(([sign]) => sign),
+  );
   const left = read.stalledRuns.some(
     ({ run }) =>
-      (run.endedAt?.getTime() ?? 0) >= since &&
+      (run.endedAt?.getTime() ?? 0) > since &&
       run.steps.some((step) => step.kind === 'paid' && step.outcome !== 'bought') &&
       !run.steps.some((step) => step.outcome === 'bought'),
   );

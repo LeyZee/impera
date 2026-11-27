@@ -7,6 +7,7 @@ import type {
   CopilotTrace,
   DraftTranslation,
   FanFlags,
+  FanSign,
   FanTier,
   HandoffCause,
   Language,
@@ -64,6 +65,7 @@ import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
+import { fanSignsOf } from '../domain/signs';
 import { spenderRegisterOf } from '../domain/spender-register';
 import { handoffCauseOf } from '../domain/traps';
 
@@ -295,6 +297,8 @@ type AgentComposeResult = (
   readonly saleTrouble?: SaleTroubleKind;
   /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
   readonly abandonTeased?: true;
+  /** What code read in a time-waster's turn (`fan_signs_seen`, ADR 0135, Charles 27/11); absent for anyone else. */
+  readonly fanSigns?: readonly FanSign[];
   /** What she answered in this draft to his asking to see her (Charles 21/11): the reason given, never twice. */
   readonly meetingAnswer?: MeetingAnswer;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
@@ -1387,8 +1391,17 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
-      const traced =
-        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(composed, scripts) } : settled;
+      const fanSigns =
+        input.timeWaster === undefined || composed.brief === undefined
+          ? []
+          : fanSignsOf({
+              intent: composed.brief.intent,
+              occasion: composed.brief.occasion,
+              risks: composed.brief.risks,
+              fanText: ownText,
+            });
+      const signed = fanSigns.length === 0 ? settled : { ...settled, fanSigns };
+      const traced = signed.kind === 'draft' ? { ...signed, copilot: copilotOf(composed, scripts) } : signed;
       const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
       const withAvailability =
         availability === undefined ? traced : { ...traced, fanAvailability: availability };

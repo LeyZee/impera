@@ -469,6 +469,24 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .map(toStoredEvent)
           .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
       },
+      async fanSignsSince(conversationId, since) {
+        const rows = await tx
+          .select()
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              eq(schema.conversationEvents.type, 'fan_signs_seen'),
+              sql`${schema.conversationEvents.createdAt} > ${since.toISOString()}`,
+            ),
+          )
+          .orderBy(schema.conversationEvents.seq);
+        return rows
+          .map(toStoredEvent)
+          .flatMap(({ body, at }) =>
+            body.type === 'fan_signs_seen' ? body.payload.signs.map((sign) => ({ sign, at })) : [],
+          );
+      },
       async scriptsExhaustedSaid(conversationId) {
         const [last] = await tx
           .select({ type: schema.conversationEvents.type })

@@ -38,7 +38,7 @@ import { deferredRespondAt } from '../../domain/rules';
 import { closeAutomaticIfLocked } from '../automatic';
 import { readProposedFacts } from '../facts';
 import { appendEvent } from '../journal';
-import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
+import { DEFAULT_TIME_ZONE, signsSince, timeWasterWait } from '../time-waster';
 
 export interface RespondDeps {
   readonly uow: UnitOfWork;
@@ -473,6 +473,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         flags: await tx.gate.fanFlags(conversation),
         unboughtRuns: await tx.scriptRuns.unbought(conversation.id),
         stalledRuns: await tx.scriptRuns.stalled(conversation.id),
+        fanSigns: await tx.events.fanSignsSince(conversation.id, signsSince(clock.now())),
       };
     });
     if (read === null) return;
@@ -489,6 +490,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       lastPurchaseAt: read.stats.lastPurchaseAt,
       unboughtRuns: read.unboughtRuns,
       stalledRuns: read.stalledRuns,
+      fanSigns: read.fanSigns,
       history: read.history,
     });
     if (wait?.until != null) {
@@ -560,6 +562,15 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         result,
         meta,
       );
+      // A time-waster's signs (ADR 0135), whatever the answer becomes: codes only, never his words.
+      if (result.fanSigns !== undefined && result.fanSigns.length > 0) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'fan_signs_seen', payload: { signs: [...result.fanSigns] } },
+          meta,
+        );
+      }
       // Her alerts that only let a human know (P4-01), whatever the answer becomes: named, never his words. One
       // already sounded since her last answer (a second pass after a wait, another message of his) is not again.
       const sounded =

@@ -556,6 +556,16 @@ describe('createDraftComposer', () => {
     );
   });
 
+  it('reads the signs of a time-waster only, codes and never his words (ADR 0135, Charles 27/11)', async () => {
+    const haggling: Brief = { ...BRIEF, intent: 'price_objection' };
+    const slowed = composer({ brief: haggling });
+    const result = await slowed.draftComposer.compose({ ...INPUT, timeWaster: 'slowed' });
+    expect(result.fanSigns).toEqual(['haggles']);
+
+    const usual = composer({ brief: haggling });
+    expect((await usual.draftComposer.compose(INPUT)).fanSigns).toBeUndefined();
+  });
+
   it('is closer with those who count: girlfriend with a whale, close with a very good payer (ADR 0132, Charles 26/11)', async () => {
     const hintsFor = async (tier: 'whale' | 'very_good' | 'good' | null) => {
       const run = composer({ brief: BRIEF });
