@@ -50,7 +50,7 @@ describe('who an alert reaches (ADR 0150 § A)', () => {
       chatter_on_shift: 'off',
     });
     expect(alertMessage('shift_not_taken', 'Nora', null, false)).toMatchObject({
-      title: 'Nora · Shift non pris',
+      title: 'Nora · Chatteur pas là',
       url: '/equipe/planning',
     });
   });

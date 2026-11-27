@@ -75,13 +75,9 @@ export function NotTakenDelay({ index }: { index: number }): JSX.Element {
           <p id={`${id}-title`} className="al-line__name">
             Chatteur pas là
           </p>
-          <p className="al-line__meta">
-            {delay.data === undefined
-              ? 'Pour toute l’agence'
-              : minutes === null
-                ? 'Pas encore réglée'
-                : `${delayText(minutes)} après le début du shift, pour toute l’agence`}
-          </p>
+          {minutes === null ? null : (
+            <p className="al-line__meta">{`${delayText(minutes)} après le début du shift, pour toute l’agence`}</p>
+          )}
         </div>
         {delay.data === undefined || editing ? null : (
           <button
@@ -112,8 +108,8 @@ export function NotTakenDelay({ index }: { index: number }): JSX.Element {
           />
         ) : null
       ) : minutes === null && !editing ? (
-        <p className="al-telegram" data-kind="missing">
-          <span className="al-telegram__dot" aria-hidden="true" />
+        <p className="al-todo">
+          <span className="al-todo__dot" aria-hidden="true" />
           <span>À régler : tant qu’aucun délai n’est choisi, rien ne part.</span>
         </p>
       ) : null}

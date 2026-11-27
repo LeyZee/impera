@@ -249,33 +249,6 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
-  it('tells a shift not taken to the « pour toutes » groups, once per shift, with the member’s name (ADR 0094)', () => {
-    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
-    expect(
-      classify({
-        kind: 'shift_not_taken',
-        creatorId,
-        platform: 'reveal',
-        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
-        shiftId: '018f3e5c-0000-7000-8000-0000000000b1',
-        memberId: '018f3e5c-0000-7000-8000-0000000000d1',
-        memberName: 'Kofi',
-        startsAt: '2026-11-20T13:00:00.000Z',
-        endsAt: '2026-11-20T19:00:00.000Z',
-        timeZone: 'Europe/Paris',
-      }),
-    ).toEqual({
-      kind: 'notice',
-      topic: 'important',
-      allCreatorsOnly: true,
-      oncePerThread: true,
-      threadKey: 'shift_not_taken:018f3e5c-0000-7000-8000-0000000000b1',
-      title: 'Important',
-      body: 'Shift non pris chez Reveal : Kofi n’a pas pris son poste, shift de 14 h à 20 h. À joindre ou à remplacer.',
-      link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
-    });
-  });
-
   it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
     expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
       kind: 'notice',

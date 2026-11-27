@@ -336,11 +336,6 @@ function signalOf(type: string, payload: unknown): Signal | null {
       if (!parsed.success) return null;
       return { kind: 'account_uncovered', ...parsed.data };
     }
-    case 'shift_not_taken': {
-      const parsed = EVENT_PAYLOADS.shift_not_taken.safeParse(payload);
-      if (!parsed.success) return null;
-      return { kind: 'shift_not_taken', ...parsed.data };
-    }
     case 'connection_state_changed': {
       const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);
       if (!parsed.success) return null;

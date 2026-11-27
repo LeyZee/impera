@@ -351,3 +351,23 @@
   flex: none;
   width: 96px;
 }
+/* What is still to set, in amber: its own line, never the Telegram note's. */
+.al-todo {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+.al-todo__dot {
+  width: 6px;
+  height: 6px;
+  align-self: start;
+  margin-top: calc((var(--nv-text-footnote-leading) - 6px) / 2);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-warning);
+}

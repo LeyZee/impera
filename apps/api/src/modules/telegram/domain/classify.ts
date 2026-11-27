@@ -67,7 +67,6 @@ export const SCANNED_EVENT_TYPES = [
   'agency_share_changed',
   'sales_feed_signal',
   'account_uncovered',
-  'shift_not_taken',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -851,18 +850,6 @@ export function classify(
         threadKey: `account_uncovered:${signal.platformAccountId}:${signal.slotStartsAt}`,
         title: 'Important',
         body: `Compte sans personne chez ${PLATFORM_NAMES[signal.platform]} : le créneau ${slotText(signal)} a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.`,
-        link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
-      };
-    // Important to the groups for all (ADR 0094 § 3): never to a chatter nor to her; once per shift.
-    case 'shift_not_taken':
-      return {
-        kind: 'notice',
-        topic: 'important',
-        allCreatorsOnly: true,
-        oncePerThread: true,
-        threadKey: `shift_not_taken:${signal.shiftId}`,
-        title: 'Important',
-        body: `Shift non pris chez ${PLATFORM_NAMES[signal.platform]} : ${signal.memberName} n’a pas pris son poste, shift ${slotText({ slotStartsAt: signal.startsAt, slotEndsAt: signal.endsAt, timeZone: signal.timeZone })}. À joindre ou à remplacer.`,
         link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
       };
     case 'connection_down':

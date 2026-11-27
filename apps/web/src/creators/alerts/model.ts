@@ -54,7 +54,7 @@ export const ALERT_TEXT: Readonly<
       'Un créneau commence sans chatteur et l’IA n’est pas en Automatique, alors que des fans ont écrit dans les 24\u00a0h.',
   },
   shift_not_taken: {
-    title: 'Shift non pris',
+    title: 'Chatteur pas là',
     sentence:
       'Un shift a commencé et son chatteur n’a pas pris son poste, passé le délai réglé dans Réglages › Alertes.',
   },

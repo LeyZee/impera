@@ -578,7 +578,6 @@ describe('« Chatteur pas là » (ADR 0094, lot b)', () => {
     expect(
       await within(item).findByText('À régler : tant qu’aucun délai n’est choisi, rien ne part.'),
     ).toBeTruthy();
-    expect(within(item).getByText('Pas encore réglée')).toBeTruthy();
     fireEvent.click(within(item).getByRole('button', { name: 'Régler' }));
     // Refused here, never sent: below the contract's bounds.
     fireEvent.change(within(item).getByLabelText('Délai après le début du shift'), {

@@ -66,7 +66,7 @@ const TITLES: Readonly<Record<CreatorAlertCode, string>> = {
   ai_budget: 'Budget IA',
   session_expired: 'Session Reveal expirée',
   uncovered_account: 'Compte sans personne',
-  shift_not_taken: 'Shift non pris',
+  shift_not_taken: 'Chatteur pas là',
 };
 
 const BODIES: Readonly<Record<CreatorAlertCode, string>> = {
