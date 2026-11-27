@@ -465,10 +465,20 @@ describe('voice guards', () => {
     expect(read('ton adresse mail tu la gardes')).toEqual([['address_word', 'soft']]);
     for (const bubble of [
       'mon adresse c’est 12 rue des Lilas',
+      '4 bis avenue Foch',
+      '3 impasse du Moulin',
+      '8 place de la Mairie',
       'écris à lina@exemple.test',
       'mon 06 12 34 56 78',
     ])
       expect(read(bubble), bubble).toContainEqual(['contact_info', 'blocking']);
+    // A number then « cours », « place » or « route » is life, not an address (Sécurité, #1054).
+    for (const bubble of [
+      'j’ai 2 cours demain matin',
+      'garde moi 1 place à côté de toi',
+      'il me reste 3 route à faire',
+    ])
+      expect(read(bubble), bubble).not.toContainEqual(['contact_info', 'blocking']);
   });
 
   it('reads stage directions as soft, and lets them through when her sheet allows them (Charles 27/11)', () => {

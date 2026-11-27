@@ -365,7 +365,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'contact_info',
     pattern:
-      /\b\d{1,4}( ?(bis|ter))?,? (rue|avenue|av|bd|boulevard|allee|impasse|chemin|place|quai|route|cours|square|street|st|road|via|calle|avenida)\b \S/,
+      /\b\d{1,4}( ?(bis|ter))?,? ((rue|avenue|bd|boulevard|allee|impasse|chemin|street|calle|avenida) (de la |de l'|des |du |de |d')?[a-z]|(place|cours|route|square|quai) (de la |de l'|des |du |de |d')[a-z])/,
   },
   // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
   // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there

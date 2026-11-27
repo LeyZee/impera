@@ -266,6 +266,13 @@ describe('permitted phrases that must always pass, output guards', () => {
     expect(raised(bubble)).not.toContain('contempt');
   });
 
+  it.each(['j’ai 2 cours demain matin', 'garde moi 1 place à côté de toi', 'il me reste 3 route à faire'])(
+    'contact_info lets the number of life « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('contact_info');
+    },
+  );
+
   it.each([
     'après tout ce que je t’ai montré, tu me fais rire',
     'tu me déçois, t’as oublié mon prénom 😏',
