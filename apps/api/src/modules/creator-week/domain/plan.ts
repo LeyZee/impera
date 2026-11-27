@@ -28,8 +28,8 @@ export interface WeekSettings {
 
 /**
  * Charles's rhythm (20/11): 3 boudoir sessions, a video a day for the public feed, a script every two weeks; no story
- * of her own since 27/11, her Reveal story is the feed's video (ADR 0136 § 11). Chosen by common sense and told to him: two days of 4 h; a script 1 h 30, a session 1 h, a video or a story
- * 5 min; 2 gift photos a session.
+ * of her own since 27/11, her Reveal story is the feed's video (ADR 0136 § 11), so it costs her no minute. Chosen by
+ * common sense and told to him: two days of 4 h; a script 1 h 30, a session 1 h, a video 5 min; 2 gift photos a session.
  */
 export const WEEK_DEFAULTS: WeekSettings = {
   shootDays: 2,
@@ -38,7 +38,7 @@ export const WEEK_DEFAULTS: WeekSettings = {
   videosPerWeek: 7,
   scriptEveryDays: 14,
   giftsPerSession: 2,
-  minutes: { script: 90, feed_shoot: 60, feed_video: 5, mass_dm: 0, idea: 45, reveal_story: 5 },
+  minutes: { script: 90, feed_shoot: 60, feed_video: 5, mass_dm: 0, idea: 45, reveal_story: 0 },
   dueWeekday: 7,
   dueMinute: 23 * 60,
 };
