@@ -119,6 +119,10 @@
   margin: 0;
   color: var(--nv-ink-muted);
 }
+.cso-cam svg {
+  flex: none;
+  color: var(--nv-ink-muted);
+}
 .cso-cam[data-booked] {
   color: var(--nv-ink);
   font-weight: 600;

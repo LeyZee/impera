@@ -26,6 +26,7 @@ import {
 } from './model';
 
 import { dayOf } from '@/scheduling/time';
+import { ScIcon } from '@/scripts/icons';
 import { Steps } from '@/shell/figures/figures';
 
 import '../custom-prices/custom-prices.css';
@@ -92,7 +93,7 @@ export function OrderCard({
       {cam === null ? null : (
         // When his cam happens, in her time: the slot booked with his payment (ADR 0159 § 5).
         <p className="cso-cam" data-booked={cam.booked ? 'true' : undefined}>
-          <span aria-hidden="true">📹</span>
+          <ScIcon name="video" />
           <span className={cam.booked ? 'nv-num' : undefined}>{cam.text}</span>
         </p>
       )}
