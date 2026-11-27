@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding: 24px 26px 22px;
+  padding: 24px var(--nv-plate-pad) 22px;
 }
 .own-money__top {
   display: grid;
@@ -67,7 +67,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 28px;
+  height: var(--nv-pill-info);
   margin-top: 16px;
   padding: 0 12px;
   border-radius: var(--nv-radius-full);
@@ -326,7 +326,7 @@
 
 /* ── Pour creuser: one line each, its answer on the right, its body when open. */
 .own-dig {
-  padding: 4px;
+  padding: 4px 0;
 }
 .own-dig__item + .own-dig__item {
   border-top: 1px solid var(--nv-hairline);
@@ -393,7 +393,7 @@
 }
 @media (max-width: 720px) {
   .own-money {
-    padding: 20px 18px 18px;
+    padding: 20px var(--nv-plate-pad) 18px;
   }
   .own-money__big {
     font-size: 50px;
