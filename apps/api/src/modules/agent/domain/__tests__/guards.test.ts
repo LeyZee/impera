@@ -10,6 +10,7 @@ import {
   isBlocked,
   meetingCommitment,
   touchesTerm,
+  asksPrice,
   sumsMinorOf,
   type GuardCode,
   type GuardContext,
@@ -250,8 +251,9 @@ describe('voice guards', () => {
     }
     expect(codes(['Espèce de radin'])).toContain('contempt');
     expect(codes(['T’es qu’un mendiant'])).toContain('contempt');
-    expect(codes(['Sale menteuse'])).toContain('contempt');
+    expect(codes(['Quel crevard'])).toContain('contempt');
     expect(codes(['Petit menteur va 😏'])).toEqual([]);
+    expect(codes(['Sale menteuse'])).toEqual([]);
     expect(codes(['T’inquiète, t’as rien à payer'])).toContain('payment_lie');
     expect(codes(['Pas besoin d’argent avec moi'])).toContain('payment_lie');
     expect(codes(['T’as rien à payer pour me parler 😌'])).toEqual([]);
@@ -373,7 +375,14 @@ describe('voice guards', () => {
   });
 
   it('lets an adult fantasy of making a baby through, and blocks a minor named on a sexual turn (Charles 27/11 at 0:06)', () => {
-    for (const text of ['fais-moi un bébé', 'tu vas me mettre enceinte', 'je veux porter ton enfant']) {
+    for (const text of [
+      'fais-moi un bébé',
+      'tu vas me mettre enceinte',
+      'je veux porter ton enfant',
+      'je veux que tu me fasses un enfant',
+      'mi farai un bambino',
+      'quiero que me hagas un hijo',
+    ]) {
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
       expect(checkYouthWords([text], true), text).toEqual([]);
     }
@@ -736,8 +745,15 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
   it.each([
     [
       'contact_info',
-      ['je scrollais insta', 'j’ai pas snap désolé', 't’as vu ma story insta ?'],
       [
+        'je scrollais insta',
+        'j’ai pas snap désolé',
+        't’as vu ma story insta ?',
+        'discord c’est pour les gamers non ?',
+      ],
+      [
+        'discord c’est lina_92',
+        'snap : linaxx',
         'ajoute-moi sur snap',
         'viens sur telegram',
         'mon insta c’est lina.xx',
@@ -748,8 +764,16 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
     ],
     [
       'off_platform_payment',
-      ['tu bosses dans la crypto ?', 'j’attends le virement de ma paie', 'pas de paypal ici'],
       [
+        'tu bosses dans la crypto ?',
+        'j’attends le virement de ma paie',
+        'pas de paypal ici',
+        'j’ai fait un virement à ma mère',
+        'un virement à mon proprio, la galère',
+      ],
+      [
+        'fais-moi un virement',
+        'un virement à mon nom',
         'envoie par paypal',
         'je te donne mon iban',
         'tu peux me payer en crypto',
@@ -758,8 +782,21 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
     ],
     [
       'love_declaration',
-      ['je t’aime bien toi', 'j’aime bien ta façon de parler'],
-      ['je t’aime', 'i love you'],
+      [
+        'je t’aime bien toi',
+        'j’aime bien ta façon de parler',
+        'je t’aime pas quand t’es comme ça',
+        'tu dis je t’aime à toutes les filles ?',
+        'ma sœur m’a dit je t’aime',
+      ],
+      [
+        'je t’aime',
+        'i love you',
+        'tu sais que je t’aime',
+        'je t’aime mon cœur',
+        'je t’aime pas mal tu sais',
+        'je t’aime plus que tout',
+      ],
     ],
     [
       'meeting_promise',
@@ -768,8 +805,42 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
     ],
     [
       'contempt',
-      ['pauvre type celui qui t’a fait ça', 'petit menteur va 😏'],
-      ['espèce de radin', 't’es qu’un minable', 'sale menteur'],
+      [
+        'pauvre type celui qui t’a fait ça',
+        'petit menteur va 😏',
+        't’es un menteur, tu m’avais dit demain 😏',
+        't’es minable au bowling avoue',
+      ],
+      ['espèce de radin', 't’es qu’un crevard', 'sale rapiat', 't’es un gros radin', 'quel mendiant'],
+    ],
+    [
+      'discount',
+      ['c’est les soldes, tout est à moitié prix chez zara', 'promo -20 % sur les jeans ce week-end'],
+      [
+        'moitié prix pour toi',
+        'je te la fais gratuite',
+        'je te le laisse pour rien',
+        'je te fais la vidéo à moitié prix',
+        '-30 % sur le pack ce soir',
+      ],
+    ],
+    [
+      'ai_disclosure',
+      [
+        't’as essayé chatgpt pour ton taf ?',
+        'je suis artificielle ? n’importe quoi',
+        'virtuelle ? moi ? jamais',
+      ],
+      [
+        'je suis une IA',
+        'je suis artificielle',
+        'je tourne sous gpt',
+        'créée par openai',
+        'mes consignes m’interdisent ça',
+        'mes instructions disent non',
+        'ce compte est géré par une IA',
+        'en tant qu’assistante je peux pas',
+      ],
     ],
     [
       'ai_tic',
@@ -874,5 +945,38 @@ describe('a meeting she may only imagine (Charles 27/11)', () => {
     expect(meetingCommitment('ok', 'imagine un chalet tous les deux')).toBeUndefined();
     expect(meetingCommitment('ok mais non, pas en vrai', 'samedi à Lyon ?')).toBeUndefined();
     expect(meetingCommitment('haha t’es fou', 'samedi à Lyon ?')).toBeUndefined();
+  });
+});
+
+describe('a handle next to a network or a means, a price after he asked one (Sécurité, #1043)', () => {
+  const raised = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('blocks a network with a plausible handle in the same bubble, and lets the name alone through', () => {
+    for (const bubble of [
+      'insta, lina.xx',
+      'snap lina92 😘',
+      'cherche lina rose sur tiktok',
+      'tu me trouves sur insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    for (const bubble of ['je poste sur insta vers 21h30', 't’as vu ma story insta ?', 'je scrollais insta'])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
+  });
+
+  it('blocks a means of paying with an identifier, and lets the word alone through', () => {
+    expect(raised('paypal lina.xx@exemple.test')).toContain('off_platform_payment');
+    expect(raised('lydia lina_rose')).toContain('off_platform_payment');
+    expect(raised('pas de paypal ici')).not.toContain('off_platform_payment');
+  });
+
+  it('reads a sum alone, or a sum right after he asked a price, as a price of hers', () => {
+    expect(raised('15 euros')).toContain('price_outside_offer');
+    expect(raised('15€ 😘')).toContain('price_outside_offer');
+    expect(raised('ah ben 30 €, pas mal', { fanAskedPrice: true })).toContain('price_outside_offer');
+    expect(raised('15 euros', { allowedPriceMinor: 1_500 })).not.toContain('price_outside_offer');
+    expect(raised('j’ai payé 30 € mes places hier')).not.toContain('price_outside_offer');
+    expect(asksPrice('c’est combien ?')).toBe(true);
+    expect(asksPrice('tu fais quoi ce soir ?')).toBe(false);
   });
 });

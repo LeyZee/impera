@@ -76,6 +76,7 @@ import {
   checkVoiceOutput,
   checkYouthWords,
   sumsMinorOf,
+  asksPrice,
   previousTurnsOf,
   touchesTerm,
   type GuardContext,
@@ -938,6 +939,8 @@ export interface ComposedTurn {
   readonly bubbles: readonly string[];
   readonly voiceFailure?: LlmFailure;
   readonly violations: readonly GuardViolation[];
+  /** The turn was sexual (her register or her script running): what a voice compared on it is guarded the same way. */
+  readonly sexualTurn?: boolean;
   readonly isBlocked: boolean;
   readonly costUsd: number;
   readonly latencyMs: number;
@@ -967,6 +970,9 @@ export function guardContextOf(
   allowedPriceMinor?: number,
 ): GuardContext {
   const lastTurn = history.at(-1);
+  const hisSinceHer = history
+    .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
+    .filter((turn) => turn.from === 'fan');
   return {
     hasMedia,
     ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
@@ -975,10 +981,9 @@ export function guardContextOf(
     ),
     sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
     // The sums he wrote since her last answer: she may say one back without agreeing to it (Charles 27/11).
-    fanAmountsMinor: history
-      .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
-      .filter((turn) => turn.from === 'fan')
-      .flatMap((turn) => sumsMinorOf(turn.text)),
+    fanAmountsMinor: hisSinceHer.flatMap((turn) => sumsMinorOf(turn.text)),
+    // He just asked a price: a sum she writes now is a price of hers (Sécurité, #1043).
+    fanAskedPrice: hisSinceHer.some((turn) => asksPrice(turn.text)),
     // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
     ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
   };
@@ -1045,6 +1050,7 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
   exampleIds: readonly string[],
+  sexual = false,
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
   const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
@@ -1053,6 +1059,8 @@ async function writeFollowUp(
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
     ...checkExplicit(written),
+    // As the main answer (Sécurité, #1043): her aftercare follows a sexual exchange.
+    ...checkYouthWords(written, sexual),
   ];
   return {
     ...(droppedNotes.length > 0 && { droppedNotes }),
@@ -1145,7 +1153,15 @@ export async function composeTurn(
   if (input.followUp !== undefined)
     return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped, exampleIds);
   if (input.aftercare !== undefined)
-    return writeFollowUp(gateway, persona, base, aftercareBrief(input.aftercare), notes.dropped, exampleIds);
+    return writeFollowUp(
+      gateway,
+      persona,
+      base,
+      aftercareBrief(input.aftercare),
+      notes.dropped,
+      exampleIds,
+      true,
+    );
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   // His desire map, from the notes kept (Charles 26/11): the scripts closest to his fantasy come first.
@@ -1947,6 +1963,7 @@ export async function composeTurn(
     bubbles,
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
+    sexualTurn,
     isBlocked: isBlocked(violations) || !voice.ok,
     costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
     latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),

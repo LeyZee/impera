@@ -1128,6 +1128,26 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     ]);
   });
 
+  it('reads « en première » as his class only after she asked what he does (Sécurité, #1043)', async () => {
+    const answers = (asked: string): AgentComposeInput => ({
+      ...INPUT,
+      history: [
+        { direction: 'outbound', text: asked, at: new Date('2026-10-17T09:59:00Z') },
+        { direction: 'inbound', text: 'en première', at: new Date('2026-10-17T09:59:30Z') },
+      ],
+    });
+    const asked = composer({}, undefined, limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' }).limits);
+    expect(await asked.draftComposer.compose(answers('et toi tu fais quoi dans la vie ?'))).toMatchObject({
+      kind: 'held',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_suspected'],
+    });
+    const other = composer({}, undefined, limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' }).limits);
+    expect(await other.draftComposer.compose(answers('t’étais où dans la course ?'))).not.toMatchObject({
+      detail: ['safety_net', 'minor_suspected'],
+    });
+  });
+
   it('hands a fantasy of his on minors to a human before any model, as a doubt on his age (Charles 26/11 at 23:45)', async () => {
     const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
     const { draftComposer, seen } = composer({}, undefined, minor.limits);
@@ -2100,6 +2120,17 @@ describe('createDraftComposer, her word after a sale of his (ADR 0156 § 2)', ()
     expect(going?.replyBrief).toContain('sans rien proposer de payant');
     const ended = await briefOf({ ...open, status: 'bought_out', endedAt: at });
     expect(ended?.replyBrief).toContain('petit mot tendre');
+  });
+
+  it('guards her word after a sale as a sexual turn: a word of youth is held (Sécurité, #1043)', async () => {
+    const { draftComposer } = composer(
+      { voice: { bubbles: ['Merci, ta petite fille sage 😘'] } },
+      undefined,
+      limitsOf({}).limits,
+    );
+    const held = await draftComposer.compose(AFTERCARE);
+    expect(held).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(held.kind === 'held' ? held.detail : []).toContain('youth_word_in_sex');
   });
 
   it('thanks him for a tip in its own words', async () => {

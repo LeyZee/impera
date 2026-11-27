@@ -20,10 +20,15 @@ const MINOR_AGE_WORDS =
   /\b(1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix sept|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen) ?(ans?|years? old|yo|y o|anni|anos)\b/u;
 
 const NO_CONSENT =
-  /\b(viols?|violer|violee?s?|de force|forcee?s?|forcer|contre son gre|sans (son )?consentement|non consentante?s?|endormie?s?|pendant son sommeil|inconsciente?s?|droguee?s?|ivre morte?|rape[ds]?|raping|forced|non ?consensual|unconscious|asleep|sleeping|drugged|passed out|stupro|violentata|forzata|addormentata|drogata|incosciente|violacion|violada|forzada|dormida|drogada|inconsciente)\b/;
+  /\b(viols?|violer|violee?s?|de force|forcee?s?|forcer|contre son gre|sans (son )?consentement|non consentante?s?|endormie?s?|pendant son sommeil|pendant qu (elle|il) dort|dort|dorment|dormir|sommeil|sleeps?|dorme|dormire|duerme|inconsciente?s?|droguee?s?|ivre morte?|rape[ds]?|raping|forced|non ?consensual|unconscious|asleep|sleeping|drugged|passed out|stupro|violentata|forzata|addormentata|drogata|incosciente|violacion|violada|forzada|dormida|drogada|inconsciente)\b/;
 
 const FAMILY =
-  /\b(incestes?|incestueuse?|demi (s(oe|œ)ur|frere)|belle (mere|s(oe|œ)ur|fille)|beau (pere|frere|fils)|s(oe|œ)urs?|freres?|mere|pere|maman|papa|cousine?s?|tante|oncle|niece|neveu|incest|step ?(sister|brother|mom|mother|dad|father|daughter|son)|sisters?|brothers?|mom|mommy|mother|dad|daddy|father|aunt|uncle|cousins?|niece|nephew|incesto|sorella|fratello|madre|padre|matrigna|patrigno|cugina|zia|hermana|hermano|madrastra|padrastro|tia)\b/;
+  /\b(incestes?|incestueuse?|demi (s(oe|œ)ur|frere)|belle (mere|s(oe|œ)ur|fille)|beau (pere|frere|fils)|s(oe|œ)urs?|freres?|mere|pere|cousine?s?|tante|oncle|niece|neveu|incest|step ?(sister|brother|mom|mother|dad|father|daughter|son)|sisters?|brothers?|mother|father|aunt|uncle|cousins?|niece|nephew|incesto|sorella|fratello|madre|padre|matrigna|patrigno|cugina|zia|hermana|hermano|madrastra|padrastro|tia)\b/;
+
+// « Daddy », « appelle-moi papa » are pet names (Sécurité, #1043): family only next to a child's role (« sa fille »).
+const PARENT_NICKNAMES = /\b(papa|daddy|dad|maman|mommy|mom|mami|papi|papino)\b/;
+const CHILD_ROLES =
+  /\b((sa|ta|ma|his|your|my|tua|sua|mia|tu|su|mi) (fille|daughter|figlia|hija|fils|son|figlio|hijo)|daughter|figlia|hija)\b/;
 
 const ANIMAL =
   /\b(animal|animale|animaux|zoophilie|bestialite|chiens?|chevaux|cheval|animals?|bestiality|zoophilia|dogs?|horses?|animali|zoofilia|cavallo|animales|perros?|caballos?)\b/;
@@ -32,7 +37,7 @@ const ANIMAL =
  * Whether a text names youth: a word of youth or of a minor, a school role, an age under 18; procreation between
  * adults and « petite » alone left out. `raw` is the text as written, for the accented words `normalise` would blur.
  */
-export function namesYouth(text: string, raw: string = text): boolean {
+function namesYouth(text: string, raw: string = text): boolean {
   const adultWords = withoutProcreation(normaliseWords(text));
   return (
     MINOR_REFERENCE.test(adultWords) ||
@@ -49,7 +54,7 @@ export function forbiddenThemeOf(item: string): ForbiddenTheme | null {
   const youth = namesYouth(item);
   if (youth) return 'youth';
   if (NO_CONSENT.test(words)) return 'no_consent';
-  if (FAMILY.test(words)) return 'family';
+  if (FAMILY.test(words) || (PARENT_NICKNAMES.test(words) && CHILD_ROLES.test(words))) return 'family';
   if (ANIMAL.test(words)) return 'animal';
   return null;
 }

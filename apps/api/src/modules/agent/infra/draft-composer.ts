@@ -1095,7 +1095,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // He says plainly he is a minor (recette AGT-01): a human answers him before any model, whatever the brain would
       // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
-      const signs = safetySigns(fanText, input.now);
+      const signs = safetySigns(fanText, input.now, input.history[lastAnswer]?.text);
       // A fantasy of his on minors: the same, the alert names the reason, never his words (Charles 26/11 at 23:45).
       if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };

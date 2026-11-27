@@ -334,6 +334,15 @@ describe('playground session, calibration', () => {
     expect(comparison?.bubbles).toEqual(['Hey toi']);
     expect(session.history).toHaveLength(2);
   });
+
+  it('guards a compared voice as the main answer: her words of youth too (Sécurité, #1043)', async () => {
+    const session = make();
+    await session.handleFanMessage('Salut');
+    expect(session.lastExchange?.sexualTurn).toBe(false);
+    const comparison = await session.compareVoice(fakeGateway({ bubbles: ['ta jeunette toute nue'] }));
+    expect(comparison?.violations.map((v) => v.code)).toContain('youth_word_in_sex');
+    expect(comparison?.isBlocked).toBe(true);
+  });
 });
 
 const PHOTO: MediaDescription = {
