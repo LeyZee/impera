@@ -30,6 +30,7 @@ describe('the block the model reads', () => {
     repliesToHer: false,
     authorCommentedBefore: true,
     mayAsk: true,
+    emojiOnly: false,
   };
 
   it('accepts what the code prepares', () => {

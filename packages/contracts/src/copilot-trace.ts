@@ -10,6 +10,7 @@ import {
   type CopilotNextMoveKind,
   type CopilotSaleBlock,
 } from './copilot';
+import { LanguageSchema } from './fan-language';
 
 /**
  * ADR 0141 lot a: what the agent decided with a draft, kept beside it in `drafts.policy_trace` (codes and numbers only,
@@ -44,6 +45,17 @@ export const CopilotTraceSchema = z.strictObject({
     .nullable(),
   saleMoment: SaleMomentSchema.nullable(),
   desireTrend: z.enum(['up', 'down', 'flat']).nullable(),
+  /**
+   * The language code decided for the draft (ADR 0168): hers, his as code read it (`unknown` when it cannot name it),
+   * and whether it may only leave by a human (his or hers outside the guards' coverage). Absent on older drafts.
+   */
+  language: z
+    .strictObject({
+      reply: LanguageSchema,
+      fan: z.union([LanguageSchema, z.literal('unknown')]).nullable(),
+      humanOnly: z.boolean(),
+    })
+    .optional(),
 });
 export type CopilotTrace = z.infer<typeof CopilotTraceSchema>;
 

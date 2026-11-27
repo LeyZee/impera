@@ -1,7 +1,7 @@
 import { CHANNEL_ONLY_GUARD_CODES, GUARD_CODES, OBSOLETE_GUARD_CODES } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { checkCare } from '../care';
+import { checkCare, checkHelpNumber } from '../care';
 import { checkNoCommitment } from '../custom-order';
 import {
   checkExplicit,
@@ -147,7 +147,21 @@ describe('voice guards (P3-13)', () => {
       ['Ah oui ? et tu comptes faire quoi de ton week-end'],
       ...Array.from({ length: 6 }, () => ['Hey']),
     ];
-    expect(codes(['Et tu comptes faire quoi de ton week-end'], { previousTurns: old })).toEqual([]);
+    expect(codes(['Et ton week-end, tu comptes faire quoi ?'], { previousTurns: old })).toEqual([]);
+  });
+
+  it('warns on a line of hers copied, however far back she wrote it (passe 2 du 26/11)', () => {
+    // Invented line, sent long before her last turns.
+    const sentBefore = [
+      'Avoue tu penses à moi depuis tout à l’heure 😏',
+      ...Array.from({ length: 8 }, () => 'Hey'),
+    ];
+    const previousTurns = Array.from({ length: 6 }, () => ['Hey']);
+    expect(
+      severities(['Mmh tu penses à moi depuis tout à l’heure toi'], { previousTurns, sentBefore }),
+    ).toEqual([['repetition', 'soft']]);
+    // Six words of it are hers to say again.
+    expect(codes(['Tu penses à moi depuis ce matin ?'], { previousTurns, sentBefore })).toEqual([]);
   });
 
   it('warns on a third closed question in a row, and not when one of them was open', () => {
@@ -200,16 +214,23 @@ describe('voice guards (P3-13)', () => {
       ...read(['T’es qu’un gamin toi']),
       ...read(['paye moi sur paypal', 'elle est à 5 €']),
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
+      ...read(['hallo schatz, was machst du heute abend?']),
       ...read(['Tu fais quoi de beau ce soir ?'], {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],
       }),
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
+      ...read(['😏 coucou', 'à demain.'], { previousTurns: [] }),
+      ...checkVoiceOutput(['bonne nuit mon cœur'], {
+        ...settings,
+        closeOnlyWords: [{ words: ['mon cœur'], minTier: 4 }],
+      }).map((v) => v.code),
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
       ...checkYouthWords(['ta jeunette t’attend'], true).map((v) => v.code),
       ...read(['espèce de motinterdit', 'si tu la prends je t’en offre une autre']),
       ...checkMoans(['mmmh'], false).map((v) => v.code),
       ...checkMoodKillers(['mon chat me regarde'], false).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
+      ...checkHelpNumber(['appelle le 988']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
       ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),
       ...checkPlaceNames(['Dimanche à Valbrume'], ['valbrume']).map((v) => v.code),

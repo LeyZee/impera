@@ -1,4 +1,15 @@
-import { normalise, normaliseWords, unmask, type GuardCode } from '@impera/contracts';
+import {
+  isGuardedLanguage,
+  normalise,
+  normaliseWords,
+  unmask,
+  type GuardCode,
+  type Language,
+} from '@impera/contracts';
+
+import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
+import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
+import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
 
 /**
  * Guards on the voice output, before anything can be sent (docs/architecture/ai-engine.md, « Les gardes »).
@@ -33,6 +44,15 @@ export interface GuardSettings {
    * listed in the repository. One in her answer is a `degrading_word`, blocking. Absent: not checked.
    */
   readonly degradingWords?: readonly string[];
+  /**
+   * Her words kept for close fans (`rules.close_only_words`, Charles 26/11): one written to a fan below its `minTier`
+   * is a `close_only_word`. Absent or empty: none.
+   */
+  readonly closeOnlyWords?: readonly { readonly words: readonly string[]; readonly minTier: number }[];
+  /** Her last this-many answers all carried an emoji: this one carries none (`behavior.emoji_streak_max`). */
+  readonly emojiStreakMax?: number;
+  /** The form of her bubbles, resolved (`resolveForm`); absent, the code's default. */
+  readonly form?: FormSettings;
 }
 
 /**
@@ -57,6 +77,13 @@ export interface GuardContext {
    * § 4), decided by code. Any other sum stays a `price_outside_offer`. Absent, no price passes.
    */
   readonly allowedPriceMinor?: number;
+  /** They flirt now (a heated reading of his message, outside care): two kinds of emoji instead of one. */
+  readonly flirting?: boolean;
+  /**
+   * His meeting tier (`relationshipTier`), read against her close-only words. Absent, not computable (her tier
+   * settings not stored): below every tier, closed by default.
+   */
+  readonly fanTier?: number;
   /**
    * The sums he wrote since her last answer, in minor units (Charles 27/11): she may say one back without agreeing to
    * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
@@ -69,6 +96,11 @@ export interface GuardContext {
   readonly fanLastMessage?: string;
   /** He asked a price since her last answer (Sécurité, #1043): a sum she writes now is a price of hers. */
   readonly fanAskedPrice?: boolean;
+  /**
+   * The languages she may write in to him (ADR 0168 § 4): her persona's, among those the guards cover. Absent, any
+   * covered language passes; a language outside the coverage never does.
+   */
+  readonly languages?: readonly Language[];
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -318,12 +350,13 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
   // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
   // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there
-  // never does (« ajoute-moi sur snap », « viens sur telegram », « mon insta c'est… », « rejoins-moi sur discord »).
+  // never does (« ajoute-moi sur snap », « viens sur telegram », « mon insta c'est… », « rejoins-moi sur discord »). The
+  // invitation verbs in Italian and Spanish too (ADR 0168 § 4): « scrivimi su whatsapp », « escríbeme por telegram ».
   {
     code: 'contact_info',
     pattern: new RegExp(
       [
-        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
+        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?|scrivi|scrivimi|scrivetemi|aggiungi|aggiungimi|seguimi|vieni|contattami|escribe|escribeme|escribime|agrega|agregame|anademe|sigueme|ven|contactame|hablame)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
         `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
         `\\b(mon|ma|mes|my|mi|il mio|la mia) (compte |account |cuenta )?${NETWORK}\\b`,
         // « discord c'est pour les gamers » is a topic: after « c'est », only a handle (Sécurité, #1043).
@@ -372,8 +405,9 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
       // teasing, the rest is for the judge in context.
       /\b(sale|espece de|t'?es (qu'?)?(une? )?|tu es (qu'?)?(une? )?|toi,? |quel |quelle ) ?(gros |grosse |petit |petite |vrai |vraie )?(radin|radine|rapiat|rapiate|mendiant|mendiante|crevard|crevarde)s?\b/,
   },
-  // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat.
-  { code: 'forbidden_term', pattern: /\bmdr+\b/ },
+  // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat. Nor
+  // « ahah » nor « lol », stretched or not (Charles 26/11).
+  { code: 'forbidden_term', pattern: /\b(mdr+|lo+l+|a+h+a+h+[ah]*)\b/ },
   // « Rien à payer » about a paid bundle is a lie; « pas besoin de payer pour me parler » is true.
   {
     code: 'payment_lie',
@@ -422,6 +456,57 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     code: 'discount',
     pattern:
       /(?<!\b(promo|promos|solde|soldes|reduc|black friday)( a)? ?:? ?)(^|\s)(moins |-) ?\d+ ?% (sur (le|la|les|ce|cette|ces|mon|ma|mes|ton|ta|tes|tout)|pour toi|de remise|de reduc|si tu)|\b\d+ ?% (de moins|moins cher) (sur|pour)\b/,
+  },
+  // ADR 0168 § 4, « couverture des langues par les gardes »: the same refusals in English, Italian and Spanish, read on
+  // the normalised text (accents off). Each has its cases per language in `language-coverage.test.ts`.
+  {
+    code: 'ai_disclosure',
+    pattern:
+      /\byou('?re| are) (talking|chatting|speaking) (to|with) (an? )?(ai|bot|robot|chatbot|machine|program)\b|\b(run|managed|written|operated) by (an? )?(ai|bot|chatbot|robot)\b|\bi'?m (just |only )?(a |an )?(program|computer|machine|virtual (girl|woman|person))\b/,
+  },
+  {
+    code: 'ai_disclosure',
+    pattern:
+      /\b(io )?sono (solo |soltanto |solamente )?(un'? ?|una |un )?(ia|intelligenza artificiale|bot|chatbot|robot|assistente virtuale|programma|modello linguistico|macchina)\b|\bnon sono (una persona |una ragazza |una donna )?(reale|umana|vera)\b|\b(stai parlando|parli|stai scrivendo) con (un'? ?|una |un )?(ia|intelligenza artificiale|bot|chatbot|robot|macchina|programma)\b|\bin quanto (ia|intelligenza artificiale|assistente|modello linguistico)\b|\b(gestit[oa]|scritt[oi]|manda) da (un'? ?|una |un )?(ia|intelligenza artificiale|bot)\b/,
+  },
+  {
+    code: 'ai_disclosure',
+    pattern:
+      /\bno soy (una persona |una chica |una mujer )?(real|humana|de verdad)\b|\b(estas hablando|hablas|estas escribiendo) con (una?|un) (ia|inteligencia artificial|bot|chatbot|robot|maquina|programa)\b|\b(gestionad[oa]|escrit[oa]s?|llevad[oa]) por (una?|un) (ia|inteligencia artificial|bot)\b|\bsoy (solo )?(un|una) (programa|maquina|modelo de lenguaje)\b/,
+  },
+  {
+    code: 'meeting_promise',
+    pattern:
+      /\b(come|coming) (over )?(to|at) my (place|house|flat|apartment|hotel)\b|\bmy (home )?address\b|\bmeet (up )?(tomorrow|tonight|this weekend|on (monday|tuesday|wednesday|thursday|friday|saturday|sunday)|at (the|my|your) (bar|cafe|hotel|station|place))\b|\bi'?ll come to (your|you)\b/,
+  },
+  {
+    code: 'meeting_promise',
+    pattern:
+      /\bvieni (a trovarmi|da me|a casa mia|in hotel)\b|\bci vediamo (domani|stasera|sabato|domenica|lunedi|martedi|mercoledi|giovedi|venerdi|questo weekend|al bar|in hotel|a casa|da me|da te|in stazione)\b|\bincontriamoci\b|\b(possiamo|potremmo) incontrarci\b|\bil mio indirizzo\b|\bvengo (da te|a casa tua|a trovarti)\b/,
+  },
+  {
+    code: 'meeting_promise',
+    pattern:
+      /\bven a (verme|mi casa|mi hotel)\b|\bnos vemos (manana|esta noche|el (sabado|domingo|lunes|martes|miercoles|jueves|viernes)|este fin de semana|en (el|la|mi|tu) |a las)\b|\bveamonos\b|\b(podemos|podriamos) (quedar|vernos)\b|\bquedamos (el|manana|esta|en (el|la|un|una|mi|tu))\b|\bmi direccion\b|\bvoy a tu casa\b/,
+  },
+  {
+    code: 'asks_for_nudes',
+    pattern:
+      /\b(send|show) me (a |some |your )?(nudes?|naked (pics?|photos?)|dick ?pics?|your (dick|cock))\b|\b(mandami|inviami|fammi vedere) (una |delle |le )?(foto nud[aeio]|nudes?|il tuo (cazzo|pene))\b|\b(mandame|enviame|pasame|ensename) (una |unas |tus )?(fotos? desnud[oa]s?|nudes?|tu (polla|pene))\b/,
+  },
+  {
+    code: 'payment_lie',
+    pattern:
+      /\b(nothing to pay|you (don'?t|do not) (have|need) to pay|no need to pay)\b(?! (to|for) (talk|chat|writ)\w*)|\b(niente da pagare|non (devi|serve|c'e bisogno di) pagare)\b(?! per (parlar|chattar|scriver)\w*)|\b(nada que pagar|no (tienes|hace falta|necesitas) (que )?pagar)\b(?! para (hablar|chatear|escribir)\w*)/,
+  },
+  {
+    code: 'off_platform_payment',
+    pattern: /\b(bank transfer|wire transfer|bonifico|postepay|satispay|bizum|transferencia( bancaria)?)\b/,
+  },
+  {
+    code: 'discount',
+    pattern:
+      /\b(i'?ll (give|make) you a (discount|deal|special price)|special price for you|half price|promo code|discount code|\d+ ?% off)\b|\b(ti (faccio|do|lascio) (uno sconto|un prezzo speciale)|prezzo speciale|a meta prezzo|codice sconto|\d+ ?% di sconto)\b|\b(te (hago|doy|dejo) (un descuento|un precio especial)|precio especial|a mitad de precio|codigo de descuento|\d+ ?% de descuento)\b/,
   },
 ];
 
@@ -706,14 +791,19 @@ const OPENING_STREAK = 3;
  */
 const REUSED_WORDS = 4;
 const REUSED_TURNS = 6;
+/**
+ * A line of hers copied: seven words in a row of any message she already sent him, however far back (passe 2 du 26/11,
+ * « tu penses à moi depuis tout à l'heure » said again). Soft, like a formula: rewritten once, then goes.
+ */
+const COPIED_WORDS = 7;
 
-function wordRuns(text: string): string[] {
+function wordRuns(text: string, size = REUSED_WORDS): string[] {
   const words = plain(text)
     .split(' ')
     .filter((word) => word !== '');
   return words
-    .slice(0, Math.max(0, words.length - REUSED_WORDS + 1))
-    .map((_, i) => words.slice(i, i + REUSED_WORDS).join(' '));
+    .slice(0, Math.max(0, words.length - size + 1))
+    .map((_, i) => words.slice(i, i + size).join(' '));
 }
 
 const openingOf = (turn: readonly string[]): string | undefined => {
@@ -757,6 +847,12 @@ function againstHistory(
     ) {
       violations.push({ code: 'repetition', severity: 'blocking', bubbleIndex, match: text });
     }
+  });
+  const copied = new Set([...sentBefore, ...turns.flat()].flatMap((text) => wordRuns(text, COPIED_WORDS)));
+  bubbles.forEach((bubble, bubbleIndex) => {
+    if (violations.some((v) => v.bubbleIndex === bubbleIndex)) return;
+    const match = wordRuns(bubble, COPIED_WORDS).find((run) => copied.has(run));
+    if (match !== undefined) violations.push({ code: 'repetition', severity: 'soft', bubbleIndex, match });
   });
   const opening = openingOf(bubbles);
   const lastOpenings = turns.slice(-(OPENING_STREAK - 1)).map(openingOf);
@@ -864,6 +960,24 @@ function sentenceAround(text: string, at: number): string {
   const start = Math.max(...['.', '!', '?', '\n'].map((mark) => text.lastIndexOf(mark, at - 1))) + 1;
   const ends = ['.', '!', '?', '\n'].map((mark) => text.indexOf(mark, at)).filter((index) => index >= 0);
   return text.slice(start, ends.length === 0 ? text.length : Math.min(...ends));
+}
+
+// « On se retrouve demain » said as she goes to bed: to talk again here, the next day (passe 2 du 26/11, conversation
+// 40). Only « retrouve », only a moment without a day of the week or an hour, and only beside a goodnight or « ici »:
+// « on se voit demain », « on se retrouve demain au café », « … samedi », « … à 20 h » stay meetings.
+const LATER_HERE = /^on se retrouve (demain|plus tard|tout a l'heure)$/;
+const GOODNIGHT = /\b(bonne nuit|dors bien|douce nuit|beaux reves|repose[- ]toi|a demain)\b/;
+const HERE_AFTER = /^ ?(ici|sur (ma|mon) (page|messagerie)|en (message|messages|dm|mp|prive))\b/;
+const PLACE_AFTER = new RegExp(
+  `^[^.!?]*\\b(chez|au|aux|a la|a l'|devant|en ville|dans (un|une|le|la)|gare|hotel|bar|cafe|resto|restaurant|${CITY})\\b|^[^.!?]*\\d`,
+);
+
+/** A meeting word that only says they will talk again here, as she goes to bed. */
+function chatGoodbye(text: string, match: string, index: number, message: string): boolean {
+  if (!LATER_HERE.test(match)) return false;
+  const after = text.slice(index + match.length);
+  if (PLACE_AFTER.test(after)) return false;
+  return HERE_AFTER.test(after) || GOODNIGHT.test(message);
 }
 
 /**
@@ -987,9 +1101,22 @@ function fanProposesMeeting(text: string): boolean {
  * a real place or an organising word in a sentence about meeting him, or her yes opening the bubble when his last
  * message proposed a concrete meeting. The daydream without any of them passes.
  */
-export function meetingCommitment(text: string, fanLastMessage?: string): string | undefined {
+export function meetingCommitment(
+  text: string,
+  fanLastMessage?: string,
+  /** The whole message, normalised, when `text` is one bubble of it: a goodnight may be in another bubble. */
+  message?: string,
+): string | undefined {
   const said = normalise(text);
-  const concrete = sentencesOf(said)
+  // « On se retrouve demain » said as she goes to bed is a chat goodbye (`chatGoodbye`): to talk again here, never an
+  // invitation. A place, an hour, a day of the week or « on se voit » after it still count.
+  const whole = message ?? said;
+  const read = said.replace(
+    /on se retrouve (demain|plus tard|tout a l'heure)/g,
+    (match, _moment, index: number) =>
+      chatGoodbye(said, match, index, whole) ? ' '.repeat(match.length) : match,
+  );
+  const concrete = sentencesOf(read)
     .map(concreteMeeting)
     .find((match) => match !== undefined);
   if (concrete !== undefined) return concrete;
@@ -997,12 +1124,18 @@ export function meetingCommitment(text: string, fanLastMessage?: string): string
   return MEETING_ASSENT.exec(said.replace(/^[^\p{L}]+/u, ''))?.[0];
 }
 
-/** A `meeting_promise` pattern, read sentence by sentence: online, in a dream or « ici », the sentence passes. */
-function meetingMatch(pattern: RegExp, text: string): string | undefined {
-  for (const sentence of sentencesOf(text)) {
-    if (elsewhere(sentence)) continue;
-    const match = pattern.exec(sentence)?.[0];
-    if (match !== undefined) return match;
+/**
+ * A `meeting_promise` pattern, read sentence by sentence: online, in a dream or « ici », the sentence passes; and
+ * « on se retrouve demain » said as she goes to bed is a chat goodbye (`chatGoodbye`), read on the whole text.
+ */
+function meetingMatch(pattern: RegExp, text: string, message: string): string | undefined {
+  // The sentences of `sentencesOf`, with where each starts in the text.
+  for (const span of text.matchAll(/[^.!?\n]+/g)) {
+    const sentence = span[0];
+    if (sentence.trim() === '' || elsewhere(sentence)) continue;
+    for (const match of sentence.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
+      if (!chatGoodbye(text, match[0], span.index + match.index, message)) return match[0];
+    }
   }
   return undefined;
 }
@@ -1012,8 +1145,10 @@ function blockingMatch(
   pattern: RegExp,
   text: string,
   context: GuardContext,
+  /** The whole message, normalised, when `text` is one bubble of it: a goodnight may be in another bubble. */
+  message: string = text,
 ): string | undefined {
-  if (code === 'meeting_promise') return meetingMatch(pattern, text);
+  if (code === 'meeting_promise') return meetingMatch(pattern, text, message);
   if (code !== 'price_outside_offer') return pattern.exec(text)?.[0];
   for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
     // « €12.50 » matches as « €1 »: the sum is read on, past the match.
@@ -1071,15 +1206,16 @@ export function checkVoiceOutput(
   const forbidden = settings.forbiddenTerms.map(normalise).filter((term) => term !== '');
   const degrading = (settings.degradingWords ?? []).map(normalise).filter((term) => term !== '');
 
+  const message = normalise(bubbles.join(' '));
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
     for (const { code, pattern } of BLOCKING_PATTERNS) {
-      const match = blockingMatch(code, pattern, text, context);
+      const match = blockingMatch(code, pattern, text, context, message);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
     const committed = violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'meeting_promise')
       ? undefined
-      : meetingCommitment(bubble, context.fanLastMessage);
+      : meetingCommitment(bubble, context.fanLastMessage, message);
     if (committed !== undefined)
       violations.push({ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match: committed });
     const compared = MINOR_COMPARISON.exec(text)?.[0];
@@ -1154,10 +1290,65 @@ export function checkVoiceOutput(
         violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named });
     });
   violations.push(...wholeMessage(bubbles, forbidden, violations, context));
+  const language = languageMatch(bubbles, context.languages);
+  if (language !== undefined)
+    violations.push({ code: 'language_not_covered', severity: 'blocking', match: language });
   if (context.previousTurns !== undefined)
     violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
   if (bubbles.length > settings.maxBubbles) violations.push({ code: 'too_many_bubbles', severity: 'soft' });
+  // Her emojis and her form are read on an answer to him, in a conversation: not on a lone sample of her bank.
+  if (context.previousTurns !== undefined)
+    violations.push(
+      ...checkEmojis(bubbles, {
+        flirting: context.flirting === true,
+        previousTurns: context.previousTurns,
+        streakMax: settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX,
+      }),
+      ...checkForm(bubbles, settings.form ?? DEFAULT_FORM_SETTINGS),
+    );
+  violations.push(...closeOnlyWords(bubbles, settings, context.fanTier));
   return violations;
+}
+
+/** « cœur » and « coeur » are one word: no Unicode normal form unties the ligature. */
+const foldLigatures = (text: string): string => text.replace(/[œŒ]/gu, 'oe').replace(/[æÆ]/gu, 'ae');
+
+/**
+ * Her words kept for close fans (Charles 26/11, ADR 0158 § O): written to a fan below the word's tier, her answer is
+ * refused, as a forbidden word is (blocking: rewritten once, then a human). A tier not computable is below every one.
+ */
+function closeOnlyWords(
+  bubbles: readonly string[],
+  settings: GuardSettings,
+  fanTier: number | undefined,
+): GuardViolation[] {
+  const text = foldLigatures(bubbles.join('\n'));
+  return (settings.closeOnlyWords ?? []).flatMap((group) =>
+    fanTier !== undefined && fanTier >= group.minTier
+      ? []
+      : group.words
+          .filter((word) => touchesTerm(text, foldLigatures(word)))
+          .map((word): GuardViolation => ({ code: 'close_only_word', severity: 'blocking', match: word })),
+  );
+}
+
+/**
+ * The language of her message when the guards do not read it (ADR 0168 § 4, closed by default): a language outside
+ * `GUARDED_LANGUAGES` or outside her languages, or a script they do not read. A message too short to say passes.
+ */
+function languageMatch(
+  bubbles: readonly string[],
+  allowed: readonly Language[] | undefined,
+): string | undefined {
+  const text = bubbles.join(' ');
+  const read = detectLanguage(text);
+  // A short Latin text no language reads plainly is hers (slang, names, a word or two); a long one is not read by the
+  // guards and does not pass (ADR 0168 § 4, closed by default).
+  if (read === null) return undefined;
+  if (read === 'unknown' && isMostlyLatin(text) && latinWordCount(text) < OUTPUT_UNKNOWN_FROM_WORDS)
+    return undefined;
+  if (read === 'unknown' || !isGuardedLanguage(read)) return read;
+  return allowed === undefined || allowed.includes(read) ? undefined : read;
 }
 
 /** How far back her messages count against a repetition: the last twenty messages of the conversation. */
@@ -1186,14 +1377,23 @@ export function isBlocked(violations: readonly GuardViolation[]): boolean {
   return violations.some((v) => v.severity === 'blocking');
 }
 
-/** Blocked, or a formula she already used with him: her answer is written once more, then goes (passe 1, 21/11). */
+/** The soft guards that ask for one more writing of her answer (passe 1, 21/11; emojis, 26/11). */
+export const REWRITTEN_SOFT: readonly GuardCode[] = ['repetition', 'emoji_misuse'];
+
+/** Blocked, a formula she already used with him or her emojis misused: her answer is written once more, then goes (passe 1, 21/11). */
 export function wantsRewrite(violations: readonly GuardViolation[]): boolean {
-  return isBlocked(violations) || violations.some((v) => v.code === 'repetition');
+  return isBlocked(violations) || violations.some((v) => REWRITTEN_SOFT.includes(v.code));
 }
 
 // Explicit words, on the normalised text: « un baiser », « la queue au cinéma » or « ma chatte Moka » are not.
 const EXPLICIT =
   /\b(bite|queue (dure|raide|en moi)|ta queue(?! de)|ma queue(?! de)|chatte (mouillee|trempee|humide)|ma chatte (te |pour toi|mouille|a envie|est trempee)|sucer|suce|te sucer|me baiser|te baiser|baise[- ]moi|on baise|baiser fort|jouir|jouis|orgasme|levrette|fellation|sodomie|branler|(?<!m'en |m en |s'en |t'en |j'm'en )branle|me toucher(?! (avec|par) (tes|ces|des|mes|les) mots| le (coeur|cœur)| au (coeur|cœur))|je me touche|mouillee pour toi|trempee pour toi|bander|tu bandes|je te fais bander|toute nue|tout nu|a poil|seins nus|mes seins|tes seins|mon cul|ton cul|clito|gode|sextoy)\b/;
+
+// ADR 0168 § 4: the same in English, Italian and Spanish. « cazzo » alone is also an oath: before his age, still too much.
+const EXPLICIT_OTHERS =
+  /\b(cock|dick|pussy|fuck me|fucking you|cum|blowjob|naked|my tits|your tits|horny for you|wet for you|cazzo|figa|scopar\w*|scopami|pompino|sborra|nuda per te|le mie tette|bagnata per te|polla|follar\w*|follame|correrme|mamada|desnuda|mis tetas|mojada para ti|cachonda)\b/;
+const explicitIn = (text: string): RegExpExecArray | null =>
+  EXPLICIT.exec(text) ?? EXPLICIT_OTHERS.exec(text);
 
 /**
  * Nothing explicit before his age is confirmed (P3-09, méthode de chatting): blocking, checked by the composer only
@@ -1202,12 +1402,12 @@ const EXPLICIT =
 export function checkExplicit(bubbles: readonly string[]): GuardViolation[] {
   const violations: GuardViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
-    const match = EXPLICIT.exec(normalise(bubble));
+    const match = explicitIn(normalise(bubble));
     if (match)
       violations.push({ code: 'explicit_before_age', severity: 'blocking', bubbleIndex, match: match[0] });
   });
   if (violations.length === 0) {
-    const match = EXPLICIT.exec(normalise(bubbles.join(' ')));
+    const match = explicitIn(normalise(bubbles.join(' ')));
     if (match) violations.push({ code: 'explicit_before_age', severity: 'blocking', match: match[0] });
   }
   return violations;

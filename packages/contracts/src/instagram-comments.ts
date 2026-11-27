@@ -81,6 +81,11 @@ export const CommentPromptInputSchema = z.strictObject({
    * code from her day's replies, never by the model.
    */
   mayAsk: z.boolean(),
+  /**
+   * He says he loves her: she answers with emojis only, never words, so that no one else is jealous and he imagines
+   * nothing (the creator, 26/11). Decided by the code from the comment (`declaresLove`).
+   */
+  emojiOnly: z.boolean(),
 });
 export type CommentPromptInput = z.infer<typeof CommentPromptInputSchema>;
 
@@ -128,6 +133,7 @@ export const COMMENT_GUARD_CODES = [
   'public_explicit',
   'repeated_reply',
   'unwanted_question',
+  'words_in_emoji_reply',
 ] as const;
 export const CommentGuardCodeSchema = z.enum(COMMENT_GUARD_CODES);
 export type CommentGuardCode = z.infer<typeof CommentGuardCodeSchema>;

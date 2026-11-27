@@ -1,0 +1,7 @@
+# 2026-11-26 — Time waster : réponses espacées et groupées (ADR 0135 § 6, 7, 10) — in progress
+Fait : `timeWasterLevel` et `slowedReplyAt` (agent/domain/attention) ; `timeWasterWait` (conversations/application) lit avant tout appel d'IA le palier (`fanStanding` de l'agent), les scripts sans achat (`scriptRuns.unbought`), la dépense du registre et ses limites ; le job de réponse reporte sa réponse (`reply_deferred`, raison `time_waster`) à un délai tiré dans la plage réglée, compté depuis son premier message en attente, ses messages suivants s'y groupent, au plus N réponses par jour puis le lendemain ; la voix écrit une seule bulle, « très sollicitée », sans un mot sur l'argent ; aucune relance (job de relance annulé). Réglages `creators.settings.timeWaster` (contrat `TimeWasterSettingSchema`), aucune valeur dans le dépôt. ADR 0135 : précisions de Charles (deux profils, seuils triplés + 7 signes, excuses).
+Pas fait : signes 1 à 5 et 7 (journal `fan_signs_seen`, migration à numéroter par Bilan), excuses, garde `money_reproach`, priorité de file, écran de réglages et pastille (lot Design, maquette d'abord), témoin et mesure (lot Chiffres).
+Décisions : seuils triplés + 2 signes différents sur 14 jours (Charles, 27/11).
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : tests unitaires (niveau, délai, attente, consigne de la voix) ; `pnpm check`. Intégration non lancée ici (pas de Docker).

@@ -4,9 +4,11 @@ import {
   blindLines,
   CorpusLineSchema,
   pairOfCorpusLine,
+  periodOf,
   setAside,
   shapeOf,
   type CalibrationPair,
+  writtenInExcludedPeriod,
 } from '../calibration';
 
 /* Invented pairs (ADR 0010). */
@@ -26,7 +28,7 @@ describe('the calibration of her replies to comments (Charles, 26/11)', () => {
       publication: 'Dimanche @amie',
       commentaire: '＠elle trop belle',
       reponses: [
-        { date: '2025-03-14', destinataire: 'quelquun', texte: '@quelquun Merciii 🫶🏻' },
+        { date: '2025-03-14', destinataire: 'quelquun', texte: '@quelquun [pseudo] Merciii 🫶🏻' },
         { date: '2025-03-15', destinataire: 'quelquun', texte: 'Encore merci' },
       ],
     });
@@ -38,6 +40,24 @@ describe('the calibration of her replies to comments (Charles, 26/11)', () => {
     });
     expect(pairOfCorpusLine({ ...line, commentaire: '@elle' })).toBeNull();
     expect(CorpusLineSchema.safeParse({ ...line, extra: 1 }).success).toBe(false);
+  });
+
+  it('drops the replies written in a period when someone else answered for her, bounds included', () => {
+    const line = CorpusLineSchema.parse({
+      id: 'R0007',
+      date: '2025-07-01',
+      support: 'Reel',
+      publication: '',
+      commentaire: 'Trop bien',
+      reponses: [{ date: '2025-07-03', destinataire: 'quelquun', texte: 'Merci' }],
+    });
+    const period = periodOf('2025-07-03..2025-07-20');
+    expect(period).toEqual({ from: '2025-07-03', to: '2025-07-20' });
+    expect(writtenInExcludedPeriod(line, period === null ? [] : [period])).toBe(true);
+    expect(writtenInExcludedPeriod(line, [{ from: '2025-07-04', to: '2025-07-20' }])).toBe(false);
+    expect(periodOf('2025-07-20..2025-07-03')).toBeNull();
+    expect(periodOf('2025-02-30..2025-03-03')).toBeNull();
+    expect(periodOf('juillet')).toBeNull();
   });
 
   it('sets aside the same pairs for the same seed, never one in both halves', () => {

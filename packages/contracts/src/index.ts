@@ -2,6 +2,7 @@
 export const CONTRACTS_PACKAGE = '@impera/contracts';
 
 export * from './agency-rates';
+export * from './agency-style';
 export * from './agent-hours';
 export * from './alert-history';
 export * from './alerts';
@@ -56,6 +57,8 @@ export * from './invoices';
 export * from './jobs';
 export * from './creator-links';
 export * from './instagram-comments';
+export * from './fan-language';
+export * from './help-lines';
 export * from './instagram-insights';
 export * from './link-stats';
 export * from './mcp';
@@ -101,3 +104,4 @@ export * from './telegram-channel';
 export * from './trends';
 export * from './trophy-case';
 export * from './vault';
+export * from './voice-form';

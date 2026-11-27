@@ -5,6 +5,7 @@ import type {
   DropMediaDescription,
   FanCardRead,
   FanFlags,
+  Language,
   LlmPurpose,
   MediaDescription,
   Money,
@@ -220,8 +221,22 @@ export interface VoiceWaitingStep {
   readonly mediaSheet: string | null;
 }
 
+/**
+ * The language she writes in, decided by code (ADR 0168 § 2), never guessed by the model: a fixed instruction of the
+ * voice, with his language she does not speak (said once, her way) and her examples in that language, when she has some.
+ */
+export interface VoiceLanguage {
+  readonly reply: Language;
+  /** His language she does not speak, to tell him once; `'unknown'` when code cannot name it; `null`: nothing to say. */
+  readonly notSpoken: Language | 'unknown' | null;
+  /** Her messages written in `reply` (persona, `language_examples`): read only when she writes in that language. */
+  readonly examples?: readonly string[];
+}
+
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
+  /** The language of her answer (ADR 0168). Absent: the prompt says nothing more than her sheet. */
+  readonly language?: VoiceLanguage;
   /**
    * A reply of her bank to his price objection (ADR 0090 § 8), chosen by code: the voice says it in her words, in a
    * typed block after the brief. Absent, none.
@@ -249,6 +264,17 @@ export interface VoiceInput extends ConversationInput {
    * what he says. Absent, none.
    */
   readonly boughtMediaSheet?: string;
+  /**
+   * The agency's base style (ADR 0173), its public then its private part, in typed blocks before her sheet, which
+   * wins where they differ. Absent or both empty: no section.
+   */
+  readonly agencyStyle?: AgencyStyleText;
+}
+
+/** The two texts of the agency's base style (ADR 0173), as the owner wrote them. */
+export interface AgencyStyleText {
+  readonly publicStyle: string;
+  readonly privateStyle: string;
 }
 
 /**
@@ -325,6 +351,12 @@ export interface InstagramCommentInput {
    * message, not the system, so the cached system stays the same from one comment to the next; empty: none.
    */
   readonly nearExamples?: readonly { readonly comment: string; readonly reply: string }[];
+  /** The shape of her reply to the closest comment, decided by the code (`replyShapeOf`); absent: the prompt alone. */
+  readonly replyShape?: {
+    readonly emojis: 0 | 1 | 2;
+    readonly exclaims: boolean;
+    readonly words: number;
+  };
   readonly comment: CommentPromptInput;
   /** What the guards refused in a first reply: this call is the one rewrite (§ 3). Rule names only, never a text. */
   readonly refusedBy?: readonly string[];
