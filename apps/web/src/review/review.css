@@ -1,16 +1,6 @@
 /* « Mon bilan » (ADR 0170 §§ 26 to 30), from the maquette validated on 26/11 (« ok maquette bilan »). */
-.rv-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-4);
-}
 .rv-section {
-  display: flex;
-  flex-direction: column;
   gap: var(--nv-space-3);
-}
-.rv-section > .nv-h3 {
-  margin: 0;
 }
 .rv-totals {
   display: grid;
@@ -36,6 +26,14 @@
   line-height: 1.1;
   font-weight: 700;
   color: var(--nv-ink);
+}
+.rv-total b {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .rv-total b {
+    font-size: var(--nv-text-title-2);
+  }
 }
 .rv-total[data-tone='miss'] b {
   color: var(--nv-warning);

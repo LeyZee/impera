@@ -6,7 +6,7 @@ import { contestRemark, markReviewSeen, REVIEW_KEY, useMyShiftReview } from './a
 import './review.css';
 
 import { amountText } from '@/reports/model';
-import { Panel } from '@/shell/layout';
+import { Panel, PanelSection } from '@/shell/layout';
 
 /** What a level says on a card (ADR 0170 § 30): grey, amber, red. */
 const TONE: Record<FaultTone, { readonly label: string; readonly colour: string }> = {
@@ -229,20 +229,21 @@ export function MyReviewCard({ shift, zone }: { shift: MyShift | null; zone: str
       eyebrow={`Mon bilan · ${shift.creatorName}`}
       title={verdict(data.faults, missed)}
     >
-      <div className="rv-totals">
-        <div className="rv-total" data-tone="miss">
-          <span>Manqué, à peu près</span>
-          <b className="nv-num">{missed === null ? '0 €' : `≈ ${missed}`}</b>
+      <PanelSection>
+        <div className="rv-totals">
+          <div className="rv-total" data-tone="miss">
+            <span>Manqué, à peu près</span>
+            <b className="nv-num">{missed === null ? '0 €' : `≈ ${missed}`}</b>
+          </div>
+          <div className="rv-total" data-tone="win">
+            <span>Rapporté par ce qui est bien fait</span>
+            <b className="nv-num">{earned ?? '0 €'}</b>
+          </div>
         </div>
-        <div className="rv-total" data-tone="win">
-          <span>Rapporté par ce qui est bien fait</span>
-          <b className="nv-num">{earned ?? '0 €'}</b>
-        </div>
-      </div>
-      <p className="rv-faint">Le manqué est compté au prix de l’étape suivante du script, pas au hasard.</p>
+        <p className="rv-faint">Le manqué est compté au prix de l’étape suivante du script, pas au hasard.</p>
+      </PanelSection>
       {data.faults.length === 0 ? null : (
-        <section className="rv-section" aria-label="À travailler">
-          <h3 className="nv-h3">À travailler</h3>
+        <PanelSection label="À travailler" className="rv-section">
           {data.faults.map((card) => (
             <Fault
               key={card.remarkId}
@@ -252,11 +253,10 @@ export function MyReviewCard({ shift, zone }: { shift: MyShift | null; zone: str
               creatorName={shift.creatorName}
             />
           ))}
-        </section>
+        </PanelSection>
       )}
       {data.wellDone.length === 0 ? null : (
-        <section className="rv-section" aria-label="Bien fait">
-          <h3 className="nv-h3">Bien fait</h3>
+        <PanelSection label="Bien fait" className="rv-section">
           {data.wellDone.map((card) => (
             <article key={card.remarkId} className="rv-tile nv-enter">
               <div className="rv-top">
@@ -270,12 +270,14 @@ export function MyReviewCard({ shift, zone }: { shift: MyShift | null; zone: str
               <Excerpt lines={card.excerpt} zone={zone} us="Toi" />
             </article>
           ))}
-        </section>
+        </PanelSection>
       )}
-      <p className="rv-faint">
-        Tes conversations avec les fans sont relues pour t’aider. Rien d’autre : ni le temps d’inactivité, ni
-        les clics. Tu peux contester chaque point.
-      </p>
+      <PanelSection>
+        <p className="rv-faint">
+          Tes conversations avec les fans sont relues pour t’aider. Rien d’autre : ni le temps d’inactivité,
+          ni les clics. Tu peux contester chaque point.
+        </p>
+      </PanelSection>
     </Panel>
   );
 }
