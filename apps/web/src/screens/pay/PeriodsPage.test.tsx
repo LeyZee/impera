@@ -136,12 +136,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Paie › Historique', () => {
+describe('Paie › Relevés', () => {
   it('lists the periods, the most recent first, each with one amount and its net, closing and statements beneath', async () => {
     const page = renderPage();
     await screen.findByText('1er – 15 novembre 2026');
     // A list of periods, not of statements (a statement is one member's computation).
-    expect(screen.getByRole('heading', { level: 1, name: 'Historique' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Relevés' })).toBeTruthy();
     expect(rowText('1er – 15 novembre 2026')).toBe(
       '1er – 15 novembre 2026En cours · 170,00 € de net à ce jour · se valide à partir du lun. 16 nov.En cours42,50 €à verser à ce jour',
     );

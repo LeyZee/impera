@@ -35,6 +35,7 @@
   --_c: var(--nv-ink-faint);
 }
 .ai-switch .nv-dot.ai-switch__dot--paused,
+.ai-switch .nv-dot.ai-switch__dot--expired,
 .ai-switch .nv-dot.ai-switch__dot--off,
 .ai-switch .nv-dot.ai-switch__dot--global {
   --_c: var(--nv-warning);
@@ -50,6 +51,7 @@
   font-weight: 600;
 }
 .ai-switch[data-state='paused'] .ai-switch__label,
+.ai-switch[data-state='expired'] .ai-switch__label,
 .ai-switch[data-state='off'] .ai-switch__label,
 .ai-switch[data-state='global'] .ai-switch__label {
   color: var(--nv-warning);

@@ -69,14 +69,17 @@ export function AlertsTab({
           : { ...old, alerts: old.alerts.map((each) => (each.code === next.code ? next : each)) },
       );
     };
-    // Shown at once; the server's answer, or the line as it was, comes after.
+    // A read under way would bring the old line back over this one (CODE-04).
+    await client.cancelQueries({ queryKey: key });
+    // Shown at once; the server's answer, or what it holds, comes after.
     put({ ...line, routes, isDefault: false });
     setStatus(null);
     try {
       put(await saveCreatorAlert(creatorId, line.code, routes));
       setStatus({ text: `${ALERT_TEXT[line.code].title} : enregistré.`, failed: false });
     } catch (error) {
-      put(line);
+      // Read again rather than the line as it was: a change made since and saved is never undone (CODE-04).
+      void client.invalidateQueries({ queryKey: key });
       setStatus({ text: ALERTS_ERRORS[alertsErrorKind(error)], failed: true });
     }
   }
@@ -172,6 +175,7 @@ function AlertRow({
           <p className="ca-line__sentence">
             {line.locked ? 'Part toujours, à tout le monde, même la nuit. ' : null}
             {text.sentence}
+            {line.chattersClosed ? ' Jamais envoyée à un chatteur : c’est une alerte de pilotage.' : null}
           </p>
         )}
       </div>
@@ -185,13 +189,22 @@ function AlertRow({
           {CREATOR_ALERT_ROLES.map((role) => (
             <div key={role} className="ca-role">
               <span className="ca-role__name">{ROLE_LABELS[role]}</span>
-              <ModeChoice
-                label={`${text.title}, ${ROLE_LABELS[role]}`}
-                value={line.routes[role]}
-                onChange={(mode) => {
-                  onChange(role, mode);
-                }}
-              />
+              {line.chattersClosed && role === 'chatter_on_shift' ? (
+                // Never to a chatter (ADR 0094 § 3): an alert of the agency, shut for them by the code.
+                <p className="ca-role__closed">
+                  <LockIcon />
+                  <span className="ca-vh">{ROLE_LABELS[role]} : </span>
+                  Jamais
+                </p>
+              ) : (
+                <ModeChoice
+                  label={`${text.title}, ${ROLE_LABELS[role]}`}
+                  value={line.routes[role]}
+                  onChange={(mode) => {
+                    onChange(role, mode);
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>

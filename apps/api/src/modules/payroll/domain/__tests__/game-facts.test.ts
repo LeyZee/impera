@@ -93,6 +93,7 @@ describe('the validated reports in the game (ADR 0118 § 1 to § 4)', () => {
         netMinor: 8_000,
         occurredAt: new Date('2025-06-03T18:00:00Z'),
         saleType: null,
+        chain: { grossMinor: 12_000, vatBps: 2_000, platformFeeBps: 2_000 },
       },
     ]);
   });

@@ -28,6 +28,13 @@ export interface DropExportFile {
    * gratuit »), so left out of the archive, and the sheet says so.
    */
   readonly inScript: boolean;
+  /** A video's or a vocal's length, when it was read; `null` for a photo or when unknown. */
+  readonly durationMs: number | null;
+  /**
+   * 1 for the file she first sent at its place; 2, 3… for each one sent in place of a medium asked again (« À refaire »)
+   * or refused: its name then says `-v2`, `-v3`.
+   */
+  readonly version: number;
 }
 
 /** A drop of hers as its archive reads it. */
@@ -36,6 +43,11 @@ export interface SentDrop {
   readonly createdAt: Date;
   /** Her time zone: the day of the folder is hers. */
   readonly timezone: string;
+  /**
+   * Its rank among her drops of that category on that day of hers, from 1, the oldest first, withdrawn ones counted:
+   * two drops of a day never share a folder, and a name never changes.
+   */
+  readonly dayRank: number;
   /** Her word on the drop, as she wrote it; `null` when she wrote none. */
   readonly sentence: string | null;
   readonly files: readonly DropExportFile[];
@@ -114,18 +126,26 @@ const longDay = (at: Date, timezone: string): string =>
     timeZone: timezone,
   }).format(at);
 
+/** « -38s » after a video's or a vocal's name, when its length is known. */
+const lengthOf = (file: DropExportFile): string =>
+  file.kind === 'image' || file.durationMs === null
+    ? ''
+    : `-${String(Math.max(1, Math.round(file.durationMs / 1000)))}s`;
+
 /**
- * Her drop's folder: `feed-seance-2026-11-11/`, the sheet first (`00-fiche.txt`), then each medium as `01-photo.jpg`,
- * `02-video.mp4`… in her order. A medium waiting for its description says so in the sheet, never a guessed one. A
+ * Her drop's folder (Charles, 26/11): `feed-seance-2026-11-11-2/`, the sheet first (`00-fiche.txt`), then each medium
+ * named in full, so a file taken out of its folder still says where it comes from: `feed-seance-2026-11-11-2-01-photo.jpg`,
+ * `feed-seance-2026-11-11-2-02-video-38s.mp4`, `-v2` for a medium sent again… in her order. Never her name, an account nor
+ * a place. A medium waiting for its description says so in the sheet, never a guessed one. A
  * medium one of her scripts sells is never in it: the sheet counts those left out, so the team knows why.
  */
 export function dropExportPlan(drop: SentDrop): DropExportPlan {
-  const folder = `${FOLDERS[drop.category]}-${dayOf(drop.createdAt, drop.timezone)}`;
+  const folder = `${FOLDERS[drop.category]}-${dayOf(drop.createdAt, drop.timezone)}-${String(drop.dayRank)}`;
   const kept = drop.files.filter((file) => !file.inScript);
   const left = drop.files.length - kept.length;
   const named = kept.map((file, index) => ({
     file,
-    name: `${String(index + 1).padStart(2, '0')}-${KIND_NAMES[file.kind]}.${extensionOf(file.mime)}`,
+    name: `${folder}-${String(index + 1).padStart(2, '0')}-${KIND_NAMES[file.kind]}${lengthOf(file)}${file.version > 1 ? `-v${String(file.version)}` : ''}.${extensionOf(file.mime)}`,
   }));
   const lines = [
     `${DROP_CATEGORY_LABELS[drop.category]} du ${longDay(drop.createdAt, drop.timezone)}`,

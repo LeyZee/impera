@@ -1,0 +1,151 @@
+/*
+ * Réglages › Agents connectés. Built on the design-system tokens and nv-* classes, the ready sets on the planning's
+ * `sc-option`; only what the package has no class for lives here, prefixed `mca-`. One card per subject: the agents,
+ * the new one, the token just made. Never a bar on a side; the state is a dot, the warnings amber.
+ */
+
+/* The agents, one row each: a dot for its state, its name and its reach, then what it reads. */
+.mca-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mca-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  align-items: start;
+  padding: var(--nv-space-4) 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.mca-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.mca-row:last-child {
+  padding-bottom: 0;
+}
+.mca-row > .nv-dot {
+  margin-top: 7px;
+}
+.mca-row__name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mca-row__meta {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.mca-row__meta [data-soon] {
+  color: var(--nv-warning);
+}
+.mca-row .nv-tags {
+  margin-top: var(--nv-space-2);
+}
+.mca-row__end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+@media (max-width: 560px) {
+  .mca-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  /* Under the name, its first button's words on the name's edge: the small button's own padding (`nv-btn--sm`) pulled back. */
+  .mca-row__end {
+    grid-column: 2;
+    justify-content: flex-start;
+    margin-inline-start: calc(-1 * var(--nv-space-4));
+  }
+}
+
+/* The steps of a new agent: a numbered title, then its choice. */
+.mca-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-6);
+}
+.mca-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.mca-step__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-weight: 600;
+}
+.mca-step__num {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-select-strong);
+  font-size: var(--nv-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The reads, by group; the sensitive group says so in amber. */
+.mca-group + .mca-group {
+  margin-top: var(--nv-space-3);
+}
+.mca-group__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0 0 2px;
+}
+.mca-group__sensitive {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+
+/* The token just made: each value with its own copy button beside it. */
+.mca-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.mca-field__row {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.mca-code {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  font-family: var(--nv-font-mono, ui-monospace, monospace);
+  font-size: var(--nv-text-footnote);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.mca-field__row > .nv-btn {
+  flex: none;
+}
+@media (max-width: 560px) {
+  .mca-field__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mca-field__row > .nv-btn {
+    align-self: flex-start;
+  }
+}
+.mca-foot {
+  display: flex;
+  justify-content: flex-end;
+}

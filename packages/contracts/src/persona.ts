@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { KYC_SLOT_LABELS, KycSlotSchema, type KycSlot } from './fans';
+import { MEETING_TIER_MAX } from './meeting-tiers';
 import { normaliseWords } from './normalise';
 
 /**
@@ -56,6 +57,7 @@ export const PERSONA_BOUNDS = {
   sexualizationMinDesireToOpen: [20, 70],
   scriptMinDesire: [50, 90],
   scriptCooldownHours: [0, 24],
+  scriptAfterPurchaseHours: [24, 72],
   postOfferDelayDays: [1, 60],
   followUpDelayHours: [1, 168],
   nudgeDelayMinutes: [1, 120],
@@ -67,6 +69,21 @@ export const ADDITIONAL_INFO_MAX = 6000;
 export const MIN_CREATOR_AGE = 18;
 /** Past this age on the date of the version, a date of birth is a typo (1890), never a creator (recette, reco 22). */
 export const MAX_CREATOR_AGE = 100;
+
+/**
+ * The French name of each language (ADR 0168): the persona's choice list, his language on his card and the copilot say
+ * these, never their own copy. Typed by `LANGUAGES`: a language added there needs its name here.
+ */
+export const LANGUAGE_LABELS_FR: Readonly<Record<(typeof LANGUAGES)[number], string>> = {
+  french: 'Français',
+  english: 'Anglais',
+  italian: 'Italien',
+  spanish: 'Espagnol',
+  german: 'Allemand',
+  portuguese: 'Portugais',
+  dutch: 'Néerlandais',
+  arabic: 'Arabe',
+};
 
 /** French labels of every choice list: the dashboard renders these, never its own copy. */
 export const PERSONA_OPTIONS = {
@@ -80,16 +97,7 @@ export const PERSONA_OPTIONS = {
     arab: 'Moyen-orientale',
     other: 'Autre',
   }),
-  languages: labelled(LANGUAGES, {
-    french: 'Français',
-    english: 'Anglais',
-    italian: 'Italien',
-    spanish: 'Espagnol',
-    german: 'Allemand',
-    portuguese: 'Portugais',
-    dutch: 'Néerlandais',
-    arabic: 'Arabe',
-  }),
+  languages: labelled(LANGUAGES, LANGUAGE_LABELS_FR),
   hair: labelled(HAIR_COLORS, {
     brown: 'Bruns',
     black: 'Noirs',
@@ -242,6 +250,11 @@ export const PersonaStrategiesSchema = z.strictObject({
       cooldown_hours: intIn(PERSONA_BOUNDS.scriptCooldownHours),
       /** His desire score (P3-12) before a script may go out; absent, 70 (`DEFAULT_SCRIPT_MIN_DESIRE`). */
       min_desire: intIn(PERSONA_BOUNDS.scriptMinDesire).optional(),
+      /**
+       * The pause after a purchase (ADR 0128 § 1): hours after his last purchase before she opens a script herself;
+       * absent, 48 (`DEFAULT_AFTER_PURCHASE_HOURS`).
+       */
+      after_purchase_hours: intIn(PERSONA_BOUNDS.scriptAfterPurchaseHours).optional(),
     })
     .refine(...instructionsWhenCustom('custom')),
   post_offer: z
@@ -533,7 +546,23 @@ export type SampleReply = z.infer<typeof SampleReplySchema>;
  * The strict rules of « Réglages de l'agent » (ADR 0079 § 4): her limits as lists of words, and the emojis she never
  * uses. Guards load them; the sheet's free answers (« Zones interdites ») are only read by the model.
  */
-export const PersonaAgentRulesSchema = PersonaLimitsSchema.extend({ emojis_forbidden: emojiList });
+export const CLOSE_ONLY_WORD_GROUPS_MAX = 20;
+
+/**
+ * Words she keeps for fans close to her (Charles 26/11, ADR 0158 § O): written to a fan whose meeting tier is below
+ * `min_tier`, her answer is refused (guard `close_only_word`). Read as the other guard words: normalised, whole word.
+ */
+export const CloseOnlyWordsSchema = z.strictObject({
+  words: entries(120, 50, guardWord).min(1),
+  min_tier: z.int().min(1).max(MEETING_TIER_MAX),
+});
+export type CloseOnlyWords = z.infer<typeof CloseOnlyWordsSchema>;
+
+export const PersonaAgentRulesSchema = PersonaLimitsSchema.extend({
+  emojis_forbidden: emojiList,
+  /** Absent or empty: no word of hers is kept for close fans. */
+  close_only_words: z.array(CloseOnlyWordsSchema).max(CLOSE_ONLY_WORD_GROUPS_MAX).optional(),
+});
 export type PersonaAgentRules = z.infer<typeof PersonaAgentRulesSchema>;
 
 /** How much of each block she filled, from 0 to 1: a block counts by the share of its fields that hold something. */

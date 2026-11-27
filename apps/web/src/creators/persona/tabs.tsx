@@ -746,7 +746,7 @@ export function NotificationsTab({
 }
 
 const RULES: readonly {
-  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden'>;
+  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden' | 'close_only_words'>;
   readonly label: string;
   readonly placeholder: string;
   readonly hint?: string;

@@ -3,6 +3,7 @@ import { Link, Navigate, Outlet, useRouterState } from '@tanstack/react-router';
 import { Fragment, useState, useSyncExternalStore, type JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
+import { AgentsSection } from '@/settings/agents/AgentsSection';
 import { BudgetSection } from '@/settings/ai-budget/BudgetSection';
 import { aiBudgetQueryKey } from '@/settings/ai-budget/api';
 import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
@@ -45,16 +46,23 @@ const item = (to: ScreenPath): SettingsItem => ({ to, label: screenLabel(to) });
  * credits (ADR 0091), the bots and groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what
  * each invoice prints (EQ-06), the backups (ADR 0028) and the security of every account (SEC-04).
  * A list, not nine tabs (recette visuelle 16/11, GES-04, decided on 16/11), in the four groups of ADR 0134 § 6:
- * Connexions (Plateformes, Bots Telegram), IA, Argent, Sécurité. The addresses keep their words (`/reglages/ventes`,
+ * Connexions (Plateformes, Bots Telegram), IA, Argent, Protection (« Sécurité » until 21/11, the name of its last screen). The addresses keep their words (`/reglages/ventes`,
  * `/reglages/telegram`): only what the screens are called changed.
  * Every section is the owner's, as the routes guard them: a section a role could not open would not be listed.
  */
 const GROUPS: readonly SettingsGroup[] = [
   { title: 'Connexions', items: [item('/reglages/ventes'), item('/reglages/telegram')] },
-  { title: 'IA', items: [item('/reglages/modeles-ia'), item('/reglages/consommation-ia')] },
+  {
+    title: 'IA',
+    items: [
+      item('/reglages/modeles-ia'),
+      item('/reglages/consommation-ia'),
+      item('/reglages/agents-connectes'),
+    ],
+  },
   { title: 'Argent', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
   {
-    title: 'Sécurité',
+    title: 'Protection',
     items: [item('/reglages/alertes'), item('/reglages/sauvegardes'), item('/reglages/securite')],
   },
   { title: 'Aide', items: [item('/reglages/aide')] },
@@ -154,14 +162,19 @@ export function SettingsLayout(): JSX.Element {
                 <>
                   <span className="rgl-eyebrow">Réglages</span>
                   {/* A phone: the section is a screen of its own, the way back to the list in the eyebrow. */}
-                  <Link to="/reglages" className="nv-btn nv-btn--plain nv-btn--sm rgl-back">
+                  {/* Exact: a way back to the list, never « page actuelle » on a section under it (NAV-09). */}
+                  <Link
+                    to="/reglages"
+                    activeOptions={{ exact: true }}
+                    className="nv-btn nv-btn--plain nv-btn--sm rgl-back"
+                  >
                     ← Réglages
                   </Link>
                 </>
               ),
             })}
         title={open?.label ?? 'Réglages'}
-        lead="Ce qui règle le CRM pour toute l’agence."
+        lead="Les réglages de toute l’agence."
       />
       <div className="rgl-body" data-open={open === null ? undefined : ''}>
         <SettingsList groups={groups} />
@@ -198,6 +211,11 @@ export function AiModelsPage(): JSX.Element {
 /** Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge its credits. */
 export function AiUsagePage(): JSX.Element {
   return <AiUsageSection />;
+}
+
+/** Réglages › Agents connectés (ADR 0026 § 3, ADR 0105 § 1): the owner's agents, their tokens and what they read. */
+export function AgentsPage(): JSX.Element {
+  return <AgentsSection />;
 }
 
 /**

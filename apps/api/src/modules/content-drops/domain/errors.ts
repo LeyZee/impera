@@ -9,6 +9,7 @@ import {
   CONTENT_DROP_NOT_FOUND,
   CONTENT_DROP_REQUEST_UNPROCESSABLE,
   CONTENT_DROP_SCRIPT_UNPROCESSABLE,
+  CONTENT_DROP_READY_VIDEO_UNPROCESSABLE,
   CONTENT_DROP_SETTLED_CONFLICT,
   CONTENT_DROP_SLOT_NOT_FOUND,
   CONTENT_DROP_SLOTS_UNPROCESSABLE,
@@ -58,6 +59,13 @@ export class ContentDropFormatUnprocessable extends DomainError {
 export class ContentDropScriptUnprocessable extends DomainError {
   constructor() {
     super(CONTENT_DROP_SCRIPT_UNPROCESSABLE, 'Un script se dépose depuis la demande de l’agence');
+  }
+}
+
+/** A video to sell without a type still offered, or a type given to another category (ADR 0163 § 7). */
+export class ContentDropReadyVideoUnprocessable extends DomainError {
+  constructor(message = 'Choisis le type de cette vidéo') {
+    super(CONTENT_DROP_READY_VIDEO_UNPROCESSABLE, message);
   }
 }
 

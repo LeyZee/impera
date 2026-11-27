@@ -413,6 +413,27 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     (d, c) =>
       `a passé ${c.member(c.entityId)} de « ${STATUS_NAMES[d.from] ?? d.from} » à « ${STATUS_NAMES[d.to] ?? d.to} »`,
   ),
+  'team_member.departure_schedule': action(
+    'team',
+    z.object({ endsAt: instant }),
+    (d, c) => `a prévu le départ de ${c.member(c.entityId)}`,
+  ),
+  'team_member.departure_cancel': action(
+    'team',
+    none,
+    (_d, c) => `a annulé le départ de ${c.member(c.entityId)}`,
+  ),
+  'team_member.departure_apply': action(
+    'team',
+    z.object({ sessionsEnded: count, passkeysRemoved: count, leftOn: day, scheduledBy: id.optional() }),
+    (d, c) =>
+      `a fait partir ${c.member(c.entityId)} (${plural(d.sessionsEnded, 'session fermée', 'sessions fermées')})`,
+  ),
+  'team_member.reveal_removed': action(
+    'team',
+    none,
+    (_d, c) => `a noté l’accès Reveal de ${c.member(c.entityId)} retiré`,
+  ),
   'team_member.time_zone_follow': action(
     'team',
     z.object({ from: zone.nullable().optional(), to: zone }),
@@ -481,6 +502,12 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     'team',
     z.object({ period }),
     (d) => `a donné un retour sur un shift (quinzaine ${frenchPeriod(d.period)})`,
+  ),
+  'shift_incident.seen': action('team', z.object({ period }), () => 'a vu un incident de fin de shift'),
+  'shift_incident.resolved': action(
+    'team',
+    z.object({ period }),
+    () => 'a réglé un incident de fin de shift',
   ),
   'sales_feed.chatter_linked': action(
     'team',
@@ -569,6 +596,12 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
   'automatic.on': agent('a allumé l’Automatique'),
   'conversation.takeover': agent('a pris la main sur une conversation'),
   'conversation.release': agent('a rendu une conversation à l’agent'),
+  // ADR 0168 § 3: the language she writes to him in, set by a person (the language only, never a word of his).
+  'fan.language_set': action(
+    'agent',
+    z.object({ language: code }),
+    (d) => `a fixé la langue d’un fan (${d.language})`,
+  ),
   'draft.placed': action(
     'agent',
     z.object({ edited: z.boolean().optional() }),
@@ -610,6 +643,16 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     z.object({ creatorId: id }),
     (d, c) => `a corrigé la persona de ${c.creator(d.creatorId)}`,
     (d) => creatorLink(d.creatorId),
+  ),
+  'agency_style.create': action(
+    'agent',
+    z.object({ version: z.int().positive() }),
+    (d) => `a enregistré la version ${String(d.version)} du style de base de l’agence`,
+  ),
+  'agency_style.activate': action(
+    'agent',
+    z.object({ version: z.int().positive() }),
+    (d) => `a activé la version ${String(d.version)} du style de base de l’agence`,
   ),
   'custom_alert.create': agent('a créé une alerte personnalisée'),
   'custom_alert.update': agent('a modifié une alerte personnalisée'),
@@ -942,6 +985,17 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     changedFields.extend({ checkCleared: z.boolean().optional() }),
     (d, c) =>
       `a modifié le dossier de prestataire de ${c.member(c.entityId)}${fieldsCount(d.changed)}${d.checkCleared === true ? ', vérification à refaire' : ''}`,
+  ),
+  // « Où te verser » (ADR 0165 § 5): the way he receives and the version written, never the beneficiary nor a number.
+  'payout_destination.update': action(
+    'money',
+    z.object({ method: code, version: id }),
+    (_d, c) => `a changé les coordonnées de versement de ${c.member(c.entityId)}`,
+  ),
+  'payout_destination.reveal': action(
+    'money',
+    none,
+    (_d, c) => `a affiché les coordonnées de versement de ${c.member(c.entityId)}`,
   ),
   'contractor_profile.verify': action(
     'money',

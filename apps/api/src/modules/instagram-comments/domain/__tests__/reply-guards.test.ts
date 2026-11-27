@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CHAT_GUARDS_ON_A_REPLY, checkReply, type ReplyGuardContext } from '../reply-guards';
 
-const calm: ReplyGuardContext = { recentReplies: [], chatGuardCodes: [], mayAsk: true };
+const calm: ReplyGuardContext = { recentReplies: [], chatGuardCodes: [], mayAsk: true, emojiOnly: false };
 const codes = (text: string, context: ReplyGuardContext = calm) =>
   checkReply(text, context).map((v) => v.code);
 
@@ -34,6 +34,13 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Viens en privé')).toContain('public_explicit');
   });
 
+  it('refuses an explicit or seductive word in English, Italian and Spanish too (ADR 0168 § 4)', () => {
+    for (const text of ['Come in my bed', 'Ti aspetto nel mio letto', 'Te espero en mi cama', 'Sono nuda'])
+      expect(codes(text), text).toContain('public_explicit');
+    for (const text of ['Thank you so much', 'Grazie mille', 'Muchas gracias'])
+      expect(codes(text), text).toEqual([]);
+  });
+
   it('refuses a question when the code gave no room for one, and lets it pass when it did', () => {
     expect(codes('Tu dis ça à toutes ? 😏', { ...calm, mayAsk: false })).toContain('unwanted_question');
     expect(codes('Tu dis ça à toutes ？', { ...calm, mayAsk: false })).toContain('unwanted_question');
@@ -41,10 +48,23 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Merci 😏', { ...calm, mayAsk: false })).toEqual([]);
   });
 
+  it('answers a declaration of love with emojis only', () => {
+    expect(codes('Merci 🫶🏻', { ...calm, emojiOnly: true })).toEqual(['words_in_emoji_reply']);
+    expect(codes('🫶🏻🫶🏻', { ...calm, emojiOnly: true })).toEqual([]);
+    expect(codes('☺️', { ...calm, emojiOnly: true })).toEqual([]);
+  });
+
   it('refuses a reply identical or nearly so to a recent one', () => {
     const context = { ...calm, recentReplies: ['Merci beaucoup, trop gentil de ta part'] };
     expect(codes('merci beaucoup trop gentil de ta part !', context)).toContain('repeated_reply');
     expect(codes('Contente que la lumière te plaise', context)).not.toContain('repeated_reply');
+  });
+
+  it('lets a short thanks come back, never the very same one twice in a row', () => {
+    const context = { ...calm, recentReplies: ['Merci 🫶🏻', 'Merci beaucoup ☺️'] };
+    expect(codes('Merci 🫶🏻', context)).not.toContain('repeated_reply');
+    expect(codes('Merci beaucoup ☺️', context)).toContain('repeated_reply');
+    expect(codes('Merci beaucoup 🙏', context)).not.toContain('repeated_reply');
   });
 
   it('refuses a mention or a hashtag anywhere in the text, full-width forms too', () => {
@@ -58,6 +78,7 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     const context: ReplyGuardContext = {
       recentReplies: [],
       mayAsk: true,
+      emojiOnly: false,
       chatGuardCodes: [
         'ai_disclosure',
         'asks_for_nudes',

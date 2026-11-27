@@ -43,6 +43,10 @@ export type MediaDescriptionId = z.infer<typeof MediaDescriptionIdSchema>;
 export const PersonaVersionIdSchema = uuid.brand<'PersonaVersionId'>();
 export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 
+/** A version of the agency's base style (ADR 0173). */
+export const AgencyStyleIdSchema = uuid.brand<'AgencyStyleId'>();
+export type AgencyStyleId = z.infer<typeof AgencyStyleIdSchema>;
+
 export const PersonaCorrectionIdSchema = uuid.brand<'PersonaCorrectionId'>();
 export type PersonaCorrectionId = z.infer<typeof PersonaCorrectionIdSchema>;
 
@@ -276,3 +280,7 @@ export type McpGrantId = z.infer<typeof McpGrantIdSchema>;
 /** His custom order (`custom_orders`, ADR 0159 § A). */
 export const CustomOrderIdSchema = uuid.brand<'CustomOrderId'>();
 export type CustomOrderId = z.infer<typeof CustomOrderIdSchema>;
+
+/** A member's departure (`team_member_departures`, ADR 0166). */
+export const MemberDepartureIdSchema = uuid.brand<'MemberDepartureId'>();
+export type MemberDepartureId = z.infer<typeof MemberDepartureIdSchema>;

@@ -1,12 +1,16 @@
 import {
   desireBandOf,
   desireNow,
+  isGuardedLanguage,
   normalise,
   type AfterSaleType,
   supplementsIn,
   type CustomPriceGrid,
   type FanFlags,
   type FanTier,
+  type GuardCode,
+  type Language,
+  type LanguageExamples,
   type MediaDescription,
   type MeetingTierSettings,
   type ObjectionReplies,
@@ -14,6 +18,7 @@ import {
 } from '@impera/contracts';
 import type {
   BrainAlert,
+  AgencyStyleText,
   Brief,
   BrainScript,
   BuyerType,
@@ -23,12 +28,14 @@ import type {
   LlmGateway,
   VoiceFantasy,
   VoiceInput,
+  VoiceLanguage,
   VoiceScriptStep,
 } from '@impera/llm';
 import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
 import { customOrderTurn, type CustomOrderTurn } from '../../custom-orders';
 import { abandonTease, type AbandonTease } from '../domain/abandon';
+import type { TimeWasterLevel } from '../domain/attention';
 import {
   asksAvailability,
   availabilityChanged,
@@ -39,8 +46,8 @@ import {
   type ScriptStart,
   type ScriptStartBlock,
 } from '../domain/availability';
-import { bubbleBudget, fitBubbles } from '../domain/bubbles';
-import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
+import { bubbleBudget, fitBubbles, type BubbleBudget } from '../domain/bubbles';
+import { CARE_BRIEF, CARE_TONE_HINTS, checkCare, checkHelpNumber } from '../domain/care';
 import {
   checkNoCommitment,
   customOrderDecision,
@@ -58,6 +65,7 @@ import {
   type DesireState,
 } from '../domain/desire';
 import { gapNotes, timingLines } from '../domain/elapsed';
+import { DEFAULT_EMOJI_STREAK_MAX, emojiStreakReached } from '../domain/emojis';
 import {
   desireMapOf,
   fantasyMatchOf,
@@ -68,6 +76,7 @@ import {
   type DesireMap,
 } from '../domain/fantasy-match';
 import { withoutForbiddenThemes } from '../domain/forbidden-themes';
+import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
 import { freeSextingTurn } from '../domain/free-sexting';
 import { gaugeDue, holdsBackNow, projectionDue } from '../domain/gauge';
 import {
@@ -82,18 +91,27 @@ import {
   touchesTerm,
   type GuardContext,
   isBlocked,
+  REWRITTEN_SOFT,
   wantsRewrite,
   type GuardSettings,
   type GuardViolation,
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
-import { meetingAnswer, relationshipTier, type MeetingAnswer, type MeetingReason } from '../domain/meeting';
-import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
+import { decideLanguage, quietLanguage, translationOf, type LanguageDecision } from '../domain/language';
+import {
+  meetingAnswer,
+  relationshipTier,
+  type MeetingAnswer,
+  type MeetingReason,
+  type Relationship,
+} from '../domain/meeting';
+import { discountAsked, pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
 import {
   NO_SALE_RISKS,
+  inPauseAfterPurchase,
   offerDecision,
   offerSignals,
   type OfferBlock,
@@ -114,6 +132,7 @@ import {
 } from '../domain/sale-trouble';
 import {
   paidWaiting,
+  mayOpenScript,
   permittedScripts,
   scriptStepsHeld,
   type PlatformScriptView,
@@ -138,6 +157,7 @@ import {
   type SexualizationLimits,
 } from '../domain/sexualization';
 import { describeSituation, isNight, type Situation } from '../domain/situation';
+import type { SpenderRegister } from '../domain/spender-register';
 import {
   explicitPhotoAnswer,
   fanStanding,
@@ -150,6 +170,7 @@ import {
 } from '../domain/standing';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
 import { heWroteFirst, workTeaseTurn, type WorkTeasePhase } from '../domain/work-tease';
+import { checkWorn, wornPhrases, type WornLimits } from '../domain/worn';
 
 import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
 
@@ -175,6 +196,52 @@ export interface ComposerPersona {
    * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
    */
   readonly voiceExamples?: readonly VoiceExample[];
+  /** The agency's base style (ADR 0173), before her sheet in the voice's prompt; her sheet wins. Absent: none. */
+  readonly agencyStyle?: AgencyStyleText;
+  /** When a phrase of hers is worn across her fans (`wornPhrases`); absent, the safe defaults. */
+  readonly wornLimits?: WornLimits;
+  /**
+   * Her languages, in her order (ADR 0168), required: a caller that forgot them once made her answer in French only.
+   * `FRENCH_ONLY` for a persona that speaks nothing else.
+   */
+  readonly spokenLanguages: readonly [Language, ...Language[]];
+  /** Her messages per language, given to the voice only in the language it writes in (ADR 0168 § 3). */
+  readonly languageExamples: LanguageExamples;
+}
+
+/** The languages of a persona that speaks French only. */
+export const FRENCH_ONLY: readonly [Language, ...Language[]] = ['french'];
+
+/**
+ * The language of this turn, decided by code (ADR 0168 § 2): on his messages for an answer, on his kept language for a
+ * follow-up or her word after a sale.
+ */
+function languageOfTurn(persona: ComposerPersona, input: ComposeTurnInput): LanguageDecision {
+  const spoken = persona.spokenLanguages;
+  const kept = input.keptLanguage ?? null;
+  const herLastText = input.history.findLast((turn) => turn.from === 'creator')?.text;
+  if (input.followUp !== undefined || input.aftercare !== undefined)
+    return quietLanguage(kept?.value ?? null, spoken, herLastText);
+  const earlier = earlierFanTexts(input.history);
+  const earlierFanText = earlier.at(-1);
+  return decideLanguage({
+    fanTexts: [input.fanText],
+    earlierFanTexts: earlier,
+    kept,
+    spoken,
+    ...(earlierFanText !== undefined && { earlierFanText }),
+    ...(herLastText !== undefined && { herLastText }),
+  });
+}
+
+/** The language as the voice reads it: the decided one, his she does not speak, her examples in hers. */
+function voiceLanguageOf(persona: ComposerPersona, decision: LanguageDecision): VoiceLanguage {
+  const examples = persona.languageExamples[decision.reply] ?? [];
+  return {
+    reply: decision.reply,
+    notSpoken: decision.notSpoken,
+    ...(examples.length > 0 && { examples }),
+  };
 }
 
 /**
@@ -192,14 +259,24 @@ function voiceTraced<T extends { readonly trace?: CallTrace }>(input: T, ids: re
   return ids.length === 0 ? input : { ...input, trace: { ...input.trace, voiceExampleIds: ids } };
 }
 
-/** What the fan receives: her bubbles, or one message when she does not split hers. */
-export function asSent(bubbles: readonly string[], splitMessages = true): readonly string[] {
-  return splitMessages || bubbles.length <= 1 ? bubbles : [bubbles.join('\n')];
+/**
+ * What the fan receives: her bubbles in her form (`formBubbles`, once the guards have read them), or one message when
+ * she does not split hers. Only the voice's bubbles come here: a bubble the code writes (care's help) is added after.
+ */
+export function asSent(
+  bubbles: readonly string[],
+  splitMessages = true,
+  form: FormSettings = DEFAULT_FORM_SETTINGS,
+): readonly string[] {
+  const formed = formBubbles(bubbles, form);
+  return splitMessages || formed.length <= 1 ? formed : [formed.join('\n')];
 }
 
 export interface ComposeTurnInput {
   /** The conversation so far, his last message(s) included, oldest first. */
   readonly history: readonly ConversationTurn[];
+  /** His kept language (`fans.language`, ADR 0168 § 3); absent or `null`, none yet. */
+  readonly keptLanguage?: { readonly value: Language; readonly source: 'detected' | 'set' } | null;
   /** His last message(s) since her last answer: what the traps read. */
   readonly fanText: string;
   readonly media: readonly MediaDescription[];
@@ -216,6 +293,13 @@ export interface ComposeTurnInput {
    * cannot decide and she offers nothing: a brain's « offer » is written as a plain answer.
    */
   readonly offer?: OfferInput;
+  /**
+   * How close she is with him, chosen by code from his tier (ADR 0132 § 7, `spenderRegisterOf`); absent, warm as with
+   * everyone. The brain never reads his tier.
+   */
+  readonly spenderRegister?: SpenderRegister;
+  /** He is a time-waster at this level (ADR 0135 § 7): one short bubble, busy and kind. Absent, he is not. */
+  readonly timeWaster?: TimeWasterLevel;
   /**
    * When she may go sexual (`sexualizationDecision`): her limits, and whether his age is confirmed. Absent, it is
    * as if his age were unknown: she does not open it, and steers back a fan who does.
@@ -316,6 +400,11 @@ export interface ComposeTurnInput {
    * him eligible to a sexting without a sale as two scripts bought do. Absent: his scripts alone decide.
    */
   readonly fanTier?: FanTier | null;
+  /**
+   * Her last outgoing messages to all her fans, newest first (passe 2 du 26/11): what comes back in too many of them
+   * is worn, and she does not say it again. Absent: only what she sent him is read.
+   */
+  readonly herRecent?: readonly string[];
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -335,14 +424,27 @@ export interface ScriptsInput {
 }
 
 /**
+ * His language for her scripts (ADR 0168 § 8): the one this message keeps, else his kept one, else French. `null`
+ * when code reads his language as one it does not know: no script opens, never one in a language he may not read.
+ */
+function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): Language | null {
+  if (language.fan === 'unknown') return null;
+  return language.keep ?? input.keptLanguage?.value ?? 'french';
+}
+
+/**
  * The scripts the brain may pick from, by the short ids it answers with (`s1`…): the permitted ones closest to his
  * fantasy first, each with what of his desire map it meets, those that touch one of his limits left out (Charles
- * 26/11); and his fantasies none of them meets. Scripts not read: none, and nothing said of his fantasies.
+ * 26/11); none when no script may open at this message, whatever he says (recette REV-13). And his fantasies none of
+ * her permitted scripts meets. Scripts not read: none, and nothing said of his fantasies.
  */
 function scriptChoices(
   scripts: ScriptsInput | undefined,
   situation: Situation,
   map: DesireMap,
+  offer: OfferInput | undefined,
+  careMode: boolean,
+  language: Language | null,
 ): {
   readonly choices: readonly {
     readonly id: string;
@@ -355,8 +457,12 @@ function scriptChoices(
   const permitted = permittedScripts(scripts.catalogue, {
     moment: isNight(situation) ? 'night' : 'day',
     history: scripts.history,
+    language,
   });
   const { ranked, uncovered } = rankByFantasy(permitted, map);
+  // No script may open at this message (recette REV-13): none to pick, his fantasies without a script still said.
+  if (offer === undefined || !mayOpenScript({ offer, latest: scripts.latest, careMode }))
+    return { choices: [], uncovered };
   // Even when none shares anything with his map, the brain gets them all: she does with what she has (Charles 21:22).
   return {
     choices: ranked
@@ -426,7 +532,7 @@ interface DesireInput {
 }
 
 /** The policy's facts on him for an offer; his heat comes from his desire score, the risks from the brain. */
-export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks'>;
+export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'fanSexualizes' | 'risks'>;
 
 /**
  * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
@@ -452,11 +558,20 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
     'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
   media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
+  emoji_misuse:
+    'ses emojis : seulement en fin de bulle, une seule sorte par message (deux en plein flirt), jamais trois, et pas d’emoji du tout s’il y en avait dans ses derniers messages',
+  close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
+  help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
 };
+
+/** The codes of the blocking guards an answer broke, each once. */
+function blockingCodes(violations: readonly GuardViolation[]): GuardCode[] {
+  return [...new Set(violations.filter((v) => v.severity === 'blocking').map((v) => v.code))];
+}
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
   const blocking = violations.filter(
-    (violation) => violation.severity === 'blocking' || violation.code === 'repetition',
+    (violation) => violation.severity === 'blocking' || REWRITTEN_SOFT.includes(violation.code),
   );
   const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
     (reason) => reason !== undefined,
@@ -471,6 +586,22 @@ function rewriteHint(violations: readonly GuardViolation[]): string {
  * him; the intention only, her words are hers (`contempt` still blocks).
  */
 const SULK_NOT_INSULT = ' ; plutôt bouder, chouiner ou une pique détournée sur son ego qu’une insulte';
+
+/** Her last answers all carried an emoji (`emojiStreakReached`, Charles 26/11): told before she writes, not after. */
+export const NO_EMOJI_HINT =
+  'pas d’emoji du tout cette fois : ses derniers messages en portaient tous un, et elle n’en met pas à chaque message';
+
+/** The brief with `NO_EMOJI_HINT` when her emoji streak is reached, so the guard never asks a paid rewrite for it. */
+function withoutEmojiIfDue(
+  brief: Brief,
+  history: readonly ConversationTurn[],
+  settings: GuardSettings,
+): Brief {
+  const turns = previousTurnsOf(history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })));
+  return emojiStreakReached(turns, settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX)
+    ? { ...brief, toneHints: [...brief.toneHints, NO_EMOJI_HINT] }
+    : brief;
+}
 
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
 const NO_OFFER_BRIEF =
@@ -492,8 +623,8 @@ function refusedOfferBrief(brief: Brief): string {
 
 function offerRefusal(brief: Brief, offer: OfferInput | undefined, desire: number): OfferRefusal | undefined {
   if (offer === undefined) return 'no_offer_context';
-  const { fanAsksForPaid } = offerSignals(brief);
-  const decision = offerDecision({ ...offer, desire, fanAsksForPaid, risks: brief.risks });
+  const { fanAsksForPaid, fanSexualizes } = offerSignals(brief);
+  const decision = offerDecision({ ...offer, desire, fanAsksForPaid, fanSexualizes, risks: brief.risks });
   return decision.allowed ? undefined : decision.reason;
 }
 
@@ -563,6 +694,10 @@ function meetingHint(answer: MeetingAnswer): string {
       return 'il demande sa prochaine soirée : si elle y va, elle le lui dira ; rien de plus, ni date, ni lieu, ni ville';
   }
 }
+/** What she said too often lately, to every fan (passe 2 du 26/11): her own words, never his. */
+function wornHint(worn: readonly string[]): string {
+  return `ces mots reviennent trop dans ses messages ces derniers temps, à tous : elle ne les reprend pas et parle d’autre chose (${worn.map((phrase) => `« ${phrase} »`).join(', ')})`;
+}
 const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
@@ -627,6 +762,26 @@ const REGISTER_HINTS: Readonly<Record<Register, string>> = {
 };
 /** In her script (Charles 26/11 at 22:47): she never speaks of a gesture her media did not show him yet. */
 const NOT_SHOWN_YET_HINT = 'ne parle d’aucun geste que ses médias ne lui ont pas encore montré';
+/**
+ * Closer with those who count (ADR 0132 § 7, Charles 26/11): words of conduct only, never a price, a pace or a
+ * permission; the guards still hold (no « je t'aime », no couple, no reproach on an absence).
+ */
+const SPENDER_REGISTER_HINTS: Readonly<Record<Exclude<SpenderRegister, 'warm'>, string>> = {
+  close:
+    'il compte pour elle : elle se souvient de ce qu’il lui a raconté et y revient quand le moment s’y prête, prend de ses nouvelles, peut lui dire qu’il lui a manqué ; jamais un reproche sur une absence, jamais pressante',
+  girlfriend:
+    'avec lui elle est comme une petite amie complice : tendre, attentionnée, plus intime et plus présente qu’avec les autres ; elle lui montre qu’il compte, qu’elle pense à lui, se souvient de sa vie et prend de ses nouvelles ; le « nous » est celui de leur conversation, jamais celui d’un couple ; jamais pressante, jamais un reproche sur une absence, jamais « je t’aime »',
+};
+/**
+ * A time-waster's scarce attention (ADR 0135 § 7-8, Charles 26/11): she is much in demand, never cold; he feels it
+ * without a word on money, on what he does not buy or on the others.
+ */
+const TIME_WASTER_HINTS: Readonly<Record<TimeWasterLevel, string>> = {
+  slowed:
+    'elle est très sollicitée en ce moment et a moins de temps pour lui : une seule bulle, courte et douce, contente de le lire ; elle cherche ce qui le retient encore et crée un peu de proximité, sans insister ni rien proposer ; jamais un mot sur l’argent, sur ce qu’il n’achète pas ni sur les autres',
+  dormant:
+    'elle est très prise et lui répond en passant : une bulle courte, gentille, sans question ni relance ; elle laisse sentir qu’on lui écrit beaucoup et qu’elle est toute à ceux qui s’investissent, sans jamais le dire ; jamais froide ni méprisante, jamais un mot sur l’argent, sur ce qu’il n’achète pas ni sur les autres',
+};
 const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
 /** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
 const ASKS_IF_BOT_HINT =
@@ -640,7 +795,7 @@ const PARTNER_RETURNS_HINT =
 /** He asks a proof she is real (Charles 21/11), by where he stands (`proofAnswer`). */
 const PROOF_HINTS: Readonly<Record<ProofAnswer, string>> = {
   relay:
-    'il demande une preuve qu’elle est vraie : sans vexation, elle dit qu’elle le fera quand elle pourra, ou trouve une excuse légère pour plus tard ; ni prix, ni promesse d’heure, rien d’envoyé maintenant',
+    'il demande une preuve qu’elle est vraie : sans vexation, elle prend sa demande avec légèreté et la garde pour plus tard ; elle ne promet rien (ni oui, ni « promis », ni « je te le ferai »), ni prix, ni heure, rien d’envoyé maintenant',
   refuse:
     'il demande une preuve qu’elle est vraie : agacée qu’il ne la croie pas réelle depuis le temps, elle n’envoie rien et ne promet rien',
 };
@@ -659,9 +814,9 @@ const EXPLICIT_PHOTO_HINTS: Readonly<Record<ExplicitPhotoAnswer, string>> = {
 const FAREWELL_HINTS = {
   says_goodnight:
     'il va se coucher : elle lui souhaite bonne nuit à sa façon, en une seule bulle, tendre ou taquine, sans question ni rien proposer',
-  away: 'il doit y aller : elle le laisse filer à sa façon, en une seule bulle, sans question ni rien proposer, contente de le retrouver plus tard',
+  away: 'il doit y aller : elle le laisse filer à sa façon, en une seule bulle, sans question ni rien proposer, contente de lui reparler plus tard, ici',
   her_day_ends:
-    'sa journée à elle se termine, elle doit y aller : elle lui répond puis lui dit au revoir à sa façon, en une seule bulle, sans rien proposer, contente de le retrouver plus tard',
+    'sa journée à elle se termine, elle doit y aller : elle lui répond puis lui dit au revoir à sa façon, en une seule bulle, sans rien proposer, contente de lui reparler plus tard, ici',
 } as const;
 
 function farewellOf(signals: readonly string[] | undefined): keyof typeof FAREWELL_HINTS | null {
@@ -946,6 +1101,11 @@ export interface ComposedTurn {
   readonly violations: readonly GuardViolation[];
   /** The turn was sexual (her register or her script running): what a voice compared on it is guarded the same way. */
   readonly sexualTurn?: boolean;
+  /**
+   * A first answer a blocking guard set aside, written again (IA-08): its blocking codes, kept for the human who reads
+   * the second one. Absent when the first answer went through.
+   */
+  readonly retried?: readonly GuardCode[];
   readonly isBlocked: boolean;
   readonly costUsd: number;
   readonly latencyMs: number;
@@ -957,6 +1117,33 @@ export interface ComposedTurn {
   readonly care?: true;
   /** A guard refused her first answer and the voice wrote it once more (M1): the copilot says why (ADR 0141 § 2). */
   readonly rewritten?: true;
+  /** The language code decided for this turn (ADR 0168): absent only when a media handed him to a human first. */
+  readonly language?: LanguageDecision;
+  /**
+   * Her bubbles in French for the team, one per bubble that leaves, when she writes in another language (ADR 0168
+   * § 9): from the same voice call, never sent, never read by a guard. Absent when none fits.
+   */
+  readonly translation?: readonly string[];
+}
+
+/**
+ * Her answer in French as the bubbles that leave are cut (ADR 0168 § 9): the voice's French, kept only one per bubble
+ * it wrote, then fitted and joined like them. Absent when she writes in French or it does not fit.
+ */
+function translationOfVoice(
+  voice: Awaited<ReturnType<LlmGateway['voice']>>,
+  reply: Language,
+  budget: BubbleBudget,
+  splitMessages: boolean | undefined,
+): { readonly translation?: readonly string[] } {
+  if (!voice.ok) return {};
+  const french = translationOf(reply, voice.value.output.bubbles, voice.value.output.translation);
+  return french === null ? {} : { translation: asSent(fitBubbles(french, budget), splitMessages) };
+}
+
+/** The languages her output guard lets through (ADR 0168 § 4): hers that the guards cover. */
+function guardLanguages(persona: ComposerPersona): readonly Language[] {
+  return persona.spokenLanguages.filter(isGuardedLanguage);
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
@@ -973,7 +1160,11 @@ export function guardContextOf(
   history: readonly ConversationTurn[],
   hasMedia = false,
   allowedPriceMinor?: number,
-  humiliationWanted = false,
+  /**
+   * Whether they flirt now, his meeting tier when her settings let code compute it (Charles 26/11), and whether his
+   * desire map holds humiliation (Charles 27/11).
+   */
+  about: Pick<GuardContext, 'flirting' | 'fanTier' | 'humiliationWanted'> = {},
 ): GuardContext {
   const lastTurn = history.at(-1);
   const hisSinceHer = history
@@ -982,6 +1173,8 @@ export function guardContextOf(
   return {
     hasMedia,
     ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
+    ...(about.flirting !== undefined && { flirting: about.flirting }),
+    ...(about.fanTier !== undefined && { fanTier: about.fanTier }),
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
@@ -993,7 +1186,7 @@ export function guardContextOf(
     // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
     ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
     // His desire map holds humiliation: « petit garçon » said to him is his game (Charles 27/11).
-    ...(humiliationWanted && { humiliationWanted }),
+    ...(about.humiliationWanted === true && { humiliationWanted: true }),
   };
 }
 
@@ -1058,15 +1251,25 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
   exampleIds: readonly string[],
+  fanTier: number | undefined,
+  languages: readonly Language[],
   sexual = false,
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
-  const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
+  const voiceInput: VoiceInput = voiceTraced(
+    { ...base, brief: withoutEmojiIfDue(brief, base.history, persona.guardSettings), maxBubbles: 1 },
+    exampleIds,
+  );
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
+    ...checkVoiceOutput(written, persona.guardSettings, {
+      ...guardContextOf(base.history, false, undefined, fanTier === undefined ? {} : { fanTier }),
+      languages,
+    }),
     ...checkExplicit(written),
+    // Model text only: the help number is the code's (ADR 0088 § 4).
+    ...checkHelpNumber(written),
     // As the main answer (Sécurité, #1043): her aftercare follows a sexual exchange.
     ...checkYouthWords(written, sexual),
   ];
@@ -1075,10 +1278,11 @@ async function writeFollowUp(
     brief,
     voiceBrief: brief,
     voiceInput,
-    bubbles: asSent(written, persona.splitMessages),
+    bubbles: asSent(written, persona.splitMessages, persona.guardSettings.form),
+    ...translationOfVoice(voice, base.language?.reply ?? 'french', 1, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
-    isBlocked: isBlocked(violations) || !voice.ok,
+    isBlocked: isBlocked(violations) || !voice.ok || written.length === 0,
     costUsd: voice.ok ? (voice.value.meta.costUsd ?? 0) : 0,
     latencyMs: voice.ok ? voice.value.meta.latencyMs : 0,
     ...(voice.ok && { model: voice.value.meta.model }),
@@ -1114,6 +1318,14 @@ function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
   return { kind: 'reply', brief: turn.brief, opens: turn.event?.type === 'custom_order_card_ready' };
 }
 
+/** Where they are, as the meeting tiers read it: how long they have talked, and whether he paid her. */
+function relationshipOf(input: ComposeTurnInput): Relationship {
+  return {
+    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+    hasBought: input.situation.spentCents > 0,
+  };
+}
+
 export async function composeTurn(
   gateway: LlmGateway,
   persona: ComposerPersona,
@@ -1145,6 +1357,8 @@ export async function composeTurn(
     input.sexualization?.ageConfirmed === true && !input.sexualization.noExplicit,
   );
   const exampleIds = examples.map((e) => e.id);
+  const language = languageOfTurn(persona, input);
+  const voiceLanguage = voiceLanguageOf(persona, language);
   // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
   const base = {
     creatorName: persona.creatorName,
@@ -1153,23 +1367,38 @@ export async function composeTurn(
       examples.map((e) => e.text),
     ),
     ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
+    ...(persona.agencyStyle !== undefined && { agencyStyle: persona.agencyStyle }),
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
     history: withTimeNotes(input.history, input.situation.timeZone),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
-  if (input.followUp !== undefined)
-    return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped, exampleIds);
-  if (input.aftercare !== undefined)
-    return writeFollowUp(
+  // His meeting tier, only when her settings let code compute it: otherwise none, and her close-only words stay closed.
+  const fanTier =
+    input.meetingTiers === undefined
+      ? undefined
+      : relationshipTier(relationshipOf(input), input.meetingTiers);
+  if (input.followUp !== undefined || input.aftercare !== undefined) {
+    const brief =
+      input.followUp !== undefined
+        ? followUpBrief(input.followUp)
+        : input.aftercare !== undefined
+          ? aftercareBrief(input.aftercare)
+          : NEUTRAL_BRIEF;
+    const written = await writeFollowUp(
       gateway,
       persona,
-      base,
-      aftercareBrief(input.aftercare),
+      { ...base, language: voiceLanguage },
+      brief,
       notes.dropped,
       exampleIds,
-      true,
+      fanTier,
+      guardLanguages(persona),
+      // Her aftercare follows a sexual exchange (Sécurité, #1043); a follow-up does not.
+      input.followUp === undefined && input.aftercare !== undefined,
     );
+    return { ...written, language };
+  }
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   // His desire map, from the notes kept (Charles 26/11): the scripts closest to his fantasy come first.
@@ -1190,7 +1419,16 @@ export async function composeTurn(
       input.offer.limits.cooldownHours,
       input.offer.timeZone ?? input.situation.timeZone,
     );
-  const ranked = scriptChoices(input.scripts, input.situation, desireMap);
+  const scriptLanguage = scriptLanguageOf(language, input);
+  // The care mode may depend on what the brain reads: only a care already open is known before it.
+  const ranked = scriptChoices(
+    input.scripts,
+    input.situation,
+    desireMap,
+    input.offer,
+    input.care === true,
+    scriptLanguage,
+  );
   const choices = evening ? [] : ranked.choices;
   const { uncovered } = ranked;
   const brainScripts: BrainScript[] = choices.map(({ id, script, matches }) => ({
@@ -1219,7 +1457,12 @@ export async function composeTurn(
     }),
   });
   // She asks only what the card lets her ask (ADR 0085 § 2): whatever the brain names, `desires` is never asked.
-  const brief = brain.ok ? askableOnly(brain.value.output) : undefined;
+  const asked = brain.ok ? askableOnly(brain.value.output) : undefined;
+  // « Fais-moi un prix »: a price objection, whatever else the brain read (passe 2 du 26/11, conversation 23).
+  const brief: Brief | undefined =
+    asked !== undefined && discountAsked(asked.intent, input.fanText)
+      ? { ...asked, intent: 'price_objection', objection: 'asks_discount' }
+      : asked;
   // A trap overrides whatever the brain suggested: she does not play along (agent/domain/traps.ts).
   const trap = assessTrap({
     fanText: input.fanText,
@@ -1255,6 +1498,7 @@ export async function composeTurn(
           fanSexualizes: offerSignals(brief, input.fanText).fanSexualizes,
           desire: heat,
           limits: input.sexualization?.limits ?? NO_LIMITS,
+          afterPurchase: input.offer !== undefined && inPauseAfterPurchase(input.offer),
         });
   const within =
     sexualization === undefined || trap.replyBrief !== undefined
@@ -1270,6 +1514,21 @@ export async function composeTurn(
           toneHints: [...within.toneHints, NO_OPENING_HINT],
         }
       : within;
+  // Where he stands, by code (ADR 0135, guide 26/11): a known payer is one who paid recently enough.
+  const standingFacts: StandingFacts = {
+    now: input.situation.now,
+    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+    spentCents: input.situation.spentCents,
+    ...(input.situation.lastSpentAt !== undefined && { lastSpentAt: input.situation.lastSpentAt }),
+    unenteredScripts:
+      input.scripts?.history?.scripts.filter(
+        (sent) => sent.sentStepIndexes.length > 0 && sent.boughtStepIndexes.length === 0,
+      ).length ?? 0,
+  };
+  const standing = fanStanding(standingFacts, input.standingLimits);
+  // A proof he asks of her (« un selfie avec deux doigts sur la joue »), relayed by where he stands: made for him, so a
+  // custom order the team takes; she never promises it herself (passe 2 du 26/11, conversation 31).
+  const proofRelayed = brief?.occasion === 'asks_proof' && proofAnswer(standing) === 'relay';
   // The care mode (ADR 0088) comes before any sale: no custom order, no objection reply, no script step.
   const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
   // A custom order is never sold by her (ADR 0090 § A): a chatter takes it, or she commits to nothing. A trap's
@@ -1289,7 +1548,7 @@ export async function composeTurn(
     held || kept === undefined
       ? undefined
       : customOrderTurn({
-          asksForService: brief.intent === 'asks_for_service',
+          asksForService: brief.intent === 'asks_for_service' || proofRelayed,
           reading:
             brief.customOrder === undefined
               ? null
@@ -1308,7 +1567,7 @@ export async function composeTurn(
       ? decisionOf(turn)
       : customOrderDecision({
           ...orderContext,
-          asksForService: brief.intent === 'asks_for_service',
+          asksForService: brief.intent === 'asks_for_service' || proofRelayed,
           chatterOnShift: input.customOrder?.chatterOnShift === true,
           orderOpen: input.customOrder?.orderOpen === true,
         });
@@ -1420,28 +1679,19 @@ export async function composeTurn(
           held: scriptStepsHeld(input.offer.flags, care) || input.offer.flags.ageDisputed !== undefined,
         });
   // Broke until his pay, a fan who already paid: kept warm with words, no step and no media this time (passe 11a).
-  // Where he stands, by code (ADR 0135, guide 26/11): a known payer is one who paid recently enough.
-  const standingFacts: StandingFacts = {
-    now: input.situation.now,
-    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-    spentCents: input.situation.spentCents,
-    ...(input.situation.lastSpentAt !== undefined && { lastSpentAt: input.situation.lastSpentAt }),
-    unenteredScripts:
-      input.scripts?.history?.scripts.filter(
-        (sent) => sent.sentStepIndexes.length > 0 && sent.boughtStepIndexes.length === 0,
-      ).length ?? 0,
-  };
-  const standing = fanStanding(standingFacts, input.standingLimits);
   const warm =
     brief !== undefined &&
     keepsWarm({ risks: brief.risks, hasBought: paysNow(standingFacts, input.standingLimits) });
-  // His messages since he bought the last paid step: the next one waits in the tension (passe 04, guide 26/11).
+  // When he wrote: his messages since he bought the last paid step, the next one waits in the tension (passe 04,
+  // guide 26/11), counted by the script turn on the run Reveal's history leaves (passe 2 du 26/11).
+  const hisMessagesAt = input.history.flatMap((turn) =>
+    turn.from === 'fan' && turn.at !== undefined ? [turn.at] : [],
+  );
+  // His messages since he bought the last paid step of his stored run: the first one after a purchase, she asks
+  // whether he liked it (`justBought`).
   const boughtAt = input.scripts?.latest?.steps.findLast((step) => step.outcome === 'bought')?.at;
   const hisMessagesSinceBought =
-    boughtAt === undefined
-      ? undefined
-      : input.history.filter((turn) => turn.from === 'fan' && turn.at !== undefined && turn.at >= boughtAt)
-          .length;
+    boughtAt === undefined ? undefined : hisMessagesAt.filter((sent) => sent >= boughtAt).length;
   // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
   const scripts =
     input.scripts === undefined || input.offer === undefined
@@ -1452,6 +1702,7 @@ export async function composeTurn(
           latest: input.scripts.latest,
           catalogue: input.scripts.catalogue,
           history: input.scripts.history,
+          language: scriptLanguage,
           moment: isNight(input.situation) ? 'night' : 'day',
           hotSession: heat >= input.offer.limits.minDesire,
           // Only an id it was given: anything else picks nothing.
@@ -1460,6 +1711,7 @@ export async function composeTurn(
             ...input.offer,
             desire: heat,
             fanAsksForPaid: brief !== undefined && offerSignals(brief).fanAsksForPaid,
+            fanSexualizes: brief !== undefined && offerSignals(brief, input.fanText).fanSexualizes,
             risks: brief?.risks ?? [],
           },
           // In care, the run still follows his message and Reveal, and no step goes (ADR 0088 § 2).
@@ -1469,7 +1721,7 @@ export async function composeTurn(
           reply: brief?.scriptReply ?? null,
           countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
           heCame,
-          ...(hisMessagesSinceBought !== undefined && { hisMessagesSinceBought }),
+          hisMessagesAt,
           mayAct:
             !care &&
             !heCame &&
@@ -1523,14 +1775,7 @@ export async function composeTurn(
   const meeting: MeetingAnswer | undefined =
     brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
       ? meetingAnswer({
-          tier: relationshipTier(
-            {
-              knownHours:
-                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-              hasBought: input.situation.spentCents > 0,
-            },
-            input.meetingTiers,
-          ),
+          tier: relationshipTier(relationshipOf(input), input.meetingTiers),
           given: input.meeting?.given ?? [],
           teased: input.meeting?.teased ?? false,
           herNextParty: brief.asksHerNextParty === true,
@@ -1667,7 +1912,10 @@ export async function composeTurn(
           ...(brief.intent === 'asks_if_bot' ? [ASKS_IF_BOT_HINT] : []),
           ...(brief.occasion === 'says_love' ? [SAYS_LOVE_HINT] : []),
           ...(brief.occasion === 'partner_returns' ? [PARTNER_RETURNS_HINT] : []),
-          ...(brief.occasion === 'asks_proof' ? [PROOF_HINTS[proofAnswer(standing)]] : []),
+          // Relayed, her answer is the custom order's: no hint of her own beside it.
+          ...(brief.occasion === 'asks_proof' && customOrder === undefined
+            ? [PROOF_HINTS[proofAnswer(standing)]]
+            : []),
           ...(brief.occasion === 'unsolicited_explicit'
             ? [EXPLICIT_PHOTO_HINTS[explicitPhotoAnswer(standing, ageConfirmed && !noExplicit)]]
             : []),
@@ -1785,7 +2033,7 @@ export async function composeTurn(
       : input.scripts?.catalogue.find((one) => one.scriptRef === storedRun?.scriptRef)?.steps[
           boughtStep.stepIndex
         ]?.mediaSheet;
-  const voiceBrief: Brief =
+  const voiceBriefRead: Brief =
     heCame && !care
       ? {
           ...answered,
@@ -1835,6 +2083,10 @@ export async function composeTurn(
                 ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
                 ...(register !== null && running !== null ? [NOT_SHOWN_YET_HINT] : []),
+                ...(care || input.timeWaster === undefined ? [] : [TIME_WASTER_HINTS[input.timeWaster]]),
+                ...(care || input.spenderRegister === undefined || input.spenderRegister === 'warm'
+                  ? []
+                  : [SPENDER_REGISTER_HINTS[input.spenderRegister]]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT, DISAPPOINTED_MEDIA_HINT] : []),
                 ...(complaint && insistsForMore(input.fanText) ? [INSISTS_FOR_MORE_HINT] : []),
@@ -1842,6 +2094,13 @@ export async function composeTurn(
                 ...(teases === null ? [] : [ABANDON_HINTS[teases]]),
               ],
             };
+  // Her anecdotes and questions worn across her fans: named to the voice, and read again on what it wrote.
+  const worn = wornPhrases(input.herRecent ?? [], persona.wornLimits);
+  const wornBrief: Brief =
+    worn.length === 0
+      ? voiceBriefRead
+      : { ...voiceBriefRead, toneHints: [...voiceBriefRead.toneHints, wornHint(worn)] };
+  const voiceBrief = withoutEmojiIfDue(wornBrief, input.history, persona.guardSettings);
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}
@@ -1878,13 +2137,21 @@ export async function composeTurn(
       latencyMs: brainLatencyMs,
       isFallback: false,
       isSkipped: true,
+      language,
     };
   }
+  // He says he loves her or asks to see her: her rule's answer slows him down, and is no brake on a compliment.
+  const slowsByRule = brief?.occasion === 'says_love' || meeting !== undefined;
   // Never past her own maximum (her persona's `maxBubbles`).
-  const budget = farewell === null ? bubbleBudget(input.history, persona.guardSettings.maxBubbles) : 1;
+  // A time-waster gets one bubble (ADR 0135 § 7), as a farewell does.
+  const budget =
+    farewell === null && input.timeWaster === undefined
+      ? bubbleBudget(input.history, persona.guardSettings.maxBubbles)
+      : 1;
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...base,
+      language: voiceLanguage,
       brief: voiceBrief,
       maxBubbles: budget,
       ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
@@ -1912,12 +2179,15 @@ export async function composeTurn(
               maxBubbleChars: persona.guardSettings.maxBubbleChars * ACTION_BUBBLE_FACTOR,
             }
           : persona.guardSettings,
-        guardContextOf(
-          input.history,
-          stepSendsMedia(scripts),
-          allowedPriceMinor,
-          wantsHumiliation(desireMap),
-        ),
+        {
+          ...guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor, {
+            // A heated reading of his message, outside care: the same test as her register's.
+            flirting: register !== null,
+            ...(fanTier !== undefined && { fanTier }),
+            ...(wantsHumiliation(desireMap) && { humiliationWanted: true }),
+          }),
+          languages: guardLanguages(persona),
+        },
       ),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       // No word of youth in a sexual message (Charles 26/11): heated, or her script running.
@@ -1926,10 +2196,15 @@ export async function composeTurn(
       ...(sexualTurn ? checkMoans(written, register === 'very_explicit') : []),
       ...(inPlay ? checkMoodKillers(written, otherManWanted) : []),
       ...(care ? checkCare(written) : []),
+      // Model text only, care or not: the help number is the code's, added after these guards (ADR 0088 § 4).
+      ...checkHelpNumber(written),
       ...(customOrder === undefined && !suggestsCustom && !moreTonight ? [] : checkNoCommitment(written)),
       // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
       // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
-      ...(sexualization?.kind === 'no_opening' && !care ? checkWelcome(written) : []),
+      // Not on his « je t'aime » nor his asking to see her: « c'est tôt, on se connaît à peine » is then the rule's own
+      // answer (passe 2 du 26/11, conversation 21).
+      ...(sexualization?.kind === 'no_opening' && !care && !slowsByRule ? checkWelcome(written) : []),
+      ...checkWorn(written, worn),
     ];
     return { voice, written, violations };
   };
@@ -1937,8 +2212,9 @@ export async function composeTurn(
   // A guard blocked her answer: the voice writes it once more, told what was wrong, before a human is called (audit
   // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers. A formula she already
   // used with him is rewritten once the same way, and the second answer goes even if it still has one (passe 1).
+  // Nothing left once her hollow bubbles dropped (« . »): written again the same way (passe 2, conversation 37).
   const retried =
-    first.voice.ok && wantsRewrite(first.violations)
+    first.voice.ok && (wantsRewrite(first.violations) || first.written.length === 0)
       ? await attempt({
           ...voiceInput,
           brief: { ...voiceBrief, toneHints: [...voiceBrief.toneHints, rewriteHint(first.violations)] },
@@ -1946,7 +2222,7 @@ export async function composeTurn(
       : undefined;
   const { voice, written, violations } = retried ?? first;
   const firstCostUsd = retried !== undefined && first.voice.ok ? (first.voice.value.meta.costUsd ?? 0) : 0;
-  const bubbles = asSent(written, persona.splitMessages);
+  const bubbles = asSent(written, persona.splitMessages, persona.guardSettings.form);
   return {
     ...(customOrder !== undefined && { customOrder }),
     ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
@@ -1975,14 +2251,18 @@ export async function composeTurn(
     voiceBrief,
     voiceInput,
     bubbles,
+    ...translationOfVoice(voice, voiceLanguage.reply, budget, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
     sexualTurn,
-    isBlocked: isBlocked(violations) || !voice.ok,
+    ...(retried !== undefined && { retried: blockingCodes(first.violations) }),
+    // Still nothing to send after the second try: a human answers.
+    isBlocked: isBlocked(violations) || !voice.ok || written.length === 0,
     costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
     latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),
     ...(voice.ok && { model: voice.value.meta.model }),
     isFallback: voice.ok && voice.value.meta.isFallback,
     ...(retried !== undefined && { rewritten: true }),
+    language,
   };
 }

@@ -1,4 +1,9 @@
-import { INVITATION_LINK_PURPOSES, TEAM_MEMBER_STATUSES, TEAM_ROLES } from '@impera/contracts';
+import {
+  DEPARTURE_MAX_DAYS_AHEAD,
+  INVITATION_LINK_PURPOSES,
+  TEAM_MEMBER_STATUSES,
+  TEAM_ROLES,
+} from '@impera/contracts';
 import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import {
   check,
@@ -336,6 +341,67 @@ export const ownerRemovals = pgTable(
     uniqueIndex('owner_removals_waiting_unique')
       .on(t.targetUserId)
       .where(sql`${t.cancelledAt} is null and ${t.appliedAt} is null`),
+  ],
+);
+
+/**
+ * A member's departure (ADR 0166): the owner sets the hour it ends, the job applies it at that hour (`applied_at`), or
+ * the owner cancels it before (`cancelled_at`); one waiting per member. « Accès Reveal retiré » is the owner's tick,
+ * dated and signed. Never deleted. The owner writes it, the job acting in the name of the owner who set it; the
+ * member reads his own; the service role has no grant (migration). The app may only set the end and the tick (column
+ * grant). Its reason is a note of the member's record (`team_member_notes`), never read by him.
+ */
+export const teamMemberDepartures = pgTable(
+  'team_member_departures',
+  {
+    id: id(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    endsAt: timestampTz('ends_at').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    cancelledAt: timestampTz('cancelled_at'),
+    cancelledBy: text('cancelled_by').references(() => user.id),
+    appliedAt: timestampTz('applied_at'),
+    revealRemovedAt: timestampTz('reveal_removed_at'),
+    revealRemovedBy: text('reveal_removed_by').references(() => user.id),
+  },
+  (t) => [
+    check(
+      'team_member_departures_window_check',
+      sql`${t.endsAt} >= ${t.createdAt} - interval '1 minute' and ${t.endsAt} <= ${t.createdAt} + interval '${sql.raw(String(DEPARTURE_MAX_DAYS_AHEAD))} days'`,
+    ),
+    check('team_member_departures_one_end_check', sql`${t.cancelledAt} is null or ${t.appliedAt} is null`),
+    check(
+      'team_member_departures_cancel_check',
+      sql`(${t.cancelledAt} is null) = (${t.cancelledBy} is null)`,
+    ),
+    check(
+      'team_member_departures_applied_check',
+      sql`${t.appliedAt} is null or ${t.appliedAt} >= ${t.endsAt}`,
+    ),
+    check(
+      'team_member_departures_reveal_check',
+      sql`(${t.revealRemovedAt} is null) = (${t.revealRemovedBy} is null) and (${t.revealRemovedAt} is null or ${t.cancelledAt} is null)`,
+    ),
+    uniqueIndex('team_member_departures_waiting_unique')
+      .on(t.memberId)
+      .where(sql`${t.cancelledAt} is null and ${t.appliedAt} is null`),
+    index('team_member_departures_member_idx').on(t.memberId, t.createdAt),
+    // The member reads his own, for his departure space (ADR 0166 § 4): it holds no reason, which is a note.
+    pgPolicy('owner_or_self_select', {
+      for: 'select',
+      using: sql`${isOwner} or exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser})`,
+    }),
+    // Set for later, or applied at once (« Parti » in « Changer le statut »): never back-dated.
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser} and ${t.cancelledAt} is null and ${t.revealRemovedAt} is null and ${t.createdAt} = now() and (${t.appliedAt} is null or (${t.appliedAt} = now() and ${t.endsAt} = now()))`,
+    }),
+    pgPolicy('owner_update', { for: 'update', using: isOwner, withCheck: isOwner }),
   ],
 );
 

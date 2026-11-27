@@ -731,10 +731,14 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     expect(archive.statusCode, archive.body).toBe(200);
     expect(archive.headers['content-type']).toBe('application/zip');
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(new Date());
-    const folder = `feed-seance-${day}`;
-    expect(archive.headers['content-disposition']).toBe(`attachment; filename="${folder}.zip"`);
+    // Numbered among her feed drops of the day (Charles, 26/11): the others of this file came before.
+    const named = /^attachment; filename="(feed-seance-\d{4}-\d{2}-\d{2}-\d+)\.zip"$/u.exec(
+      String(archive.headers['content-disposition']),
+    );
+    const folder = named?.[1] ?? '';
+    expect(folder.startsWith(`feed-seance-${day}-`)).toBe(true);
     const entries = unzipSync(new Uint8Array(archive.rawPayload));
-    expect(Object.keys(entries)).toEqual([`${folder}/00-fiche.txt`, `${folder}/01-photo.jpg`]);
+    expect(Object.keys(entries)).toEqual([`${folder}/00-fiche.txt`, `${folder}/${folder}-01-photo.jpg`]);
     const sheet = strFromU8(entries[`${folder}/00-fiche.txt`] ?? new Uint8Array());
     expect(sheet.split('\n').slice(0, 4)).toEqual([
       `Feed · Séance boudoir du ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: PARIS }).format(new Date())}`,
@@ -742,7 +746,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       'À publier sur son feed Reveal, en une seule publication, dans cet ordre.',
       '',
     ]);
-    expect(sheet).toContain('01-photo.jpg');
+    expect(sheet).toContain(`${folder}-01-photo.jpg`);
 
     const before = Date.now();
     const confirmed = await call('POST', `${url}/confirm`, 'manager');
@@ -769,6 +773,33 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     ]);
     const hers = CreatorContentSchema.parse((await call('GET', '/v1/creator-space/content', 'nora')).json());
     expect(hers.drops.find((mine) => mine.id === one.dropId)?.exportedAt).toBe(drop.exportedAt);
+  });
+
+  it('numbers her drop among her own of the day: another creator’s drop the same day shifts nothing (Sécurité, 27/11)', async () => {
+    // Another creator drops a feed session first, the same day.
+    const theirs = { id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes: MB };
+    const other = await call('POST', '/v1/creator-space/drops', 'ines', {
+      id: newId(ContentDropIdSchema),
+      category: 'feed_shoot',
+      files: [theirs],
+    });
+    expect(other.statusCode, other.body).toBe(200);
+    const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x6e));
+    await sendWhole(one);
+    await receive();
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(new Date());
+    const hers = await test.admin.db
+      .select({ createdAt: schema.contentDrops.createdAt })
+      .from(schema.contentDrops)
+      .where(and(eq(schema.contentDrops.creatorId, nora), eq(schema.contentDrops.category, 'feed_shoot')));
+    const today = hers.filter(
+      (drop) => new Intl.DateTimeFormat('en-CA', { timeZone: PARIS }).format(drop.createdAt) === day,
+    ).length;
+    const archive = await call('GET', `/v1/creators/${nora}/drops/${one.dropId}/export`, 'manager');
+    expect(archive.statusCode, archive.body).toBe(200);
+    expect(String(archive.headers['content-disposition'])).toBe(
+      `attachment; filename="feed-seance-${day}-${String(today)}.zip"`,
+    );
   });
 
   it('takes no more bytes once her drop is withdrawn, and the job erases what had arrived', async () => {

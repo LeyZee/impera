@@ -96,6 +96,8 @@ export interface NotificationContext {
   readonly cappedRungToday: number;
   /** Sales already rung for this account within the 2 minutes before `at`. */
   readonly salesInBurstWindow: number;
+  /** Its sort is one she turned off (ADR 0150 § 16 ter): kept, never rung, not even at the recap. */
+  readonly turnedOff?: boolean;
 }
 
 export type NotificationDecision =
@@ -119,6 +121,8 @@ const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set([
   'safety_alert',
   // A change among the owners (ADR 0096 § 2): the 72 hours of notice only help an owner who hears of it.
   'owner_change',
+  // A change of where a member is paid (ADR 0165 § 5): heard before the next transfer, or it protects nobody.
+  'payout_change',
 ]);
 
 /** The alerts of a creator's tab ring all day outside the cap, and wait for the recap at night (Charles, 19/11). */
@@ -130,6 +134,7 @@ export function isCapped(kind: NotificationReason): boolean {
 
 /** The decision for one notification, from facts the caller has read (counts, settings, time). */
 export function decideNotification(context: NotificationContext): NotificationDecision {
+  if (context.turnedOff === true) return { action: 'silent' };
   if (!PASSES_QUIET_HOURS.has(context.kind)) {
     const until = quietHoursEnd(context.at, context.timeZone, context.quiet);
     if (until !== null) return { action: 'hold', until };

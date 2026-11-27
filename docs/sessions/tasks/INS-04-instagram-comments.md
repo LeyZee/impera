@@ -46,7 +46,12 @@ Lot e, sa voix calibrée sur ses vraies réponses (amendement du 26/11 de l'ADR 
 - [x] Questions : `mayAskQuestion` (une réponse sur trois, bornée de deux à dix), garde `unwanted_question`.
 - [x] `pnpm comment-calibration` : passage à l'aveugle sur le PC, chiffres seuls en sortie.
 - [ ] Banque en base et import de l'export par le propriétaire dans le CRM (attend la forme de l'export, fil Bilan ; table neuve, migration numérotée par Bilan).
-- [ ] Premier calibrage sur le PC (coût demandé à Charles avant), audit, réglages.
+- [x] Premier calibrage sur le PC (40 commentaires, 0,83 $) : emojis variés, plus d'exclamations, questions quand le code les permet (prompt).
+- [x] Corrections de la créatrice sur la feuille à l'aveugle : jamais d'intimité en public (prompt 1.2.0), « je t'aime » reçoit des emojis seulement (`declaresLove`, garde `words_in_emoji_reply`).
+- [x] Second calibrage (période des assistants écartée, relu sur le PC) : forme de sa réponse la plus proche dite par le code (`replyShapeOf`), compliment remercié simplement, marqueur « [pseudo] » retiré (prompt 1.3.0).
+- [x] Troisième calibrage : longueur de sa réponse la plus proche dite au modèle ; un merci court peut revenir (`repeated_reply` assoupli pour moins de trois mots).
+- [x] Quatrième calibrage : compliments réglés ; faits manquants renvoyés à la fiche 2.3.0.
+- [x] Style public de l'agence lu par le prompt des commentaires (prompt 1.4.0) et par le calibrage.
 
 ## Critères d'acceptation
 - Tout passe contre `FakeInstagram` ; aucun appel réel à Meta dans un test.

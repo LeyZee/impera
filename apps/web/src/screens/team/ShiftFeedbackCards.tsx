@@ -1,0 +1,369 @@
+import {
+  REPORT_SIGNAL_CATEGORIES,
+  type PayPeriod,
+  type ReportSignalCategory,
+  type ShiftFeedbackLine,
+  type ShiftFeedbackList,
+  type ShiftIncidentStep,
+} from '@impera/contracts';
+import { useState, type JSX } from 'react';
+
+import './team.css';
+
+import { IncidentTrack, RpIcon, SignalChips, StagePill } from '@/reports/FeedbackPanel';
+import {
+  DRAFT_REASON_WORDS,
+  FEEDBACK_ERRORS,
+  incidentStage,
+  SIGNAL_CATEGORIES,
+  stepIncident,
+  useRefreshFeedbacks,
+  useShiftFeedbacks,
+} from '@/reports/feedback';
+import { periodLine } from '@/reports/model';
+import { accountLine, swapShiftLine } from '@/scheduling/model';
+import { dayOf } from '@/scheduling/time';
+import { useNow } from '@/scheduling/useNow';
+import { initialsOf } from '@/settings/sales-feed/importing';
+import { Donut, useLit } from '@/shell/figures/figures';
+import { Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
+
+const plural = (count: number, one: string, many: string): string =>
+  `${String(count)} ${count > 1 ? many : one}`;
+
+/** Who and where a feedback is from, on one line. */
+function Whose({
+  line,
+  list,
+  zone,
+}: {
+  line: Pick<ShiftFeedbackLine, 'memberId' | 'platformAccountId' | 'shiftStartsAt' | 'shiftEndsAt'>;
+  list: ShiftFeedbackList;
+  zone: string;
+}): JSX.Element {
+  const member = list.members.find((one) => one.id === line.memberId);
+  const account = list.accounts.find((one) => one.id === line.platformAccountId);
+  return (
+    <div className="rp-fb__whose">
+      <p className="rp-fb__who">
+        {member === undefined ? null : (
+          <span className="nv-avatar nv-avatar--sm" aria-hidden="true">
+            {initialsOf(member.displayName)}
+          </span>
+        )}
+        {member?.displayName ?? 'Un membre'}
+      </p>
+      <p className="rp-fb__where">
+        {account === undefined ? null : (
+          <>
+            <span className="rp-fb__creator">{account.creatorName}</span> · {accountLine(account)} ·{' '}
+          </>
+        )}
+        <span className="nv-num">{swapShiftLine(line.shiftStartsAt, line.shiftEndsAt, undefined, zone)}</span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The incidents not « Réglé » yet, first on Équipe › Rapports (trous béants n° 1): red, each with its track, « Vu » and
+ * « Réglé » beside it. Absent when none waits: an urgency is never an empty card.
+ */
+export function IncidentsCard({ zone }: { zone: string }): JSX.Element | null {
+  const open = useShiftFeedbacks(null);
+  const refresh = useRefreshFeedbacks();
+  const now = useNow(60_000);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<{ readonly id: string; readonly text: string } | null>(null);
+  if (open.isError) {
+    return (
+      <Panel className="rp-incidents" eyebrow="Incidents">
+        <div className="rp-sec">
+          <Failure
+            inline
+            onRetry={() => {
+              void open.refetch();
+            }}
+          />
+        </div>
+      </Panel>
+    );
+  }
+  const list = open.data;
+  if (list === undefined || list.feedbacks.length === 0) return null;
+  const waiting = list.feedbacks.filter((one) => incidentStage(one) === 'sent').length;
+
+  const say = async (line: ShiftFeedbackLine, step: ShiftIncidentStep): Promise<void> => {
+    setBusy(line.id);
+    setRefusal(null);
+    const outcome = await stepIncident(line.id, step);
+    if (outcome.kind !== 'ok') {
+      setRefusal({
+        id: line.id,
+        text:
+          outcome.kind === 'refused'
+            ? FEEDBACK_ERRORS[outcome.code]
+            : 'Le serveur ne répond pas : rien n’a été enregistré.',
+      });
+    }
+    await refresh();
+    setBusy(null);
+  };
+
+  return (
+    <Panel
+      className="rp-incidents nv-enter"
+      eyebrow="Urgent"
+      title={plural(list.feedbacks.length, 'incident à suivre', 'incidents à suivre')}
+    >
+      <div className="rp-sec">
+        <p className="rp-incidents__lead">
+          {waiting === 0
+            ? 'Tous vus : dis « Réglé » quand c’est fini, le chatteur le voit.'
+            : `${plural(waiting, 'pas encore vu', 'pas encore vus')} : le chatteur attend ta réponse.`}
+        </p>
+        <ul className="rp-incidents__list">
+          {list.feedbacks.map((line, index) => {
+            const stage = incidentStage(line);
+            return (
+              <li
+                key={line.id}
+                className="rp-incident-line nv-enter"
+                style={{ '--nv-i': Math.min(index, 8) }}
+                data-stage={stage ?? undefined}
+                aria-busy={busy === line.id}
+              >
+                <div className="rp-incident-line__top">
+                  <Whose line={line} list={list} zone={zone} />
+                  {stage === null ? null : <StagePill stage={stage} />}
+                </div>
+                <p className="rp-incident-line__text">{line.incident}</p>
+                <IncidentTrack feedback={line} zone={zone} today={dayOf(now, zone)} />
+                {refusal?.id === line.id ? <p className="tm-hint tm-hint--error">{refusal.text}</p> : null}
+                <div className="rp-incident-line__acts">
+                  {stage === 'sent' ? (
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--plain nv-btn--sm rp-icon-btn"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        void say(line, 'seen');
+                      }}
+                    >
+                      <RpIcon name="seen" />
+                      Vu
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--soft nv-btn--sm rp-icon-btn rp-incident-line__done"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      void say(line, 'resolved');
+                    }}
+                  >
+                    <RpIcon name="done" />
+                    Réglé
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Panel>
+  );
+}
+
+/** What the period's signals ask for, by category: a donut in their colours, its legend lighting it (the figures). */
+function SignalDonut({ list }: { list: ShiftFeedbackList }): JSX.Element | null {
+  const { lit, setLit, row } = useLit();
+  const counts = REPORT_SIGNAL_CATEGORIES.map((category) => ({
+    category,
+    count: list.feedbacks.reduce(
+      (sum, line) => sum + line.signals.filter((signal) => signal.category === category).length,
+      0,
+    ),
+  })).filter((one) => one.count > 0);
+  const total = counts.reduce((sum, one) => sum + one.count, 0);
+  if (total === 0) return null;
+  const colour = (category: ReportSignalCategory): string =>
+    `var(--nv-content-${String(SIGNAL_CATEGORIES[category].content)})`;
+  const litOne = lit === null ? undefined : counts[lit];
+  return (
+    <div className="rp-sigs">
+      <Donut
+        label={`Remontées par catégorie : ${counts
+          .map((one) => `${SIGNAL_CATEGORIES[one.category].label} ${String(one.count)}`)
+          .join(', ')}`}
+        slices={counts.map((one) => ({ key: one.category, colour: colour(one.category), value: one.count }))}
+        lit={lit}
+        onLit={setLit}
+      >
+        {litOne === undefined ? (
+          <>
+            <b className="nv-donut__value nv-num">{total}</b>
+            <span className="nv-donut__sub">{total > 1 ? 'remontées' : 'remontée'}</span>
+          </>
+        ) : (
+          <>
+            <b className="nv-donut__value nv-num">{litOne.count}</b>
+            <span className="nv-donut__sub">{SIGNAL_CATEGORIES[litOne.category].label}</span>
+          </>
+        )}
+      </Donut>
+      <ul className="nv-breakdown rp-sigs__legend">
+        {counts.map((one, i) => (
+          <li key={one.category}>
+            <button
+              type="button"
+              className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
+              {...row(i)}
+            >
+              <span className="nv-key" style={{ '--_c': colour(one.category) }} aria-hidden="true" />
+              <span className="nv-breakdown__label">{SIGNAL_CATEGORIES[one.category].label}</span>
+              <span className="nv-breakdown__value nv-num">{one.count}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * A period's mini feedbacks (ADR 0050 § 10), on the accounts whose pay reads the sales: what was said first in figures
+ * (feedbacks, incidents, signals by category), then each one, its incident first.
+ */
+export function FeedbacksPanel({
+  period,
+  zone,
+}: {
+  period: PayPeriod | null;
+  zone: string;
+}): JSX.Element | null {
+  const read = useShiftFeedbacks(period, period !== null);
+  if (period === null) return null;
+  if (read.isError) {
+    return (
+      <Panel className="rp-fbs" eyebrow="Retours de fin de shift">
+        <div className="rp-sec">
+          <Failure
+            inline
+            onRetry={() => {
+              void read.refetch();
+            }}
+          />
+        </div>
+      </Panel>
+    );
+  }
+  const list = read.data;
+  if (list === undefined) {
+    return (
+      <Panel className="rp-fbs">
+        <div className="sc-skeleton" aria-hidden="true">
+          <i />
+          <i />
+        </div>
+      </Panel>
+    );
+  }
+  const incidents = list.feedbacks.filter((one) => one.incident !== null).length;
+  const quiet = list.feedbacks.filter((one) => one.nothingToReport).length;
+  const { missing } = list;
+  return (
+    <Panel
+      className="rp-fbs"
+      eyebrow="Retours de fin de shift"
+      title={
+        list.feedbacks.length === 0 ? 'Aucun retour' : plural(list.feedbacks.length, 'retour', 'retours')
+      }
+    >
+      <div className="rp-sec">
+        {list.feedbacks.length === 0 && missing.length === 0 ? (
+          <p className="tm-hint">
+            Sur la quinzaine {periodLine(period)}, aucun retour : ils se font sur les comptes dont la paie lit
+            les ventes relevées.
+          </p>
+        ) : (
+          <>
+            {/* Four tiles of the system: the colour on the figure alone (Design, 21/11). */}
+            <div className="nv-tiles rp-fbs__tiles">
+              <p className={`nv-tile${incidents > 0 ? ' nv-tone--bad' : ''}`}>
+                <span className="nv-tile__value rp-fbs__value">{incidents}</span>
+                <span className="nv-tile__label">{incidents > 1 ? 'incidents' : 'incident'}</span>
+              </p>
+              <p className="nv-tile">
+                <span className="nv-tile__value rp-fbs__value">{list.feedbacks.length - quiet}</span>
+                <span className="nv-tile__label">avec un mot</span>
+              </p>
+              <p className="nv-tile nv-tone--ok">
+                <span className="nv-tile__value rp-fbs__value">{quiet}</span>
+                <span className="nv-tile__label">sans souci</span>
+              </p>
+              {/* A shift whose feedback expired (retour léger, 26/11): counted, never caught up. */}
+              <p className={`nv-tile${missing.length > 0 ? ' nv-tone--warn' : ''}`}>
+                <span className="nv-tile__value rp-fbs__value">{missing.length}</span>
+                <span className="nv-tile__label">sans retour</span>
+              </p>
+            </div>
+            <SignalDonut list={list} />
+            <ul className="rp-fbs__list">
+              {list.feedbacks.map((line, index) => {
+                const stage = incidentStage(line);
+                return (
+                  <li key={line.id} className="rp-fb nv-enter" style={{ '--nv-i': Math.min(index, 8) }}>
+                    <div className="rp-incident-line__top">
+                      <Whose line={line} list={list} zone={zone} />
+                      {stage === null ? (
+                        line.nothingToReport ? (
+                          <span className="nv-status rp-stage-pill" data-stage="resolved">
+                            <span className="nv-status__dot" />
+                            Rien à signaler
+                          </span>
+                        ) : null
+                      ) : (
+                        <StagePill stage={stage} prefix="Incident · " />
+                      )}
+                    </div>
+                    {line.incident === null ? null : (
+                      // The pill says « Incident » and its stage: the text takes the stage's colour, never a word again.
+                      <p className="rp-fb__incident" data-stage={stage ?? undefined}>
+                        {line.incident}
+                      </p>
+                    )}
+                    {line.comment === null ? null : <p className="rp-fb__comment">« {line.comment} »</p>}
+                    {line.draftReason === null ? null : (
+                      <p className="rp-fb__comment">
+                        Propositions de l’IA retouchées ou refusées, surtout :{' '}
+                        {DRAFT_REASON_WORDS[line.draftReason].toLowerCase()}
+                      </p>
+                    )}
+                    <SignalChips feedback={line} />
+                  </li>
+                );
+              })}
+              {missing.map((one) => (
+                <li key={one.shiftId} className="rp-fb nv-enter">
+                  <div className="rp-incident-line__top">
+                    <Whose
+                      line={{ ...one, shiftStartsAt: one.startsAt, shiftEndsAt: one.endsAt }}
+                      list={list}
+                      zone={zone}
+                    />
+                    <span className="nv-status rp-stage-pill" data-stage="seen">
+                      <span className="nv-status__dot" />
+                      Sans retour
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+}

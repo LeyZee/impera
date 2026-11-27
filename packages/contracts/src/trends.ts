@@ -306,6 +306,14 @@ export const ExtensionLinkCreatedSchema = ExtensionLinkSchema.omit({ lastUsedAt:
 export type ExtensionLinkCreated = z.infer<typeof ExtensionLinkCreatedSchema>;
 
 /**
+ * `GET /v1/trends/extension-links/holder`, with `x-extension-link`: whether the code names someone, asked by the
+ * extension when it is linked. Open to every holder, a chatter's included: `watch` says whether the trend watch's doors
+ * are his too (ADR 0060 § 2, ADR 0086 § 8). 401 for a code that names nobody.
+ */
+export const ExtensionLinkHolderSchema = z.strictObject({ watch: z.boolean() });
+export type ExtensionLinkHolder = z.infer<typeof ExtensionLinkHolderSchema>;
+
+/**
  * `GET /v1/trends/readings/creators`, with `x-extension-link`: the creators the linked person may mark a post for,
  * as `POST /v1/trends/readings` checks them (herself for a creator; every creator for the agency).
  */

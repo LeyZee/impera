@@ -10,6 +10,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
+import { FeedbacksPanel, IncidentsCard } from './ShiftFeedbackCards';
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
 
@@ -56,7 +57,7 @@ import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
 import { useTeamImportCounts } from '@/settings/sales-feed/api';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
-import { Failure } from '@/shell/states';
+import { Empty, Failure } from '@/shell/states';
 
 /** The correction panel the agency opens on a validated report, for its shift. */
 interface Correcting {
@@ -256,6 +257,8 @@ export function ReportsPage({
         />
       ) : null}
       <div className="rp-board">
+        {/* The incidents of the mini feedback still open, before anything else (trous béants n° 1). */}
+        <IncidentsCard zone={zone} />
         <ToValidate
           list={open.data}
           isError={open.isError}
@@ -308,6 +311,7 @@ export function ReportsPage({
             setCorrecting({ shiftId: line.shift.id, memberName, draft: emptyCorrection() });
           }}
         />
+        <FeedbacksPanel period={period} zone={zone} />
       </div>
       {correcting === null ? null : (
         <ReportPanel
@@ -480,25 +484,26 @@ function ToValidate({
   return (
     <Panel className="rp-validate nv-enter" eyebrow="À valider">
       <div className="rp-sec">
-        <div className="rp-validate__top">
-          <p className="rp-validate__count">
-            <span className="rp-validate__num nv-num">{waiting.length}</span>
-            <span className="rp-validate__what">
-              {waiting.length === 0
-                ? 'Rien à valider'
-                : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
-            </span>
-          </p>
-          {sums.length === 0 ? null : (
-            <p className="rp-validate__sum nv-num">
-              {sums.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' · ')} déclarés
+        {waiting.length === 0 ? null : (
+          <div className="rp-validate__top">
+            <p className="rp-validate__count">
+              <span className="rp-validate__num nv-num">{waiting.length}</span>
+              <span className="rp-validate__what">
+                {waiting.length === 0
+                  ? 'Rien à valider'
+                  : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
+              </span>
             </p>
-          )}
-        </div>
+            {sums.length === 0 ? null : (
+              <p className="rp-validate__sum nv-num">
+                {sums.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' · ')} déclarés
+              </p>
+            )}
+          </div>
+        )}
         {unread ? (
           <p className="rp-validate__unread">
-            Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se
-            valide à la main.
+            Les ventes de Reveal ne sont pas encore lues : rien n’est validé sans toi.
           </p>
         ) : null}
         {unlinked.map((line) => (
@@ -534,9 +539,9 @@ function ToValidate({
         ) : null}
 
         {waiting.length === 0 ? (
-          <p className="rp-mine__empty">
+          <Empty title="Rien à valider">
             Tout est validé. Un rapport arrive ici dès qu’un membre le fait, à la fin de son shift.
-          </p>
+          </Empty>
         ) : (
           <>
             {reviewable.length === 0 ? null : (

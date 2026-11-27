@@ -57,6 +57,13 @@
   padding-block: 0;
   font-size: var(--nv-text-footnote);
 }
+/* On a phone a finger, not a pointer: the 44px target (DS-08). */
+@media (max-width: 640px) {
+  .hi-filters .hi-select .nv-select__field {
+    height: 44px;
+    min-height: 44px;
+  }
+}
 
 .hi-said {
   margin: 0;

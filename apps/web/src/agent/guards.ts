@@ -45,4 +45,11 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   address_word: 'le mot « adresse » (« mon adresse », « mon adresse mail »), sans l’adresse elle-même',
   belittling_name: 'un nom qui le rabaisse (« petit garçon », « vilain garçon »)',
   unwarranted_brake: 'un frein (« tu y vas un peu fort », « tu vises direct ») sur un simple compliment',
+  emoji_misuse:
+    'des emojis hors règle : ailleurs qu’en fin de bulle, trop de sortes, trois ou plus, ou à chaque message',
+  form_rule:
+    'une bulle hors de sa forme (majuscule, point final, espace avant « ? » ou « ! »), corrigée avant l’envoi',
+  close_only_word: 'un mot qu’elle garde pour ses fans proches, écrit à un fan qui ne l’est pas encore',
+  language_not_covered: 'une langue que les gardes ne lisent pas, ou qu’elle ne parle pas',
+  help_number_from_model: 'un numéro ou une ligne d’aide écrit par l’IA, que seul le code pose',
 };

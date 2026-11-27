@@ -113,7 +113,10 @@ describe('Entraîner › Post du canal (ADR 0080 § 7)', () => {
       expect(link.getAttribute('aria-disabled')).toBeNull();
     });
     choose(link, 'Boutique');
+    // A main post reacts to its media: asked for while it is empty (IA-11).
+    expect(screen.getByText('Décris le média pour qu’elle y réagisse.')).toBeDefined();
     fireEvent.change(screen.getByLabelText('Le média'), { target: { value: ' selfie au miroir ' } });
+    expect(screen.queryByText('Décris le média pour qu’elle y réagisse.')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Écrire' }));
     const bubble = await screen.findByRole('article', { name: 'Le post' });
     expect(within(bubble).getByText('je suis là').tagName).toBe('STRONG');
@@ -157,7 +160,7 @@ describe('Entraîner › Post du canal (ADR 0080 § 7)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Écrire' }));
     expect(await screen.findByText('Vous préférez quoi ce soir ?')).toBeDefined();
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Un live', 'Une photo']);
-    expect(screen.getByText('Aucune garde levée. Fiche 1.0.0, rien n’est publié.')).toBeDefined();
+    expect(screen.getByText('Aucune garde levée. Persona v1.0.0, rien n’est publié.')).toBeDefined();
     expect(TryChannelPostBodySchema.parse(asked[0])).toEqual({
       kind: 'poll',
       media: null,

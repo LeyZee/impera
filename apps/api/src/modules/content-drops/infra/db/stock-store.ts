@@ -1,4 +1,4 @@
-import { DESCRIPTION_TRIES } from '@impera/contracts';
+import { DESCRIPTION_TRIES, type ReadyVideoTypes } from '@impera/contracts';
 import {
   onCreatorList,
   sql,
@@ -10,6 +10,7 @@ import {
 
 import type { StockRow } from '../../application/stock';
 import { ContentDropForbidden } from '../../domain/errors';
+import type { ReadyVideoLines } from '../../domain/ports';
 
 const readsTeam = (scope: string): boolean => scope === 'owner' || scope === 'agency';
 
@@ -81,10 +82,38 @@ async function stockRowsIn(tx: Transaction, creatorId: string): Promise<readonly
 export interface StockStore {
   forCreator(userId: string): Promise<readonly StockRow[]>;
   forTeam(creatorId: string, userId: string): Promise<readonly StockRow[]>;
+  /** The types a video to sell may take (ADR 0163 § 7), for her drop: the owner's lines still offered, names only. */
+  readyTypesForCreator(userId: string): Promise<ReadyVideoTypes>;
+  /** The same for the team that drops for her, under the same door as her stock. */
+  readyTypesForTeam(creatorId: string, userId: string): Promise<ReadyVideoTypes>;
 }
 
-export function createDrizzleStockStore(db: Database): StockStore {
+const typesOf = async (readyVideos: ReadyVideoLines, creatorId: string): Promise<ReadyVideoTypes> => ({
+  types: (await readyVideos(creatorId))
+    .filter((line) => line.offered)
+    .map((line) => ({ id: line.id, label: line.label })),
+});
+
+export function createDrizzleStockStore(
+  db: Database,
+  readyVideos: ReadyVideoLines = () => Promise.resolve([]),
+): StockStore {
+  const teamDoor = (creatorId: string, userId: string): Promise<void> =>
+    withTenantMember(db, creatorId, userId, async (tx, scope) => {
+      if (!readsTeam(scope)) throw new ContentDropForbidden();
+      if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId)))
+        throw new ContentDropForbidden();
+    });
   return {
+    readyTypesForCreator: async (userId) =>
+      typesOf(
+        readyVideos,
+        await withCreatorAccount(db, userId, (_tx, creatorId) => Promise.resolve(creatorId)),
+      ),
+    readyTypesForTeam: async (creatorId, userId) => {
+      await teamDoor(creatorId, userId);
+      return typesOf(readyVideos, creatorId);
+    },
     forCreator: (userId) => withCreatorAccount(db, userId, (tx, creatorId) => stockRowsIn(tx, creatorId)),
     forTeam: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {

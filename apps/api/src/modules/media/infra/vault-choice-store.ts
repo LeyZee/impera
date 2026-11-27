@@ -1,4 +1,10 @@
-import { newId, PlatformAccountIdSchema } from '@impera/contracts';
+import {
+  AuditEntryIdSchema,
+  DropMediaDescriptionSchema,
+  MediaDescriptionIdSchema,
+  newId,
+  PlatformAccountIdSchema,
+} from '@impera/contracts';
 import {
   and,
   eq,
@@ -16,7 +22,14 @@ import type { DescribeCandidate } from '../domain/vault-choice';
 
 import { enqueueVaultDescribeIn } from './vault-describe-store';
 
-const { mediaPlatformRefs, platformAccounts, vaultDescribeRequests, vaultImportChoices } = schema;
+const {
+  auditLog,
+  mediaDescriptions,
+  mediaPlatformRefs,
+  platformAccounts,
+  vaultDescribeRequests,
+  vaultImportChoices,
+} = schema;
 
 const RowIdSchema = z.uuid();
 const KindSchema = z.enum(['image', 'video', 'audio']);
@@ -35,6 +48,8 @@ const MediaRowSchema = z.object({
   asked: z.boolean(),
   failures: z.coerce.number().int(),
   detailed: z.string().nullable(),
+  description_id: MediaDescriptionIdSchema.nullable(),
+  validated: z.boolean(),
 });
 const CountSchema = z.object({ n: z.coerce.number().int() });
 
@@ -68,11 +83,14 @@ async function mediaOf(
                     where q.platform_account_id = r.platform_account_id
                       and q.platform_media_id = r.platform_media_id) as asked,
            r.description_failures as failures,
-           (select md.content ->> 'detailed' from ${schema.mediaDescriptions} md
-             where md.media_asset_id = r.media_asset_id and md.content ? 'detailed'
-             order by md.created_at desc, md.id desc
-             limit 1) as detailed
+           d.detailed, d.id as description_id, coalesce(d.validated, false) as validated
       from ${mediaPlatformRefs} r
+      left join lateral (
+        select md.id, md.content ->> 'detailed' as detailed, md.validated_at is not null as validated
+          from ${mediaDescriptions} md
+         where md.media_asset_id = r.media_asset_id and md.content ? 'detailed'
+         order by md.created_at desc, md.id desc
+         limit 1) d on true
      where r.creator_id = ${creatorId}
        and (${platformAccountId}::uuid is null or r.platform_account_id = ${platformAccountId}::uuid)
        and ${only}
@@ -105,12 +123,14 @@ async function isHers(tx: Transaction, creatorId: string, platformAccountId: str
  * account. A request queues `media.describe_vault` in the same transaction.
  */
 export function createDrizzleVaultChoiceStore(db: Database): VaultChoiceStore {
+  /** The owner, or an active manager whose list holds her: the readers of her vault and of its descriptions. */
+  const mayRead = async (tx: Transaction, scope: string, creatorId: string, userId: string) =>
+    scope === 'owner' || (scope === 'agency' && (await onCreatorList(tx, userId, creatorId)));
+
   return {
     view: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
-        const reads =
-          scope === 'owner' || (scope === 'agency' && (await onCreatorList(tx, userId, creatorId)));
-        if (!reads) return null;
+        if (!(await mayRead(tx, scope, creatorId, userId))) return null;
         const folders = await tx.execute(sql`
           select platform_account_id, folder_ref, imported
             from ${vaultImportChoices}
@@ -130,6 +150,8 @@ export function createDrizzleVaultChoiceStore(db: Database): VaultChoiceStore {
             ...candidateOf(row),
             platformAccountId: row.platform_account_id,
             detailed: row.detailed,
+            descriptionId: row.description_id,
+            validated: row.validated,
           })),
         };
       }),
@@ -205,6 +227,63 @@ export function createDrizzleVaultChoiceStore(db: Database): VaultChoiceStore {
           correlationId: request.correlationId,
         });
         return decision.answer;
+      }),
+
+    review: (creatorId, userId, platformMediaId, review) =>
+      withTenantMember(db, creatorId, userId, async (tx, scope) => {
+        if (!(await mayRead(tx, scope, creatorId, userId))) return 'forbidden';
+        const [media] = await mediaOf(tx, creatorId, review.platformAccountId, [platformMediaId]);
+        if (media?.description_id == null) return 'not_found';
+        // Only the description the sheet shows, its latest: one replaced meanwhile is read again first.
+        if (media.description_id !== review.descriptionId) return 'stale';
+        const [base] = await tx
+          .select()
+          .from(mediaDescriptions)
+          .where(
+            and(eq(mediaDescriptions.id, review.descriptionId), eq(mediaDescriptions.creatorId, creatorId)),
+          );
+        if (base === undefined) return 'not_found';
+        const audit = (action: string, details: Record<string, unknown>) =>
+          tx.insert(auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId,
+            action,
+            entity: 'media_asset',
+            entityId: base.mediaAssetId,
+            details: { ...details, creatorId, platformMediaId },
+          });
+        // A reason lifted by a person (a doubt, a safety flag) stays in the trail, with who lifted it.
+        const lifted =
+          base.reviewReasons.length === 0 ? [] : [{ descriptionId: base.id, reasons: base.reviewReasons }];
+        if (review.kind === 'validate') {
+          if (base.validatedAt !== null) return 'already';
+          await tx
+            .update(mediaDescriptions)
+            .set({ validatedBy: userId, validatedAt: sql`now()` })
+            .where(and(eq(mediaDescriptions.id, base.id), sql`${mediaDescriptions.validatedAt} is null`));
+          await audit('media_description.validated', { descriptionIds: [base.id], lifted });
+          return 'validated';
+        }
+        const content = DropMediaDescriptionSchema.safeParse(base.content);
+        if (!content.success) return 'stale';
+        const id = newId(MediaDescriptionIdSchema);
+        // A new row (the table is append-only): the vision's closed labels kept, the words rewritten, validated.
+        await tx.insert(mediaDescriptions).values({
+          id,
+          creatorId,
+          mediaAssetId: base.mediaAssetId,
+          vocabularyVersion: base.vocabularyVersion,
+          content: { ...content.data, detailed: review.detailed },
+          model: 'human',
+          promptHash: base.promptHash,
+          author: 'human',
+          creatorNote: base.creatorNote,
+          reviewReasons: [],
+          validatedBy: userId,
+          validatedAt: sql`now()`,
+        });
+        await audit('media_description.corrected', { from: base.id, to: id, lifted });
+        return 'corrected';
       }),
   };
 }

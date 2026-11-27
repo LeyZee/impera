@@ -1,5 +1,13 @@
 # 0090. Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0159 · Une demande sur mesure passe par l'accord et le prix de la créatrice ; l'IA prend la commande avec un acompte par pourboire et livre depuis un dossier rattaché au fan](0159-custom-order-creator-price-and-tip-deposit.md) : Remplace : l'ADR 0090 § A, points 1 et 2 (« l'IA ne vend jamais de sur-mesure ») ; garde le reste de l'ADR 0090 (réponse d'attente, garde `no_commitment`, objections de prix).
+>
+> Toutes les décisions du même sujet : [`docs/regles/vente-et-scripts.md`](../regles/vente-et-scripts.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 11/11/2026 17h59, « ok 0090 », fil Agent ; décisions du 11/11 à 17h51, fil « Évaluer la capacité de vente de l'IA »)
 Date : 2026-11-11
 Précise : P4-01 (alerte système `service_request`), l'ADR 0023 (passation à l'humain), l'ADR 0021 (elle reste elle-même), l'ADR 0010 (rien de réel dans le dépôt), la garde « jamais de négociation ».
@@ -64,3 +72,9 @@ Amende : l'ADR 0079 § 4 et § 6 (deux questions de plus dans la section « Conv
 - Migration 0182 : les deux types d'événements entrent dans les contraintes de `conversation_events` et `domain_events`. Aucune table.
 - Prompts versionnés : cerveau 1.12.0 (`objection`), voix 1.7.0 (les deux champs, le bloc `<objection_reply>`).
 - Évals : demande sur mesure avec et sans chatteur, commande déjà ouverte, chaque type d'objection, réplique déjà reçue.
+
+## Amendement du 26/11/2026 (passe 2 des évals)
+
+- **La preuve qu'il demande est une demande sur mesure.** « Prouve-le : un selfie avec deux doigts sur la joue » est un contenu fait pour lui. Quand sa place auprès d'elle permet de la relayer (`proofAnswer` : `relay`), elle suit le chemin du § A : un chatteur en poste la prend, sinon elle la garde sans rien promettre et la commande attend dans « À traiter ». Au time-waster confirmé, elle refuse toujours.
+- **`no_commitment` bloque aussi une promesse dite sans oui** : « je te le ferai quand je pourrai, promis », « je vais te l'envoyer », « je te promets ». « Je te promets rien » passe.
+- **« Fais-moi un prix » est lu par le code** (`discountAsked`, § B) en plus du cerveau : sa demande de remise devient une objection `asks_discount` quand le cerveau n'a lu ni objection ni rien qui passe avant (détresse, plainte, sa commande sur mesure).

@@ -15,6 +15,7 @@ import {
   PersonaStrategiesSchema,
   type Persona,
 } from './persona';
+import { VoiceFormSettingsSchema } from './voice-form';
 
 /**
  * The persona sheet at format 2 (ADR 0079): Desirali's sheet, section by section and question by question, with its
@@ -89,7 +90,7 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('place_of_life', 'Lieu de vie', 'short', 'half'),
       q('timezone', 'Fuseau horaire', 'timezone', 'half'),
       q('spoken_languages', 'Langues parlées', 'languages', 'half', {
-        help: 'Sélectionnez les langues que le modèle parle couramment',
+        help: 'Les langues qu’elle parle couramment.',
         required: true,
       }),
     ],
@@ -133,7 +134,7 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('roleplaying_description', 'Description du jeu de rôle', 'long', 'full'),
       q('favourite_emojis', 'Émojis favoris', 'short', 'full'),
       q('conversation_description', 'Description de la conversation', 'long', 'full', {
-        help: 'Décrivez le ton, le style ou les sujets de conversation typiques.',
+        help: 'Le ton, le style ou les sujets de ses conversations.',
       }),
       q('spelling_description', "Style d'orthographe", 'long', 'full'),
       q('compliment_description', 'Style de compliments', 'long', 'full'),
@@ -341,7 +342,26 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
    * guards read one as a soft `stage_direction`.
    */
   stage_directions: z.boolean().optional(),
+  /**
+   * The form of her bubbles (Charles 26/11): first letter, final period, space before « ? » and « ! », and her emoji
+   * streak (`emoji_misuse`). Each absent: her agency's base style decides, then the code's default.
+   */
+  ...VoiceFormSettingsSchema.shape,
 });
+
+/** The most examples of her messages per language, and the longest one. */
+export const LANGUAGE_EXAMPLES_MAX = 12;
+export const LANGUAGE_EXAMPLE_MAX_CHARS = 300;
+
+/**
+ * « Exemples de messages dans cette langue » (ADR 0168 § 3): her messages written in a language of hers, per language,
+ * given to the voice only when it writes in that language. Optional, empty by default; typed by the owner.
+ */
+export const LanguageExamplesSchema = z.partialRecord(
+  z.enum(LANGUAGES),
+  z.array(z.string().trim().min(1).max(LANGUAGE_EXAMPLE_MAX_CHARS)).max(LANGUAGE_EXAMPLES_MAX),
+);
+export type LanguageExamples = z.infer<typeof LanguageExamplesSchema>;
 
 /** « Réglages de l'agent » (ADR 0079 § 4): versioned with the sheet, applied by the code, never a question of hers. */
 export const PersonaAgentSettingsSchema = z.strictObject({
@@ -352,6 +372,8 @@ export const PersonaAgentSettingsSchema = z.strictObject({
   rules: PersonaAgentRulesSchema,
   /** Her replies to price objections (ADR 0090 § 10): the owner's and the agent's, never hers nor a chatter's. */
   objection_replies: ObjectionRepliesSchema.default({}),
+  /** Her messages per language (ADR 0168 § 3): the voice reads those of the language it writes in, only. */
+  language_examples: LanguageExamplesSchema.default({}),
 });
 export type PersonaAgentSettings = z.infer<typeof PersonaAgentSettingsSchema>;
 
@@ -660,6 +682,7 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
       },
       rules: { ...v1.limits, emojis_forbidden: w?.emojis_forbidden ?? [] },
       objection_replies: {},
+      language_examples: {},
     },
   };
   return { persona, moved };

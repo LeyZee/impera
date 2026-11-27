@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { OfferContext } from '../policy';
 import {
   applyScriptRunEvent,
+  mayOpenScript,
   nextScriptStep,
   openScriptRun,
   permittedScripts,
   platformScriptFaults,
+  playableFamiliesIn,
   playedScriptRefs,
   reconcileScriptRun,
   scriptStepsHeld,
@@ -179,6 +181,69 @@ describe('permittedScripts', () => {
       permittedScripts(catalogue, { moment: 'night', history }).map((script) => script.scriptRef);
     expect(ids(sentTo(['gone', [0]]))).toEqual(['script-both']);
     expect(ids(sentTo(['script-night', [9]]))).toEqual(['script-both']);
+  });
+});
+
+describe('his language (ADR 0168 § 8)', () => {
+  const FR: PlatformScriptView = { ...BOTH, scriptRef: 'lingerie-fr', family: 'lingerie' };
+  const EN: PlatformScriptView = {
+    ...BOTH,
+    scriptRef: 'lingerie-en',
+    family: 'lingerie',
+    language: 'english',
+  };
+  const SHOWER_EN: PlatformScriptView = { ...BOTH, scriptRef: 'shower-en', language: 'english' };
+  const catalogue = [FR, EN, SHOWER_EN, NIGHT];
+  const ids = (
+    language: 'french' | 'english' | 'italian' | undefined,
+    played: ScriptHistoryView = NO_HISTORY,
+  ) =>
+    permittedScripts(catalogue, {
+      moment: 'night',
+      history: played,
+      ...(language !== undefined && { language }),
+    }).map((script) => script.scriptRef);
+
+  it('opens only a script written in his language; a script that says none is French, and so is a fan without one', () => {
+    expect(ids('english')).toEqual(['lingerie-en', 'shower-en']);
+    expect(ids('french')).toEqual(['lingerie-fr', 'script-night']);
+    expect(ids(undefined)).toEqual(['lingerie-fr', 'script-night']);
+    expect(ids('italian')).toEqual([]);
+  });
+
+  it('plays a family once: the French version received, the English one is not a new script for him', () => {
+    expect(ids('english', history(['lingerie-fr', [0]]))).toEqual(['shower-en']);
+    expect(ids('french', history(['lingerie-en', [0]]))).toEqual(['script-night']);
+  });
+
+  it('opens no script at all when code reads his language as one it does not know', () => {
+    expect(permittedScripts(catalogue, { moment: 'night', history: NO_HISTORY, language: null })).toEqual([]);
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-fr', language: null })).toMatchObject({
+      kind: 'none',
+    });
+  });
+
+  it('decides no start without a version in his language', () => {
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-fr', language: 'italian' })).toEqual({
+      kind: 'none',
+      reason: 'scripts_exhausted',
+    });
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-en', language: 'english' }).kind).toBe(
+      'start',
+    );
+  });
+
+  it('counts her playable stock in his language by family, a version in another language never counting twice', () => {
+    const versions = [
+      FR,
+      { ...FR, scriptRef: 'lingerie-fr-bis' },
+      EN,
+      SHOWER_EN,
+      { ...SHOWER_EN, scriptRef: 'broken-en', family: 'broken', steps: [] },
+    ];
+    expect(playableFamiliesIn(versions, 'french')).toBe(1);
+    expect(playableFamiliesIn(versions, 'english')).toBe(2);
+    expect(playableFamiliesIn(versions, 'italian')).toBe(0);
   });
 });
 
@@ -634,5 +699,26 @@ describe('nextScriptStep: the gate before the first teaser (ADR 0103 § 11-12)',
         startGate: { open: false, missing: ['availability_unconfirmed'] },
       }),
     ).toEqual({ kind: 'send_step', step: toSend(NIGHT, 1) });
+  });
+});
+
+describe('mayOpenScript (recette REV-13)', () => {
+  it('lets a script open with an adult fan, never twice the same evening, his asking or not', () => {
+    expect(mayOpenScript({ offer: offer, latest: null, careMode: false })).toBe(true);
+    expect(mayOpenScript({ offer: { ...offer, lastOfferAt: at(-30) }, latest: null, careMode: false })).toBe(
+      false,
+    );
+  });
+
+  it('shows no script while a run is open, in the care mode, or when the policy refuses even his asking', () => {
+    const open = play([sent(0, 1)]);
+    expect(mayOpenScript({ offer: offer, latest: open, careMode: false })).toBe(false);
+    expect(mayOpenScript({ offer: offer, latest: null, careMode: true })).toBe(false);
+    expect(mayOpenScript({ offer: { ...offer, flags: {} }, latest: null, careMode: false })).toBe(false);
+    const frozen = {
+      ...offer.flags,
+      salesFrozen: { reason: 'operator' as const, since: '2026-11-01T10:00:00Z' },
+    };
+    expect(mayOpenScript({ offer: { ...offer, flags: frozen }, latest: null, careMode: false })).toBe(false);
   });
 });

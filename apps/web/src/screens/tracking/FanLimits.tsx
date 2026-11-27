@@ -11,10 +11,12 @@ import {
   euros,
   flagsSummary,
   isAgeDisputed,
+  attentionTone,
   isOn,
-  needsAttention,
   SWITCHES,
   switchDetail,
+  switchTone,
+  type FlagTone,
   type SwitchFlag,
 } from './flags-model';
 
@@ -63,12 +65,12 @@ export function FanLimits({
 
   const view: FanFlagsView | undefined = query.data;
   const flags = view?.flags;
-  const warn = flags !== undefined && needsAttention(flags);
+  const tone = flags === undefined ? null : attentionTone(flags);
   return (
     <details className="tr-limits">
       <summary>
         <span className="tr-limits__title">Limites du fan</span>
-        <span className={`tr-limits__sum${warn ? ' tr-warn' : ''}`}>
+        <span className={`tr-limits__sum${tone === null ? '' : ` tr-${tone}`}`}>
           {flags !== undefined
             ? flagsSummary(flags)
             : query.error instanceof FanFlagsRefused
@@ -87,7 +89,7 @@ export function FanLimits({
               label={s.label}
               meaning={switchDetail(flags, s.flag) ?? s.meaning}
               on={isOn(flags, s.flag)}
-              warn={(s.flag === 'doNotContact' || s.flag === 'salesFrozen') && isOn(flags, s.flag)}
+              tone={switchTone(flags, s.flag)}
               disabled={!canDecide || pending}
               onChange={(set) => void change(switchBody(s.flag, set))}
             />
@@ -124,7 +126,7 @@ function Switch({
   label,
   meaning,
   on,
-  warn,
+  tone,
   disabled,
   onChange,
 }: {
@@ -132,7 +134,7 @@ function Switch({
   label: string;
   meaning: string;
   on: boolean;
-  warn: boolean;
+  tone: FlagTone | null;
   disabled: boolean;
   onChange: (set: boolean) => void;
 }): JSX.Element {
@@ -140,7 +142,7 @@ function Switch({
   return (
     <div className="tr-limit">
       <label htmlFor={id} className="tr-limit__text">
-        <span className={`tr-limit__label${warn ? ' tr-warn' : ''}`}>{label}</span>
+        <span className={`tr-limit__label${tone === null ? '' : ` tr-${tone}`}`}>{label}</span>
         <span className="tr-limit__hint">{meaning}</span>
       </label>
       <input
@@ -188,10 +190,10 @@ function Age({
   return (
     <div className="tr-limit">
       <span className="tr-limit__text">
-        <span className={`tr-limit__label${disputed ? ' tr-warn' : ''}`}>
+        <span className={`tr-limit__label${disputed ? ' tr-bad' : ''}`}>
           {disputed ? 'Âge contesté' : 'Âge confirmé'}
         </span>
-        <span className={`tr-limit__hint${disputed && !asking ? ' tr-warn' : ''}`}>
+        <span className={`tr-limit__hint${disputed && !asking ? ' tr-bad' : ''}`}>
           {asking ? ageQuestion(flags) : ageLine(flags, mayConfirmDisputed)}
         </span>
         {asking && disputed ? (

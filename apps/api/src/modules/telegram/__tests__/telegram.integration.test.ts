@@ -791,7 +791,7 @@ describe('telegram module on Postgres', () => {
     const sent = telegram.sent.map((m) => m.text).join();
     // Named as the history names it: her alert's name, written by the agency, never the word.
     expect(sent).toContain('🔔 <b>Appel vidéo · Autre</b>');
-    expect(sent).toContain('Le message du fan correspond à l’alerte « Appel vidéo ». Il n’écrit plus');
+    expect(sent).toContain('Le message du fan correspond à l’alerte « Appel vidéo ». L’agent n’écrit plus');
     expect(sent).not.toContain('mot-déclaré');
   });
 

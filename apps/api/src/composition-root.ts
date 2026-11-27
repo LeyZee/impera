@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { CreatorIdSchema, JOB_PAYLOADS } from '@impera/contracts';
 import { createDbClient, withAdmin, type Database, type DbClient } from '@impera/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -39,6 +39,7 @@ import type {
   LinkServiceReader,
   SalesFeedRegistry,
 } from './modules/connectors';
+import { confinePinnedGets } from './modules/connectors';
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
@@ -282,7 +283,11 @@ export function breachCheckOf(config: Config, logger: Logger): PasswordBreachChe
 export async function createApp(config: Config, logger: Logger, options: AppOptions = {}): Promise<App> {
   // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
   const sandbox = sandboxOf(config);
-  if (sandbox !== null) installSandboxGuard(sandbox, logger);
+  if (sandbox !== null) {
+    installSandboxGuard(sandbox, logger);
+    // The GETs that go through `node:https` rather than `fetch`: the link service, the avatars, the vault's files.
+    confinePinnedGets(true);
+  }
   const db = createDbClient(config.DATABASE_URL, { ...POOL_OPTIONS, max: config.DATABASE_POOL_MAX });
   const adminDb = createDbClient(config.DATABASE_SERVICE_URL, {
     ...POOL_OPTIONS,
@@ -441,6 +446,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
+    // The types of the videos she sells are the owner's lines of her grid (ADR 0163 § 7), read by their module.
+    readyVideos: async (creatorId) =>
+      (await customOrders.module.gridOf(CreatorIdSchema.parse(creatorId)))?.readyVideos ?? [],
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
     // Late bound: the captions read her described drops, and her drops tell them of each description.
     onDescribed: (creatorId, mediaAssetId, correlationId) =>
@@ -471,6 +479,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     requeue: invoiceRequeue,
     invoices: invoiceReadsForContractors,
     pay: payReadsForContractors,
+    notify: notifications.module.notify,
     ...(options.invoiceBuckets !== undefined && { invoiceBuckets: options.invoiceBuckets }),
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
@@ -495,7 +504,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     activePersona: persona.activePersona,
     connectors: connectors.module,
     scripts: scripts.module,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.5.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.6.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
@@ -734,6 +743,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         },
         // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
         async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+        agent.personaLanguagesOf,
       ),
       ...team.routes,
       ...scheduling.routes,

@@ -1,11 +1,13 @@
 import { sql, type SQL } from 'drizzle-orm';
 import {
+  boolean,
   check,
   customType,
   index,
   integer,
   pgPolicy,
   pgTable,
+  primaryKey,
   smallint,
   text,
   unique,
@@ -96,6 +98,34 @@ export const notificationPreferences = pgTable(
 );
 
 /**
+ * The sorts of notification a creator turned on or off herself (ADR 0150 § 16 ter); no row means on. Each account
+ * reads and writes only its own: the agency never sees these choices.
+ */
+export const notificationKindPreferences = pgTable(
+  'notification_kind_preferences',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    enabled: boolean('enabled').notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.kind] }),
+    check(
+      'notification_kind_preferences_kind_check',
+      sql`${t.kind} in ('agency_request', 'week_to_validate', 'earnings', 'lives')`,
+    ),
+    pgPolicy('own_rows', {
+      for: 'all',
+      using: sql`${t.userId} = ${currentUser}`,
+      withCheck: sql`${t.userId} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
  * Every notification asked for an account, once (CR-01): the unique key (account, reason, object) makes a replayed
  * job a no-op, and the row is written with the decision in one transaction. It is also what the rules count: the
  * capped ones rung today in the account's day (`local_day`), the sales rung in the last two minutes, the ones held
@@ -127,7 +157,7 @@ export const notificationDeliveries = pgTable(
     ),
     check(
       'notification_deliveries_reason_check',
-      sql`${t.reason} in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision')`,
+      sql`${t.reason} in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change')`,
     ),
     pgPolicy('own_rows', {
       for: 'all',

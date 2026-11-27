@@ -17,9 +17,11 @@ import {
   fileLine,
   lengthOf,
   matchResumed,
+  measuredVideoRefusal,
   mediaLabel,
   mimeOf,
   moved,
+  movedTo,
   onTheirWay,
   openRequests,
   outLine,
@@ -39,6 +41,21 @@ import {
   UNREADABLE_HERE,
   weightOf,
 } from './model';
+
+describe('Contenu: a video measured on her phone (recette MED-04)', () => {
+  it('refuses a landscape video for a vertical category before it goes up', () => {
+    expect(measuredVideoRefusal('feed_video', { ms: 20_000, width: 1920, height: 1080 })).toBe(
+      '« Feed · Vidéo short » : la vidéo doit être verticale',
+    );
+    expect(measuredVideoRefusal('feed_video', { ms: 20_000, width: 1080, height: 1920 })).toBeNull();
+    expect(measuredVideoRefusal('feed_shoot', { ms: 20_000, width: 1920, height: 1080 })).toBeNull();
+  });
+
+  it('leaves to the server a video her phone could not measure', () => {
+    expect(measuredVideoRefusal('feed_video', { ms: 20_000, width: null, height: null })).toBeNull();
+    expect(measuredVideoRefusal('feed_video', { ms: null, width: 1920, height: 1080 })).toBeNull();
+  });
+});
 
 describe('Contenu: the rules of her screen (CR-06 d)', () => {
   it('reads a file’s type from her browser, or from its extension when the browser gives none', () => {
@@ -237,6 +254,11 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(moved(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
     expect(moved(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
     expect(moved(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'b', 'c']);
+    // Dragged: taken out, put back at its new place.
+    expect(movedTo(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd']);
+    expect(movedTo(['a', 'b', 'c', 'd'], 3, 0)).toEqual(['d', 'a', 'b', 'c']);
+    expect(movedTo(['a', 'b', 'c'], 1, 1)).toEqual(['a', 'b', 'c']);
+    expect(movedTo(['a', 'b', 'c'], 1, 5)).toEqual(['a', 'b', 'c']);
   });
 
   it('knows the same file picked twice', () => {

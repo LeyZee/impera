@@ -86,6 +86,60 @@ describe('voice guards', () => {
     expect(codes(['Je passe chez toi ce soir'])).toEqual(['meeting_promise']);
   });
 
+  it('lets « on se retrouve demain » go as she says goodnight, to talk again here (passe 2, conversation 40)', () => {
+    expect(codes(['Dors bien toi', 'on se retrouve demain 😘'])).toEqual([]);
+    expect(codes(['Bonne nuit, on se retrouve demain'])).toEqual([]);
+    expect(codes(['on se retrouve demain ici 😌'])).toEqual([]);
+  });
+
+  it('reads « on se retrouve demain » with a goodnight as a chat goodbye in her meeting commitment too, both ways', () => {
+    expect(codes(['bonne nuit, on se retrouve demain'])).toEqual([]);
+    expect(
+      meetingCommitment('on se retrouve demain', undefined, 'dors bien toi on se retrouve demain'),
+    ).toBeUndefined();
+    expect(codes(['bonne nuit, on se retrouve demain à la gare'])).toContain('meeting_promise');
+    expect(codes(['bonne nuit, demain 20h chez moi'])).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, demain 20h chez moi')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve demain à la gare')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve demain à 20 h')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se retrouve samedi')).toBeDefined();
+    expect(meetingCommitment('bonne nuit, on se voit demain')).toBeDefined();
+    expect(meetingCommitment('on se retrouve demain')).toBeDefined();
+  });
+
+  it('takes « bonne nuit, on se retrouve demain » as her yes after a concrete meeting he proposed (Sécurité, #1048)', () => {
+    const proposed = 'on se voit demain 18h à la gare ?';
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', proposed)).toBeDefined();
+    expect(
+      checkVoiceOutput(['bonne nuit, on se retrouve demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: proposed,
+      }).map((v) => v.code),
+    ).toContain('meeting_promise');
+    expect(meetingCommitment('bonne nuit, on se retrouve demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(meetingCommitment('bonne nuit à demain', 'bonne nuit ma belle')).toBeUndefined();
+    expect(
+      checkVoiceOutput(['bonne nuit à demain'], DEFAULT_GUARD_SETTINGS, {
+        fanLastMessage: 'bonne nuit ma belle',
+      }),
+    ).toEqual([]);
+  });
+
+  it('still blocks a real meeting said with a goodnight', () => {
+    for (const meeting of [
+      'Bonne nuit, on se retrouve demain au café',
+      'Dors bien, on se retrouve demain chez toi',
+      'Bonne nuit, on se retrouve demain à 20 h',
+      'Bonne nuit, on se retrouve demain à Lyon',
+      'Bonne nuit, on se voit demain',
+      'Bonne nuit, on se retrouve samedi',
+      'Bonne nuit 😘 viens chez moi demain',
+    ]) {
+      expect(codes([meeting]), meeting).toContain('meeting_promise');
+    }
+    // Without a goodnight nor « ici », the day alone stays a meeting.
+    expect(codes(['on se retrouve demain'])).toContain('meeting_promise');
+  });
+
   it('lets ordinary jobs and sexting through', () => {
     expect(codes(['Je suis modèle photo, et toi ?'])).toEqual([]);
     expect(codes(['Avant je suis assistante dentaire, tu imagines'])).toEqual([]);
@@ -900,6 +954,12 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
         'j’ai pas snap désolé',
         't’as vu ma story insta ?',
         'discord c’est pour les gamers non ?',
+        'whatsapp è comodo',
+        'telegram es para frikis',
+        'ven aquí conmigo',
+        'vieni qui da me',
+        'no tengo instagram',
+        'non uso whatsapp',
       ],
       [
         'discord c’est lina_92',
@@ -910,6 +970,10 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
         'rejoins-moi sur discord',
         'je suis sur insta',
         'écris-moi @lina_xx',
+        'scrivimi su whatsapp',
+        'aggiungimi su snap',
+        'escríbeme por telegram',
+        'agrégame en insta',
       ],
     ],
     [
