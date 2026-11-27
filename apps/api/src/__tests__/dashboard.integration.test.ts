@@ -689,14 +689,15 @@ describe('GET /v1/dashboard', () => {
     // The read comes back: the breaker is closed.
     await account({ pausedUntil: null, lastPollAt: new Date() });
     expect((await reveal()).outage).toBeNull();
-    // Reveal not answering: the cause is « unreachable ».
-    await account({ lastPollAt: lastRead, pausedUntil: new Date(Date.now() + 10 * 60_000) });
-    await breaker('connector_network', opened);
+    // Reveal not answering: the cause is « unreachable »; the shape changed before the last good read is forgotten.
+    const readAgain = new Date(Date.now() - 5 * 60_000);
+    await account({ lastPollAt: readAgain, pausedUntil: new Date(Date.now() + 10 * 60_000) });
+    await breaker('connector_network', new Date(Date.now() - 60_000));
     expect((await reveal()).outage).toMatchObject({ reason: 'unreachable' });
     // A dead session wins, since its last read.
     await account({ pausedUntil: null, sessionState: 'expired' });
     expect(await reveal()).toMatchObject({
-      outage: { reason: 'session_expired', since: lastRead.toISOString() },
+      outage: { reason: 'session_expired', since: readAgain.toISOString() },
     });
     await account({ sessionState: 'active', lastPollAt: new Date() });
   });
