@@ -1153,7 +1153,7 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
       { title: 'Ouvre Aujourd’hui', text: 'En haut, ce qu’on attend de toi aujourd’hui, puis ta journée.' },
       {
         title: 'Dépose ton contenu',
-        text: 'Contenu : « Déposer » sur une demande, ou « Envoyer un contenu ». L’agence s’occupe du reste.',
+        text: 'Contenu : « Déposer » sur une demande, ou « Envoyer un contenu ».',
       },
       { title: 'C’est tout', text: 'Le reste, l’agence s’en occupe.' },
     ],
