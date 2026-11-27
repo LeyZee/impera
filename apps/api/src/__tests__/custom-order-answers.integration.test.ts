@@ -1,5 +1,6 @@
 import {
   AvailabilityIdSchema,
+  CreatorAgendaSchema,
   CreatorIdSchema,
   CustomOrderListSchema,
   CustomOrderViewSchema,
@@ -280,6 +281,18 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     const at = (minutes: number): string => new Date(opens.getTime() + minutes * 60_000).toISOString();
     expect(await paidCam()).toEqual({ startsAt: at(0), endsAt: at(30) });
     expect(await paidCam()).toEqual({ startsAt: at(45), endsAt: at(75) });
+    // Her agenda shows both cams, the slot only (Charles, 27/11: « un suivi des cams »).
+    const day = opens.toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
+    const agenda = await server.inject({
+      method: 'GET',
+      url: `/v1/creator-space/agenda?from=${day}&to=${day}`,
+      headers: { cookie: cookies.nora, origin: DASHBOARD_ORIGIN },
+    });
+    expect(agenda.statusCode).toBe(200);
+    expect(CreatorAgendaSchema.parse(agenda.json()).cams).toEqual([
+      { startsAt: at(0), endsAt: at(30) },
+      { startsAt: at(45), endsAt: at(75) },
+    ]);
   });
 
   it('her no closes the order; a price out of bounds is refused', async () => {

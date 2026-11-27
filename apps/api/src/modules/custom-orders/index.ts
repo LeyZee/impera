@@ -15,7 +15,12 @@ export type {
   CustomOrderTurnInput,
 } from './domain/turn';
 import { camSlotOf, type CamSlot } from './domain/cam';
-import { bookedCams, createDrizzleCustomOrderAgencyStore, type CamAgenda } from './infra/db/agency-store';
+import {
+  bookedCams,
+  bookedCamsBetween,
+  createDrizzleCustomOrderAgencyStore,
+  type CamAgenda,
+} from './infra/db/agency-store';
 import { createCustomPriceGridReader, createDrizzleCustomPriceGridStore } from './infra/db/grid-store';
 import { createDrizzleCustomOrderStore, type CustomOrderStore } from './infra/db/order-store';
 import { createCustomOrderRoutes, createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
@@ -38,6 +43,12 @@ export interface CustomOrdersModule {
    * suite ») or later, or null when none has room. Read only: the slot is booked with his full payment.
    */
   readonly camSlot: (creatorId: CreatorId, minutes: number, now: Date) => Promise<CamSlot | null>;
+  /** Her cams booked with fans that meet `[from, to)`, for her agenda: the slot only, under her tenant. */
+  readonly bookedCamsOf: (
+    creatorId: string,
+    from: Date,
+    to: Date,
+  ) => Promise<readonly { readonly startsAt: Date; readonly endsAt: Date }[]>;
 }
 
 export interface CustomOrdersDeps {
@@ -66,6 +77,8 @@ export function createCustomOrdersModule(deps: CustomOrdersDeps): CustomOrdersMo
     },
     gridOf: createCustomPriceGridReader(deps.adminDb),
     orders: createDrizzleCustomOrderStore(),
+    bookedCamsOf: (creatorId, from, to) =>
+      withTenant(deps.db, creatorId, (tx) => bookedCamsBetween(tx, creatorId, from, to)),
     camSlot: (creatorId, minutes, now) =>
       camSlotOf(
         {

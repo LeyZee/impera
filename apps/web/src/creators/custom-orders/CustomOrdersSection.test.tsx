@@ -59,7 +59,12 @@ function renderSection(canAnswer: boolean) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <CustomOrdersSection creatorId={CREATOR} creatorName="Nora" canAnswer={canAnswer} />
+      <CustomOrdersSection
+        creatorId={CREATOR}
+        creatorName="Nora"
+        timezone="Europe/Paris"
+        canAnswer={canAnswer}
+      />
     </QueryClientProvider>,
   );
 }

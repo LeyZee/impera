@@ -1,12 +1,15 @@
 import {
   CUSTOM_DETAIL_KEYS,
   customDepositMinor,
+  isPerMinute,
   type CustomDetailKey,
   type CustomOrderState,
   type CustomOrderView,
 } from '@impera/contracts';
 
 import { euros, FORMAT_LABELS } from '../custom-prices/model';
+
+import { clockOf, dayWordOf, minuteOf } from '@/scheduling/time';
 
 /*
  * His custom order as the screens say it (ADR 0159 § A): where it stands, its steps up to delivery, what he asked.
@@ -171,4 +174,37 @@ export function actionsOf(order: CustomOrderView): OrderAction[] {
     case 'cancelled':
       return [];
   }
+}
+
+/** A call or a video call: it takes her live, in one of her dispos cam (ADR 0159 § 5). */
+export const isCam = (order: Pick<CustomOrderView, 'format'>): boolean =>
+  order.format !== null && isPerMinute(order.format);
+
+/**
+ * When his cam happens, in her time (ADR 0159 § 5): the slot the code booked with his full payment, or why there is
+ * none yet. Null for anything that is not a cam, or before he paid.
+ */
+export function camLine(
+  order: Pick<CustomOrderView, 'format' | 'state' | 'cam'>,
+  zone: string,
+  today: string,
+): { readonly booked: boolean; readonly text: string } | null {
+  if (!isCam(order)) return null;
+  if (order.state === 'creator_yes')
+    return { booked: false, text: 'Le créneau se réserve dans ses dispos cam dès qu’il a tout payé' };
+  if (order.state !== 'deposit_paid' && order.state !== 'delivered') return null;
+  if (order.cam === null)
+    return order.state === 'delivered'
+      ? null
+      : { booked: false, text: 'Aucune dispo cam n’avait de place : l’heure se cale avec elle' };
+  const start = clockOf(minuteOf(order.cam.startsAt, zone));
+  const end = clockOf(minuteOf(order.cam.endsAt, zone));
+  return { booked: true, text: `${dayWordOf(order.cam.startsAt, zone, today)} · ${start} – ${end}` };
+}
+
+/** Her state in words: « Payé » once a call or a video call is paid in full, never « Acompte reçu ». */
+export function stateLabelOf(order: Pick<CustomOrderView, 'state' | 'depositMinor' | 'priceMinor'>): string {
+  if (order.state === 'deposit_paid' && order.priceMinor !== null && order.depositMinor === order.priceMinor)
+    return 'Payé';
+  return STATE_LABELS[order.state];
 }

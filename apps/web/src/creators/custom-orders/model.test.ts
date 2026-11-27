@@ -1,7 +1,16 @@
 import { CustomOrderViewSchema, type CustomOrderView } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { actionsOf, detailLines, headlineOf, priceLine, proposedMinor, stepsOf } from './model';
+import {
+  actionsOf,
+  camLine,
+  stateLabelOf,
+  detailLines,
+  headlineOf,
+  priceLine,
+  proposedMinor,
+  stepsOf,
+} from './model';
 
 /* An invented order with neutral values (ADR 0010). */
 const order = (over: Partial<CustomOrderView> = {}): CustomOrderView =>
@@ -78,5 +87,36 @@ describe('a custom order as the screens say it', () => {
     ]);
     expect(headlineOf(order())).toBe('Vidéo pour lui · 3 min');
     expect(headlineOf(order({ format: null, minutes: null }))).toBe('Demande à préciser');
+  });
+
+  it('says when his cam happens, in her time, once he paid it all (ADR 0159 § 5)', () => {
+    const cam = { format: 'video_call_talk', minutes: 30, priceMinor: 5000, depositMinor: 5000 } as const;
+    expect(camLine(order({ ...cam, state: 'creator_yes' }), 'Europe/Paris', '2030-03-04')?.booked).toBe(
+      false,
+    );
+    expect(
+      camLine(
+        order({
+          ...cam,
+          state: 'deposit_paid',
+          cam: { startsAt: '2030-03-04T20:15:00.000Z', endsAt: '2030-03-04T20:45:00.000Z' },
+        }),
+        'Europe/Paris',
+        '2030-03-04',
+      ),
+    ).toEqual({ booked: true, text: 'Aujourd’hui · 21\u00a0h\u00a015 – 21\u00a0h\u00a045' });
+    expect(camLine(order({ ...cam, state: 'deposit_paid' }), 'Europe/Paris', '2030-03-04')).toEqual({
+      booked: false,
+      text: 'Aucune dispo cam n’avait de place : l’heure se cale avec elle',
+    });
+    // A video has no slot.
+    expect(camLine(order({ state: 'deposit_paid' }), 'Europe/Paris', '2030-03-04')).toBeNull();
+  });
+
+  it('says « Payé » for a cam paid in full, « Acompte reçu » for half a video', () => {
+    expect(stateLabelOf({ state: 'deposit_paid', priceMinor: 5000, depositMinor: 5000 })).toBe('Payé');
+    expect(stateLabelOf({ state: 'deposit_paid', priceMinor: 5000, depositMinor: 2500 })).toBe(
+      'Acompte reçu',
+    );
   });
 });

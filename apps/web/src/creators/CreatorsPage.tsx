@@ -353,6 +353,7 @@ export function CreatorsPage({
             key={`orders-${current.id}`}
             creatorId={current.id}
             creatorName={current.displayName}
+            timezone={current.timezone}
             canAnswer={isOwner}
           />
           {isOwner ? (

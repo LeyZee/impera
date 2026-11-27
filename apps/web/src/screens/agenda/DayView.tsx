@@ -18,6 +18,7 @@ import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { timedSuggestionsOf } from './grid';
 import {
+  BOOKED_CAM_TITLE,
   closedTickWords,
   firstOf,
   momentOf,
@@ -585,6 +586,31 @@ function Program({
           );
         if (row.kind === 'proposed')
           return <ProposedRow key={row.at.suggestion.id} at={row.at} onOpen={onSuggestion} />;
+        if (row.kind === 'cam') {
+          const { cam } = row;
+          const past = nowMinute !== null && cam.end <= nowMinute;
+          // A fan's cam booked in her dispo cam (ADR 0159 § 5): when, on Instagram, never who nor a price.
+          return (
+            <li key={`cam-${String(cam.start)}`} className="ag-row" data-past={past ? 'true' : undefined}>
+              <span className="ag-time nv-num">
+                <b>{clockOf(cam.start)}</b>
+                <span>{clockOf(cam.end)}</span>
+              </span>
+              <div className="ag-slot ag-cam" data-opens-to="cam">
+                <span className="ag-mark" aria-hidden="true">
+                  📹
+                </span>
+                <div className="ag-task__body">
+                  <b>{BOOKED_CAM_TITLE}</b>
+                  <span className="ag-meta">
+                    <span>Sur Instagram, c’est toi qui l’appelles</span>
+                    <span className="nv-num">{lengthOf((cam.end - cam.start) * MINUTE_MS)}</span>
+                  </span>
+                </div>
+              </div>
+            </li>
+          );
+        }
         const { item } = row;
         const liveAt =
           nowMinute !== null && item.start <= nowMinute && nowMinute < item.end ? nowMinute : null;

@@ -411,6 +411,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const creatorTasks = wireCreatorTasks(shared, {
     notifications: notifications.module,
     persona: persona.module,
+    // Late bound: the orders look for a cam's room in her agenda, and her agenda shows the cams booked.
+    bookedCams: (creatorId, from, to) => customOrders.module.bookedCamsOf(creatorId, from, to),
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const creatorLimits = wireCreatorLimits(shared);

@@ -13,17 +13,19 @@ import {
 } from './api';
 import {
   actionsOf,
+  camLine,
   detailLines,
   headlineOf,
   priceLine,
   proposedMinor,
   quoteLine,
-  STATE_LABELS,
+  stateLabelOf,
   STATE_TONES,
   stepsOf,
   type OrderTone,
 } from './model';
 
+import { dayOf } from '@/scheduling/time';
 import { Steps } from '@/shell/figures/figures';
 
 import '../custom-prices/custom-prices.css';
@@ -45,11 +47,14 @@ export const TONE_COLOURS: Readonly<Record<OrderTone, string>> = {
 export function OrderCard({
   creatorId,
   order,
+  zone = Intl.DateTimeFormat().resolvedOptions().timeZone,
   canAnswer,
   supplementName = () => null,
 }: {
   creatorId: CreatorId;
   order: CustomOrderView;
+  /** Her zone: a cam's hour is said in her time; the reader's own when unknown (« À traiter »). */
+  zone?: string;
   canAnswer: boolean;
   /** A supplement's name from her grid, when the reader may read it; null says « 1 supplément ». */
   supplementName?: (id: string) => string | null;
@@ -59,6 +64,7 @@ export function OrderCard({
   const steps = stepsOf(order);
   const done = steps.filter((step) => step.done).length;
   const price = priceLine(order);
+  const cam = camLine(order, zone, dayOf(new Date(), zone));
   const details = detailLines(order);
   const named = order.supplements.map(supplementName);
   const unnamed = named.filter((name) => name === null).length;
@@ -79,10 +85,17 @@ export function OrderCard({
           {order.fanName}
         </h3>
         <span className="nv-tag nv-tag--tint cso-state" style={{ '--_c': TONE_COLOURS[tone] }}>
-          {STATE_LABELS[order.state]}
+          {stateLabelOf(order)}
         </span>
       </header>
       <p className="cso-card__what">{headlineOf(order)}</p>
+      {cam === null ? null : (
+        // When his cam happens, in her time: the slot booked with his payment (ADR 0159 § 5).
+        <p className="cso-cam" data-booked={cam.booked ? 'true' : undefined}>
+          <span aria-hidden="true">📹</span>
+          <span className={cam.booked ? 'nv-num' : undefined}>{cam.text}</span>
+        </p>
+      )}
 
       <Steps
         steps={steps}

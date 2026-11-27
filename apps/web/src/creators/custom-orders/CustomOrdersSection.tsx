@@ -17,10 +17,13 @@ import './custom-orders.css';
 export function CustomOrdersSection({
   creatorId,
   creatorName,
+  timezone,
   canAnswer,
 }: {
   creatorId: CreatorId;
   creatorName: string;
+  /** Her zone: a cam's hour is said in her time. */
+  timezone: string;
   canAnswer: boolean;
 }): JSX.Element {
   const [scope, setScope] = useState<CustomOrdersScope>('active');
@@ -81,6 +84,7 @@ export function CustomOrdersSection({
               <OrderCard
                 creatorId={creatorId}
                 order={order}
+                zone={timezone}
                 canAnswer={canAnswer}
                 supplementName={supplementName}
               />
@@ -92,12 +96,18 @@ export function CustomOrdersSection({
   );
 }
 
-/** What waits on her first, then what runs, then the rest; the latest first inside each. */
+/**
+ * What waits on her first, then what runs, then the rest; inside what runs, the cams booked come first, the soonest
+ * first (Charles, 27/11: « un suivi des cams »); else the latest first.
+ */
 function sorted(orders: readonly CustomOrderView[]): CustomOrderView[] {
   const rank = { warn: 0, info: 1, ok: 2, muted: 3 } as const;
+  const camAt = (order: CustomOrderView): number =>
+    order.state === 'deposit_paid' && order.cam !== null ? Date.parse(order.cam.startsAt) : Infinity;
   return orders.toSorted(
     (a, b) =>
       rank[STATE_TONES[a.state]] - rank[STATE_TONES[b.state]] ||
+      (camAt(a) === camAt(b) ? 0 : camAt(a) < camAt(b) ? -1 : 1) ||
       Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
   );
 }

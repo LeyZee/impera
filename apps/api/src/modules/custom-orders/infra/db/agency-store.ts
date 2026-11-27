@@ -140,6 +140,29 @@ export interface CamAgenda {
   readonly absence: (creatorId: CreatorId, at: Date) => ReturnType<CamSlotPorts['absence']>;
 }
 
+/** The cams booked with her, paid and not cancelled, that meet `[from, to)`: what her agenda shows. */
+export async function bookedCamsBetween(
+  tx: Transaction,
+  creatorId: string,
+  from: Date,
+  to: Date,
+): Promise<{ startsAt: Date; endsAt: Date }[]> {
+  const rows = await tx
+    .select({ startsAt: customOrders.camStartsAt, endsAt: customOrders.camEndsAt })
+    .from(customOrders)
+    .where(
+      and(
+        eq(customOrders.creatorId, creatorId),
+        inArray(customOrders.state, ['deposit_paid', 'delivered']),
+        sql`${customOrders.camStartsAt} < ${to} and ${customOrders.camEndsAt} > ${from}`,
+      ),
+    )
+    .orderBy(customOrders.camStartsAt);
+  return rows.flatMap((row) =>
+    row.startsAt === null || row.endsAt === null ? [] : [{ startsAt: row.startsAt, endsAt: row.endsAt }],
+  );
+}
+
 /** The cams booked with her and still to happen or happening: what a new one never falls on. */
 export async function bookedCams(
   tx: Transaction,

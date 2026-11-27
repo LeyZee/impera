@@ -59,6 +59,15 @@ export interface DayWindow {
   readonly opensTo: AvailabilityOpensTo;
 }
 
+/** A fan's cam booked in her dispo cam (ADR 0159 § 5), in minutes from her midnight: when only. */
+export interface DayCam {
+  readonly start: number;
+  readonly end: number;
+}
+
+/** What her agenda calls a booked cam: never who, never a price. */
+export const BOOKED_CAM_TITLE = 'Cam avec un fan';
+
 export interface DayPlan {
   readonly day: string;
   /** Her tasks of the day and of her routine, essential first, then by title. */
@@ -68,6 +77,8 @@ export interface DayPlan {
   readonly windows: readonly DayWindow[];
   /** The agency's suggestions dated that day, still to decide. */
   readonly suggestions: readonly CreatorSuggestion[];
+  /** The fans' cams booked that start that day, by start. */
+  readonly cams: readonly DayCam[];
 }
 
 const done = (ticks: readonly CreatorTick[], taskId: string, day: string): boolean =>
@@ -205,6 +216,10 @@ export function planOf(agenda: CreatorAgenda, day: string): DayPlan {
     timed: timed.sort((a, b) => a.start - b.start || a.end - b.end),
     windows: windowsOn(agenda.availabilities, day, zone),
     suggestions: agenda.suggestions.filter((suggestion) => suggestedOn(suggestion, day, zone, agenda.today)),
+    cams: agenda.cams
+      .filter((cam) => dayOf(cam.startsAt, zone) === day)
+      .map((cam) => ({ start: minuteOf(cam.startsAt, zone), end: minutesFrom(day, cam.endsAt, zone) }))
+      .sort((a, b) => a.start - b.start),
   };
 }
 
@@ -259,6 +274,7 @@ export interface ProposedAt {
 export type ProgramRow =
   | { readonly kind: 'task'; readonly item: TimedTask }
   | { readonly kind: 'proposed'; readonly at: ProposedAt }
+  | { readonly kind: 'cam'; readonly cam: DayCam }
   | {
       readonly kind: 'free';
       readonly start: number;
@@ -312,6 +328,7 @@ export function programOf(
   const placed = [
     ...plan.timed.map((item) => ({ start: item.start, end: item.end, row: { kind: 'task', item } as const })),
     ...proposed.map((at) => ({ start: at.start, end: at.end, row: { kind: 'proposed', at } as const })),
+    ...plan.cams.map((cam) => ({ start: cam.start, end: cam.end, row: { kind: 'cam', cam } as const })),
   ].sort((a, b) => a.start - b.start || a.end - b.end);
   let cursor = Math.min(PROGRAM_START, ...placed.map((one) => one.start));
   for (const one of placed) {
@@ -325,9 +342,11 @@ export function programOf(
       ? row.item.start
       : row.kind === 'proposed'
         ? row.at.start
-        : row.kind === 'free'
-          ? row.start
-          : 0;
+        : row.kind === 'cam'
+          ? row.cam.start
+          : row.kind === 'free'
+            ? row.start
+            : 0;
   if (now !== null && !plan.timed.some((item) => item.start <= now && now < item.end)) {
     const at = rows.findIndex((row) => startOf(row) >= now);
     rows.splice(at < 0 ? rows.length : at, 0, { kind: 'now', at: now });

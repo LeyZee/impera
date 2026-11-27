@@ -12,7 +12,7 @@ import { remind } from './application/remind';
 import type { Interval } from './domain/availability';
 import type { AgendaFeedEntry } from './domain/feed';
 import type { ShootGuard, ShootSuggestion, WeekAgendaStore } from './domain/ports';
-import { createDrizzleCreatorAgendaStore } from './infra/db/agenda-store';
+import { createDrizzleCreatorAgendaStore, type BookedCamsOf } from './infra/db/agenda-store';
 import { createCamRoomReader } from './infra/db/cam-reads';
 import { createDrizzleAgendaFeed } from './infra/db/feed-reads';
 import { createReminderSource } from './infra/db/reminder-source';
@@ -20,6 +20,8 @@ import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
 import { createDrizzleWeekAgendaStore } from './infra/db/week-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 
+/** @public The fans' cams booked with her, read by the orders' module for her agenda. */
+export type { BookedCamsOf } from './infra/db/agenda-store';
 /** @public An interval of her time, as instants. */
 export type { Interval } from './domain/availability';
 export type {
@@ -104,13 +106,15 @@ export interface CreatorTasksDeps {
   readonly guardShoot: ShootGuard;
   /** The `notifications` module's `notify`, null when push is off. */
   readonly notify: ((request: NotificationRequest, at: Date) => Promise<NotificationOutcome>) | null;
+  /** The fans' cams booked with her (`custom-orders`), shown in her agenda; late bound by the composition root. */
+  readonly bookedCams: BookedCamsOf;
   /** Tests only: another clock than the server's. */
   readonly clock?: () => Date;
 }
 
 export function createCreatorTasksModule(deps: CreatorTasksDeps): CreatorTasksModule {
   const suggestions = createDrizzleSuggestionStore(deps.db);
-  const agenda = createDrizzleCreatorAgendaStore(deps.db);
+  const agenda = createDrizzleCreatorAgendaStore(deps.db, deps.bookedCams);
   const source = createReminderSource(deps.adminDb);
   const { notify } = deps;
   return {

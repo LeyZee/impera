@@ -1600,6 +1600,45 @@
   font-size: inherit;
   color: var(--nv-ink-muted);
 }
+/* A fan's cam booked (ADR 0159 § 5): a solid tint of the cam's colour over its hatched dispo, under her tasks. */
+.ag-wk__cam {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ag-c) 26%, var(--nv-plate));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 55%, transparent);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink);
+  pointer-events: none;
+}
+.ag-wk__cam b {
+  font-weight: 600;
+}
+.ag-wk__cam .nv-num {
+  color: var(--nv-ink-muted);
+}
+/* The same cam in her list and her day: solid where its dispo is hatched. */
+.ag-dispo--booked {
+  gap: var(--nv-space-2);
+}
+.ag-cam {
+  background: color-mix(in srgb, var(--ag-c) 14%, var(--nv-plate));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 45%, transparent);
+}
+.ag-cam:hover {
+  background: color-mix(in srgb, var(--ag-c) 14%, var(--nv-plate));
+}
+
 .ag-wk__dispo span {
   position: absolute;
   top: 5px;

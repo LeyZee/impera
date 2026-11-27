@@ -1,7 +1,11 @@
 import { CreatorIdSchema, JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
-import { createCreatorTasksModule, type CreatorTasksModule } from '../modules/creator-tasks';
+import {
+  createCreatorTasksModule,
+  type BookedCamsOf,
+  type CreatorTasksModule,
+} from '../modules/creator-tasks';
 import type { NotificationsModule } from '../modules/notifications';
 import type { PersonaModule } from '../modules/persona';
 import { shootGuardFault } from '../modules/trends';
@@ -23,7 +27,12 @@ export interface WiredCreatorTasks {
  */
 export function wireCreatorTasks(
   shared: Shared,
-  deps: { readonly notifications: NotificationsModule; readonly persona: PersonaModule },
+  deps: {
+    readonly notifications: NotificationsModule;
+    readonly persona: PersonaModule;
+    /** Her cams booked with fans (`custom-orders`), late bound: that module looks for room in her agenda. */
+    readonly bookedCams: BookedCamsOf;
+  },
 ): WiredCreatorTasks {
   const limitsOf = personaLimitsOf(deps.persona);
   const module = createCreatorTasksModule({
@@ -34,6 +43,7 @@ export function wireCreatorTasks(
     guardShoot: async (creatorId, shoot) =>
       shootGuardFault(shoot, await limitsOf(CreatorIdSchema.parse(creatorId))),
     notify: deps.notifications.notify,
+    bookedCams: deps.bookedCams,
   });
   return {
     module,

@@ -221,7 +221,14 @@ const sameTask = (
   });
 
 /** `withCreatorAccount` for every reading and writing of her agenda (CR-05). */
-export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStore {
+/** The fans' cams booked with her between two instants (`custom-orders`), which her own account never reads. */
+export type BookedCamsOf = (
+  creatorId: string,
+  from: Date,
+  to: Date,
+) => Promise<readonly { readonly startsAt: Date; readonly endsAt: Date }[]>;
+
+export function createDrizzleCreatorAgendaStore(db: Database, bookedCams: BookedCamsOf): CreatorAgendaStore {
   async function liveTask(tx: Transaction, taskId: string): Promise<TaskRow> {
     const [row] = await tx
       .select()
@@ -282,6 +289,11 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
           availabilities: availabilityRows.map(availabilityViewOf),
           suggestions: suggestionRows.map(creatorSuggestionOf),
           streak: await streakNow(tx, zone, now),
+          // Her cams with fans, read for her by the orders' module: the slot only (ADR 0159 § 5).
+          cams: (await bookedCams(creatorId, from, to)).map((cam) => ({
+            startsAt: cam.startsAt.toISOString(),
+            endsAt: cam.endsAt.toISOString(),
+          })),
         };
       }),
 

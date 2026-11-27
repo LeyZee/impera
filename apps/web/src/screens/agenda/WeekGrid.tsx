@@ -21,7 +21,7 @@ import {
   timedSuggestionsOf,
   type Span,
 } from './grid';
-import { planOf, type DayPlan, type TimedTask } from './model';
+import { BOOKED_CAM_TITLE, planOf, type DayCam, type DayPlan, type TimedTask } from './model';
 import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, minuteOf, weekOf } from '@/scheduling/time';
@@ -372,16 +372,31 @@ export function WeekGrid({
                   }}
                 >
                   {window.opensTo === 'cam' ? (
-                    // An opening, not a cam booked: her words and its hours, as the tasks beside it (Design, 26/11).
-                    <span>
-                      <b>Dispo cam</b>
-                      <small className="nv-num">
-                        {clockOf(window.start)} – {clockOf(window.end % 1440)}
-                      </small>
-                    </span>
+                    // An opening, not a cam booked: her words and its hours, as the tasks beside it (Design, 26/11);
+                    // a cam booked near its top leaves room for its name only, or for nothing.
+                    <DispoCamLabel window={window} cams={plan.cams} />
                   ) : (
                     <span>Dispo</span>
                   )}
+                </div>
+              ))}
+              {plan.cams.map((cam) => (
+                // A fan's cam booked in her dispo cam (ADR 0159 § 5): above its dispo, below her tasks; when only.
+                <div
+                  key={`cam-${String(cam.start)}`}
+                  className="ag-wk__cam"
+                  data-opens-to="cam"
+                  aria-label={`${BOOKED_CAM_TITLE}, ${clockOf(cam.start)} – ${clockOf(cam.end % 1440)}`}
+                  style={{
+                    top: top(cam.start),
+                    height: height(cam.start, Math.min(cam.end, hours.last * 60)),
+                  }}
+                >
+                  {/* One line: a cam of 20 min is a thin block (Design, 27/11). */}
+                  <span>
+                    <span aria-hidden="true">📹</span> <b>Cam</b>{' '}
+                    <span className="nv-num">{clockOf(cam.start)}</span>
+                  </span>
                 </div>
               ))}
               <Column
@@ -549,5 +564,32 @@ function Column({
         );
       })}
     </>
+  );
+}
+
+/** Room left above the first cam booked in a dispo cam: under 20 min nothing, under 45 its name, else its hours too. */
+function DispoCamLabel({
+  window,
+  cams,
+}: {
+  window: { readonly start: number; readonly end: number };
+  cams: readonly DayCam[];
+}): JSX.Element | null {
+  const room = Math.min(
+    Infinity,
+    ...cams
+      .filter((cam) => cam.start < window.end && cam.end > window.start)
+      .map((cam) => cam.start - window.start),
+  );
+  if (room < 20) return null;
+  return (
+    <span>
+      <b>Dispo cam</b>
+      {room < 45 ? null : (
+        <small className="nv-num">
+          {clockOf(window.start)} – {clockOf(window.end % 1440)}
+        </small>
+      )}
+    </span>
   );
 }
