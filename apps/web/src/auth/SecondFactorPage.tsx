@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from
 import { BackupCodesList, CopyButton } from './BackupCodesList';
 import { PasskeyOffer } from './PasskeyOffer';
 import { PublicBrand } from './PublicBrand';
+import { QrCode } from './QrCode';
 import { chosenPassword, forgetChosenPassword } from './chosen-password';
 import { deviceHoldsPasskeys, passkeyOffered } from './passkeys';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
@@ -197,9 +198,13 @@ export function SecondFactorPage({
                 Ajoute Impera dans ton application
               </h1>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                Sur ton téléphone, touche le bouton. Sur un ordinateur, choisis « Saisir une clé » dans
-                l’application et recopie celle-ci.
+                Sur ton téléphone, touche le bouton. Sur un ordinateur, scanne le code avec l’application, ou
+                choisis « Saisir une clé » et recopie celle-ci.
               </p>
+            </div>
+            {/* A computer's screen only: a phone cannot scan itself, its button opens the app (recette 27/11, G7). */}
+            <div className="hidden justify-center sm:flex">
+              <QrCode text={setup.totpURI} label="Code à scanner avec l’application" />
             </div>
             <a className="nv-btn nv-btn--soft" href={setup.totpURI}>
               Ouvrir dans l’application
