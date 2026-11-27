@@ -10,6 +10,7 @@ import {
   lastMessageAgo,
   mergeConversations,
   orderLines,
+  outageZone,
   parseTrackingSearch,
   sharedLabel,
   sharedMode,
@@ -278,5 +279,14 @@ describe('the desire score in the list (P3-12)', () => {
     const ids = (ordered: typeof lines) => ordered.map((l) => l.conversation.id.slice(-1));
     expect(ids(orderLines(lines, 'hot'))).toEqual(['3', '2', '4', '1']);
     expect(ids(orderLines(lines, 'recent'))).toEqual(['1', '2', '3', '4']);
+  });
+});
+
+describe('outageZone (recette 27/11, A9)', () => {
+  it('says the outage at her clock when her creators share one, the reader’s otherwise', () => {
+    expect(outageZone(['Europe/Paris', 'Europe/Paris'])).toBe('Europe/Paris');
+    const reader = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(outageZone(['Europe/Paris', 'America/Montreal'])).toBe(reader);
+    expect(outageZone([])).toBe(reader);
   });
 });

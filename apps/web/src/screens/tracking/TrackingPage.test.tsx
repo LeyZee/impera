@@ -661,6 +661,11 @@ describe('TrackingPage', () => {
     expect(within(queue).getAllByRole('listitem')[0]?.textContent).toContain('IA indisponible · 2 fans');
     expect(screen.queryByText(/IA de retour/u)).toBeNull();
     expect(screen.queryByRole('button', { name: /Rendre la main à l’agent \(/u })).toBeNull();
+    // The header no longer promises the copilot's drafts: no draft comes during the outage.
+    expect(
+      screen.getByText('IA indisponible : l’agent n’écrit plus, chaque fan attend une réponse humaine.'),
+    ).toBeDefined();
+    expect(screen.queryByText(/En copilote/u)).toBeNull();
   });
 
   it('narrows the list to the fans of a group on a click, and gives it back whole (recette 27/11, G14, PRO-10)', async () => {
@@ -695,7 +700,9 @@ describe('TrackingPage', () => {
         .getAllByRole('listitem')
         .map((row) => row.textContent),
     ).toEqual([expect.stringContaining('Fan 1'), expect.stringContaining('Fan 2')]);
-    expect(screen.getByText(/Seulement les 2 fans de « IA de retour »/u)).toBeDefined();
+    // Said under the group pressed, where the eye is, not under the phone's tab bar.
+    const note = screen.getByText(/Seulement les 2 fans de « IA de retour »/u);
+    expect(group.closest('li')?.contains(note)).toBe(true);
     // Nothing opens: the list is narrowed, the reader stays where it was.
     expect(screen.getByText(/Choisis une conversation à gauche/u)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Tout afficher' }));

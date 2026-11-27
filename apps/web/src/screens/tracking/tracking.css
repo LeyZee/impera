@@ -1005,3 +1005,26 @@
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
+
+/* The group the list is narrowed to (recette 27/11, PRO-10): marked as chosen, a ring and a ground, in both themes. */
+.tr-group > .tr-row[aria-pressed='true'] {
+  background: var(--nv-select-strong);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--nv-ink) 32%, transparent);
+}
+/* Under it, where the eye is, aligned with the rest of the list: what the list shows now, and how to see it whole. */
+.tr-group__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-1) var(--nv-space-2);
+  margin: 0;
+  padding: var(--nv-space-2) var(--nv-space-3) var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-align: left;
+}
+/* Its button starts where the sentence does, not indented by its own padding. */
+.tr-group__filter > .nv-btn {
+  padding-inline: 0;
+}

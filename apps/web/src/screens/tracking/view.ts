@@ -1,7 +1,7 @@
 import type { ConversationMode, ConversationState, ConversationSummary } from '@impera/contracts';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
-import { clockAt } from '@/scheduling/time';
+import { clockAt, readerZone } from '@/scheduling/time';
 
 /** The labels of `nv-status--<state>` (docs/design/README.md, « Pastilles d'état »). */
 export const STATE_LABELS: Readonly<Record<ConversationState, string>> = {
@@ -199,6 +199,10 @@ export const MODE_MEANINGS: Readonly<Record<ConversationMode, string>> = {
   auto: 'En automatique : l’agent répond seul.',
 };
 
+/** Suivi's line under its title while no model answers (recette 27/11, A9): no draft comes, whatever the mode. */
+export const OUTAGE_MEANING =
+  'IA indisponible : l’agent n’écrit plus, chaque fan attend une réponse humaine.';
+
 /** The emoji of a desire band that says something, before its word (D-03: a category is an emoji). */
 export const DESIRE_BAND_EMOJIS = { playful: '😏', hot: '🔥' } as const;
 
@@ -259,6 +263,13 @@ export function outageWords(outage: { readonly since: string | null }, timeZone:
   return outage.since === null
     ? 'IA indisponible, un humain répond.'
     : `IA indisponible depuis ${clockAt(outage.since, timeZone)}, un humain répond.`;
+}
+
+/** The clock an outage is said at: her creators' zone when they share one, the reader's otherwise (A9). */
+export function outageZone(timezones: readonly string[]): string {
+  const zones = new Set(timezones);
+  const [only] = zones;
+  return zones.size === 1 && only !== undefined ? only : readerZone();
 }
 
 /** How « Toutes les conversations » is ordered: the most recent first unless the reader asks for the hottest. */

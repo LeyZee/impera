@@ -23,10 +23,12 @@ import {
   LIST_ORDER_LABELS,
   LIST_ORDERS,
   MODE_MEANINGS,
+  OUTAGE_MEANING,
   mergeConversations,
   onlyConversations,
   orderLines,
   outageWords,
+  outageZone,
   readListOrder,
   searchLines,
   sharedMode,
@@ -45,7 +47,6 @@ import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queu
 import { useCreators } from '@/creators/api';
 import { creatorsOverviewQuery } from '@/creators/overview/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
-import { readerZone } from '@/scheduling/time';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { ChatArt, CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
@@ -203,8 +204,6 @@ export function TrackingPage({
         );
   // No model answers (recette 27/11, A9): said once above everything, at her clock when her creators share one.
   const aiOutage = queue.data?.aiOutage ?? null;
-  const zones = new Set(creators.map((creator) => creator.timezone));
-  const outageZone = zones.size === 1 ? (creators[0]?.timezone ?? readerZone()) : readerZone();
   const open =
     selected === null
       ? null
@@ -223,7 +222,16 @@ export function TrackingPage({
         title={nav === undefined ? 'Suivi' : screenLabel('/suivi')}
         // Only what the mode means: the panels say the rest themselves (D-03).
         // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
-        lead={mode === null || offShift !== undefined ? undefined : MODE_MEANINGS[mode]}
+        // During an outage no draft comes: the mode's promise would be false, the outage is said instead (A9).
+        lead={
+          offShift !== undefined
+            ? undefined
+            : aiOutage !== null
+              ? OUTAGE_MEANING
+              : mode === null
+                ? undefined
+                : MODE_MEANINGS[mode]
+        }
         tabs={nav}
       />
       {offShift?.(lines.length > 0)}
@@ -240,7 +248,7 @@ export function TrackingPage({
         <Panel className="tr-stop">
           <p className="tr-stop__in" role="status">
             <span className="nv-orb nv-tone--bad" aria-hidden="true" />
-            <strong>{outageWords(aiOutage, outageZone)}</strong>
+            <strong>{outageWords(aiOutage, outageZone(creators.map((creator) => creator.timezone)))}</strong>
           </p>
         </Panel>
       )}
@@ -326,6 +334,9 @@ export function TrackingPage({
                         onFilter={() => {
                           setGroupFilter((current) => (current === entry.key ? null : entry.key));
                         }}
+                        onShowAll={() => {
+                          setGroupFilter(null);
+                        }}
                       />
                     ),
                   )}
@@ -364,20 +375,6 @@ export function TrackingPage({
                     }}
                   />
                 ) : null}
-                {filterGroup === undefined ? null : (
-                  <p className="tr-more tr-more--action" role="status">
-                    {`Seulement les ${fansWaiting(filterGroup.todos.length)} de « ${todoLabel(filterGroup.oldest)} »`}{' '}
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--plain nv-btn--sm"
-                      onClick={() => {
-                        setGroupFilter(null);
-                      }}
-                    >
-                      Tout afficher
-                    </button>
-                  </p>
-                )}
                 <label className="tr-search">
                   <span className="sr-only">Chercher un fan par son pseudo</span>
                   <input
@@ -616,6 +613,7 @@ function QueueGroupRow({
   withCreator,
   isFiltering,
   onFilter,
+  onShowAll,
 }: {
   group: Extract<QueueEntry<CreatorTodo>, { kind: 'group' }>;
   /** The owner or a manager: the agent's hand given back to every fan behind an outage at once (recette 27/11, G14). */
@@ -624,6 +622,7 @@ function QueueGroupRow({
   /** The list shows these fans only. */
   isFiltering: boolean;
   onFilter: () => void;
+  onShowAll: () => void;
 }): JSX.Element {
   const { oldest } = group;
   // Only once a model answers again (A9, PARC-04): during the outage the hand given back would come straight back.
@@ -651,6 +650,15 @@ function QueueGroupRow({
         </span>
         <span className="nv-convo__side tr-wait">{duration(oldest.waitingMinutes)}</span>
       </button>
+      {/* Said under the group just pressed, where the eye is: on a phone the list below is out of sight (PRO-10). */}
+      {isFiltering ? (
+        <p className="tr-group__filter" role="status">
+          <span>{`Seulement les ${fansWaiting(group.todos.length)} de « ${todoLabel(oldest)} » dans la liste.`}</span>
+          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onShowAll}>
+            Tout afficher
+          </button>
+        </p>
+      ) : null}
       {canGiveBack && givesBack ? <GiveBackAll todos={group.todos} /> : null}
     </li>
   );
