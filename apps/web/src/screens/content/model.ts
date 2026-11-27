@@ -510,6 +510,12 @@ export function lengthOf(ms: number): string {
   return `${String(Math.floor(seconds / 60))} min ${String(seconds % 60).padStart(2, '0')}`;
 }
 
+/** « 0:08 », « 1:05 »: a video's length on its thumbnail's corner, as her phone's gallery writes it (Charles, 27/11). */
+export function clockOf(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 /**
  * A chosen file as she reads it in the sheet (recette CRE-16): « Photo », « Vidéo · 8 s », « Vocal · 12 s »; never its
  * name (« IMG_4032.HEIC » tells her nothing). « Fichier » for a type we do not take.
