@@ -649,8 +649,8 @@
 }
 .nv-switch:checked,
 .nv-switch[data-state='checked'] {
-  background: var(--nv-neon-solid);
-  box-shadow: var(--nv-shadow-neon-soft);
+  background: var(--nv-switch-on);
+  box-shadow: var(--nv-shadow-switch-on);
 }
 .nv-switch:checked::before,
 .nv-switch[data-state='checked']::before {
@@ -1226,11 +1226,12 @@
   caret-color: var(--nv-neon);
   transition: box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
+/* The field one writes in keeps its plate: a fine edge of ink and a soft halo say where the caret is, without the
+   heavy dark frame on a grey fill it wore before (Charles, 21/11). The edge holds 3:1 on the plate (contrast test). */
 .nv-field__control:focus {
-  background: var(--nv-select);
   box-shadow:
-    inset 0 0 0 1px var(--nv-plate-edge),
-    var(--nv-shadow-focus);
+    inset 0 0 0 1.5px color-mix(in srgb, var(--nv-ink) 50%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--nv-ink) 9%, transparent);
 }
 .nv-field__control::placeholder {
   color: var(--nv-ink-faint);
@@ -1322,6 +1323,79 @@
   outline-offset: -1px;
   color: var(--nv-ink-muted);
 }
+/* Tinted by its category (--_c: a content, series or state colour): a faint fill and a full dot of that colour, the
+   words in ink so they read on any tint. The 16 % is held by the contrast test. */
+.nv-tag--tint {
+  background: color-mix(in srgb, var(--_c, var(--nv-ink-faint)) 16%, transparent);
+  color: var(--nv-ink);
+}
+.nv-tag--tint::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c, var(--nv-ink-faint));
+}
+/* ───────────── Note: a sentence set apart inside a card ─────────────
+   <p class="nv-note">: something to know, on a quiet ground. --warn: something she or the team must do or mind, tinted
+   amber; --danger: what must never be done, tinted red. The words stay in ink; a title inside (`nv-note__title`) carries
+   the tone on a dot. Never a bar on its side. */
+.nv-note {
+  --_c: transparent;
+  display: grid;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+}
+.nv-note--warn {
+  --_c: var(--nv-warning);
+}
+.nv-note--danger {
+  --_c: var(--nv-danger);
+}
+.nv-note--warn,
+.nv-note--danger {
+  background: color-mix(in srgb, var(--_c) 12%, transparent);
+}
+.nv-note__title {
+  margin: 0;
+  font-weight: 650;
+}
+/* The tone on a dot before the title, as the tinted tag does: red on its own tint does not hold 4.5:1 in Jour. */
+:is(.nv-note--warn, .nv-note--danger) > .nv-note__title::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+  vertical-align: 1px;
+}
+
+/* The same pill where it is read at arm's length (the copilot's fan card): 26 px, footnote text, a larger dot. */
+.nv-tag--lg {
+  gap: 6px;
+  height: auto;
+  min-height: var(--nv-pill-info-lg);
+  padding: 3px 10px;
+  box-sizing: border-box;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 500;
+  white-space: normal;
+}
+.nv-tag--lg.nv-tag--tint::before {
+  width: 7px;
+  height: 7px;
+}
 /* A counter (what waits behind a tab, unread messages, a rank): 18 px, 11 px figures, ink on a quiet fill. Never an
    alarm by itself: a screen that needs the amber or the red says so with a modifier of its own (COH-08). */
 .nv-count {
@@ -1394,7 +1468,16 @@
 .nv-stat__spark .nv-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: nv-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
+  animation: nv-stat-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
+}
+/* The sparkline is stretched to the tile (preserveAspectRatio="none") with a non-scaling stroke, and the browser
+   then measures the dash on screen: a dash of 1 stops at the viewBox's own width, short of the edge of any wider
+   tile. The draw therefore ends on a pattern with no gap, which is a whole line at every width. */
+@keyframes nv-stat-draw {
+  to {
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
+  }
 }
 /* The one stat that matters most on the screen: lit by the neon, like the single neon button. */
 .nv-stat--hero {
@@ -1781,6 +1864,303 @@
 }
 .nv-disclosure[open] .nv-disclosure__body {
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+
+/* ───────────── Guide: a hard gesture, folded beside its screen and in Moi › Aide ─────────────
+   <details class="nv-guide" style="--_c: var(--nv-content-5)">: one colour per page (the person's), carried by the
+   icon tile, the tint behind the step numbers and the open guide's rim; every word and figure stays in ink, so the
+   colour never carries small text (contrast test: nv-guide). Steps say what to do, then « Tu dois voir » what proves
+   it; « À savoir » on a tile, « Jamais » in the danger colour, « Si ça coince » in amber. « Essentiel » and the chips
+   are nv-tag nv-tag--tint. Validated by Charles, 21/11. */
+.nv-guide {
+  --_c: var(--nv-ink);
+  border-radius: var(--nv-radius-lg);
+  border: 1px solid var(--nv-plate-edge);
+  background: var(--nv-plate);
+  overflow: clip;
+  interpolate-size: allow-keywords;
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
+  transition: border-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide:hover {
+  border-color: color-mix(in srgb, var(--_c) 35%, var(--nv-plate-edge));
+}
+.nv-guide[open] {
+  border-color: color-mix(in srgb, var(--_c) 40%, transparent);
+}
+.nv-guide > summary {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto 28px;
+  gap: 14px;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 16px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide > summary::-webkit-details-marker {
+  display: none;
+}
+.nv-guide > summary:hover {
+  background: var(--nv-glass-fill);
+}
+.nv-guide > summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.nv-guide__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--_c);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 26%, transparent);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__icon svg {
+  width: 21px;
+  height: 21px;
+}
+.nv-guide > summary:hover .nv-guide__icon {
+  transform: rotate(-8deg) scale(1.08);
+}
+.nv-guide[open] .nv-guide__icon {
+  background: var(--_c);
+  color: var(--nv-void);
+  box-shadow: none;
+}
+.nv-guide__head {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.nv-guide__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+}
+.nv-guide__sum {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* « Essentiel »: an nv-tag nv-tag--tint in gold whose dot is a star, the only gold of the page. */
+.nv-guide__key::before {
+  content: none;
+}
+.nv-guide__key svg {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  color: var(--_c);
+}
+.nv-guide__time {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+.nv-guide__chev {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--nv-glass-fill);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__chev::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.7px solid var(--nv-ink-muted);
+  border-bottom: 1.7px solid var(--nv-ink-muted);
+  transform: rotate(45deg);
+}
+.nv-guide[open] .nv-guide__chev {
+  transform: rotate(180deg);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+}
+.nv-guide[open] .nv-guide__chev::after {
+  border-color: var(--nv-ink);
+}
+.nv-guide::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size var(--nv-dur-base) var(--nv-ease-out),
+    content-visibility var(--nv-dur-base) allow-discrete;
+}
+.nv-guide[open]::details-content {
+  block-size: auto;
+}
+.nv-guide__body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 20px 22px 72px;
+}
+.nv-guide[open] .nv-guide__body > * {
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(n + 4) {
+  animation-delay: 180ms;
+}
+.nv-guide__why {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+}
+.nv-guide__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The steps: numbered in the page's colour, linked by a thread; each proves itself with « Tu dois voir ». */
+.nv-guide__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  counter-reset: nv-guide-step;
+}
+.nv-guide__steps > li {
+  counter-increment: nv-guide-step;
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: var(--nv-radius-sm);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__steps > li:hover {
+  background: var(--nv-glass-fill);
+}
+.nv-guide__steps > li::before {
+  content: counter(nv-guide-step);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 45%, transparent);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-guide__steps > li:hover::before {
+  transform: scale(1.08);
+}
+.nv-guide__steps > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 40px;
+  bottom: -6px;
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--_c) 22%, transparent);
+}
+.nv-guide__do {
+  font-weight: 600;
+}
+.nv-guide__see {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* « Tu dois voir : » steps back, so the proof stands out. */
+.nv-guide__see-label {
+  color: var(--nv-ink-faint);
+}
+.nv-guide__box {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.nv-guide__box h4 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.nv-guide__box ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.nv-guide__box--never {
+  background: color-mix(in srgb, var(--nv-danger) 9%, transparent);
+}
+.nv-guide__box--never h4 {
+  color: var(--nv-danger);
+}
+.nv-guide__box--stuck {
+  background: color-mix(in srgb, var(--nv-warning) 11%, transparent);
+}
+.nv-guide__box--stuck h4 {
+  color: var(--nv-warning);
+}
+@media (max-width: 560px) {
+  .nv-guide > summary {
+    grid-template-columns: 42px minmax(0, 1fr) 28px;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .nv-guide__time {
+    display: none;
+  }
+  .nv-guide__body {
+    padding: 4px 16px 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-guide,
+  .nv-guide[open] .nv-guide__body > * {
+    animation: none;
+  }
+  .nv-guide::details-content {
+    transition: none;
+  }
+  .nv-guide > summary:hover .nv-guide__icon,
+  .nv-guide__steps > li:hover::before {
+    transform: none;
+  }
 }
 
 /* ───────────── Charts ───────────── */
@@ -2209,6 +2589,20 @@
   background: var(--_c, var(--nv-data-1));
   transform-origin: left;
   animation: nv-widen var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
+}
+/* The objective on the same track: a thin line across it, a little taller than the track so it reads over the fill. */
+.nv-meter:has(.nv-meter__mark) {
+  overflow: visible;
+}
+.nv-meter__mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--_m);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
 }
 @keyframes nv-widen {
   from {
@@ -2973,13 +3367,13 @@
   gap: 6px;
   padding: 12px 14px;
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  background: var(--nv-tile-fill);
   transition:
     background-color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .nv-tile:hover {
-  background: var(--nv-glass-fill-strong);
+  background: var(--nv-tile-fill-strong);
   transform: translateY(-1px);
 }
 .nv-tile__label {
@@ -3058,6 +3452,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* The value's glow reaches past the box: cut by it, it shows as a square behind the ring. */
+  overflow: visible;
   transform: rotate(-90deg);
 }
 .nv-ring__track,
@@ -3085,6 +3481,98 @@
   line-height: 1;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Steps: where something stands on a short path (sent, seen, settled). One node per step, joined by a line; what is
+   reached is filled with --_c and ticked, the step it stands on wears a halo, what is ahead stays a hollow ring. The
+   word and its time sit centred under each node. Colour: --_c, the data's ink by default (amber for a warning, the
+   danger for an urgency, as the screen decides). */
+.nv-steps {
+  --_c: var(--nv-data-1);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-steps__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+/* The line from the node before, edge to edge: it never runs under a node. */
+.nv-steps__step + .nv-steps__step::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: calc(-50% + 17px);
+  right: calc(50% + 17px);
+  height: 2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.nv-steps__step[data-done='true']::before {
+  background: var(--_c);
+}
+.nv-steps__node {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
+  border-radius: var(--nv-radius-full);
+  box-shadow: inset 0 0 0 2px var(--nv-fill-track);
+  color: var(--nv-void);
+  transition:
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.nv-steps__node > svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nv-steps__step[data-done='true'] > .nv-steps__node {
+  background: var(--_c);
+  box-shadow: none;
+  animation: nv-steps-in var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.nv-steps__step[aria-current='step'] > .nv-steps__node {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--_c) 24%, transparent);
+}
+.nv-steps__label {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.nv-steps__step[data-done='true'] > .nv-steps__label {
+  color: var(--nv-ink);
+}
+.nv-steps__when {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+@keyframes nv-steps-in {
+  from {
+    transform: scale(0.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-steps__step[data-done='true'] > .nv-steps__node {
+    animation: none;
+  }
 }
 
 /* What the percentage counts (« agent »), under it. */
@@ -3537,6 +4025,10 @@
   .nv-stat__spark .nv-draw,
   .nv-chart__line {
     stroke-dashoffset: 0;
+  }
+  /* Same reason as nv-stat-draw: without the draw, no dash at all, so the line reaches the edge of a wide tile. */
+  .nv-stat__spark .nv-draw {
+    stroke-dasharray: none;
   }
   .nv-btn,
   .nv-iconbtn,

@@ -1,5 +1,5 @@
 # INS-04 Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués
-Statut : in progress (lot a fait, lot c écrit hors évals et branchement ; tout se fait contre `FakeInstagram` ; l'essai réel attend le compte professionnel, l'application Meta et le mot écrit de Charles)
+Statut : in progress (lot a fait, lot c écrit hors évals et branchement ; lot e en cours : sa voix calibrée sur ses vraies réponses ; tout se fait contre `FakeInstagram` ; l'essai réel attend le compte professionnel, l'application Meta et le mot écrit de Charles)
 Phase : Instagram (ADR 0122)
 Dépend de : ADR 0122 acceptée ; INS-01 (faux, contrats, branchement) ; le contrat des notes accordé avec le fil Playground
 Branche : task/ins-04-instagram-comments
@@ -39,6 +39,18 @@ Lot d, entraînement et écrans (fils Playground et Design) :
 - [ ] Banque d'exemples « commentaire », par créatrice et par version de persona ; compteur d'autonomie calculé depuis les notes (seule « validée » compte, une nouvelle persona redemande une série).
 - [ ] CRM : réponses préparées à envoyer, corriger ou refuser ; commentaires masqués avec « Réafficher » ; relais à un humain.
 - [ ] Captures Nuit/Jour, téléphone et PC, vues par Design puis par Charles avant fusion.
+
+Lot e, sa voix calibrée sur ses vraies réponses (amendement du 26/11 de l'ADR 0122) :
+- [x] Prompt `voice/instagram-comment` 1.1.0 : ses vraies réponses d'abord, suggéré jamais cru, deux emojis au plus, une question seulement quand le code la permet.
+- [x] Choix par le code des cinq paires les plus proches (`nearExamples`, sans modèle), dans le bloc `her_replies` du message.
+- [x] Questions : `mayAskQuestion` (une réponse sur trois, bornée de deux à dix), garde `unwanted_question`.
+- [x] `pnpm comment-calibration` : passage à l'aveugle sur le PC, chiffres seuls en sortie.
+- [ ] Banque en base et import de l'export par le propriétaire dans le CRM (attend la forme de l'export, fil Bilan ; table neuve, migration numérotée par Bilan).
+- [x] Premier calibrage sur le PC (40 commentaires, 0,83 $) : emojis variés, plus d'exclamations, questions quand le code les permet (prompt).
+- [x] Corrections de la créatrice sur la feuille à l'aveugle : jamais d'intimité en public (prompt 1.2.0), « je t'aime » reçoit des emojis seulement (`declaresLove`, garde `words_in_emoji_reply`).
+- [x] Second calibrage (période des assistants écartée, relu sur le PC) : forme de sa réponse la plus proche dite par le code (`replyShapeOf`), compliment remercié simplement, marqueur « [pseudo] » retiré (prompt 1.3.0).
+- [x] Troisième calibrage : longueur de sa réponse la plus proche dite au modèle ; un merci court peut revenir (`repeated_reply` assoupli pour moins de trois mots).
+- [ ] Quatrième calibrage et comparaison.
 
 ## Critères d'acceptation
 - Tout passe contre `FakeInstagram` ; aucun appel réel à Meta dans un test.

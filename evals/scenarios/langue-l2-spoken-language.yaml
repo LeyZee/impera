@@ -1,0 +1,14 @@
+# Langue du fan, L2 (ADR 0168) : il écrit dans une autre langue qu'elle parle, elle répond dans sa langue, sans une
+# phrase française. La spécification le dit pour l'italien ; la persona de démonstration parle espagnol et non italien,
+# le scénario le joue donc en espagnol. Fan et messages fictifs (ADR 0010).
+description: Il écrit en espagnol, une langue de sa fiche ; elle répond en espagnol, aucune phrase française.
+persona_version: demo
+tier: full
+inbound: hola guapa, ¿qué tal tu día? me encantan tus fotos
+expect:
+  voice:
+    bubbles_min: 1
+    must_match_any:
+      - \b(gracias|que|me|mi|tu|el|la|y|muy|hoy)\b
+    must_not_match:
+      - \b(je|toi|et|pas|une|les|c’est|c'est|merci|journée)\b

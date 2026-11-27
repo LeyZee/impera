@@ -38,6 +38,8 @@ export const FAMILY_OF: Readonly<Record<NotificationReason, InboxFamily>> = {
   creator_alert: 'alert',
   safety_alert: 'safety',
   owner_change: 'safety',
+  decision: 'day',
+  payout_change: 'safety',
 };
 
 export const FAMILY_WORDS: Readonly<Record<InboxFamily, string>> = {
@@ -129,7 +131,7 @@ export function headline(items: readonly NotificationInboxItem[]): {
 export const FAMILY_ICON = {
   money: 'pay',
   day: 'today',
-  team: 'people',
+  team: 'team',
   alert: 'bell',
   safety: 'shield',
 } as const satisfies Readonly<Record<InboxFamily, NavIconName>>;

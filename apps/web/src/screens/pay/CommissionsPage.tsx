@@ -16,6 +16,7 @@ import { useEffect, useState, type JSX } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
 import { MyDaysCard, MyFiguresAside } from './MyFigures';
+import { MySaleClaimsPanel } from './MySaleClaimsPanel';
 import { MySalesPanel } from './MySalesPanel';
 import { useAgencySettingsDown, useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
 import { Chip, Empty, Gauge, GoalTicks, Loading, MoneyPath, Unreachable } from './parts';
@@ -275,6 +276,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 expected={statement.lines.some((line) => line.base === 'platform_net')}
                 now={now}
               />
+              <MySaleClaimsPanel />
               {plain ? (
                 <p className="py-quiet py-me__none">
                   {chatter ? 'Pas de palier ni d’objectif d’équipe sur cette quinzaine. ' : ''}Tes relevés

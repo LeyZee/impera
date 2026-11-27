@@ -48,6 +48,7 @@ export const JOB_NAMES = [
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
+  'conversation.settle_placed',
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
@@ -72,6 +73,7 @@ export const JOB_NAMES = [
   'scheduling.check_agency_shares',
   'scheduling.check_reports',
   'scheduling.remind_reports',
+  'scheduling.notify_incident',
   'team.apply_roles',
   'team.member_departure',
   'owners.watch',
@@ -90,6 +92,7 @@ export const JOB_NAMES = [
   'payroll.purge_refused_documents',
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
+  'payroll.notify_payout_change',
   'media.describe',
   'media.describe_vault',
   'content_drops.receive_file',
@@ -101,6 +104,7 @@ export const JOB_NAMES = [
   'content_drops.describe_backlog',
   'content_drops.make_thumbnail',
   'content_drops.thumbnail_backlog',
+  'instagram_captions.propose',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
   'providers.check_credentials',
@@ -133,6 +137,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
+  'conversation.settle_placed': 'Brouillons placés dans Reveal',
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
@@ -157,6 +162,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
+  'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
   'team.apply_roles': 'Rôles de l’équipe',
   'team.member_departure': 'Départ d’un membre',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
@@ -175,6 +181,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.purge_refused_documents': 'Nettoyage des documents refusés',
   'payroll.settle_documents': 'Règlement des documents',
   'payroll.lock_payout_certificate': 'Attestation de paiement',
+  'payroll.notify_payout_change': 'Où te verser changé',
   'media.describe': 'Description des médias',
   'media.describe_vault': 'Description des médias du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
@@ -184,6 +191,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'content_drops.describe_backlog': 'Rattrapage des descriptions',
+  'instagram_captions.propose': 'Légendes proposées pour ses Reels',
   'content_drops.make_thumbnail': 'Vignettes des médias déposés',
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
@@ -252,6 +260,8 @@ export const JOB_PAYLOADS = {
         kind: z.literal('operator_note'),
         note: z.string().min(1).max(300),
         at: z.iso.datetime(),
+        /** Who left it, shown on his card (trou béant 17); absent from a job queued before 21/11. */
+        userId: UserIdSchema.optional(),
       }),
     ]),
   }),
@@ -262,6 +272,11 @@ export const JOB_PAYLOADS = {
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
   /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
   'conversation.release_unavailable': z.object({}),
+  /**
+   * The window of a draft placed from the copilot panel closed (ADR 0086 § 5): what left of it decides its verdict,
+   * nothing left and it expires. One per draft (`settlePlacedJobKey`); a draft decided before is left as it is.
+   */
+  'conversation.settle_placed': conversationJob.extend({ draftId: DraftIdSchema }),
   'connector.dispatch': z.object({}),
   'connector.poll': z.object({
     creatorId: CreatorIdSchema,
@@ -364,6 +379,8 @@ export const JOB_PAYLOADS = {
    * the next one within its window, never later.
    */
   'scheduling.remind_reports': z.object({}),
+  // The creator rides with the feedback so that the read of its facts is bounded to her (Sécurité, #992).
+  'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -464,6 +481,16 @@ export const JOB_PAYLOADS = {
    * not locked yet (`null`). A bucket that does not answer fails the run, never the transfer.
    */
   'payroll.lock_payout_certificate': z.object({ statementId: CommissionStatementIdSchema.nullable() }),
+  /**
+   * A member's « Où te verser » changed (ADR 0165 § 5): told to his own devices (his account, read with the write, so
+   * that the job needs no service-role read), the version's id as its object.
+   */
+  'payroll.notify_payout_change': z.object({
+    memberId: TeamMemberIdSchema,
+    versionId: z.uuid(),
+    userId: z.string().min(1),
+    timeZone: z.string().min(1),
+  }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -524,6 +551,16 @@ export const JOB_PAYLOADS = {
    * put off by itself when the day's budget is spent or the disk short. Nothing while her switch is off (§ 9).
    */
   'content_drops.describe_file': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
+   * A medium of hers was described: three captions are proposed for each live Reel that holds it, on a decision card
+   * (ADR 0164 § 9). Enqueued after each description under `instagram_captions.propose:<id>`; put off by itself when the
+   * day's budget is spent. Replayable: a Reel already asked is left alone.
+   */
+  'instagram_captions.propose': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
     correlationId: z.string().min(1),
@@ -629,6 +666,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
   'conversation.release_unavailable': 1,
+  'conversation.settle_placed': 3,
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
@@ -665,6 +703,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.check_reports': 1,
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
+  'scheduling.notify_incident': 3,
   'team.apply_roles': 1,
   'team.member_departure': 5,
   // Every minute: the next run is the retry.
@@ -699,6 +738,7 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.settle_documents': 5,
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
+  'payroll.notify_payout_change': 5,
   'media.describe': 3,
   // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
   'media.describe_vault': 3,
@@ -713,6 +753,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.drop_received': 5,
   // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
   'content_drops.describe_file': 5,
+  // Every model failed: a few tries; a spent budget is not a failure, the job puts itself off.
+  'instagram_captions.propose': 5,
   // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
   'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.
@@ -781,6 +823,11 @@ export function reopenJobKey(creatorId: string): string {
  */
 export function pauseEndJobKey(creatorId: string): string {
   return `conversation.reopen:pause:${creatorId}`;
+}
+
+/** The one settling of a placed draft (ADR 0086 § 5): placed again, it is not scheduled twice. */
+export function settlePlacedJobKey(draftId: string): string {
+  return `conversation.settle_placed:${draftId}`;
 }
 
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {

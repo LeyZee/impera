@@ -15,6 +15,15 @@ describe('where things stand with him (ADR 0086 § 3.1)', () => {
     expect(standingOf('unread', null)).toMatchObject({ unread: true, noContact: false });
   });
 
+  // ADR 0141 § 9: the panel cuts the sale and masks what is intimate by itself while his age is contested.
+  it('says when his age is contested, in the glossary word', () => {
+    expect(standingOf({ ageDisputed: { since: '2026-11-08T18:00:00Z', by: 'policy' } }, 'hot')).toMatchObject(
+      { stops: ['Âge contesté'], ageDisputed: true },
+    );
+    expect(standingOf({}, null).ageDisputed).toBe(false);
+    expect(standingOf('unread', null).ageDisputed).toBe(false);
+  });
+
   // Bilan's review: closed by default, nothing to copy until his limits are read.
   it('withholds the text to copy unless his limits are read and allow a word', () => {
     expect(withheldOf(null)).toBe('unread');

@@ -40,18 +40,28 @@
     position: relative;
     min-height: 0;
   }
-  .tr-aside .tr-card__head > .nv-btn--plain {
+  .tr-aside .tr-card__field:not(.tr-card__field--other) .tr-card__head > .nv-btn--plain {
     position: absolute;
     inset: 0 0 0 auto;
     margin-block: auto;
   }
-  .tr-aside .tr-card__field:not(:hover, :focus-within) .tr-card__head > .nv-btn--plain {
+  /* « Retirer » stays on every line of « Autres », at its edge: a line one can take off says so without the pointer
+   * (Design, recette du 21/11). */
+  .tr-aside
+    .tr-card__field:not(.tr-card__field--other, :hover, :focus-within)
+    .tr-card__head
+    > .nv-btn--plain {
     opacity: 0;
   }
   /* An unknown field says so at the edge, where « Ajouter » takes its place under the pointer. */
   .tr-aside .tr-card__field:is(:hover, :focus-within) .tr-card__empty {
     visibility: hidden;
   }
+}
+/* A line of « Autres » fills its row, so that « Retirer » ends on the edge like « Corriger » and « Ajouter ». */
+.tr-card__value.tr-card__other {
+  flex: 1;
+  min-width: 0;
 }
 .tr-card__hint {
   color: var(--nv-ink-faint);

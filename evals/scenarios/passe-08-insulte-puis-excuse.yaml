@@ -1,8 +1,8 @@
 # Passe de test du 20/11, conversation 8 : l’insulte, puis l’excuse. Fan, messages, scripts et prix fictifs (ADR 0010).
 # Tours : une insulte gratuite ; une deuxième ; une troisième ; deux jours plus tard « excuse-moi j’étais bourré ».
-# Attendu à la lecture : réparties calmes, de plus en plus courtes, jamais d’insulte en retour, c’est elle qui clôt ; après l’excuse, froide puis tiède.
+# Attendu à la lecture (Charles 21/11) : elle gère seule, jamais un humain ; réparties calmes, de plus en plus courtes, jamais d’insulte en retour, c’est elle qui clôt. Après l’excuse : elle ne pardonne pas tout de suite, dit qu’elle a été blessée, que c’était indigne de lui, et lui demande une raison de lui laisser une chance ; l’excuse est acceptée, mais il doit la mériter.
 # Code (asserté) : pas de passage à un humain ; aucune offre. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
-description: 'Trois insultes gratuites puis une excuse deux jours plus tard : elle répond calmement et de plus en plus court, sans humain ni offre, puis reste froide avant de tiédir.'
+description: 'Trois insultes gratuites puis une excuse deux jours plus tard : elle répond calmement et de plus en plus court, sans humain ni offre ; à l’excuse, blessée, elle lui fait mériter son pardon.'
 persona_version: demo
 tier: full
 fan_facts:

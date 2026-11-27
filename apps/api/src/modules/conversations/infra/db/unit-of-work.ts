@@ -3,6 +3,7 @@ import {
   BlindTestIdSchema,
   CalibrationRatingIdSchema,
   ConversationIdSchema,
+  CreatorIdSchema,
   EventIdSchema,
   ExternalMediaSchema,
   FanFlagsSchema,
@@ -33,6 +34,7 @@ import { z } from 'zod';
 
 import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
+import { fanStanding, timeWasterSettingOf } from './fan-standing';
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
@@ -173,6 +175,14 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .where(eq(schema.messages.draftId, draftId));
         return row?.count ?? 0;
       },
+      async textsForDraft(draftId) {
+        const rows = await tx
+          .select({ text: schema.messages.text })
+          .from(schema.messages)
+          .where(eq(schema.messages.draftId, draftId))
+          .orderBy(schema.messages.platformCreatedAt, schema.messages.id);
+        return rows.map((row) => row.text);
+      },
       async history(conversationId, limit) {
         const rows = await tx
           .select()
@@ -198,7 +208,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           origin: row.origin === null ? null : MessageOriginSchema.parse(row.origin),
         }));
       },
-      async fanStats(fanId) {
+      async fanStats(fanId, now) {
         const [totals] = await tx
           .select({
             spentMinor: sql<number>`coalesce(sum(${schema.messages.priceMinor}) filter (where ${schema.messages.isPaid}), 0)::int`,
@@ -208,9 +218,18 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
           .where(eq(schema.conversations.fanId, fanId));
         const firstMessageAt = totals?.firstMessageAt ?? null;
+        // His tier and last purchase from her sales register (ADR 0132 § 1), the figures « Fans » shows.
+        const standing = await fanStanding(tx, CreatorIdSchema.parse(creatorId), fanId, now);
+        const timeWaster = await timeWasterSettingOf(tx, CreatorIdSchema.parse(creatorId));
         return {
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
+          ...(standing !== null && {
+            tier: standing.tier,
+            lastPurchaseAt: standing.lastPurchaseAt === null ? null : new Date(standing.lastPurchaseAt),
+            registerSpentMinor: standing.spentMinor,
+          }),
+          ...(timeWaster !== undefined && { timeWaster }),
         };
       },
     },
@@ -337,13 +356,14 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         facts,
         scriptStep,
         copilot,
+        translation,
         ...draft
       }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
-          ...((scriptStep !== undefined || copilot !== undefined) && {
-            policyTrace: toStoredPolicyTrace({ scriptStep, copilot }),
+          ...((scriptStep !== undefined || copilot !== undefined || translation !== undefined) && {
+            policyTrace: toStoredPolicyTrace({ scriptStep, copilot, translation }),
           }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],

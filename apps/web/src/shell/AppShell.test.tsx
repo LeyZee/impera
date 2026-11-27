@@ -47,7 +47,7 @@ beforeEach(() => {
   // jsdom has no matchMedia: a reduced motion, so the lens and the icons do not play.
   vi.stubGlobal(
     'matchMedia',
-    vi.fn(() => ({ matches: true })),
+    vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
   // The screens stay on their loading state: only the shell is under test.
   vi.stubGlobal(
@@ -243,11 +243,13 @@ describe('Réglages › Sauvegardes', () => {
       'Bots Telegram',
       'Modèles IA',
       'Consommation IA',
+      'Agents connectés',
       'Règles de paie',
       'Facturation',
       'Alertes',
       'Sauvegardes',
       'Sécurité',
+      'Aide',
     ]);
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
@@ -1030,7 +1032,8 @@ describe('the width of each section without tabs', () => {
 
   const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self', creatorIds: ['c1'] };
   it.each([
-    ['/aujourdhui', 'Aujourd’hui', 'narrow', chatter],
+    // Two columns on a computer: who to talk to, his figures beside (Charles, 21/11).
+    ['/aujourdhui', 'Aujourd’hui', 'wide', chatter],
     ['/planning', 'Planning', 'narrow', chatter],
     ['/notifications', 'Notifications', 'narrow', chatter],
     ['/aide/installer', 'Installer Impera', 'narrow', chatter],
@@ -1067,16 +1070,13 @@ describe('an address of Entraîner with no screen yet', () => {
     );
   });
 
-  it.each(['/entrainer/corrections', '/entrainer/tests'])(
-    'leads %s to the Playground, and says why',
-    async (path) => {
-      const router = renderApp(owner, path);
-      await waitFor(() => {
-        expect(router.state.location.pathname).toBe('/entrainer/playground');
-      });
-      expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
-    },
-  );
+  it.each(['/entrainer/tests'])('leads %s to the Playground, and says why', async (path) => {
+    const router = renderApp(owner, path);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/entrainer/playground');
+    });
+    expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
+  });
 
   it('says nothing on its own address, which opens the Playground as its first tab', async () => {
     const router = renderApp(owner, '/entrainer');

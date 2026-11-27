@@ -92,6 +92,11 @@ const draftPayload = z.object({
    */
   leavesFanWaiting: z.literal(true).optional(),
   /**
+   * On `draft_approved` and `draft_edited`: a chatter sent it himself on the platform, from the copilot panel, and what
+   * left decided the verdict (ADR 0086 § 5). Nothing is sent after it; the message itself already answered the fan.
+   */
+  sentOnPlatform: z.literal(true).optional(),
+  /**
    * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
    * on the fixed help bubble, given once per episode. Absent everywhere else.
    */
@@ -407,9 +412,10 @@ export const EVENT_PAYLOADS = {
   }),
   /**
    * Out of her reply slots, with nobody on shift (P3-14): no draft, his message waits for `until`, the opening of her
-   * next slot, when the answer is tried again. The conversation stays pending.
+   * next slot, when the answer is tried again. The conversation stays pending. `time_waster`: his answer waits his
+   * turn (ADR 0135 § 6), the same way.
    */
-  reply_deferred: z.object({ reason: z.enum(['outside_hours']), until: z.iso.datetime() }),
+  reply_deferred: z.object({ reason: z.enum(['outside_hours', 'time_waster']), until: z.iso.datetime() }),
   /**
    * The engine's desire score of the fan changed (P3-12): written with the result it came with, only when it moved.
    * The conversation projects the last one; `before` is the stored score cooled down to that moment, `null` for the

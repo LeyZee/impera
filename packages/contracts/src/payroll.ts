@@ -1455,6 +1455,12 @@ export type MyFigures = z.infer<typeof MyFiguresSchema>;
  * author, the validator, or gone with a validated final statement), or a share of a sale of the agent (ADR 0101) ;
  * `pay_sale_signal_conflict` 409, the same signal `id` with other values ;
  * `pay_sale_signal_state_conflict` 409, a line already signalled, or a withdrawal without a signal in force ;
+ * `sale_claim_not_found` 404, a claim the reader may not read (ADR 0101 § 18) ;
+ * `sale_claim_conflict` 409, the same claim `id` with other values ;
+ * `sale_claim_shift_conflict` 409, a shift he may not claim on: not his, not ended, begun more than 15 days ago, in a
+ * closed fortnight, or claimed already ;
+ * `sale_claims_too_many_conflict` 409, a fourth claim waiting (`details.max`) ;
+ * `sale_claim_answered_conflict` 409, a claim already answered otherwise, or an answer its reader may not give ;
  * `pay_rule_started_invalid` 400, tiers or a payout minimum from a period that has begun (PAIE-22, `details.period`) ;
  * `collective_goal_late_invalid` 400, a goal for a period past its 3rd day (PAIE-22, `details.period`) ;
  * `exchange_rate_missing_conflict` 409, a currency without a rate read ;
@@ -1501,6 +1507,11 @@ export const PAYROLL_ERROR_CODES = [
   'pay_sale_recipient_conflict',
   'pay_sale_signal_conflict',
   'pay_sale_signal_state_conflict',
+  'sale_claim_not_found',
+  'sale_claim_conflict',
+  'sale_claim_shift_conflict',
+  'sale_claims_too_many_conflict',
+  'sale_claim_answered_conflict',
   'pay_rule_started_invalid',
   'collective_goal_late_invalid',
   'exchange_rate_missing_conflict',

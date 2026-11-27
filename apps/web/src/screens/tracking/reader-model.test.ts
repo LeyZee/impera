@@ -16,6 +16,7 @@ import {
   isOutdated,
   isStopped,
   messageTime,
+  careSinceText,
   stoppedText,
   threadOf,
   todoLabel,
@@ -443,5 +444,16 @@ describe('the times and notes of the thread (CHAT-24)', () => {
       'L’arrêt d’urgence est actif\u00a0: rien ne part pour l’instant. Préviens ton responsable si ça dure.',
     );
     expect(stoppedText(false)).toContain('Dashboard');
+  });
+});
+
+describe('his care mode’s banner (trou béant 4)', () => {
+  it('says since which day, and how many days once it lasts', () => {
+    const now = new Date('2026-11-21T15:00:00Z');
+    expect(careSinceText('2026-11-21T08:00:00Z', now, 'Europe/Paris')).toBe('Mode soin depuis aujourd’hui');
+    expect(careSinceText('2026-11-20T08:00:00Z', now, 'Europe/Paris')).toBe('Mode soin depuis hier');
+    expect(careSinceText('2026-10-17T08:00:00Z', now, 'Europe/Paris')).toBe(
+      'Mode soin depuis le samedi 17 octobre (35 jours)',
+    );
   });
 });

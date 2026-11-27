@@ -10,9 +10,23 @@ const drop: SentDrop = {
   timezone: 'Europe/Paris',
   sentence: 'Une séance  inventée,\nau salon',
   files: [
-    { kind: 'image', mime: 'image/jpeg', bytes: 10, storageKey: 'k/1', description: 'Une photo inventée.' },
-    { kind: 'image', mime: 'image/heic', bytes: 10, storageKey: 'k/2', description: null },
-    { kind: 'video', mime: 'video/mp4', bytes: 10, storageKey: 'k/3', description: 'Une vidéo\ninventée.' },
+    {
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: 10,
+      storageKey: 'k/1',
+      description: 'Une photo inventée.',
+      inScript: false,
+    },
+    { kind: 'image', mime: 'image/heic', bytes: 10, storageKey: 'k/2', description: null, inScript: false },
+    {
+      kind: 'video',
+      mime: 'video/mp4',
+      bytes: 10,
+      storageKey: 'k/3',
+      description: 'Une vidéo\ninventée.',
+      inScript: false,
+    },
   ],
 };
 
@@ -53,7 +67,16 @@ describe('dropExportPlan (recette créatrice 1)', () => {
       ...drop,
       category: 'mass_dm',
       sentence: null,
-      files: [{ kind: 'audio', mime: 'audio/mp4', bytes: 10, storageKey: 'k/4', description: null }],
+      files: [
+        {
+          kind: 'audio',
+          mime: 'audio/mp4',
+          bytes: 10,
+          storageKey: 'k/4',
+          description: null,
+          inScript: false,
+        },
+      ],
     });
     expect(plan.folder).toBe('relance-2026-11-11');
     expect(plan.sheet).toBe(
@@ -69,8 +92,36 @@ describe('dropExportPlan (recette créatrice 1)', () => {
     );
   });
 
+  it('never puts in a free drop a medium one of her scripts sells, and says so (ADR 0145 § 2)', () => {
+    const [first, second, third] = drop.files;
+    if (first === undefined || second === undefined || third === undefined) throw new Error('fixture');
+    const plan = dropExportPlan({ ...drop, files: [first, { ...second, inScript: true }, third] });
+    // The others keep her order, numbered without a hole.
+    expect(plan.entries).toEqual([
+      { path: 'feed-seance-2026-11-11/01-photo.jpg', storageKey: 'k/1' },
+      { path: 'feed-seance-2026-11-11/02-video.mp4', storageKey: 'k/3' },
+    ]);
+    expect(plan.sheet).toContain(
+      'Un média est laissé de côté : il est vendu dans un de ses scripts, il ne part jamais offert.',
+    );
+    expect(plan.sheet).not.toContain('heic');
+    const all = dropExportPlan({
+      ...drop,
+      category: 'mass_dm',
+      files: drop.files.map((file) => ({ ...file, inScript: true })),
+    });
+    expect(all.entries).toEqual([]);
+    expect(all.sheet).toContain('3 médias sont laissés de côté');
+  });
+
   it('holds in one archive what a script’s archive holds, no more', () => {
-    const file = { kind: 'video', mime: 'video/mp4', storageKey: 'k', description: null } as const;
+    const file = {
+      kind: 'video',
+      mime: 'video/mp4',
+      storageKey: 'k',
+      description: null,
+      inScript: false,
+    } as const;
     expect(dropFitsInOneArchive([{ ...file, bytes: SCRIPT_EXPORT_MAX_BYTES }])).toBe(true);
     expect(
       dropFitsInOneArchive([

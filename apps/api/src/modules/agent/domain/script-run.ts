@@ -1,6 +1,7 @@
 import type {
   FanAvailabilityState,
   FanFlags,
+  Language,
   ScriptRunStatus,
   ScriptStart,
   ScriptStartBlock,
@@ -8,7 +9,7 @@ import type {
   ScriptStepOutcome,
 } from '@impera/contracts';
 
-import { offerDecision, type OfferBlock, type OfferContext } from './policy';
+import { offerDecision, sameEvening, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
 
 /**
@@ -50,6 +51,42 @@ export interface PlatformScriptView {
   readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
+  /** The language its texts are written in (ADR 0168 § 8). Absent: French, as every script before its versions. */
+  readonly language?: Language;
+  /**
+   * Its family: the script it is a version of in another language, or itself (`versionOf ?? id`). A family plays once
+   * with him, whatever its language (ADR 0168 § 8). Absent: its own ref.
+   */
+  readonly family?: string;
+}
+
+/** A script's language: French when it says none (ADR 0168 § 8). */
+function languageOfScript(script: PlatformScriptView): Language {
+  return script.language ?? 'french';
+}
+
+/** A script's family: the one it is a version of, or itself (ADR 0168 § 8). */
+function familyOf(script: PlatformScriptView): string {
+  return script.family ?? script.scriptRef;
+}
+
+/**
+ * The families of her playable scripts written in his language (ADR 0168 § 8): what « enough scripts to sell » counts,
+ * a family once, never a version in another language. Played or not by him: this is her stock in his language.
+ */
+export function playableFamiliesIn(catalogue: readonly PlatformScriptView[], language: Language): number {
+  return new Set(
+    catalogue
+      .filter(
+        (script) =>
+          languageOfScript(script) === language &&
+          script.mediaValidated &&
+          script.descriptionValidated &&
+          !script.touchesLimits &&
+          platformScriptFaults(script).length === 0,
+      )
+      .map(familyOf),
+  ).size;
 }
 
 type PlatformScriptFault =
@@ -315,14 +352,28 @@ export function scriptStepsHeld(flags: FanFlags, careMode: boolean): boolean {
  */
 export function permittedScripts(
   catalogue: readonly PlatformScriptView[],
-  options: { readonly moment: DayPart; readonly history: ScriptHistoryView },
+  options: {
+    readonly moment: DayPart;
+    readonly history: ScriptHistoryView;
+    /**
+     * His language (ADR 0168 § 8): only a script written in it opens. Absent: French. `null`, a language code does
+     * not read: no script opens.
+     */
+    readonly language?: Language | null;
+  },
 ): PlatformScriptView[] {
+  if (options.language === null) return [];
   const played = playedScriptRefs(options.history);
+  const familyByRef = new Map(catalogue.map((script) => [script.scriptRef, familyOf(script)]));
+  const playedFamilies = new Set([...played].map((ref) => familyByRef.get(ref) ?? ref));
   const received = receivedMediaRefs(catalogue, options.history);
+  const language = options.language ?? 'french';
   return catalogue.filter(
     (script) =>
       (script.moment === null || script.moment === options.moment) &&
+      languageOfScript(script) === language &&
       !played.has(script.scriptRef) &&
+      !playedFamilies.has(familyOf(script)) &&
       !script.steps.some((step) => step.mediaRefs.some((ref) => received.has(ref))) &&
       script.mediaValidated &&
       script.descriptionValidated &&
@@ -378,7 +429,23 @@ export interface NextScriptStepInput {
   readonly startGate?: ScriptStart;
   /** His availability as code holds it: « non » pauses an open run, no step and no refusal counted (§ 12). */
   readonly availability?: FanAvailabilityState;
+  /**
+   * His language (ADR 0168 § 8): no script opens without a version in it. Absent: French. `null`, a language code does
+   * not read: no script opens.
+   */
+  readonly language?: Language | null;
+  /**
+   * His messages since he bought the last paid step (passe 04, guide): the next paid step waits for a few of them,
+   * kept in the tension. Absent, not counted: no wait (the evals and tests that predate it).
+   */
+  readonly hisMessagesSinceBought?: number;
 }
+
+/**
+ * Between two paid steps, at least this many messages of his in the tension (guide: two to four), and after each
+ * step she checks he liked it and is still hot; the next one goes only while his desire holds (`hotSession`).
+ */
+const MIN_MESSAGES_BETWEEN_PAID_STEPS = 2;
 
 type NoScriptReason =
   | OfferBlock
@@ -389,6 +456,8 @@ type NoScriptReason =
   | 'scripts_exhausted'
   | 'no_pick'
   | 'cold_session'
+  /** He just bought a paid step: a few messages in the tension before the next one (passe 04). */
+  | 'in_tension'
   | 'price_mismatch';
 
 export type ScriptStepDecision =
@@ -447,8 +516,15 @@ export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
   if (status === 'open') return nextInOpenRun(input, run, script);
   if (run.endedAt?.getTime() === input.now.getTime()) {
     const last = current(run);
-    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message.
-    if (status === 'stalled' && last?.kind === 'paid' && last.outcome === 'sent')
+    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message. Only when
+    // he comes back another evening (ADR 0158, « revient le lendemain »): his heat falling the same evening (he came,
+    // he says thanks) is no reason to tease him about it (eval passe-13).
+    if (
+      status === 'stalled' &&
+      last?.kind === 'paid' &&
+      last.outcome === 'sent' &&
+      !sameEvening(input.now, last.sentAt, input.offer.limits.cooldownHours, input.offer.timeZone)
+    )
       return { kind: 'end', status, unopened: last };
     if (status !== 'refused') return { kind: 'end', status };
     if (last !== undefined) return { kind: 'after_refusal', step: last };
@@ -472,9 +548,17 @@ function nextInOpenRun(
   if (step === null) return { kind: 'none', reason: 'no_script' };
   if (!input.hotSession) return { kind: 'none', reason: 'cold_session' };
   if (scriptStepsHeld(input.offer.flags, input.careMode)) return { kind: 'none', reason: 'held' };
+  if (
+    step.kind === 'paid' &&
+    last?.outcome === 'bought' &&
+    input.hisMessagesSinceBought !== undefined &&
+    input.hisMessagesSinceBought < MIN_MESSAGES_BETWEEN_PAID_STEPS
+  )
+    return { kind: 'none', reason: 'in_tension' };
   if (step.kind === 'paid') {
     // The cooldown is between two scripts, not between two steps of the same one: the staircase climbs in one session.
-    const decision = offerDecision({ ...input.offer, lastOfferAt: null });
+    // So is the pause after a purchase (ADR 0128 § 1): it stops a new script, never the next step of his.
+    const decision = offerDecision({ ...input.offer, lastOfferAt: null, lastPurchaseAt: null });
     if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   }
   return { kind: 'send_step', step };
@@ -495,7 +579,11 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
     return { kind: 'wait', reason: gate.missing[0] ?? 'availability_unconfirmed' };
   }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
-  const permitted = permittedScripts(input.catalogue, { moment: input.moment, history });
+  const permitted = permittedScripts(input.catalogue, {
+    moment: input.moment,
+    history,
+    ...(input.language !== undefined && { language: input.language }),
+  });
   if (permitted.length === 0) {
     // Only where a script would open now (gate open, desire at the threshold, no pause): ADR 0150 § 9.
     return { kind: 'none', reason: input.catalogue.length === 0 ? 'no_script' : 'scripts_exhausted' };

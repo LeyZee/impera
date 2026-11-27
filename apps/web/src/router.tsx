@@ -26,6 +26,7 @@ import {
   sheetOf,
   sheetsFor,
 } from './creators/search';
+import { HelpContent, HelpPage } from './help/HelpPage';
 import { parsePaySearch } from './payroll/model';
 import { ExtensionLinkPage } from './pwa/ExtensionLinkPage';
 import { ExtensionPage } from './pwa/ExtensionPage';
@@ -73,6 +74,7 @@ import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
 import { parseSalesSearch } from './screens/sales/view';
 import {
   AiModelsPage,
+  AgentsPage,
   AiUsagePage,
   AlertsPage,
   BackupsPage,
@@ -100,6 +102,7 @@ import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
 import { TrafficPage } from './screens/traffic/TrafficPage';
 import { ChannelPostPage } from './screens/train/ChannelPostPage';
+import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
@@ -110,6 +113,7 @@ import { scopesCreators } from './shell/CreatorScope';
 import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
 import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf, securityPathOf } from './shell/nav';
+import { MyStockPage } from './stock/MyStockPage';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -277,7 +281,9 @@ const creators = createRoute({
     }
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
-    if (first !== undefined && !sheets.includes(sheetOf(search))) {
+    // No tab named opens the persona; a member whose sheet opens elsewhere (an active manager) lands there instead.
+    const landsElsewhere = search.onglet === undefined && first !== 'persona';
+    if (first !== undefined && (landsElsewhere || !sheets.includes(sheetOf(search)))) {
       // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
       // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
       const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
@@ -544,12 +550,22 @@ const content = createRoute({
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+          onOpenStock={() => void navigate({ to: '/contenu/coffre' })}
           asked={demande ?? null}
           onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
       </>
     );
+  },
+});
+/** Mon coffre (ADR 0162 § 5): what she dropped, by use, with what the AI understood of each medium. */
+const contentStock = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/contenu/coffre',
+  component: function ContentStock() {
+    const navigate = contentStock.useNavigate();
+    return <MyStockPage onDrop={() => void navigate({ to: '/contenu' })} />;
   },
 });
 /** Her script, card by card (SC-02 lot b2): a drop of hers, by its id; any other address goes back to Contenu. */
@@ -980,6 +996,19 @@ const meSecurity = createRoute({
   },
 });
 
+/**
+ * Moi › Aide (demande de Charles du 21/11) : the person's guide, a chatter's, a manager's or a creator's by the rail's
+ * kind; an operator without a team reads the chatter's. The owner's is in Réglages › Aide.
+ */
+const meHelp = createRoute({
+  getParentRoute: () => me,
+  path: '/aide',
+  component: function MyHelp() {
+    const { user } = rootRoute.useRouteContext();
+    return <HelpPage user={user} />;
+  },
+});
+
 const mePreferences = createRoute({
   getParentRoute: () => me,
   path: '/preferences',
@@ -1031,19 +1060,26 @@ const channelPost = createRoute({
   },
   component: ChannelPostPage,
 });
-/*
- * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
- * to an « à venir » page under its header (recette 05/11, PRO-25), and say so on arrival (recette visuelle 16/11,
- * PIL-17). Each comes back with its screen.
- */
+// Corrections (trou béant 12) are the owner's, like her channel's posts (ADR 0092 § 8): a manager finds the Playground.
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
-  beforeLoad: () => {
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/entrainer/playground', replace: true });
+    }
+  },
+  component: function Corrections() {
+    const { user } = rootRoute.useRouteContext();
+    return <CorrectionsPage scoped={useScopedCreator(scopesCreators(user))} />;
   },
 });
+/*
+ * Tests have no screen yet, hence no tab (ADR 0024): its address leads to the Playground rather than to an « à venir »
+ * page under its header (recette 05/11, PRO-25), and says so on arrival (recette visuelle 16/11, PIL-17). It comes back
+ * with its screen.
+ */
 const tests = createRoute({
   getParentRoute: () => train,
   path: '/tests',
@@ -1088,6 +1124,18 @@ const aiUsage = createRoute({
     }
   },
   component: AiUsagePage,
+});
+/** Réglages › Agents connectés: the owner's alone, like the routes it calls (ADR 0026 § 3). */
+const agents = createRoute({
+  getParentRoute: () => settings,
+  path: '/agents-connectes',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: AgentsPage,
 });
 const salesFeeds = createRoute({
   getParentRoute: () => settings,
@@ -1155,6 +1203,20 @@ const backups = createRoute({
     }
   },
   component: BackupsPage,
+});
+/** Réglages › Aide: the owner's guide, his alone like the rest of Réglages. */
+const settingsHelp = createRoute({
+  getParentRoute: () => settings,
+  path: '/aide',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: function OwnerHelp() {
+    return <HelpContent audience="owner" />;
+  },
 });
 const payRules = createRoute({
   getParentRoute: () => settings,
@@ -1287,6 +1349,7 @@ const routeTree = rootRoute.addChildren([
   agenda,
   sales,
   content,
+  contentStock,
   contentScript,
   myPlanning,
   team.addChildren([
@@ -1310,6 +1373,7 @@ const routeTree = rootRoute.addChildren([
     meCalendar,
     meLinks,
     meSecurity,
+    meHelp,
     mePreferences,
   ]),
   accountSecurity,
@@ -1318,12 +1382,14 @@ const routeTree = rootRoute.addChildren([
     aiModels,
     salesFeeds,
     aiUsage,
+    agents,
     alerts,
     telegram,
     payRules,
     billing,
     backups,
     settingsSecurity,
+    settingsHelp,
     devices,
     agentMode,
   ]),

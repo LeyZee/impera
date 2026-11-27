@@ -149,28 +149,39 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-3) var(--nv-space-4);
+  padding: var(--nv-space-3);
+  margin-inline: calc(var(--nv-space-3) * -1);
   border-radius: var(--nv-radius-md);
-  /* A discreet ground of its own: the glass fill vanishes on a dialog in Jour (captures of #591). */
-  background: var(--nv-fill-soft);
   transition: background-color var(--nv-dur-base) var(--nv-ease-out);
 }
-.rp-incident:hover {
-  background: var(--nv-fill-track);
-}
+/* Switched on, the urgency's red, at 8 % on the glass: one tint, no frame. */
 .rp-incident[data-on='true'] {
-  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-fill-soft));
+  background: color-mix(in srgb, var(--nv-danger) 8%, transparent);
 }
 .rp-incident__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--nv-space-3);
   min-height: var(--nv-target-min);
   cursor: pointer;
 }
+.rp-incident__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-danger) 14%, transparent);
+  color: var(--nv-danger);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring, var(--nv-ease-out));
+}
+.rp-incident[data-on='true'] .rp-incident__badge {
+  transform: scale(1.08) rotate(-6deg);
+}
 .rp-incident__text {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
@@ -1373,6 +1384,308 @@ a.sc-sheet__report:focus-visible,
   }
 }
 
+/* ── Mini feedback of a shift (ADR 0050 § 10) and its incident followed « Vu », « Réglé » (trous béants n° 1) ──
+   An incident reads by its stage: red while nobody saw it, amber seen, green « Réglé ». A signal reads by its
+   category, each its own hue of the design system's content palette (--nv-content-*, as feedback.ts maps them). Never a bar on a card's side. */
+
+.rp-incident-sent {
+  --_c: var(--nv-danger);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--_c) 10%, transparent);
+}
+.rp-incident-sent[data-stage='seen'] {
+  --_c: var(--nv-warning);
+}
+.rp-incident-sent[data-stage='resolved'] {
+  --_c: var(--nv-success);
+}
+.rp-incident-sent__title {
+  margin: 0;
+  font-weight: 650;
+}
+.rp-incident-sent__text,
+.rp-incident-line__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+/* A signal: its category in its colour, then its sentence. */
+.rp-signals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-signal,
+.rp-cat {
+  --rp-kind: var(--nv-content-10);
+}
+.rp-signal[data-kind='1'],
+.rp-cat[data-kind='1'] {
+  --rp-kind: var(--nv-content-3);
+}
+.rp-signal[data-kind='2'],
+.rp-cat[data-kind='2'] {
+  --rp-kind: var(--nv-content-1);
+}
+.rp-signal[data-kind='3'],
+.rp-cat[data-kind='3'] {
+  --rp-kind: var(--nv-content-2);
+}
+.rp-signal[data-kind='4'],
+.rp-cat[data-kind='4'] {
+  --rp-kind: var(--nv-content-5);
+}
+.rp-signal[data-kind='5'],
+.rp-cat[data-kind='5'] {
+  --rp-kind: var(--nv-content-4);
+}
+.rp-signal[data-kind='6'],
+.rp-cat[data-kind='6'] {
+  --rp-kind: var(--nv-content-10);
+}
+.rp-signal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nv-space-1) var(--nv-space-2);
+  min-width: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-signal__cat {
+  /* The category's colour, tinted by the system's tag (nv-tag--tint). */
+  --_c: var(--rp-kind);
+  flex: none;
+}
+.rp-signal__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rp-signal__fan {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+
+/* The form's signals: a category picked among four coloured pills, then its sentence. */
+.rp-remontees {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rp-remontees__add {
+  align-self: flex-start;
+}
+.rp-remontee {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding-bottom: var(--nv-space-3);
+  border-bottom: 1px solid var(--nv-hairline, var(--nv-plate-edge));
+}
+.rp-remontee__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The sentence takes the whole width, « Retirer » under it (Design, #992): never a phrase cut on a phone. */
+.rp-remontee__line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.rp-remontee__line > button {
+  align-self: flex-end;
+}
+.rp-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* The category's colour as a dot in front of its word (nv-chip, nv-tag): the pill stays the system's. */
+.rp-cat__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rp-kind);
+}
+.rp-cat[aria-pressed='true'] .rp-cat__dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rp-kind) 40%, transparent);
+}
+
+/* Équipe › Rapports: the incidents still open, first and in red. */
+.nv-plate.rp-incidents {
+  background: color-mix(in srgb, var(--nv-danger) 8%, var(--nv-plate));
+}
+.rp-incidents .nv-eyebrow {
+  color: var(--nv-danger);
+}
+.rp-incidents__lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-incidents__list,
+.rp-fbs__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* One plate per subject (Design, #992): its lines are parted by a hairline, never cards in a card. */
+.rp-incident-line,
+.rp-fb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) 0;
+  transition: opacity var(--nv-dur-base) var(--nv-ease-out);
+}
+.rp-incident-line + .rp-incident-line,
+.rp-fb + .rp-fb {
+  border-top: 1px solid var(--nv-hairline, var(--nv-plate-edge));
+}
+.rp-incident-line:first-child,
+.rp-fb:first-child {
+  padding-top: var(--nv-space-2);
+}
+.rp-incident-line:last-child,
+.rp-fb:last-child {
+  padding-bottom: 0;
+}
+.rp-incident-line[aria-busy='true'] {
+  opacity: 0.6;
+}
+.rp-incident-line__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.rp-incident-line__acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+.rp-incident-line__done:not(:disabled):hover {
+  color: var(--nv-success);
+}
+.nv-status.rp-stage-pill {
+  --_c: var(--nv-danger);
+}
+.nv-status.rp-stage-pill[data-stage='seen'] {
+  --_c: var(--nv-warning);
+}
+.nv-status.rp-stage-pill[data-stage='resolved'] {
+  --_c: var(--nv-success);
+}
+/* Nobody saw it yet: its dot breathes, as the system's states at work do. */
+.rp-stage-pill[data-stage='sent'] .nv-status__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--_c);
+  animation: nv-ping 1.8s var(--nv-ease-out) infinite;
+}
+.rp-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rp-incident__badge .rp-icon {
+  width: 18px;
+  height: 18px;
+}
+.rp-incident-line__done:not(:disabled):hover .rp-icon {
+  color: var(--nv-success);
+}
+.rp-fb__whose {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rp-fb__who {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-weight: 650;
+}
+.rp-fb__where {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-fb__creator {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.rp-fb__comment {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A period's feedbacks: three figures first, then the signals by category as one coloured bar. */
+/* Three figures side by side, a phone too: short words under big numbers. */
+.nv-tiles.rp-fbs__tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 560px) {
+  .nv-tiles.rp-fbs__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.rp-fbs__tiles .nv-tile {
+  margin: 0;
+}
+.rp-fbs__value {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+}
+.rp-fbs__tiles :is(.nv-tone--bad, .nv-tone--warn, .nv-tone--ok) .rp-fbs__value {
+  color: var(--_c);
+}
+.rp-sigs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nv-space-4);
+}
+/* The ring, its rows and their lighting are the design system's (`nv-donut`, `nv-breakdown`). */
+.rp-sigs__legend {
+  flex: 1 1 200px;
+  --nv-breakdown-cols: auto minmax(0, 1fr) auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rp-island {
     animation: none;
@@ -1384,11 +1697,164 @@ a.sc-sheet__report:focus-visible,
   .rp-island__spin {
     animation-duration: 2.4s;
   }
+  .rp-stage-pill[data-stage='sent'] .nv-status__dot::after,
+  .rp-incident__badge {
+    animation: none;
+    transition: none;
+  }
   .rp-incident,
+  .rp-cat,
+  .rp-incident-line,
   .rp-correction,
   .rp-todo__go,
   .rp-review,
   .rp-account {
     transition: none;
   }
+}
+
+/* The track of an incident keeps to its text on a wide screen, left, as in the chatter's window (Design, 21/11). */
+.rp-incidents .nv-steps {
+  max-width: 420px;
+}
+/* An incident in the list of feedbacks, tinted by its stage like rp-incident-sent: its pill already says the word. */
+.rp-fb__incident {
+  --_c: var(--nv-danger);
+  margin: 2px 0 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--_c) 10%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rp-fb__incident[data-stage='seen'] {
+  --_c: var(--nv-warning);
+}
+.rp-fb__incident[data-stage='resolved'] {
+  --_c: var(--nv-success);
+}
+
+/* His shift as he ends it (ADR 0170 § 1, Charles, 26/11): what he sold first and large, then the AI in one sentence
+   on one bar, then what to report. Sent as is green, touched up violet, refused quiet (Design, 26/11). */
+.rp-shift {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-shift__eyebrow {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.rp-shift__amount {
+  margin: 0;
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--nv-ink);
+}
+.rp-shift__amount--quiet {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  color: var(--nv-ink-muted);
+}
+.rp-shift__sub {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.rp-ai {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rp-ai__line {
+  margin: 0;
+  text-wrap: pretty;
+}
+.rp-ai__bar {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  animation: rp-ai-fill var(--nv-dur-data) var(--nv-ease-out) both;
+}
+@keyframes rp-ai-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-ai__bar {
+    animation: none;
+  }
+}
+/* Its three parts and the keys of the sentence, one tone each: touching up is what he is asked, never amber. */
+.rp-ai__part {
+  flex: 1 1 0;
+  min-width: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+}
+:is(.rp-ai__part, .rp-ai__key)[data-part='as-is'] {
+  --_c: var(--nv-success);
+}
+:is(.rp-ai__part, .rp-ai__key)[data-part='edited'] {
+  --_c: var(--nv-content-5);
+}
+:is(.rp-ai__part, .rp-ai__key)[data-part='rejected'] {
+  --_c: var(--nv-ink-faint);
+}
+.rp-ai__group {
+  white-space: nowrap;
+}
+.rp-ai__key {
+  margin-right: 0.3em;
+  vertical-align: 0.05em;
+}
+.rp-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.rp-report-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.rp-report-head__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.rp-option-tick {
+  margin-left: auto;
+  display: inline-grid;
+  flex: none;
+}
+.rp-option-check {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rp-fans {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  align-items: stretch;
+}
+.rp-fans > .nv-btn {
+  align-self: flex-start;
 }

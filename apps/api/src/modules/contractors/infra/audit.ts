@@ -18,7 +18,9 @@ type AuditedAction =
   | 'billing_regime.validate'
   | 'contractor_regime.assign'
   | 'contractor_document.add'
-  | 'contractor_document.review';
+  | 'contractor_document.review'
+  | 'payout_destination.update'
+  | 'payout_destination.reveal';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -34,7 +36,8 @@ export async function audit(
       | 'contract_acceptance'
       | 'billing_regime'
       | 'contractor_regime'
-      | 'contractor_document';
+      | 'contractor_document'
+      | 'payout_destination';
     readonly id: string;
   },
   details: Record<string, unknown>,

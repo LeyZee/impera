@@ -8,7 +8,7 @@ import {
 } from '@impera/contracts';
 import { niceTicks } from '@impera/design-system';
 import { useNavigate } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { FunnelPanel, type FunnelLabel } from '../Funnel';
 import { CountUp, Section, type FloatingTip } from '../parts';
@@ -475,29 +475,35 @@ export function SteeringPanel({
   opensTracking,
   tip,
   index = 1,
+  afterDay,
 }: {
   creatorId: string | null;
   /** The account opens Suivi: a lapsed payer's line leads to his conversation. */
   opensTracking: boolean;
   tip: FloatingTip;
   index?: number;
+  /** What stands right under « Objectif du jour », before the other cards: the owner's unanswered questions (INS-05). */
+  afterDay?: ReactNode;
 }): JSX.Element | null {
   const query = useAgencySteering(creatorId);
   if (query.error instanceof NotYours) return null;
   if (query.data === undefined) {
     return (
-      <Section title="Objectif du jour" sub="le chiffre d’affaires d’aujourd’hui" index={index}>
-        {query.isError ? (
-          <Failure onRetry={() => void query.refetch()} />
-        ) : (
-          <div
-            className="db-loading nv-plate stg-loading"
-            role="status"
-            aria-busy="true"
-            aria-label="Chargement"
-          />
-        )}
-      </Section>
+      <>
+        <Section title="Objectif du jour" sub="le chiffre d’affaires d’aujourd’hui" index={index}>
+          {query.isError ? (
+            <Failure onRetry={() => void query.refetch()} />
+          ) : (
+            <div
+              className="db-loading nv-plate stg-loading"
+              role="status"
+              aria-busy="true"
+              aria-label="Chargement"
+            />
+          )}
+        </Section>
+        {afterDay}
+      </>
     );
   }
   const steering = query.data;
@@ -511,6 +517,7 @@ export function SteeringPanel({
       >
         <DayCard daily={steering.daily} tip={tip} />
       </Section>
+      {afterDay}
       <Section
         title="Du trafic à l’argent"
         sub="les 30 derniers jours, comparés aux 30 d’avant"
