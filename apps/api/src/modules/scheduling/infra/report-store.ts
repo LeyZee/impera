@@ -842,5 +842,43 @@ export function createDrizzleShiftReportStore(
         );
         return (await checkSettingsIn(tx)).threshold;
       }),
+
+    notTakenDelay: (actor) =>
+      withMember(db, actor, async (tx) => {
+        const [row] = await tx
+          .select({ minutes: schedulingSettings.notTakenDelayMinutes })
+          .from(schedulingSettings);
+        return { minutes: row?.minutes ?? null };
+      }),
+
+    saveNotTakenDelay: (actor, delay) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new OwnerOnly();
+        const values = {
+          notTakenDelayMinutes: delay.minutes,
+          updatedBy: actor.userId,
+          updatedAt: new Date(),
+        };
+        // A first save keeps the module's defaults for the rest of the settings, as `saveSettings` does.
+        await tx
+          .insert(schedulingSettings)
+          .values({
+            id: 1,
+            timeZone: DEFAULT_SCHEDULING_SETTINGS.timeZone,
+            accessMarginMinutes: DEFAULT_SCHEDULING_SETTINGS.accessMarginMinutes,
+            slotStartMinute: 0,
+            slotLengthMinutes: 360,
+            ...values,
+          })
+          .onConflictDoUpdate({ target: schedulingSettings.id, set: values });
+        await audit(
+          tx,
+          actor,
+          'scheduling_settings.not_taken_delay',
+          { kind: 'scheduling_settings', id: '1' },
+          { ...delay },
+        );
+        return delay;
+      }),
   };
 }

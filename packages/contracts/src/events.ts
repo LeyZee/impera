@@ -29,6 +29,7 @@ import {
   MessageIdSchema,
   PlatformAccountIdSchema,
   SalesLineIdSchema,
+  ShiftIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
@@ -295,6 +296,7 @@ export const EVENT_TYPES = [
   'agency_share_mismatch',
   'agency_share_changed',
   'account_uncovered',
+  'shift_not_taken',
   'connection_state_changed',
   'security_alert',
   'content_drop_received',
@@ -722,6 +724,23 @@ export const EVENT_PAYLOADS = {
     timeZone: z.string().min(1),
   }),
   /**
+   * ADR 0094 § 1 (lot b), « chatteur pas là »: a shift began on this account the agency's delay ago (Réglages ›
+   * Planning) and its member, active, has not taken it (« Je prends mon poste », EQ-12, `shifts.checked_in_at`).
+   * Published once per shift (unique index); the member's display name says who, the zone is the planning's, to say
+   * the shift's hours. For the owner and the managers only: never a chatter, never her.
+   */
+  shift_not_taken: z.strictObject({
+    creatorId: CreatorIdSchema,
+    platform: PlatformSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    shiftId: ShiftIdSchema,
+    memberId: TeamMemberIdSchema,
+    memberName: z.string().min(1).max(120),
+    startsAt: z.iso.datetime(),
+    endsAt: z.iso.datetime(),
+    timeZone: z.string().min(1),
+  }),
+  /**
    * CRM-04 lot d3 (ADR 0054 § 2, question 5): on the fortnight just over, a creator's part as the platform reads it
    * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale and per refund, on
    * one account and in one currency. Only the days a percentage covers are compared, each with its own; `sales` and
@@ -855,6 +874,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('agency_share_mismatch'),
   typedEvent('agency_share_changed'),
   typedEvent('account_uncovered'),
+  typedEvent('shift_not_taken'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('content_drop_received'),
