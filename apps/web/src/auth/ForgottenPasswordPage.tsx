@@ -137,14 +137,11 @@ function NoLink({ onLeave }: { onLeave: () => void }): JSX.Element {
     <section className="flex flex-col gap-5">
       <header className="nv-enter flex flex-col gap-2" style={{ '--nv-i': 1 }}>
         <h1 className="text-title-1 font-bold text-balance">Mot de passe oublié</h1>
-        <p className="text-[var(--nv-ink-muted)]">
-          Un nouveau mot de passe se choisit avec un lien, valable {keepUnits('15 minutes')}.
-        </p>
+        <p>Demande un nouveau lien à ton agence. Il vaut {keepUnits('15 minutes')} et sert une fois.</p>
       </header>
-      <ul className="nv-enter flex flex-col gap-3 text-sm text-[var(--nv-ink-muted)]" style={{ '--nv-i': 2 }}>
-        <li>Tu fais partie de l’équipe ou tu es créatrice&nbsp;: demande-le à ton agence.</li>
-        <li>Tu es propriétaire&nbsp;: il se fait sur le serveur, par qui le gère.</li>
-      </ul>
+      <p className="nv-enter text-sm text-[var(--nv-ink-faint)]" style={{ '--nv-i': 2 }}>
+        Tu es propriétaire&nbsp;: le lien se fait sur le serveur, par qui le gère.
+      </p>
       <button
         type="button"
         className="nv-btn nv-btn--soft nv-enter"

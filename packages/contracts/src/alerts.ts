@@ -58,7 +58,7 @@ const customAlertFields = z.object({
     }),
   /** Hands the conversation to a human (cause `keyword` or `custom_alert`); otherwise it only lets one know. */
   pausesAgent: z.boolean(),
-  /** Sent to Telegram, in the topic of her alerts (`custom`); always kept in the history. */
+  /** « Prévenir l'équipe »: rung to the team by notification (ADR 0176 § 10); always kept in the history. */
   notify: z.boolean(),
 });
 

@@ -23,4 +23,4 @@ Depuis le 27/11/2026, tout ce qui demande un humain sonne en notification Impera
 La page de connexion n'envoie plus de lien (ADR 0176 § 8).
 
 - Un membre de l'équipe ou une créatrice : un propriétaire lui fait un lien depuis Équipe (« Nouveau mot de passe »).
-- Un propriétaire : sur le serveur, `pnpm ops:password-reset-link --email <son e-mail>`. Le lien s'affiche là, vaut 15 minutes, sert une fois ; on le lui donne de vive voix ou en main propre, jamais dans un chat. Le deuxième facteur reste demandé à la connexion suivante.
+- Un propriétaire : sur le serveur, `pnpm ops:password-reset-link --email <son e-mail>`. Le lien s'affiche là, vaut 15 minutes, sert une fois ; on le lui donne de vive voix ou en main propre, jamais dans un chat. La commande se lance dans un terminal interactif sur le serveur, jamais dans une tâche planifiée ou un déploiement dont l'hébergeur garde le journal : le lien y resterait écrit. Le deuxième facteur reste demandé à la connexion suivante.

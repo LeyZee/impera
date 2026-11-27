@@ -36,7 +36,7 @@ Le routage d'alertes vers des groupes, le scan de l'outbox, les envois groupés,
 
 ### 4. Alertes de sécurité (amende 0046 § 8)
 
-Nouvel appareil, refus de connexion répétés, deuxième facteur remis à zéro, clé d'accès ajoutée, propriétaire ajouté ou retiré, persona activée, Automatique allumé, session Reveal remplacée : elles sonnent en `agency_urgent` chez chaque propriétaire, avec les mêmes mots que sur Telegram (l'acte, le rôle du compte, son réseau, jamais un nom ni une adresse complète).
+Nouvel appareil, refus de connexion répétés, deuxième facteur remis à zéro, clé d'accès ajoutée, propriétaire ajouté ou retiré, persona activée, Automatique allumé, session Reveal remplacée : elles sonnent en `agency_urgent` chez chaque propriétaire, avec les mêmes mots que sur Telegram (l'acte, le rôle du compte, son réseau, jamais un nom ni une adresse complète). Le réseau de connexion (`203.0.113.x`) se lit donc sur l'écran verrouillé du téléphone d'un propriétaire : accepté (relecture Sécurité du 27/11), seuls les propriétaires les reçoivent.
 
 ### 5. Écarts de persona d'un chatteur (amende 0059)
 
@@ -54,7 +54,7 @@ Le récap du matin, le bilan du soir et les bilans donnés aux chatteurs deviend
 
 - La page « Mot de passe oublié » ne demande plus rien : sans lien, elle dit d'où il vient.
 - Un membre de l'équipe ou une créatrice : un lien à usage unique fait par un propriétaire depuis Équipe (EQ-10), comme aujourd'hui.
-- Un propriétaire : un lien fait sur le serveur par `pnpm ops:password-reset-link --email <e-mail>`, affiché là et jamais envoyé ailleurs, inscrit au journal d'audit sans adresse IP. Même lien que celui de 0068 : 15 minutes, un toutes les 5 minutes au plus, toutes les sessions fermées après usage, le deuxième facteur inchangé.
+- Un propriétaire : un lien fait sur le serveur par `pnpm ops:password-reset-link --email <e-mail>`, affiché là et jamais envoyé ailleurs, inscrit au journal d'audit sans adresse IP. Elle se lance dans un terminal interactif, jamais dans une tâche dont l'hébergeur garde le journal. Même lien que celui de 0068 : 15 minutes, un toutes les 5 minutes au plus, toutes les sessions fermées après usage, le deuxième facteur inchangé.
 - L'envoi par e-mail viendra avec le domaine.
 
 ### 9. Aperçu des posts du canal (amende 0080)

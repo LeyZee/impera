@@ -64,8 +64,8 @@ describe('« Mot de passe oublié » without a link (SEC-05 lot 3, amended 27/11
     const fake = serve({});
     const { onLeave } = open();
     expect(screen.getByRole('heading', { name: 'Mot de passe oublié' })).toBeDefined();
-    expect(screen.getByText(/demande-le à ton agence/)).toBeDefined();
-    expect(screen.getByText(/il se fait sur le serveur/)).toBeDefined();
+    expect(screen.getByText(/Demande un nouveau lien à ton agence/)).toBeDefined();
+    expect(screen.getByText(/le lien se fait sur le serveur/)).toBeDefined();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByText(/Telegram/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retour à la connexion' }));
@@ -107,7 +107,7 @@ describe('« Mot de passe oublié » with its link (SEC-05 lot 3)', () => {
     expect(await screen.findByRole('heading', { name: 'Ce lien ne marche plus' })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Avoir un nouveau lien' }));
     expect(screen.getByRole('heading', { name: 'Mot de passe oublié' })).toBeDefined();
-    expect(screen.getByText(/demande-le à ton agence/)).toBeDefined();
+    expect(screen.getByText(/Demande un nouveau lien à ton agence/)).toBeDefined();
   });
 
   it('says a cut link does not work, without asking the server', () => {
