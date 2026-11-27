@@ -98,7 +98,8 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (currentVersion === 0) return none('mandate_unpublished');
   if (acceptedVersion === null) return none('no_mandate');
   if (regime === null) return none('no_regime');
-  if (regime.validatedOn === null || regime.validatedOn > facts.day) return none('regime_not_validated');
+  // The accountant's validation of a regime is a note, no longer a gate (Charles, 21/11/2026): `regime_not_validated`
+  // stays in the vocabulary only for the decisions written before.
   // His record moved to another country since the regime was given (« ok pays », Charles, 01/11): another country's
   // mentions and VAT would be printed. The owner gives him a regime of his country, from today.
   if (!facts.regimesOfCountry.has(regime.id)) return none('regime_country_mismatch');
