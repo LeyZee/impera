@@ -1,0 +1,193 @@
+/* The welcome of a first sign-in (recette 27/11, P1): one plate, three steps, as the validated maquette. */
+.fw {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 40px 16px;
+}
+.fw__card {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.fw__hello {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fw__title {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.fw__lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.fw__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fw__step {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-glass-edge, transparent);
+}
+.fw__num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 15px;
+  background: var(--nv-neon-soft);
+  color: var(--nv-neon-ink);
+}
+.fw__step[data-done] .fw__num {
+  background: color-mix(in srgb, var(--nv-success) 18%, transparent);
+  color: var(--nv-success);
+}
+.fw__num svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fw__what {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fw__what b {
+  font-weight: 600;
+  font-size: 15px;
+}
+.fw__what span {
+  color: var(--nv-ink-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.fw__state {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--nv-success);
+  white-space: nowrap;
+}
+.fw__info {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--nv-glass-fill);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--nv-ink-muted);
+}
+.fw__info b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.fw__chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fw__chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--nv-glass-fill);
+  font-size: 13px;
+}
+.fw__role {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.fw__col {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--nv-glass-fill);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fw__col h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nv-ink-faint);
+}
+.fw__col ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.fw__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fw__later {
+  align-self: center;
+}
+.fw__note {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 560px) {
+  .fw {
+    padding: 28px 16px;
+    align-items: start;
+  }
+  .fw__title {
+    font-size: 34px;
+  }
+  .fw__step {
+    grid-template-columns: 32px 1fr;
+    row-gap: 10px;
+    align-items: start;
+  }
+  .fw__num {
+    width: 32px;
+    height: 32px;
+  }
+  .fw__step > .nv-btn,
+  .fw__step > .fw__state {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .fw__role {
+    grid-template-columns: 1fr;
+  }
+}
