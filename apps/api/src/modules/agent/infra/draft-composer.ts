@@ -7,6 +7,7 @@ import type {
   CopilotTrace,
   DraftTranslation,
   FanFlags,
+  FanTier,
   HandoffCause,
   Language,
   MediaDescription,
@@ -36,6 +37,7 @@ import {
   type FiredAlert,
   type PhraseAlert,
 } from '../domain/alerts';
+import type { TimeWasterLevel } from '../domain/attention';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
 import { copilotTrace } from '../domain/copilot-trace';
@@ -62,6 +64,7 @@ import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
+import { spenderRegisterOf } from '../domain/spender-register';
 import { handoffCauseOf } from '../domain/traps';
 
 import {
@@ -96,6 +99,8 @@ function withOriginNote(origin: MessageOrigin | null | undefined): { originNote?
 }
 
 export interface AgentComposeInput {
+  /** He is a time-waster at this level (ADR 0135), read by code before the AI; absent, he is not. */
+  readonly timeWaster?: TimeWasterLevel;
   readonly creatorId: string;
   readonly conversationId: string;
   readonly fanId: string;
@@ -130,6 +135,10 @@ export interface AgentComposeInput {
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
     readonly firstMessageAt: Date | null;
+    /** His tier from her sales register (`fanTierOf`); absent or `null`, she is warm as with everyone (ADR 0132). */
+    readonly tier?: FanTier | null;
+    /** His last purchase in her sales register (ADR 0128 § 1); absent, not read. */
+    readonly lastPurchaseAt?: Date | null;
   };
   /** His desire score as stored on the conversation (P3-12), and when it was counted; absent, he starts at 0. */
   readonly desire?: { readonly score: number; readonly at: Date };
@@ -358,6 +367,11 @@ export interface DraftComposerDeps {
    * the cooldown cannot be read, so she offers nothing.
    */
   readonly lastOfferAt?: (creatorId: string, fanId: string) => Promise<Date | null>;
+  /**
+   * When he last bought a priced step of hers (ADR 0128 § 1), for the pause after a purchase. Without it, or unreadable,
+   * no pause: she sells as before.
+   */
+  readonly lastPurchaseAt?: (creatorId: string, fanId: string) => Promise<Date | null>;
   /** A limit the policy could not save without holding the draft (his declared age): counted, never silent. */
   readonly onLimitsNotSaved?: (event: {
     readonly conversationId: string;
@@ -669,6 +683,26 @@ function ageInDoubt(input: AgentComposeInput, lastFanAt: Date | undefined): Agen
   return { ...held, desire: { before, score, signals, weightsVersion } };
 }
 
+/** The later of two dates, either unknown (`undefined`) or never (`null`). */
+function latestKnown(a: Date | null | undefined, b: Date | null | undefined): Date | null | undefined {
+  if (a === undefined) return b;
+  if (b === undefined || b === null) return a;
+  return a === null || b > a ? b : a;
+}
+
+/** His last purchase, or `undefined` when it cannot be read: the pause is then not applied (ADR 0128 § 1). */
+async function lastPurchaseOf(
+  deps: DraftComposerDeps,
+  input: AgentComposeInput,
+): Promise<Date | null | undefined> {
+  if (deps.lastPurchaseAt === undefined) return undefined;
+  try {
+    return await deps.lastPurchaseAt(input.creatorId, input.fanId);
+  } catch {
+    return undefined;
+  }
+}
+
 /** What the policy needs to let her offer; any of it unknown, there is no offer to decide on (fail closed). */
 async function offerInput(
   deps: DraftComposerDeps,
@@ -679,7 +713,15 @@ async function offerInput(
     return undefined;
   try {
     const lastOfferAt = await deps.lastOfferAt(input.creatorId, input.fanId);
-    return { now: input.now, lastOfferAt, hasNoBudget: false, flags, limits: deps.offerLimits };
+    const lastPurchaseAt = latestKnown(await lastPurchaseOf(deps, input), input.fan.lastPurchaseAt);
+    return {
+      now: input.now,
+      lastOfferAt,
+      ...(lastPurchaseAt !== undefined && { lastPurchaseAt }),
+      hasNoBudget: false,
+      flags,
+      limits: deps.offerLimits,
+    };
   } catch {
     return undefined;
   }
@@ -1212,6 +1254,12 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         ...(input.fan.brainNotes !== undefined &&
           input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
+        ...(input.timeWaster !== undefined && { timeWaster: input.timeWaster }),
+        spenderRegister: spenderRegisterOf(input.fan.tier, {
+          fragile: stop.flags?.fragile === true,
+          care: careForced,
+          moneyTrouble: stop.flags?.salesFrozen?.reason === 'money_trouble',
+        }),
         ...(withHer.sexualizationLimits !== undefined && {
           sexualization: {
             limits: withHer.sexualizationLimits,

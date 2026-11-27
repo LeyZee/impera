@@ -42,6 +42,13 @@ describe('sexualizationDecision', () => {
     expect(sexualizationDecision({ ...base, triedThisEvening: true })).toEqual({ kind: 'free' });
   });
 
+  it('does not open it herself in the pause after a purchase, and still follows him there (ADR 0128 § 2-3)', () => {
+    const calm = { ...base, fanSexualizes: false };
+    expect(sexualizationDecision(calm)).toEqual({ kind: 'free' });
+    expect(sexualizationDecision({ ...calm, afterPurchase: true })).toEqual({ kind: 'no_opening' });
+    expect(sexualizationDecision({ ...base, afterPurchase: true })).toEqual({ kind: 'free' });
+  });
+
   it('opens it herself only after her delay, and never with his age unknown', () => {
     const calm = { ...base, fanSexualizes: false };
     expect(sexualizationDecision({ ...calm, relationshipHours: 20 })).toEqual({ kind: 'no_opening' });

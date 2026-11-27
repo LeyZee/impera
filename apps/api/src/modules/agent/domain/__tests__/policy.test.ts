@@ -293,3 +293,51 @@ describe('a broke fan kept warm (passe 11a, Charles 21/11)', () => {
     expect(keepsWarm({ risks: ['no_budget', 'distress'], hasBought: true })).toBe(false);
   });
 });
+
+describe('the pause after a purchase (ADR 0128 § 1-3)', () => {
+  const paused = { ...base, limits: { ...base.limits, afterPurchaseHours: 48 } };
+
+  it('opens no script within the pause after his last purchase', () => {
+    expect(offerDecision({ ...paused, lastPurchaseAt: hoursAgo(20) })).toEqual({
+      allowed: false,
+      reason: 'after_purchase',
+    });
+    expect(offerDecision({ ...paused, lastPurchaseAt: hoursAgo(47.9) })).toEqual({
+      allowed: false,
+      reason: 'after_purchase',
+    });
+  });
+
+  it('lets a script go once the pause is over, if his heat allows', () => {
+    expect(offerDecision({ ...paused, lastPurchaseAt: hoursAgo(48) })).toEqual({ allowed: true });
+    expect(offerDecision({ ...paused, lastPurchaseAt: hoursAgo(60), desire: 50 })).toEqual({
+      allowed: false,
+      reason: 'low_desire',
+    });
+  });
+
+  it('lifts when he asks for content or takes her there himself', () => {
+    expect(offerDecision({ ...paused, lastPurchaseAt: hoursAgo(20), fanAsksForPaid: true })).toEqual({
+      allowed: true,
+    });
+    expect(offerDecision({ ...paused, lastPurchaseAt: hoursAgo(20), fanSexualizes: true })).toEqual({
+      allowed: true,
+    });
+  });
+
+  it('never lifts the cooldown, his limits or a risk', () => {
+    const lifted = { ...paused, lastPurchaseAt: hoursAgo(20), fanSexualizes: true };
+    expect(offerDecision({ ...lifted, lastOfferAt: hoursAgo(2) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    expect(offerDecision({ ...lifted, risks: ['distress'] })).toEqual({ allowed: false, reason: 'risk' });
+    expect(offerDecision({ ...lifted, flags: {} })).toEqual({ allowed: false, reason: 'age_unconfirmed' });
+  });
+
+  it('applies no pause without a known purchase or a pause set', () => {
+    expect(offerDecision({ ...paused, lastPurchaseAt: null })).toEqual({ allowed: true });
+    expect(offerDecision(paused)).toEqual({ allowed: true });
+    expect(offerDecision({ ...base, lastPurchaseAt: hoursAgo(1) })).toEqual({ allowed: true });
+  });
+});
