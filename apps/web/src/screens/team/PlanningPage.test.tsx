@@ -188,6 +188,8 @@ function serve(
     reportShifts?: unknown[];
     /** The context of a shift's report panel, by shift (EQP-02). */
     reportContext?: (shiftId: string) => unknown;
+    /** The team's weeks of availability (ADR 0171); unanswered (404) when left out. */
+    availability?: unknown;
     /** The team's calendar (CR-12) for a window; unanswered (404) when left out. */
     calendar?: (from: string, to: string) => unknown;
     write?: (method: string, path: string, body: unknown) => Reply;
@@ -267,6 +269,8 @@ function serve(
           },
         };
       else if (path === '/v1/scheduling/settings') reply = { status: 200, body: settingsOf() };
+      else if (path === '/v1/scheduling/availability' && routes.availability !== undefined)
+        reply = { status: 200, body: routes.availability };
       else if (routes.reportContext !== undefined && /^\/v1\/scheduling\/shifts\/[^/]+\/report$/u.test(path))
         reply = { status: 200, body: routes.reportContext(path.split('/')[4] ?? '') };
       else reply = { status: 404 };
@@ -451,6 +455,39 @@ describe('Équipe › Planning', () => {
     if (!(day instanceof HTMLInputElement)) throw new Error('no day field');
     // Written as French writes it, never by the system's date field (recette #561).
     expect(day.value).toBe('29/10/2026');
+  });
+
+  it('says who is dispo on a place to fill, the whole of it first, and their hours on a part (ADR 0171, trou 16)', async () => {
+    const week = (memberId: string, ranges: unknown[]): unknown => ({
+      memberId,
+      weekId: id(301),
+      timeZone: 'Africa/Porto-Novo',
+      ranges,
+      setAt: '2026-10-20T10:00:00.000Z',
+      setByMember: true,
+    });
+    serve({
+      members: [
+        member({}),
+        member({ id: BASILE, userId: id(72), displayName: 'Basile', firstName: 'Basile', color: null }),
+      ],
+      availability: {
+        members: [
+          week(THEO, [{ weekday: 4, startMinute: 5 * 60, endMinute: 13 * 60 }]),
+          week(BASILE, [{ weekday: 4, startMinute: 8 * 60, endMinute: 12 * 60 }]),
+        ],
+      },
+    });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    const morning = await within(row).findByRole('button', {
+      name: /^À pourvoir : 6\sh – 12\sh, le jeudi 29.*, 1\sdispo$/u,
+    });
+    expect(text(morning.querySelector('.sc-slot__dispos'))).toBe('1 dispo');
+    fireEvent.click(morning);
+    const panel = await screen.findByRole('dialog', { name: 'Nouveau shift' });
+    const chips = within(within(panel).getByRole('radiogroup', { name: 'Membre' })).getAllByRole('radio');
+    expect(chips.map((chip) => text(chip))).toEqual(['Théo dispo', 'Basile 8 h – 12 h']);
   });
 
   it('reads a créneau in the order of the day, draws a shift once and keeps the amber for the next day (GES-05)', async () => {

@@ -95,6 +95,7 @@ Branche : task/<id>-<slug>
 | EQ-23 | Retour de fin de shift et suivi de ses incidents | équipe | in_review | ADR 0050 § 10, EQ-03, CR-01 |
 | EQ-24 | « Où te verser » : où un membre reçoit ses virements | équipe | in_review | ADR 0165, EQ-05, EQ-15, CR-01 |
 | EQ-25 | « J'ai été décisif sur une vente » : le chatteur signale son shift, le manager répond | équipe | in_review | ADR 0101 §§ 18 à 22, EQ-22 |
+| EQ-26 | Dispos hebdomadaires, et qui est dispo sur chaque place libre | équipe | in_review | ADR 0171, EQ-02 |
 | EQ-27 | Retour de fin de shift léger | équipe | in_review | ADR 0170, EQ-23 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
