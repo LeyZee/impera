@@ -57,6 +57,7 @@ export const PERSONA_BOUNDS = {
   sexualizationMinDesireToOpen: [20, 70],
   scriptMinDesire: [50, 90],
   scriptCooldownHours: [0, 24],
+  scriptAfterPurchaseHours: [24, 72],
   postOfferDelayDays: [1, 60],
   followUpDelayHours: [1, 168],
   nudgeDelayMinutes: [1, 120],
@@ -249,6 +250,11 @@ export const PersonaStrategiesSchema = z.strictObject({
       cooldown_hours: intIn(PERSONA_BOUNDS.scriptCooldownHours),
       /** His desire score (P3-12) before a script may go out; absent, 70 (`DEFAULT_SCRIPT_MIN_DESIRE`). */
       min_desire: intIn(PERSONA_BOUNDS.scriptMinDesire).optional(),
+      /**
+       * The pause after a purchase (ADR 0128 § 1): hours after his last purchase before she opens a script herself;
+       * absent, 48 (`DEFAULT_AFTER_PURCHASE_HOURS`).
+       */
+      after_purchase_hours: intIn(PERSONA_BOUNDS.scriptAfterPurchaseHours).optional(),
     })
     .refine(...instructionsWhenCustom('custom')),
   post_offer: z
