@@ -141,8 +141,10 @@ function guardClicksAfterClose(): void {
     event.preventDefault();
     event.stopPropagation();
   };
-  window.addEventListener('click', swallow, true);
-  window.setTimeout(() => {
-    window.removeEventListener('click', swallow, true);
+  // The window it listens on, kept: the timer may fire after a test tore the page down.
+  const target = window;
+  target.addEventListener('click', swallow, true);
+  target.setTimeout(() => {
+    target.removeEventListener('click', swallow, true);
   }, CLOSE_GUARD_MS);
 }
