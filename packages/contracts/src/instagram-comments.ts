@@ -76,6 +76,16 @@ export const CommentPromptInputSchema = z.strictObject({
   postAgeHours: z.number().int().nonnegative(),
   repliesToHer: z.boolean(),
   authorCommentedBefore: z.boolean(),
+  /**
+   * The code allows a question in this reply (her replies ask one now and then, never on every one): decided by the
+   * code from her day's replies, never by the model.
+   */
+  mayAsk: z.boolean(),
+  /**
+   * He says he loves her: she answers with emojis only, never words, so that no one else is jealous and he imagines
+   * nothing (the creator, 26/11). Decided by the code from the comment (`declaresLove`).
+   */
+  emojiOnly: z.boolean(),
 });
 export type CommentPromptInput = z.infer<typeof CommentPromptInputSchema>;
 
@@ -122,6 +132,8 @@ export const COMMENT_GUARD_CODES = [
   'instagram_text',
   'public_explicit',
   'repeated_reply',
+  'unwanted_question',
+  'words_in_emoji_reply',
 ] as const;
 export const CommentGuardCodeSchema = z.enum(COMMENT_GUARD_CODES);
 export type CommentGuardCode = z.infer<typeof CommentGuardCodeSchema>;

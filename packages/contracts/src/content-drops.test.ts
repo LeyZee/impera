@@ -29,11 +29,11 @@ describe('the format of a drop, read from the file and never from the image (ADR
     expect(declaredFileRefusal('reveal_story', { mime: 'image/jpeg', bytes: 1 })).toBeNull();
   });
 
-  it('a vocal goes only to a relance or a script', () => {
+  it('a vocal goes only to a relance, a script or the two voices of the AI', () => {
     const takesVocals = DROP_CATEGORIES.filter((category) =>
       DROP_FORMAT_RULES[category].kinds.includes('audio'),
     );
-    expect(takesVocals).toEqual(['script', 'mass_dm']);
+    expect(takesVocals).toEqual(['script', 'mass_dm', 'voice_beep', 'voice_real']);
   });
 
   it('weighs a photo at 30 Mo and a video at 10 Go at most (ADR 0070)', () => {

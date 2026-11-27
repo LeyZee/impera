@@ -38,7 +38,7 @@ interface Call {
   readonly body: unknown;
 }
 
-function serve(content: unknown, answers: Record<string, (body: unknown) => Response> = {}): Call[] {
+function serve(content: object, answers: Record<string, (body: unknown) => Response> = {}): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
     'fetch',
@@ -48,7 +48,8 @@ function serve(content: unknown, answers: Record<string, (body: unknown) => Resp
       calls.push({ url, method, body });
       const answer = answers[`${method} ${url}`];
       if (answer !== undefined) return Promise.resolve(answer(body));
-      if (url === '/v1/creator-space/content') return Promise.resolve(Response.json(content));
+      if (url === '/v1/creator-space/content')
+        return Promise.resolve(Response.json({ redone: [], ...content }));
       return Promise.resolve(new Response('null', { status: 404 }));
     }),
   );
@@ -100,7 +101,8 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Publié' })).toBeNull();
     const tiles = [...document.querySelectorAll('.ct-tile__name')].map((tile) => tile.textContent);
-    expect(tiles).toHaveLength(4);
+    // Reveal's four, the whale gifts and the videos to sell (ADR 0163), and the AI's two voices.
+    expect(tiles).toHaveLength(8);
     expect(tiles.some((name) => name.includes('Script'))).toBe(false);
     expect(tiles.some((name) => name.includes('Insta'))).toBe(false);
   });
@@ -138,6 +140,38 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     serve({ requests: [requestOf({ dueOn: '2026-11-05', reason: 'Une story pour ce soir' })], drops: [] });
     show();
     expect((await screen.findByText('Pour aujourd’hui')).className).toContain('ct-due--today');
+  });
+
+  it('shows her the team’s « À refaire » on her request, and a drop sent back without one (trou 7 du 21/11)', async () => {
+    const request = requestOf({
+      reason: 'La séance promise',
+      redo: { sentence: 'Trop sombre, refais-la avec plus de lumière', at: '2026-11-05T09:00:00.000Z' },
+    });
+    serve({
+      requests: [request],
+      drops: [],
+      redone: [
+        {
+          dropId: ContentDropIdSchema.parse('00000000-0000-4000-8000-0000000000dd'),
+          category: 'reveal_story',
+          redo: { sentence: 'C’est flou, refais-la plus nette', at: '2026-11-05T10:00:00.000Z' },
+        },
+      ],
+    });
+    show();
+    const section = (await screen.findByRole('heading', { name: 'À tourner' })).closest('section');
+    if (section === null) throw new Error('no section');
+    const cards = within(section).getAllByRole('listitem');
+    expect(cards).toHaveLength(2);
+    const [story, seance] = cards;
+    if (story === undefined || seance === undefined) throw new Error('no cards');
+    expect(within(story).getByText('Story Reveal')).toBeDefined();
+    expect(within(story).getByText('Ton dernier envoi est revenu')).toBeDefined();
+    expect(within(story).getByText('C’est flou, refais-la plus nette')).toBeDefined();
+    expect(within(seance).getByText('À refaire')).toBeDefined();
+    expect(within(seance).getByText('Trop sombre, refais-la avec plus de lumière')).toBeDefined();
+    fireEvent.click(within(story).getByRole('button', { name: 'Déposer à nouveau' }));
+    expect(await screen.findByRole('dialog')).toBeDefined();
   });
 
   it('opens the sheet on the request Aujourd’hui sent her to drop, then forgets it (CRE-01)', async () => {
@@ -416,5 +450,66 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     });
     const drop = calls.find((call) => call.method === 'POST');
     expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
+  });
+
+  it('replaces a medium the team asked again where it is, and says what does not fit (trou 7 du 21/11)', async () => {
+    const asked = fileOf({
+      position: 0,
+      redo: { sentence: 'Trop sombre, refais-la', at: '2026-11-05T09:00:00.000Z' },
+    });
+    const refused = fileOf({ position: 1, state: 'refused', refusal: 'Photo illisible' });
+    const drop = dropOf({ state: 'ready', files: [asked, refused] });
+    const calls = serve(
+      { requests: [], drops: [drop] },
+      {
+        [`POST /v1/creator-space/drops/${drop.id}/files/${asked.id}/replace`]: (body) => {
+          const sent = z.object({ id: ContentDropFileIdSchema }).parse(body);
+          return Response.json({
+            ...drop,
+            state: 'received',
+            files: [fileOf({ id: sent.id, position: 0, state: 'awaiting' }), refused],
+          });
+        },
+      },
+    );
+    show();
+    const section = (await screen.findByRole('heading', { name: 'En route' })).closest('section');
+    if (section === null) throw new Error('no section');
+    const card = within(section).getByText('Trop sombre, refais-la').closest('.ct-card');
+    if (!(card instanceof HTMLElement)) throw new Error('no card');
+    expect(within(card).getByText('Photo illisible')).toBeDefined();
+    expect(within(card).getByRole('button', { name: 'Remplacer Photo 2' })).toBeDefined();
+    fireEvent.click(within(card).getByRole('button', { name: 'Remplacer Photo 1' }));
+    const input = card.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    expect(input.accept).toContain('image/*');
+    pick(input, [new File([new Uint8Array(4)], 'vocal.mp3', { type: 'audio/mpeg' })]);
+    expect(await within(card).findByRole('alert')).toHaveProperty(
+      'textContent',
+      '« Feed · Séance boudoir » prend seulement des photos et des vidéos',
+    );
+    fireEvent.click(within(card).getByRole('button', { name: 'Remplacer Photo 1' }));
+    const better = fileWithHead('nouvelle.jpg', 'jpeg', 10, 'image/jpeg');
+    pick(input, [better]);
+    await waitFor(() => {
+      expect(queueSend).toHaveBeenCalledTimes(1);
+    });
+    const posted = calls.filter((call) => call.method === 'POST');
+    expect(posted).toHaveLength(1);
+    expect(posted[0]?.body).toMatchObject({ mime: 'image/jpeg', bytes: 13 });
+    expect(queueSend).toHaveBeenCalledWith(
+      drop.id,
+      z.object({ id: z.string() }).parse(posted[0]?.body).id,
+      better,
+      expect.any(Function),
+    );
+  });
+
+  it('keeps a published drop out of « En route » when nothing of it is asked again', async () => {
+    serve({ requests: [], drops: [dropOf({ state: 'ready', exportedAt: '2026-11-04T09:00:00.000Z' })] });
+    show();
+    expect(await screen.findByRole('heading', { name: 'Publié' })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remplacer/u })).toBeNull();
   });
 });

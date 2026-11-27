@@ -2,10 +2,12 @@ import {
   AuditEntryIdSchema,
   CreatorDecisionIdSchema,
   CreatorDecisionKindSchema,
+  CreatorIdSchema,
   CreatorTaskCategorySchema,
   DecisionAnswerSchema,
   DecisionLayoutSchema,
   DecisionStateSchema,
+  fittingAnswers,
   NewCreatorDecisionSchema,
   newId,
   type CreatorDecisionId,
@@ -28,9 +30,15 @@ import {
   DecisionAnswered,
   DecisionAnswerUnknown,
   DecisionForbidden,
+  DecisionNoMoreIdeas,
   DecisionNotFound,
 } from '../../domain/errors';
-import type { AskedDecision, DecisionAsking, DecisionStore } from '../../domain/ports';
+import {
+  IDEAS_WRITING_MS,
+  type AskedDecision,
+  type DecisionAsking,
+  type DecisionStore,
+} from '../../domain/ports';
 
 const d = schema.creatorDecisions;
 
@@ -149,6 +157,23 @@ export function createDrizzleDecisionStore(db: Database): DecisionStore {
         shown(await openOf(tx, creatorId), now, false).map(toRead),
       ),
 
+    renewable: (userId, id, now) =>
+      withCreatorAccount(db, userId, async (tx, creatorId) => {
+        const [row] = await tx
+          .select({ ...columns, subject: d.subject })
+          .from(d)
+          .where(and(eq(d.id, id), eq(d.creatorId, creatorId)));
+        if (row === undefined) throw new DecisionNotFound();
+        const decision = toDecision(row);
+        if (!waits(decision, now)) throw new DecisionNotFound();
+        if (decision.otherIdeasLeft === 0) throw new DecisionNoMoreIdeas();
+        return {
+          creatorId: CreatorIdSchema.parse(creatorId),
+          subject: row.subject,
+          decision: toRead(decision),
+        };
+      }),
+
     answer: (userId, id, key, now) =>
       withCreatorAccount(db, userId, async (tx, creatorId) => {
         const { noted } = await answer(tx, creatorId, id, key, userId, now);
@@ -224,6 +249,83 @@ export function createDrizzleDecisionAsking(db: Database): DecisionAsking {
           .where(
             and(eq(d.creatorId, creatorId), eq(d.kind, kind), eq(d.subject, subject), eq(d.state, 'open')),
           );
+      }),
+
+    countIdeas: (creatorId, id, now) =>
+      asking(creatorId, async (tx) => {
+        // The update names the open row with a request left and none being written: two at once keep the first.
+        const counted = await tx
+          .update(d)
+          .set({ otherIdeasLeft: sql`${d.otherIdeasLeft} - 1`, ideasAskedAt: now, updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(d.id, id),
+              eq(d.creatorId, creatorId),
+              eq(d.state, 'open'),
+              sql`${d.otherIdeasLeft} > 0`,
+              sql`(${d.ideasAskedAt} is null or ${d.ideasAskedAt} < ${new Date(now.getTime() - IDEAS_WRITING_MS)})`,
+            ),
+          )
+          .returning({ id: d.id });
+        return counted.length > 0;
+      }),
+
+    returnIdeas: (creatorId, id) =>
+      asking(creatorId, async (tx) => {
+        await tx
+          .update(d)
+          .set({ otherIdeasLeft: sql`${d.otherIdeasLeft} + 1`, ideasAskedAt: null, updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(d.id, id),
+              eq(d.creatorId, creatorId),
+              eq(d.state, 'open'),
+              sql`${d.ideasAskedAt} is not null`,
+            ),
+          );
+      }),
+
+    otherIdeas: (creatorId, id, answers) =>
+      asking(creatorId, async (tx) => {
+        const [open] = await tx
+          .select({ layout: d.layout })
+          .from(d)
+          .where(and(eq(d.id, id), eq(d.creatorId, creatorId), eq(d.state, 'open')));
+        if (open === undefined) return null;
+        const fitting = fittingAnswers(DecisionLayoutSchema.parse(open.layout), answers);
+        const [row] = await tx
+          .update(d)
+          .set({ answers: fitting, ideasAskedAt: null, updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(d.id, id),
+              eq(d.creatorId, creatorId),
+              eq(d.state, 'open'),
+              sql`${d.ideasAskedAt} is not null`,
+            ),
+          )
+          .returning(columns);
+        return row === undefined ? null : toRead(toDecision(row));
+      }),
+
+    phones: (creatorId) =>
+      asking(creatorId, async (tx) => {
+        const [creator] = await tx
+          .select({ timeZone: schema.creators.timezone })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        // Her accounts: role `creator`, linked to her alone (one link per account since CR-02).
+        const accounts = await tx
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(
+            and(
+              eq(schema.user.role, 'creator'),
+              sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`,
+            ),
+          )
+          .orderBy(schema.user.id);
+        return { accounts: accounts.map((one) => one.id), timeZone: creator?.timeZone ?? 'Europe/Paris' };
       }),
 
     read: (creatorId, kind, subject, now) =>

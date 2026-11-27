@@ -28,6 +28,16 @@ export interface SexualizationContext {
   /** His desire score after his message (`desireScore`): she opens it herself only once he is warm enough. */
   readonly desire: number;
   readonly limits: SexualizationLimits;
+  /**
+   * She already tried to open it herself this evening and he did not follow (passe 17, guide): one attempt per
+   * evening, never a second. Absent, not known: as not tried.
+   */
+  readonly triedThisEvening?: boolean;
+  /**
+   * Inside the pause after his last purchase (ADR 0128 § 2): she does relation and does not open it herself; she still
+   * follows him if he goes there. Absent, no pause.
+   */
+  readonly afterPurchase?: boolean;
 }
 
 export type SexualizationDecision =
@@ -51,7 +61,9 @@ export function sexualizationDecision(context: SexualizationContext): Sexualizat
     !context.ageConfirmed ||
     context.noExplicit ||
     hours < limits.initiateAfterHours ||
-    context.desire < limits.minDesireToOpen
+    context.desire < limits.minDesireToOpen ||
+    context.triedThisEvening === true ||
+    context.afterPurchase === true
   )
     return { kind: 'no_opening' };
   return { kind: 'free' };

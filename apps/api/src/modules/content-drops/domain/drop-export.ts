@@ -58,6 +58,10 @@ const FOLDERS: Readonly<Record<SentDrop['category'], string>> = {
   instagram_reel: 'reel-insta',
   instagram_post: 'photo-insta',
   telegram_post: 'telegram',
+  whale_gift: 'cadeau-baleine',
+  voice_beep: 'vocal-bip',
+  voice_real: 'vocal-reelle',
+  sale_video: 'video-a-vendre',
 };
 
 const KIND_NAMES: Readonly<Record<DropMediaKind, string>> = {
@@ -76,6 +80,13 @@ const OUTPUTS: Readonly<Record<SentDrop['category'], string>> = {
   instagram_reel: 'À publier en Reel sur Instagram.',
   instagram_post: 'À publier sur Instagram, dans cet ordre.',
   telegram_post: 'À publier sur son canal Telegram, dans cet ordre.',
+  whale_gift: 'À ranger dans Reveal, dossier des cadeaux : offert à un gros fan, jamais revendu.',
+  voice_beep:
+    'À ranger dans Reveal, dossier des vocaux de l’IA : envoyé à un fan qui la croit un robot, jamais vendu.',
+  voice_real:
+    'À ranger dans Reveal, dossier des vocaux de l’IA : la preuve qu’elle est bien réelle, jamais vendue.',
+  sale_video:
+    'À ranger dans Reveal, dossier des vidéos à vendre : vendue au prix de la grille, jamais offerte.',
 };
 
 /** Whether her drop's media fit in one archive (a ZIP without ZIP64). */

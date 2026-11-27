@@ -14,16 +14,17 @@ export type {
   CustomOrderTurn,
   CustomOrderTurnInput,
 } from './domain/turn';
+import { createDrizzleCustomOrderAgencyStore } from './infra/db/agency-store';
 import { createCustomPriceGridReader, createDrizzleCustomPriceGridStore } from './infra/db/grid-store';
 import { createDrizzleCustomOrderStore, type CustomOrderStore } from './infra/db/order-store';
-import { createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
+import { createCustomOrderRoutes, createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
 
 /** @public His orders for the agent's turn: read and written in the turn's own transaction, under her RLS. */
 export type { CustomOrderRecord, CustomOrderStore } from './infra/db/order-store';
 
 export interface CustomOrdersModule {
   readonly name: 'custom-orders';
-  /** Mounted under `/v1`: `/creators/:creatorId/custom-prices`, the owner's alone. */
+  /** Mounted under `/v1`: `/creators/:creatorId/custom-prices` (the owner's alone) and `…/custom-orders`. */
   readonly routes: FastifyPluginAsyncZod;
   /** Her grid in force for the agent's turn, read as the service role; null when never saved. */
   readonly gridOf: (creatorId: CreatorId) => Promise<CustomPriceGrid | null>;
@@ -42,9 +43,14 @@ export interface CustomOrdersDeps {
 
 export function createCustomOrdersModule(deps: CustomOrdersDeps): CustomOrdersModule {
   const store = createDrizzleCustomPriceGridStore(deps.db);
+  const prices = createCustomPriceRoutes(store, deps.requireRole);
+  const orders = createCustomOrderRoutes(createDrizzleCustomOrderAgencyStore(deps.db), deps.requireRole);
   return {
     name: 'custom-orders',
-    routes: createCustomPriceRoutes(store, deps.requireRole),
+    routes: async (app, options) => {
+      await prices(app, options);
+      await orders(app, options);
+    },
     gridOf: createCustomPriceGridReader(deps.adminDb),
     orders: createDrizzleCustomOrderStore(),
   };

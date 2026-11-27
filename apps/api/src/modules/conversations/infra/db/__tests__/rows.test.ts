@@ -2,7 +2,7 @@ import { ConversationIdSchema, CreatorIdSchema, EventIdSchema, newId } from '@im
 import type { schema } from '@impera/db';
 import { describe, expect, it } from 'vitest';
 
-import { toStoredEvent } from '../rows';
+import { readDraftTranslation, toStoredEvent, toStoredPolicyTrace } from '../rows';
 
 const conversationId = newId(ConversationIdSchema);
 
@@ -69,5 +69,22 @@ describe('journal rows written before a contract change (ADR 0007, Évolution de
       toStoredEvent(row('handoff_requested', { conversationId: other, cause: 'distress' })).body,
     ).toEqual({ type: 'handoff_requested', payload: { conversationId: other, cause: 'distress' } });
     expect(() => toStoredEvent(row('handoff_requested', { cause: 'not_a_cause' }))).toThrow();
+  });
+});
+
+describe('her draft in French for the team, beside the draft (ADR 0168 § 9)', () => {
+  it('is kept and read back apart from the step the send reads', () => {
+    const translation = { language: 'french' as const, bubbles: ['coucou toi'] };
+    const stored = toStoredPolicyTrace({ translation });
+    expect(stored).toEqual({ translation });
+    expect(readDraftTranslation(stored)).toEqual(translation);
+    // The send reads the step only (`scriptStep`): the French is not one.
+    expect(stored.scriptStep).toBeUndefined();
+  });
+
+  it('drops one that does not read, never the draft, and reads none on an older trace', () => {
+    expect(toStoredPolicyTrace({ translation: { language: 'french', bubbles: [] } })).toEqual({});
+    expect(readDraftTranslation({})).toBeNull();
+    expect(readDraftTranslation({ translation: { language: 'english', bubbles: ['hey'] } })).toBeNull();
   });
 });

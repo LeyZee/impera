@@ -2,11 +2,14 @@ import { z } from 'zod';
 
 import {
   CUSTOM_MINUTES_MAX,
+  CUSTOM_PRICE_MAX_MINOR,
   CUSTOM_SUPPLEMENTS_MAX,
   CustomFormatSchema,
   CustomSupplementIdSchema,
+  isPerMinute,
   type CustomFormat,
 } from './custom-prices';
+import { ConversationIdSchema, CustomOrderIdSchema, FanIdSchema } from './ids';
 
 /**
  * A custom order as the code follows it (ADR 0159 § A): what the brain reads of his request, the details the code
@@ -143,3 +146,99 @@ export const OpenCustomOrderSchema = z
   })
   .strict();
 export type OpenCustomOrder = z.infer<typeof OpenCustomOrderSchema>;
+
+/** The grid's price on the card, as stored: the sum, her refusal given in advance, or « hors grille ». */
+export const StoredCustomQuoteSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('price'),
+    totalMinor: z.number().int().min(0),
+    lines: z.array(z.looseObject({ kind: z.string(), amountMinor: z.number().int() })),
+  }),
+  z.object({ kind: z.literal('declined'), by: z.string() }),
+  z.object({ kind: z.literal('off_grid'), missing: z.array(z.string()) }),
+]);
+
+/** The card for her (ADR 0159 § A.2 bis), as the turn kept it: what he asked, and the price her grid proposes. */
+export const CustomOrderCardSchema = z.object({
+  format: CustomFormatSchema.nullable(),
+  supplements: z.array(z.string()),
+  minutes: z.number().int().nullable(),
+  details: CustomDetailsSchema,
+  quote: StoredCustomQuoteSchema.nullable(),
+  to: z.enum(['creator', 'owner']),
+  missing: z.array(z.string()),
+});
+export type CustomOrderCardView = z.infer<typeof CustomOrderCardSchema>;
+
+/**
+ * What he pays before she starts (ADR 0159 § A.4, Charles 20/11): half of a video as a tip, a call or a video call in
+ * full; anything else is paid when it is delivered (null). Pure: the screen and the server read the same sum.
+ */
+export function customDepositMinor(format: CustomFormat | null, priceMinor: number): number | null {
+  if (format === 'video') return Math.round(priceMinor / 200) * 100;
+  if (format !== null && isPerMinute(format)) return priceMinor;
+  return null;
+}
+
+/** His order as the agency reads it: the card, her answer and price, and where it stands up to delivery. */
+export const CustomOrderViewSchema = z.object({
+  id: CustomOrderIdSchema,
+  fanId: FanIdSchema,
+  fanName: z.string(),
+  conversationId: ConversationIdSchema.nullable(),
+  state: CustomOrderStateSchema,
+  format: CustomFormatSchema.nullable(),
+  supplements: z.array(z.string()),
+  minutes: z.number().int().nullable(),
+  details: CustomDetailsSchema,
+  card: CustomOrderCardSchema.nullable(),
+  /** Her price, set with her yes; null before. Never shown to the fan before that. */
+  priceMinor: z.number().int().nullable(),
+  depositMinor: z.number().int().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  decidedAt: z.iso.datetime().nullable(),
+});
+export type CustomOrderView = z.infer<typeof CustomOrderViewSchema>;
+
+export const CustomOrderListSchema = z.object({ orders: z.array(CustomOrderViewSchema) });
+export type CustomOrderList = z.infer<typeof CustomOrderListSchema>;
+
+/** Which orders a list shows: those still moving (before delivery), or every one. */
+export const CustomOrderListQuerySchema = z.object({ scope: z.enum(['active', 'all']).default('active') });
+
+/** Her answer, entered by the owner (ADR 0159 § A.3): yes at a price, or no. */
+export const DecideCustomOrderBodySchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('yes'), priceMinor: z.number().int().min(100).max(CUSTOM_PRICE_MAX_MINOR) }),
+  z.object({ decision: z.literal('no') }),
+]);
+export type DecideCustomOrderBody = z.infer<typeof DecideCustomOrderBodySchema>;
+
+/** The next step of an order she said yes to: deposit received, delivered, or cancelled. */
+export const AdvanceCustomOrderBodySchema = z.object({
+  to: z.enum(['deposit_paid', 'delivered', 'cancelled']),
+});
+export type AdvanceCustomOrderBody = z.infer<typeof AdvanceCustomOrderBodySchema>;
+
+/** The states an order may move to from each state, by a person (the turn moves `gathering` and `awaiting_creator`). */
+export const CUSTOM_ORDER_MOVES: Readonly<Record<CustomOrderState, readonly CustomOrderState[]>> = {
+  gathering: ['creator_yes', 'creator_no', 'cancelled'],
+  awaiting_creator: ['creator_yes', 'creator_no', 'cancelled'],
+  creator_yes: ['deposit_paid', 'delivered', 'cancelled'],
+  creator_no: [],
+  deposit_paid: ['delivered', 'cancelled'],
+  delivered: [],
+  expired: [],
+  cancelled: [],
+};
+
+/** The states still moving: shown in « Commandes en cours ». */
+export const ACTIVE_CUSTOM_ORDER_STATES: readonly CustomOrderState[] = [
+  'gathering',
+  'awaiting_creator',
+  'creator_yes',
+  'deposit_paid',
+];
+
+export const CUSTOM_ORDER_ERROR_CODES = ['custom_order_not_found', 'custom_order_move_conflict'] as const;
+export type CustomOrderErrorCode = (typeof CUSTOM_ORDER_ERROR_CODES)[number];

@@ -83,8 +83,12 @@ Le code vient en petits lots. Charles a levé l'attente de la première vente r�
    Commande enregistrée (lot du 20/11 au soir) : table `custom_orders` (migration 0242), une commande ouverte par fan au plus (`gathering` ou `awaiting_creator`), écrite par le tour de l'agent sous la RLS de la créatrice (`withTenant`), jamais par le rôle de service ; le même message du fan ne compte qu'une fois ; le fan est lié à la créatrice de la commande par une clé étrangère composée. Le compte de la créatrice n'en lit rien avant le lot 1.
 
 1. Oui ou non et prix de la créatrice saisis sur la ligne « Demande sur mesure » d'« À traiter » ; annonce du prix et demande d'acompte ; pourboire reconnu ; garde « pourboire seulement ici » ; relais de preuve (§ F).
+
+   Réponse de la créatrice, côté serveur (lot du 21/11) : migration 0267 (`price_minor`, `deposit_minor`, `decided_by`, `decided_at`, prix au moins 1 €, acompte entre 0 et le prix). `GET /v1/creators/:creatorId/custom-orders` (en cours, ou toutes) est lu par le propriétaire et par un manager actif qui la suit, en lecture seule (Charles, 21/11) ; `POST …/:orderId/decision` (oui à un prix, ou non) et `POST …/:orderId/advance` (acompte reçu, livrée, annulée) par le propriétaire seul. L'acompte se calcule au oui (`customDepositMinor`) : moitié d'une vidéo, tout pour un appel ou une visio, rien pour le reste. Une étape qui ne part pas de l'état de la commande est refusée (409). Le journal d'audit garde qui a fait quelle étape, jamais un prix. Chatteurs et compte de la créatrice n'en lisent rien encore ; l'annonce du prix au fan reste au fil Agent.
 2. Dossier `custom` rattaché au fan, livraison au prix restant (§ B, § A.6).
 3. Grille interne (§ C).
+
+   Vidéos déjà tournées (lot du 26/11, avec le fil Coffre) : la grille porte une liste `readyVideos`, des types de vidéos qu'elle vend hors des scripts, nommés par le propriétaire (le dépôt n'en nomme aucun), chacun avec une fourchette (au moins 1 €, haut au moins égal au bas) et un interrupteur « En vente ». Une grille enregistrée avant se lit sans aucun type : pas de migration. Le prix d'une vidéo est tiré dans la fourchette de son type et arrondi à l'euro par une fonction pure (`readyVideoPriceMinor`, même graine, même prix) ; le moment du tirage et l'endroit où il est figé appartiennent à la vente (fil Coffre).
 4. Cadeaux (§ E).
 5. Plus tard : cam (après relevé de ce que Reveal permet), vocaux préparés, réponse de la créatrice depuis son espace.
 

@@ -8,6 +8,7 @@ import {
 import {
   and,
   eq,
+  onCreatorList,
   inArray,
   schema,
   sql,
@@ -25,7 +26,7 @@ import {
   SuggestionForbidden,
   SuggestionIdTaken,
 } from '../../domain/errors';
-import type { HerWeekFrame, WeekAgendaStore } from '../../domain/ports';
+import type { HerWeekFrame, HerWeekRead, WeekAgendaStore } from '../../domain/ports';
 import { shootDayDone, shootItemTimely } from '../../domain/week';
 
 const tasks = schema.creatorTasks;
@@ -44,6 +45,69 @@ async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
     .where(eq(schema.creators.id, creatorId));
   if (creator === undefined) throw new SuggestionForbidden();
   return creator.timeZone;
+}
+
+/** Her frames of the week starting `week`, in whatever account the transaction runs: hers, or her team's. */
+async function weekFrames(tx: Transaction, creatorId: string, week: string, now: Date): Promise<HerWeekRead> {
+  const timeZone = await zoneOf(tx, creatorId);
+  const rows = await tx
+    .select()
+    .from(suggestions)
+    .where(
+      and(
+        eq(suggestions.creatorId, creatorId),
+        eq(suggestions.week, week),
+        sql`${suggestions.weekRole} is not null`,
+      ),
+    )
+    .orderBy(suggestions.day);
+  const ids = rows.map((row) => row.id);
+  const born =
+    ids.length === 0
+      ? []
+      : await tx
+          .select({
+            id: tasks.id,
+            suggestionId: tasks.suggestionId,
+            day: tasks.day,
+            archivedAt: tasks.archivedAt,
+          })
+          .from(tasks)
+          .where(and(eq(tasks.creatorId, creatorId), inArray(tasks.suggestionId, ids)));
+  const theirLines =
+    ids.length === 0
+      ? []
+      : await tx
+          .select()
+          .from(lines)
+          .where(and(eq(lines.creatorId, creatorId), inArray(lines.suggestionId, ids)))
+          .orderBy(lines.position);
+  const frames: HerWeekFrame[] = rows.flatMap((row) => {
+    const role = WeekRoleSchema.safeParse(row.weekRole);
+    if (!role.success || row.day === null) return [];
+    const task = born.find((one) => one.suggestionId === row.id && one.archivedAt === null);
+    return [
+      {
+        suggestionId: row.id,
+        role: role.data,
+        state: SuggestionStateSchema.parse(row.state),
+        taskId: task?.id ?? null,
+        day: task?.day ?? row.day,
+        lines: theirLines
+          .filter((line) => line.suggestionId === row.id)
+          .map((line) => ({
+            id: line.id,
+            need: WeekNeedSchema.parse(line.need),
+            label: line.label,
+            sheet: line.sheet,
+            count: line.count,
+            requestId: line.requestId,
+            done: line.doneAt !== null,
+          })),
+      },
+    ];
+  });
+  return { creatorId, timeZone, today: calendarDayIn(now, timeZone), frames };
 }
 
 /** Inserts a frame of her week, or finds it again under its id: a replay writes nothing, another frame under it is refused. */
@@ -148,56 +212,16 @@ export function createDrizzleWeekAgendaStore(db: Database): WeekAgendaStore {
       }),
 
     herWeek: (userId, week, now) =>
-      withCreatorAccount(db, userId, async (tx, creatorId) => {
-        const timeZone = await zoneOf(tx, creatorId);
-        const rows = await tx
-          .select()
-          .from(suggestions)
-          .where(and(eq(suggestions.week, week), sql`${suggestions.weekRole} is not null`))
-          .orderBy(suggestions.day);
-        const ids = rows.map((row) => row.id);
-        const born =
-          ids.length === 0
-            ? []
-            : await tx
-                .select({
-                  id: tasks.id,
-                  suggestionId: tasks.suggestionId,
-                  day: tasks.day,
-                  archivedAt: tasks.archivedAt,
-                })
-                .from(tasks)
-                .where(inArray(tasks.suggestionId, ids));
-        const theirLines =
-          ids.length === 0
-            ? []
-            : await tx.select().from(lines).where(inArray(lines.suggestionId, ids)).orderBy(lines.position);
-        const frames: HerWeekFrame[] = rows.flatMap((row) => {
-          const role = WeekRoleSchema.safeParse(row.weekRole);
-          if (!role.success || row.day === null) return [];
-          const task = born.find((one) => one.suggestionId === row.id && one.archivedAt === null);
-          return [
-            {
-              suggestionId: row.id,
-              role: role.data,
-              state: SuggestionStateSchema.parse(row.state),
-              taskId: task?.id ?? null,
-              day: task?.day ?? row.day,
-              lines: theirLines
-                .filter((line) => line.suggestionId === row.id)
-                .map((line) => ({
-                  id: line.id,
-                  need: WeekNeedSchema.parse(line.need),
-                  label: line.label,
-                  sheet: line.sheet,
-                  count: line.count,
-                  requestId: line.requestId,
-                  done: line.doneAt !== null,
-                })),
-            },
-          ];
-        });
-        return { creatorId, timeZone, today: calendarDayIn(now, timeZone), frames };
+      withCreatorAccount(db, userId, (tx, creatorId) => weekFrames(tx, creatorId, week, now)),
+
+    teamWeek: (creatorId, userId, week, now) =>
+      withTenantMember(db, creatorId, userId, async (tx, scope) => {
+        // Her owner and an active manager read where she is; a chatter does not (trous béants n° 11).
+        if (scope !== 'owner' && scope !== 'agency') throw new SuggestionForbidden();
+        // A manager reads only the creators on his own list (avis Sécurité, 21/11).
+        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId)))
+          throw new SuggestionForbidden();
+        return weekFrames(tx, creatorId, week, now);
       }),
 
     tickLine: (userId, lineId, done, now) =>

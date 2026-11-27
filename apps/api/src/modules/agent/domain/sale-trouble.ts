@@ -49,12 +49,15 @@ export function saleTroubleOutcome(
 /**
  * His message complains about something he bought (ADR 0156 § 7): the brain reads a complaint or a dispute, and he
  * did buy from her (a step of a script, or any spending Reveal records). A complaint with nothing bought is no
- * purchase complaint: she answers it as any other message.
+ * purchase complaint: she answers it as any other message. Contempt toward her (`insult` without `dispute`, « t'es
+ * comme les autres ») is not one either: no refund talk, her retort (ADR 0158 § 25, eval passe-16).
  */
 export function complainsOfPurchase(input: {
   readonly intent: string;
   readonly risks: readonly string[];
   readonly hasBought: boolean;
 }): boolean {
-  return input.hasBought && (input.intent === 'complaint' || input.risks.includes('dispute'));
+  if (!input.hasBought) return false;
+  if (input.risks.includes('dispute')) return true;
+  return input.intent === 'complaint' && !input.risks.includes('insult');
 }

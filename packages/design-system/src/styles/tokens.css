@@ -58,6 +58,9 @@
   /* A quiet fill that holds on any surface: a soft button, an avatar, a gauge's rail. On white glass it is a tint of
      ink, never more white (D-03: in Jour they vanished). */
   --nv-fill-soft: rgba(255, 255, 255, 0.09);
+  /* The ground of a tile set on a plate: the glass fill at Night, a faint shade in Jour where white on white vanishes. */
+  --nv-tile-fill: rgba(255, 255, 255, 0.05);
+  --nv-tile-fill-strong: rgba(255, 255, 255, 0.09);
   --nv-thumb: #ffffff;
 
   /* Aura: one neon light source above the page, and its wine shadow. */
@@ -67,6 +70,8 @@
 
   /* Semantic */
   --nv-success: #5fd4ff;
+  /* A state to know, not a task nor an alarm (a fan in care mode): a calm blue. */
+  --nv-info: #3d8ce6;
   --nv-warning: #ffa340;
   --nv-danger: #ff5a45;
   --nv-sale: #e8c37a;
@@ -105,6 +110,10 @@
   --nv-content-8: #25b6d2;
   --nv-content-9: #c558d6;
   --nv-content-10: #7f93b2;
+  /* 11 what is sold as a video; 12 and 13 the two voice notes, one family of sand, light then deep. */
+  --nv-content-11: #7cbf3a;
+  --nv-content-12: #d1a57a;
+  --nv-content-13: #a3765a;
   /*
    * The intensity of one measure (Dashboard de l'agence, « Quand ça vend »: the hours map and the ten biggest fans'
    * bar, Charles 20/11): one violet-fuchsia, mixed toward --nv-fill-track from pale to vivid. Never a state nor a
@@ -204,12 +213,16 @@
   --nv-hairline: rgba(60, 10, 30, 0.09);
   --nv-fill-track: rgba(60, 10, 30, 0.14);
   --nv-fill-soft: rgba(60, 10, 30, 0.07);
+  --nv-tile-fill: rgba(60, 10, 30, 0.045);
+  --nv-tile-fill-strong: rgba(60, 10, 30, 0.08);
 
   --nv-aura-neon: rgba(255, 92, 122, 0.34);
   --nv-aura-wine: rgba(255, 168, 190, 0.6);
   --nv-aura-rose: rgba(255, 206, 218, 0.7);
 
   --nv-success: #006c99;
+  /* A state to know, not a task nor an alarm (a fan in care mode): a calm blue. */
+  --nv-info: #2a6fc9;
   --nv-warning: #9a4a00;
   --nv-danger: #c42a12;
   --nv-sale: #7a5a12;
@@ -236,6 +249,9 @@
   --nv-content-8: #0b7f97;
   --nv-content-9: #9b2fb0;
   --nv-content-10: #55688a;
+  --nv-content-11: #4a8512;
+  --nv-content-12: #8f5f2a;
+  --nv-content-13: #6b4226;
   --nv-heat: #b040d8;
   --nv-money-creator: #b8406f;
   /* The Impera logo's navy itself, Charles's value (19/11), unretouched. */
@@ -292,6 +308,7 @@
 
   /* Pills (COH-08): three heights only. Information (a state, a tag) 22, a choice to tap 32, a counter 18. */
   --nv-pill-info: 22px;
+  --nv-pill-info-lg: 26px;
   --nv-pill-choice: 32px;
   --nv-pill-count: 18px;
 
