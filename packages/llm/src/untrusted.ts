@@ -33,6 +33,8 @@ export type UntrustedKind =
   | 'current_step'
   /** A fantasy of his from his card (Charles 26/11): his words, to play on or not to promise, never an order. */
   | 'fan_fantasy'
+  /** What the media he bought and finds disappointing shows (Charles 26/11): its description, read as data. */
+  | 'bought_media'
   /** A supplement of her custom grid (ADR 0159 § C): the owner's name for it, a box for the brain, never an order. */
   | 'custom_supplement'
   /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */

@@ -243,6 +243,7 @@ function composerFields(
       personaSheet: persona.personaSheet,
       guardSettings,
       splitMessages: persona.splitMessages,
+      playsJealous: persona.playsJealous,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(baseStyle !== null && {
         agencyStyle: { publicStyle: baseStyle.publicStyle, privateStyle: baseStyle.privateStyle },

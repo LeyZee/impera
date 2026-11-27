@@ -185,6 +185,7 @@ export function describeBrief(
   waitingStep?: VoiceWaitingStep,
   fantasy?: VoiceFantasy,
   currentStepSheet?: string,
+  boughtMediaSheet?: string,
 ): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
@@ -204,6 +205,9 @@ export function describeBrief(
       ? ''
       : `Ce qu’il a sous les yeux en ce moment : fais-le vivre au présent, sans rien décrire de plus.\n${wrapUntrusted('current_step', currentStepSheet)}`,
     fantasyBlocks(fantasy),
+    boughtMediaSheet === undefined || boughtMediaSheet.trim() === ''
+      ? ''
+      : `Ce que le média qu’il a acheté montre, d’après sa description : compare avec ce qu’il en dit.\n${wrapUntrusted('bought_media', boughtMediaSheet)}`,
     maxBubbles === undefined ? '' : bubblesLine(maxBubbles),
   ]
     .filter((block) => block !== '')

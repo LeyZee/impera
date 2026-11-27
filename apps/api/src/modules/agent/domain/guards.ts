@@ -40,6 +40,11 @@ export interface GuardSettings {
    */
   readonly neverDo?: readonly string[];
   /**
+   * The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): read from her persona, never
+   * listed in the repository. One in her answer is a `degrading_word`, blocking. Absent: not checked.
+   */
+  readonly degradingWords?: readonly string[];
+  /**
    * Her words kept for close fans (`rules.close_only_words`, Charles 26/11): one written to a fan below its `minTier`
    * is a `close_only_word`. Absent or empty: none.
    */
@@ -84,6 +89,11 @@ export interface GuardContext {
    * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
    */
   readonly fanAmountsMinor?: readonly number[];
+  /**
+   * His last message before her answer (Charles 27/11): her yes to a concrete meeting he proposes (« samedi à Lyon ? »
+   * then « avec plaisir ») is a `meeting_promise`. Absent, only her own words are read.
+   */
+  readonly fanLastMessage?: string;
   /** He asked a price since her last answer (Sécurité, #1043): a sum she writes now is a price of hers. */
   readonly fanAskedPrice?: boolean;
   /**
@@ -120,6 +130,40 @@ const CITY =
  * A day, a time, a city or « dispo » later in the same sentence: what turns a daydream into a real proposal, so the
  * daydream's exceptions below never cover it.
  */
+// What an extra is, said by her: a media offered, a bonus, a gift, something more (Charles 26/11 at 23:44).
+const FR_EXTRA =
+  "(je t'?en (offre|donne|mets|rajoute|envoie|glisse)|je t'?(offre|offrirai|rajoute|ajoute|glisse|mets|donne|envoie) (un|une|deux|2|en plus|aussi|cadeau|gratuitement)|(un|une|en|petit|petite) (bonus|cadeau|extra|surprise|offerte?|gratuite?)\\b|en (bonus|cadeau)\\b|une? (de|en) plus\\b|offerte?s?\\b|gratuite?s?\\b|gratos\\b)";
+const FR_BUYS =
+  "\\bsi tu (la |le |les |l'|me |m'|en )?(prends|achetes|debloques|ouvres|craques|valides|payes|paies|choisis)\\b";
+const EN_EXTRA =
+  "(i'?ll (throw in|add|give you|send you|gift you|include)|(a|an|one|another) (free|bonus|extra)\\b|for free\\b|on the house\\b|as a (gift|bonus)\\b|bonus\\b|(a|one) more for free)";
+const EN_BUYS = '\\bif you (buy|get|unlock|grab|take|open|purchase)\\b';
+const IT_EXTRA =
+  '(te ne (regalo|mando|aggiungo)|ti (regalo|aggiungo|mando) (un|una|anche|in piu)|in (regalo|omaggio)\\b|omaggio\\b|bonus\\b|gratis\\b)';
+const IT_BUYS = "\\bse (lo |la |li |le |l')?(compri|prendi|sblocchi|apri|acquisti)\\b";
+const ES_EXTRA =
+  '(te (regalo|doy|mando|pongo|anado) (otr[oa]|un[oa]?|de regalo|gratis|extra)|de regalo\\b|gratis\\b|bonus\\b|de extra\\b)';
+const ES_BUYS = '\\bsi (lo |la |los |las )?(compras|coges|tomas|desbloqueas|abres|pillas)\\b';
+// An extra tied to a purchase, either way round (« si tu la prends je t'en offre une », « un bonus si tu l'ouvres »),
+// an order then a gift (« prends-la et je t'en offre une »), a gift with a purchase (« deux pour le prix d'une »).
+const PURCHASE_SWEETENER = new RegExp(
+  [
+    `${FR_BUYS}.{0,70}${FR_EXTRA}`,
+    `${FR_EXTRA}.{0,70}${FR_BUYS}`,
+    `\\b(prends|achete|debloque|ouvre)((-| )(la|le|les|moi|celle|celui|ca))?\\b.{0,40}\\bet\\b.{0,50}${FR_EXTRA}`,
+    // « Pour tout achat une photo en plus » (Sécurité, #1043).
+    `\\b(pour|avec|a) (tout|chaque|ton|un|cet|ce|l') ?achat\\b.{0,50}(${FR_EXTRA}|\\ben plus\\b)`,
+    "\\b(bonus|cadeau|surprise|extra|offerte?|gratuite?) (pour|avec|a) (ton |chaque |l'|cet |ce |un )?achat\\b|\\b(2|deux) pour le prix d'une?\\b",
+    `${EN_BUYS}.{0,70}${EN_EXTRA}`,
+    `${EN_EXTRA}.{0,70}${EN_BUYS}`,
+    `\\b(buy|unlock|grab|get) (it|this|that|this one|that one)\\b.{0,30}\\band (i'?ll|i will|you'?ll get|get)\\b.{0,50}${EN_EXTRA}`,
+    `${IT_BUYS}.{0,70}${IT_EXTRA}`,
+    `${IT_EXTRA}.{0,70}${IT_BUYS}`,
+    `${ES_BUYS}.{0,70}${ES_EXTRA}`,
+    `${ES_EXTRA}.{0,70}${ES_BUYS}`,
+  ].join('|'),
+);
+
 const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|ce week-end|cette semaine|dispo|disponible|\\d{1,2} ?h|${CITY})\\b`;
 
 /** A child or a minor named, on the normalised text: the `minor_reference` guard, and the desire map's filter. */
@@ -172,6 +216,10 @@ const NETWORK =
   '(snap(chat)?|whatsapp|insta(gram)?|telegram|tik ?tok|twitter|facebook|messenger|fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)';
 
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
+  // Charles 26/11 at 23:44: never an extra (a gift, a bonus, a media offered) promised to unlock or close a purchase,
+  // in French, English, Italian or Spanish. Only an extra tied to a purchase: his own gift, a surprise of hers with no
+  // purchase, her thanks for his wishlist all pass.
+  { code: 'purchase_sweetener', pattern: PURCHASE_SWEETENER },
   {
     code: 'ai_disclosure',
     // « je suis modèle photo », « je suis assistante dentaire » are jobs: the article is required for those words.
@@ -967,6 +1015,133 @@ export function sumsMinorOf(written: string): number[] {
 }
 
 /** The first match of a blocking pattern in the text; a sum is read one by one (`priceOutsideOffer`). */
+// A meeting she may only imagine (Charles 27/11). « Imagine un week-end tous les deux dans un chalet », « un jour
+// peut-être, tu me ferais visiter » are a daydream and pass. What makes it a commitment blocks, even in the
+// conditional: a date or a delay, a real place one can organise, a verb of organising or of coming over, and her yes
+// to a concrete proposal of his. The live, the DMs and the bed stay hers.
+const MEETING_DATE =
+  '\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|apres-demain|ce soir|cette nuit|ce week-?end|le week-?end prochain|(la )?semaine (pro|prochaine)|le mois (pro|prochain)|dans (\\d+|deux|trois|quatre|quelques) (jours|semaines|mois)|cet ete|ces vacances|pendant les vacances|le \\d{1,2}(?= |/|$)|\\d{1,2} ?h(\\d{2})?)\\b';
+const MEETING_ABOUT =
+  '\\b(se (voir|voit|voie|verra|verrait|verrons|retrouv\\w*|rencontr\\w*|rejoin\\w*)|(te|me) (voir|rejoindre|retrouver|rencontrer)|(venir|viens|viendrai|viendrais|passer|passe|monter|descendre) (chez|te|me)|chez (toi|moi)|tous les deux|toi et moi|en vrai|irl|en personne|visiter|un (verre|cafe|resto|diner|date))\\b';
+const MEETING_ONLINE =
+  '\\b(live|en prive|prive|dm|mp|tchat|chat|ici|messages?|story|video|appel|facetime|au lit|sous la couette|dans (tes|mes) reves|en reve|en pensee)\\b';
+// What one organises to meet: « ça », « la rencontre », « un week-end », « notre soirée ».
+const MEETING_OBJECT =
+  "ca|tout ca|un truc|quelque chose|qqch|la rencontre|une rencontre|le voyage|notre \\w+|nos \\w+|un (rdv|rendez-vous|date|verre|diner|resto|week-?end|sejour|voyage)|une (soiree|nuit|sortie|rencontre)|pour (se voir|nous|toi et moi|qu'on)";
+// Online, in a dream or « ici », anywhere in the sentence (Sécurité, #1043): « je viens chez toi dans mes rêves »,
+// « on se voit demain ici », « on se retrouve ce soir sur reveal », « tu viens me voir demain sur mon live ? ». Not
+// when a real place stands in the same sentence.
+const MEETING_ELSEWHERE =
+  /\b(sur (reveal|ici|mon live|ton live|le live|le tchat|le chat|l'?appli|mes stories|ma story)|en (live|prive|dm|mp|reve|pensee|video|story)|au (live|lit)|(mon|le|un|ce|du|prochain) live|dans (tes|mes|nos) (reves|pensees|bras)|en revant|ici)\b/;
+const MEETING_REAL_PLACE = new RegExp(
+  `\\b(${CITY}|hotel|airbnb|gare|motel|bar|cafe|resto|restaurant|aeroport|en vrai|pour de vrai|irl|en personne)\\b`,
+);
+const elsewhere = (sentence: string): boolean =>
+  MEETING_ELSEWHERE.test(sentence) && !MEETING_REAL_PLACE.test(sentence);
+const MEETING_ORGANISED = new RegExp(
+  [
+    // Organising, in any mood: « on pourrait organiser ça », « je réserve l'hôtel ».
+    // Organising counts with a meeting object or « avec toi » (Sécurité, #1043): « on pourrait organiser ça », « on
+    // s'organise ? », not « je cale mon réveil » nor « on organise un live samedi ».
+    `\\b(on|je|tu|nous) (\\w+ )?(s'?)?(organiser|organise|organiserait|organiserai|planifier|planifie|caler|cale|prevoir|prevoit)\\b(?= ?$|[,;:]| (${MEETING_OBJECT})\\b|[^.!?]*\\bavec toi\\b)`,
+    `\\b(organiser|organisons|planifions|calons) (${MEETING_OBJECT})\\b`,
+    "(?<!(sans|te|t'ai|vous) )\\b(reserve|reserves|reserver|reserverai|reserverais|reservons|reservez|booke|booker) (un|une|la|le|l'|les|des|notre|nos) ?(\\w+ )?(hotel|chambre|airbnb|nuits?|gite|chalet|suite|motel)\\b",
+    // A table, a train, a seat: only for the two of them (« je réserve une table pour mon anniv avec mes copines »).
+    "(?<!(sans|te|t'ai|vous) )\\b(reserve|reserves|reserver|reserverai|reserverais|reservons|reservez|booke|booker) (un|une|la|le|l'|les|des|notre|nos) ?(\\w+ )?(table|billets?|train|vol|avion|resto|restaurant|week-?end|places?)\\b(?=[^.!?]*\\b(avec toi|pour (nous|toi et moi|nous deux|te voir|venir)|tous les deux|toi et moi)\\b)",
+    // Coming over, in any mood: « je viens te voir », « je passe chez toi », « je pourrais venir te voir ».
+    `\\b(je|tu) (viens|passe|passes|monte|montes|descends|viendrai|viendrais|viendras|passerai|passerais|passeras|((peux|pourrais|vais|veux|voudrais) (venir|passer|monter|descendre))) (te|me) (voir|rejoindre|retrouver)\\b(?!${ONLINE})`,
+    '\\b(je|tu) (viens|passe|passes|monte|montes|viendrai|viendrais|viendras|passerai|passerais|passeras|((peux|pourrais|vais|veux|voudrais) (venir|passer|monter))) chez (toi|moi)\\b',
+    "\\b(i'?ll|i will|i can|i could|let me) (come (to )?see you|come over|visit you|pick you up)\\b|\\b(let'?s|we (can|could|should)) (book|plan|organi[sz]e)\\b|\\bbook (a|the|us a) (room|hotel|table|flight|ticket)\\b",
+  ].join('|'),
+);
+// An invitation as such, off the platform: « on se voit ? », « on se voit quand ? », not « imagine qu'on se voit ».
+const MEETING_INVITATION = new RegExp(
+  `(?<!(imagine|imaginons|imaginer|si|reve|un jour|une autre vie)[^.!?]{0,30})\\bon se (voit|retrouve)\\b(?!( a| au)?${ONLINE})`,
+);
+// Her yes, opening a bubble: « ok », « avec plaisir », « carrément ». A yes then a no (« ok mais non ») is no yes.
+const MEETING_ASSENT =
+  /^(ok|okay|oki|oui|ouais|grave|carrement|avec plaisir|avec joie|volontiers|d'?accord|dac|ca marche|ca me va|vas-y|go|deal|top|parfait|pourquoi pas|bien sur|evidemment|je veux bien|j'ai hate|hate|yes|sure|of course|vale|claro|certo)\b(?![^.!?]{0,40}\b(mais|non|jamais|pas|no|never|not)\b)/;
+
+const sentencesOf = (text: string): string[] => text.split(/[.!?\n]+/).filter((s) => s.trim() !== '');
+
+/** A sentence about meeting him that a date, a real place or an organising word makes concrete. */
+function concreteMeeting(sentence: string): string | undefined {
+  if (elsewhere(sentence)) return undefined;
+  const organised = MEETING_ORGANISED.exec(sentence)?.[0];
+  if (organised !== undefined) return organised;
+  if (new RegExp(MEETING_ONLINE).test(sentence)) return undefined;
+  const invited = MEETING_INVITATION.exec(sentence)?.[0];
+  if (invited !== undefined) return invited;
+  if (!new RegExp(MEETING_ABOUT).test(sentence)) return undefined;
+  return new RegExp(MEETING_DATE).exec(sentence)?.[0] ?? new RegExp(`\\b${CITY}\\b`).exec(sentence)?.[0];
+}
+
+/** His message proposes a concrete meeting: her meeting words in his mouth, or a date with a place (« samedi à Lyon ? »). */
+// A proposal of his: a question, a « on », an invitation (Sécurité, #1043). « samedi je suis à lyon pour le taf » tells.
+const PROPOSES =
+  /\?|\bon\b|\b(viens|venez|rejoins|retrouve|tu (viens|passes|veux|voudrais|pourrais))\b|^\s*(dispo|libre)\b/;
+
+/** His message proposes a concrete meeting: her meeting words in his mouth, or a date with a place (« samedi à Lyon ? »). */
+function fanProposesMeeting(text: string): boolean {
+  const said = normalise(text);
+  if (!PROPOSES.test(said)) return false;
+  return said
+    .split(/(?<=[.!?\n])/)
+    .filter((sentence) => sentence.trim() !== '' && !elsewhere(sentence))
+    .some(
+      (sentence) =>
+        BLOCKING_PATTERNS.some(({ code, pattern }) => code === 'meeting_promise' && pattern.test(sentence)) ||
+        concreteMeeting(sentence) !== undefined ||
+        (new RegExp(MEETING_DATE).test(sentence) && new RegExp(`\\b${CITY}\\b`).test(sentence)),
+    );
+}
+
+/**
+ * What commits her to a meeting in one bubble of hers, beyond the `meeting_promise` patterns, or `undefined`: a date,
+ * a real place or an organising word in a sentence about meeting him, or her yes opening the bubble when his last
+ * message proposed a concrete meeting. The daydream without any of them passes.
+ */
+export function meetingCommitment(
+  text: string,
+  fanLastMessage?: string,
+  /** The whole message, normalised, when `text` is one bubble of it: a goodnight may be in another bubble. */
+  message?: string,
+): string | undefined {
+  const said = normalise(text);
+  // « On se retrouve demain » said as she goes to bed is a chat goodbye (`chatGoodbye`): to talk again here, never an
+  // invitation. A place, an hour, a day of the week or « on se voit » after it still count.
+  // Never after a concrete meeting he proposed (Sécurité, #1048): « bonne nuit, on se retrouve demain » is her yes.
+  const whole = message ?? said;
+  const heProposed = fanLastMessage !== undefined && fanProposesMeeting(fanLastMessage);
+  const read = said.replace(
+    /on se retrouve (demain|plus tard|tout a l'heure)/g,
+    (match, _moment, index: number) =>
+      !heProposed && chatGoodbye(said, match, index, whole) ? ' '.repeat(match.length) : match,
+  );
+  const concrete = sentencesOf(read)
+    .map(concreteMeeting)
+    .find((match) => match !== undefined);
+  if (concrete !== undefined) return concrete;
+  if (fanLastMessage === undefined || !fanProposesMeeting(fanLastMessage)) return undefined;
+  return MEETING_ASSENT.exec(said.replace(/^[^\p{L}]+/u, ''))?.[0];
+}
+
+/**
+ * A `meeting_promise` pattern, read sentence by sentence: online, in a dream or « ici », the sentence passes; and
+ * « on se retrouve demain » said as she goes to bed is a chat goodbye (`chatGoodbye`), read on the whole text.
+ */
+function meetingMatch(pattern: RegExp, text: string, message: string): string | undefined {
+  // The sentences of `sentencesOf`, with where each starts in the text.
+  for (const span of text.matchAll(/[^.!?\n]+/g)) {
+    const sentence = span[0];
+    if (sentence.trim() === '' || elsewhere(sentence)) continue;
+    for (const match of sentence.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
+      if (!chatGoodbye(text, match[0], span.index + match.index, message)) return match[0];
+    }
+  }
+  return undefined;
+}
+
 function blockingMatch(
   code: GuardCode,
   pattern: RegExp,
@@ -975,12 +1150,7 @@ function blockingMatch(
   /** The whole message, normalised, when `text` is one bubble of it: a goodnight may be in another bubble. */
   message: string = text,
 ): string | undefined {
-  if (code === 'meeting_promise') {
-    for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
-      if (!chatGoodbye(text, match[0], match.index, message)) return match[0];
-    }
-    return undefined;
-  }
+  if (code === 'meeting_promise') return meetingMatch(pattern, text, message);
   if (code !== 'price_outside_offer') return pattern.exec(text)?.[0];
   for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
     // « €12.50 » matches as « €1 »: the sum is read on, past the match.
@@ -1036,6 +1206,7 @@ export function checkVoiceOutput(
 ): GuardViolation[] {
   const violations: GuardViolation[] = [];
   const forbidden = settings.forbiddenTerms.map(normalise).filter((term) => term !== '');
+  const degrading = (settings.degradingWords ?? []).map(normalise).filter((term) => term !== '');
 
   const message = normalise(bubbles.join(' '));
   bubbles.forEach((bubble, bubbleIndex) => {
@@ -1044,6 +1215,11 @@ export function checkVoiceOutput(
       const match = blockingMatch(code, pattern, text, context, message);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
+    const committed = violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'meeting_promise')
+      ? undefined
+      : meetingCommitment(bubble, context.fanLastMessage, message);
+    if (committed !== undefined)
+      violations.push({ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match: committed });
     const compared = MINOR_COMPARISON.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
@@ -1073,6 +1249,11 @@ export function checkVoiceOutput(
     for (const term of forbidden) {
       if (forbiddenMatch(text, term)) {
         violations.push({ code: 'forbidden_term', severity: 'blocking', bubbleIndex, match: term });
+      }
+    }
+    for (const term of degrading) {
+      if (forbiddenMatch(text, term)) {
+        violations.push({ code: 'degrading_word', severity: 'blocking', bubbleIndex, match: term });
       }
     }
     // Compared as typed, the variation selector aside: normalising would erase an emoji.
@@ -1268,5 +1449,68 @@ export function checkYouthWords(bubbles: readonly string[], sexual: boolean): Gu
         ? []
         : [{ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named }];
     return [...youth, ...minor];
+  });
+}
+
+// Written sounds of pleasure, on the normalised text (Charles 26/11): « mmmh », « aaah », « ohhh », « haaan ». A laugh
+// (« haha »), a thinking « hmm » or a plain « oh » are not.
+const MOANS =
+  /(^|[^\p{L}])(m{3,}h*|m{2,}h+|a{2,}h+|ah{2,}|a{3,}|o{2,}h+|oh{2,}|o{3,}|ha{2,}n+|han{2,}|ouh{2,}|ou{3,}h*)(?=$|[^\p{L}])/u;
+
+/**
+ * Written sounds of pleasure only at the frankest rung of her register (Charles 26/11): below it, a soft violation, the
+ * answer goes and the calibration reads it. `atPeak`: the composer's register is `very_explicit`.
+ */
+export function checkMoans(bubbles: readonly string[], atPeak: boolean): GuardViolation[] {
+  if (atPeak) return [];
+  return bubbles.flatMap((bubble, bubbleIndex) => {
+    const match = MOANS.exec(normalise(bubble))?.[2];
+    if (match === undefined) return [];
+    const violation: GuardViolation = { code: 'moan_below_peak', severity: 'soft', bubbleIndex, match };
+    return [violation];
+  });
+}
+
+/** What kills a sexting, by kind (Charles 26/11): her pets, his partner, another man, money trouble. */
+const MOOD_KILLER_KINDS = ['her_pet', 'his_partner', 'other_man', 'money'] as const;
+type MoodKiller = (typeof MOOD_KILLER_KINDS)[number];
+
+// Generic words of the four kinds, French, English, Italian, Spanish, on the normalised text. « Ma chatte » is no pet.
+const MOOD_KILLERS: Readonly<Record<MoodKiller, RegExp>> = {
+  her_pet:
+    /\b(mon (chat|chaton|chien|chiot|lapin|perroquet|hamster|cheval)|mes (chats|chatons|chiens|chiots|lapins)|ma (chienne|jument|lapine)|my (cat|kitten|dog|puppy|bunny)|il mio (gatto|cane|gattino|cagnolino)|mi (gato|gatito|perro|perrito))\b/,
+  his_partner:
+    /\b((ta|votre) (femme|copine|compagne|meuf|epouse|nana)|your (wife|girlfriend|gf|partner|missus)|(tua moglie|la tua ragazza|la tua compagna)|tu (esposa|novia|mujer|pareja))\b/,
+  other_man:
+    /\b(mon ex|mon copain|mon mec|mon petit ami|un autre (homme|mec|gars)|my ex|my boyfriend|another (man|guy)|il mio ex|il mio ragazzo|un altro (uomo|ragazzo)|mi ex|mi novio|otro (hombre|chico|tio))\b/,
+  money:
+    /\b(mon loyer|mes dettes|des dettes|a decouvert|fin de mois|problemes? d'argent|galere d'argent|mes factures|fauchee|my rent|my bills|in debt|i'?m broke|l'affitto|debiti|el alquiler|deudas)\b/,
+};
+
+/** The kind of mood killer a text touches, the first found; `otherManWanted` leaves another man out. */
+function moodKillerIn(text: string, otherManWanted = false): MoodKiller | undefined {
+  const read = normalise(text);
+  return MOOD_KILLER_KINDS.find(
+    (kind) => (kind !== 'other_man' || !otherManWanted) && MOOD_KILLERS[kind].test(read),
+  );
+}
+
+/**
+ * What kills the sexting while her script runs (Charles 26/11): she never brings up her pets, his partner, another man
+ * (unless a fantasy of his card asks for one: `otherManWanted`) or money trouble. Soft: the answer goes and the
+ * calibration reads it; the voice is told the intention beforehand.
+ */
+export function checkMoodKillers(bubbles: readonly string[], otherManWanted: boolean): GuardViolation[] {
+  return bubbles.flatMap((bubble, bubbleIndex) => {
+    const kind = moodKillerIn(bubble, otherManWanted);
+    if (kind === undefined) return [];
+    const match = MOOD_KILLERS[kind].exec(normalise(bubble))?.[0];
+    const violation: GuardViolation = {
+      code: 'mood_killer',
+      severity: 'soft',
+      bubbleIndex,
+      ...(match !== undefined && { match }),
+    };
+    return [violation];
   });
 }

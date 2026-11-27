@@ -77,3 +77,17 @@ describe('how frank her words may be: a ladder (Charles 21/11, 26/11 at 21:16 an
     expect(registerOf({ ...hottest, noExplicit: true })).toBe('suggestive');
   });
 });
+
+describe('a fan who already bought from her (Charles 26/11, amendement du 26/11)', () => {
+  it('may be met at his level at once: hot is enough to be frank, before any paid step of the evening', () => {
+    expect(registerOf({ ...BASE, hot: true, boughtBefore: true })).toBe('explicit');
+    expect(registerOf({ ...BASE, run: teased, hot: true, boughtBefore: true })).toBe('explicit');
+  });
+
+  it('stays at his level when he is not hot, and never past suggestive before his age or with nothing explicit', () => {
+    expect(registerOf({ ...BASE, boughtBefore: true })).toBe('suggestive');
+    expect(registerOf({ ...BASE, hot: true, boughtBefore: false })).toBe('sensual');
+    expect(registerOf({ ...BASE, hot: true, boughtBefore: true, ageConfirmed: false })).toBe('suggestive');
+    expect(registerOf({ ...BASE, hot: true, boughtBefore: true, noExplicit: true })).toBe('suggestive');
+  });
+});

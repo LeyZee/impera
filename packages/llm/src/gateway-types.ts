@@ -260,6 +260,11 @@ export interface VoiceInput extends ConversationInput {
    */
   readonly currentStepSheet?: string;
   /**
+   * What the media he bought and finds disappointing shows, by its description (Charles 26/11): she compares it with
+   * what he says. Absent, none.
+   */
+  readonly boughtMediaSheet?: string;
+  /**
    * The agency's base style (ADR 0173), its public then its private part, in typed blocks before her sheet, which
    * wins where they differ. Absent or both empty: no section.
    */

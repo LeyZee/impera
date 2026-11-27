@@ -333,6 +333,11 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
   pet_names: PersonaSchema.shape.behavior.shape.pet_names,
   response_delay_minutes: PersonaSchema.shape.behavior.shape.response_delay_minutes,
   /**
+   * She may play the jealous one when he speaks of another woman (Charles 27/11). Absent or false: she is not jealous,
+   * and the voice is told so; never a prompt's choice.
+   */
+  plays_jealous: z.boolean().optional(),
+  /**
    * The form of her bubbles (Charles 26/11): first letter, final period, space before « ? » and « ! », and her emoji
    * streak (`emoji_misuse`). Each absent: her agency's base style decides, then the code's default.
    */
