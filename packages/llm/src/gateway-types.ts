@@ -26,6 +26,7 @@ import type { ModelResolver } from './providers';
 import type {
   Brief,
   ChannelPollOutput,
+  FanTranslation,
   ChannelPostOutput,
   JudgeCriterion,
   JudgeOutput,
@@ -423,6 +424,16 @@ export interface FanCardReadInput {
   readonly trace?: CallTrace;
 }
 
+/**
+ * His message translated into French for the nets (ADR 0168 § 5, amended 27/11, role `sense`, prompt
+ * `sense/fan-translation`): his original text alone, in a `fan_message` block, read as data. French is fixed by the
+ * prompt: nothing here chooses the target language.
+ */
+export interface FanTranslationInput {
+  readonly text: string;
+  readonly trace?: CallTrace;
+}
+
 export type ChannelPostResult =
   ({ readonly kind: 'post' } & ChannelPostOutput) | ({ readonly kind: 'poll' } & ChannelPollOutput);
 
@@ -504,6 +515,11 @@ export interface LlmGateway {
    */
   readCard(input: FanCardReadInput): Promise<Result<LlmSuccess<FanCardRead>, LlmFailure>>;
   /**
+   * His message in French, for the nets only (ADR 0168 § 5, amended 27/11): role `sense` (the fast, cheap model),
+   * journaled in `llm_calls` like any call (no content kept), stopped by the daily cap. Never sent, never kept.
+   */
+  translateFanText(input: FanTranslationInput): Promise<Result<LlmSuccess<FanTranslation>, LlmFailure>>;
+  /**
    * The version of the prompts whose outputs are kept and redone when they change (ADR 0083 § 2): a drop's description
    * and a script's synthesis, as `meta.promptHash` gives them.
    */
@@ -548,6 +564,7 @@ export interface LlmGatewayDeps {
     readonly scriptSummary?: PromptTemplate;
     readonly scriptIdentity?: PromptTemplate;
     readonly fanCard?: PromptTemplate;
+    readonly fanTranslation?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */
   readonly canary?: string;

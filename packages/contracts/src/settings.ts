@@ -65,5 +65,11 @@ export const CreatorSettingsSchema = z.object({
   fanTiers: FanTiersSettingSchema.prefault({}),
   /** Her time-waster rule (ADR 0135), set by the owner or a manager; absent, nobody is a time-waster. */
   timeWaster: TimeWasterSettingSchema.optional(),
+  /**
+   * Translation for the nets (ADR 0168 § 5, amended 27/11): his message in a language the nets do not read is
+   * translated into French, the nets read both, and her draft may leave without a human when nothing is raised. Off
+   * by default: the owner turns it on after the cost is known.
+   */
+  translateForNets: z.boolean().default(false),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;

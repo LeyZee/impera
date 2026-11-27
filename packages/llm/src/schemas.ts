@@ -158,6 +158,18 @@ export const VoiceOutputSchema = z.object({
 });
 export type VoiceOutput = z.infer<typeof VoiceOutputSchema>;
 
+/** The most characters of his message the translation for the nets reads, and of the French it writes. */
+export const FAN_TRANSLATION_TEXT_MAX = 2_000;
+
+/**
+ * His message in French, for the nets only (ADR 0168 § 5, amended 27/11): a closed object with one field, never sent,
+ * never shown, never kept. French is the only target: no field of the request chooses another.
+ */
+export const FanTranslationSchema = z
+  .object({ french: z.string().max(FAN_TRANSLATION_TEXT_MAX * 2) })
+  .strict();
+export type FanTranslation = z.infer<typeof FanTranslationSchema>;
+
 /** What the sense model writes; the gateway adds the version, the kind and the duration it already knows. */
 export const SenseOutputSchema = MediaDescriptionSchema.omit({
   vocabularyVersion: true,

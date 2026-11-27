@@ -1,4 +1,4 @@
-import type { FanAvailabilityRecord } from '@impera/contracts';
+import { DraftStatusSchema, type FanAvailabilityRecord } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -57,6 +57,14 @@ describe('conversation rules', () => {
     expect(canSend({ ...base, draftStatus: 'pending' })).toBe(false);
     expect(canSend({ ...base, conversationState: 'human' })).toBe(false);
     expect(canSend({ ...base, lastInboundAt: later(1) })).toBe(false);
+  });
+
+  it('sends no draft a human did not decide, so a `humanOnly` draft never leaves alone (ADR 0168 § 5, 27/11)', () => {
+    // No path sends a draft without a human today (message-flow.md § 3): the agent writes it `pending`, and only a
+    // person's approval (`approveDraft`) or a send by hand from the panel makes it `approved` or `edited`.
+    const base = { draftCreatedAt: AT, conversationState: 'sending', lastInboundAt: AT } as const;
+    const sendable = DraftStatusSchema.options.filter((draftStatus) => canSend({ ...base, draftStatus }));
+    expect(sendable).toEqual(['approved', 'edited']);
   });
 
   it('gives each bubble its own idempotency key', () => {

@@ -335,6 +335,7 @@ function fakeHer(): LlmGateway {
     summarizeScript: unused,
     identifyScript: unused,
     readCard: unused,
+    translateFanText: unused,
     judge: unused,
     testConnection: unused,
     promptHashes: { creatorDrop: 'd', scriptSummary: 's', scriptIdentity: 'i' },

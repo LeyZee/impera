@@ -16,6 +16,7 @@ import {
   type ScriptSource,
 } from './infra/draft-composer';
 import { createFanLimits } from './infra/fan-limits';
+import { createFanTextTranslator } from './infra/fan-text-translator';
 import { guardSettingsOf, languagesOf, type PersonaForModels } from './infra/persona-file';
 
 /** Public entry point of the `agent` module (ADR 0002). Other modules import this file only. */
@@ -185,6 +186,11 @@ export interface DraftComposerStartOptions {
   /** Her grid of custom prices (`custom-orders`, ADR 0159 § C), read when his order is kept. */
   readonly gridOf?: DraftComposerDeps['gridOf'];
   /**
+   * Her setting `translateForNets` (ADR 0168 § 5, amended 27/11), read at each draft: on, his message in a language
+   * the nets do not read is translated on this gateway for the nets. Without it, never.
+   */
+  readonly translateForNetsOf?: DraftComposerDeps['translateForNetsOf'];
+  /**
    * Her bank of examples, newest first, withdrawn ones left out (ADR 0102): the playground's corrections filed as her
    * voice's examples, one bank whichever version they were made on. Without it, or unreadable, she writes from her
    * sheet alone.
@@ -304,6 +310,10 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.lastOfferAt !== undefined && { lastOfferAt: options.lastOfferAt }),
     ...(options.lastPurchaseAt !== undefined && { lastPurchaseAt: options.lastPurchaseAt }),
     ...(options.gridOf !== undefined && { gridOf: options.gridOf }),
+    ...(options.translateForNetsOf !== undefined && {
+      translateForNetsOf: options.translateForNetsOf,
+      translator: createFanTextTranslator(options.gateway),
+    }),
   });
 }
 

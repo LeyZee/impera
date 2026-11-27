@@ -102,6 +102,9 @@ export function wireAgent(
       lastOfferAt: createLastOfferAt(scriptReads),
       lastPurchaseAt: createLastPurchaseAt(scriptReads),
       gridOf: (creatorId) => deps.customOrders.gridOf(CreatorIdSchema.parse(creatorId)),
+      // Her translation for the nets (ADR 0168 § 5, amended 27/11): off unless her settings say on.
+      translateForNetsOf: async (creatorId) =>
+        (await persona.creators.translateForNets(CreatorIdSchema.parse(creatorId))) === true,
       // Her bio on her platform profile, as the poll last read it (ADR 0154): beside her persona, it wins where they differ.
       profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),
       timeZoneOf: async (creatorId) => {

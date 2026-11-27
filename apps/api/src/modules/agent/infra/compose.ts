@@ -62,6 +62,7 @@ import {
 import { gapNotes, timingLines } from '../domain/elapsed';
 import { DEFAULT_EMOJI_STREAK_MAX, emojiStreakReached } from '../domain/emojis';
 import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
+import { assessTrapRead } from '../domain/guard-translation';
 import {
   checkExplicit,
   checkVoiceOutput,
@@ -134,7 +135,7 @@ import {
   type StandingFacts,
   type StandingLimits,
 } from '../domain/standing';
-import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
+import { screenMedia, type TrapAssessment } from '../domain/traps';
 import { checkWorn, wornPhrases, type WornLimits } from '../domain/worn';
 
 import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
@@ -239,6 +240,11 @@ export interface ComposeTurnInput {
   readonly keptLanguage?: { readonly value: Language; readonly source: 'detected' | 'set' } | null;
   /** His last message(s) since her last answer: what the traps read. */
   readonly fanText: string;
+  /**
+   * His message in French, when it was translated for the nets (ADR 0168 § 5, amended 27/11): the traps read it too.
+   * Never given to a model, never sent.
+   */
+  readonly netTranslation?: string;
   readonly media: readonly MediaDescription[];
   readonly fanNotes: string;
   /**
@@ -1207,12 +1213,15 @@ export async function composeTurn(
       ? { ...asked, intent: 'price_objection', objection: 'asks_discount' }
       : asked;
   // A trap overrides whatever the brain suggested: she does not play along (agent/domain/traps.ts).
-  const trap = assessTrap({
-    fanText: input.fanText,
-    earlierFanTexts: earlierFanTexts(input.history),
-    media: input.media,
-    ...(brief && { brain: brief }),
-  });
+  const trap = assessTrapRead(
+    {
+      fanText: input.fanText,
+      earlierFanTexts: earlierFanTexts(input.history),
+      media: input.media,
+      ...(brief && { brain: brief }),
+    },
+    input.netTranslation,
+  );
   const read: Brief =
     trap.replyBrief === undefined
       ? (brief ?? NEUTRAL_BRIEF)
