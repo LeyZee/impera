@@ -58,12 +58,43 @@ export function isPrivateAddress(address: string): boolean {
 export const systemLookup: Lookup = (hostname) => dnsLookup(hostname, { all: true, verbatim: true });
 
 /**
+ * The recette sandbox (ADR 0075) confines the process to this machine: its guard covers `fetch`, and this GET goes
+ * through `node:https`, so the sandbox confines it here too (recette MED-12). Off outside the sandbox.
+ */
+let confined = false;
+
+/** Turns the sandbox's confinement of `pinnedGet` on or off (`installSandboxGuard`). */
+export function confinePinnedGets(on: boolean): void {
+  confined = on;
+}
+
+const LOOPBACK = new BlockList();
+LOOPBACK.addSubnet('127.0.0.0', 8, 'ipv4');
+LOOPBACK.addAddress('::1', 'ipv6');
+
+/** Whether the address the GET connects to is this machine (`::ffff:127.0.0.1` too). */
+function isLoopbackAddress(address: string): boolean {
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/iu.exec(address)?.[1];
+  if (mapped !== undefined) return LOOPBACK.check(mapped, 'ipv4');
+  const family = isIP(address);
+  return family !== 0 && LOOPBACK.check(address, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+/**
  * The GET itself, connected to the address that was checked and to no other: the name is not resolved a second time,
  * so a name that answers a public address to the check and another one to the connection reaches nothing. The
  * certificate is still verified against the name (`servername`), and no redirect is followed (`node:https` never does).
  */
 export function pinnedGet(url: string, init: RequestInit, pinned: Pinned): Promise<Response> {
   const target = new URL(url);
+  if (confined && !isLoopbackAddress(pinned.address)) {
+    // As `fetch` fails offline, so that every caller reacts as to a real outage.
+    return Promise.reject(
+      new TypeError('fetch failed', {
+        cause: new Error(`blocked by the sandbox: ${target.host} is not this machine (ADR 0075)`),
+      }),
+    );
+  }
   return new Promise((resolve, reject) => {
     const outgoing = httpsRequest(target, {
       method: 'GET',

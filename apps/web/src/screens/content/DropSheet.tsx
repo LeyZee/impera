@@ -15,13 +15,13 @@ import { useRef, useState, type JSX } from 'react';
 
 import { Thumb } from './Thumb';
 import { Refused, createDrop } from './api';
-import { durationOf } from './media-length';
+import { factsOf } from './media-length';
 import {
-  CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   HEAVY_BYTES,
   UNKNOWN_TYPE,
   acceptOf,
+  measuredVideoRefusal,
   mediaLabel,
   mimeOf,
   moved,
@@ -108,8 +108,14 @@ export function DropSheet({
       }
       const kind = item.mime === null ? null : kindOfMime(item.mime);
       if (kind !== 'video' && kind !== 'audio') continue;
-      void durationOf(item.file, kind).then((ms) => {
-        setChosen((list) => list.map((one) => (one.id === item.id ? { ...one, ms } : one)));
+      void factsOf(item.file, kind).then((facts) => {
+        // A video in the wrong orientation or too long is refused here, before it goes up (recette MED-04).
+        const measured = kind === 'video' ? measuredVideoRefusal(category, facts) : null;
+        setChosen((list) =>
+          list.map((one) =>
+            one.id === item.id ? { ...one, ms: facts.ms, refusal: one.refusal ?? measured } : one,
+          ),
+        );
       });
     }
   };
@@ -149,7 +155,7 @@ export function DropSheet({
 
   return (
     <Dialog
-      title={`${CATEGORY_EMOJIS[category]} ${DROP_CATEGORY_LABELS[category]}`}
+      title={DROP_CATEGORY_LABELS[category]}
       lead={request === null ? CATEGORY_HINTS[category] : request.reason}
       busy={busy}
       className="ct-sheet"

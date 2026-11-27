@@ -244,8 +244,8 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
             },
             meta(payload),
           );
-          if (isFinal)
-            await setDraftStatus(tx, sendable.draft, 'failed', { decidedBy: null, at: clock.now() });
+          // The person who approved it, and when, stay on the draft (recette REV-06).
+          if (isFinal) await setDraftStatus(tx, sendable.draft, 'failed');
         });
         logger.warn({ draftId: payload.draftId, index, attempt, code, isFinal }, 'send: failed');
         // Graphile retries with backoff until `maxAttempts`; the last failure leaves the conversation in `error`.
@@ -312,7 +312,7 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
         },
         at,
       );
-      await setDraftStatus(tx, sendable.draft, 'sent', { decidedBy: null, at: clock.now() });
+      await setDraftStatus(tx, sendable.draft, 'sent');
       // He has her answer: if he goes silent, she follows up (P3-10).
       await scheduleFollowUp(tx, sent, delaysHours, at);
     });

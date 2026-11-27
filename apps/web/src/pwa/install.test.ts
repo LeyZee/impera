@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   addRefusal,
+  captureInstallPrompt,
   INSTALL_REFUSALS_KEY,
+  INSTALLED_KEY,
+  isInstalled,
   MAX_REFUSALS,
   parseRefusals,
   platformOf,
@@ -42,6 +45,17 @@ describe('install guide', () => {
     expect(shouldNudge({ ...phone, refusals: MAX_REFUSALS - 1 })).toBe(true);
     expect(shouldNudge({ ...phone, refusals: MAX_REFUSALS })).toBe(false);
     expect(shouldNudge({ ...phone, dismissedThisOpening: true })).toBe(false);
+    expect(shouldNudge({ ...phone, installed: true })).toBe(false);
+  });
+
+  it('remembers on the device that the app was installed (choice of 21/11)', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    expect(window.localStorage.getItem(INSTALLED_KEY)).toBeNull();
+    captureInstallPrompt();
+    window.dispatchEvent(new Event('appinstalled'));
+    expect(window.localStorage.getItem(INSTALLED_KEY)).toBe('1');
+    expect(isInstalled()).toBe(true);
+    vi.unstubAllGlobals();
   });
 
   it('reads anything odd in storage as no refusal', () => {

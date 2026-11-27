@@ -7,14 +7,16 @@ import {
   type ConversationDetail,
   type ConversationEventView,
   type DashboardTodo,
+  type DraftScriptStepView,
   type DraftView,
+  type GuardCode,
   type MessageView,
 } from '@impera/contracts';
 import { z } from 'zod';
 
 import { euros } from './flags-model';
 
-import { CAUSE_LABELS } from '@/agent/causes';
+import { CAUSE_LABELS, handoffCauseLabel } from '@/agent/causes';
 import { GUARD_LABELS } from '@/agent/guards';
 import { addDays, clockAt, dayMonth, dayOf, daysFrom, longDay, weekdayOf } from '@/scheduling/time';
 
@@ -29,6 +31,8 @@ export function todoLabel(todo: DashboardTodo): string {
   if (todo.kind === 'send_failed') return 'Envoi échoué';
   if (todo.kind === 'unanswered') return 'Sans réponse';
   if (todo.kind === 'fragile_proposed') return 'Le marquer fragile ?';
+  // The outage is over (IA-07): never « IA indisponible » above « L’IA répond de nouveau ».
+  if (todo.kind === 'llm_unavailable' && todo.voiceBack === true) return 'IA de retour';
   return CAUSE_LABELS[todo.kind];
 }
 
@@ -115,7 +119,10 @@ function alertNote(trigger: AlertTrigger): string {
 /** The note an event leaves in the thread, or null for the events the messages already show. */
 function noteOf(event: ConversationEventView, timeZone: string): string | null {
   if (event.type === 'handoff_requested')
-    return withReason(`L’agent passe la main (${CAUSE_LABELS[event.payload.cause]})`, event.payload.reason);
+    return withReason(
+      `L’agent passe la main (${handoffCauseLabel(event.payload.cause, event.payload.trigger?.keyword)})`,
+      event.payload.reason,
+    );
   if (event.type === 'takeover_started') return withReason('Un humain reprend la main', event.payload.reason);
   if (event.type === 'alert_triggered') return alertNote(event.payload.trigger);
   if (event.type === 'takeover_ended') return 'La main revient à l’agent';
@@ -302,6 +309,35 @@ export const stoppedText = (selfScope: boolean): string =>
       'L’arrêt d’urgence est actif\u00a0: rien ne part pour l’instant. Préviens ton responsable si ça dure.'
     : 'L’arrêt d’urgence est actif\u00a0: rien ne part tant qu’il n’est pas levé sur le Dashboard.';
 
+/** A fan whose age is in doubt is never given back to the agent: his age is confirmed first (IA-01). */
+export const AGE_IN_DOUBT_TEXT =
+  'Son âge est en doute : confirme d’abord qu’il est majeur (Fiche du fan › Limites du fan › Confirmer son âge), puis rends la main.';
+
+/**
+ * Under a draft, discreetly: the first answer a blocking guard set aside before this one was written (IA-08), « 1
+ * réponse écartée : un aveu d’IA ». Null when the first answer went through.
+ */
+export function retriedLine(retried: readonly GuardCode[]): string | null {
+  if (retried.length === 0) return null;
+  return `1 réponse écartée : ${[...new Set(retried.map((code) => GUARD_LABELS[code]))].join(', ')}`;
+}
+
+/**
+ * Under a draft, what leaves with it of her script (REV-03): « Part avec : étape 2 de « Café » · un média · 9 € ».
+ * `null` for words only, or while the server does not say it.
+ */
+export function scriptStepLine(step: DraftScriptStepView | null | undefined): string | null {
+  if (step === null || step === undefined) return null;
+  const which =
+    step.scriptName === null
+      ? `étape ${String(step.stepIndex + 1)} de son script`
+      : `étape ${String(step.stepIndex + 1)} de « ${step.scriptName} »`;
+  const which2 = step.stepName === null ? which : `${which} (${step.stepName})`;
+  const kinds = step.hasMedia ? ['un média'] : [];
+  const price = step.priceMinor === 0 ? 'offerte' : euros(step.priceMinor);
+  return `Part avec : ${[which2, ...kinds, price].join(' · ')}`;
+}
+
 /** The codes a refusal names; one this screen does not know yet is left out, never shown raw. */
 const GuardsSchema = z.object({ guards: z.array(z.string()) });
 
@@ -325,6 +361,7 @@ export function decisionError(status: number, body: unknown): string {
     return 'Ce message porte une étape payante que ses limites interdisent maintenant (soin, ventes gelées, âge en doute ou « ne plus lui écrire »). Refuse-le et réponds-lui sans l’étape.';
   if (code === 'persona_inactive_unprocessable')
     return 'Ce message ne peut pas partir : cette créatrice n’a pas de persona active. Active une version dans Créatrices › Persona.';
+  if (code === 'age_in_doubt_conflict') return AGE_IN_DOUBT_TEXT;
   if (code === 'creator_archived_conflict')
     return 'Cette créatrice est archivée : rien ne part en son nom. Rouvre-la dans Créatrices pour reprendre.';
   if (code === KILL_SWITCH_CODE)

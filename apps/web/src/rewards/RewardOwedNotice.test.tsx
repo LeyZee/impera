@@ -49,20 +49,22 @@ afterEach(() => {
 describe('RewardOwedNotice', () => {
   it('says a gain waits on a conversation, and « Voir » leads to Aujourd’hui where it plays', async () => {
     renderAt('/suivi', owing(1));
-    expect(await screen.findByText('Un gain t’attend.')).toBeTruthy();
+    expect(await screen.findByText('Un trophée à découvrir.')).toBeTruthy();
     expect((await screen.findByRole('link', { name: 'Voir' })).getAttribute('href')).toBe('/aujourdhui');
     expect(document.querySelector('.rw-reveal')).toBeNull();
   });
 
   it('counts several gains', async () => {
-    renderAt('/commissions/factures', owing(2));
-    expect(await screen.findByText('2 gains t’attendent.')).toBeTruthy();
+    renderAt('/suivi', owing(2));
+    expect(await screen.findByText('2 trophées à découvrir.')).toBeTruthy();
   });
 
   it('stays silent where the reveal plays or the case shows it, when nothing is owed, and for who does not play', async () => {
     for (const [pathname, trophyCase, user] of [
       ['/aujourdhui', owing(1), THEO_ME],
       ['/commissions', owing(1), THEO_ME],
+      // Its invoices are accepted from a button the pill would cover on a phone (recette MED-09).
+      ['/commissions/factures', owing(1), THEO_ME],
       ['/moi/trophees', owing(1), THEO_ME],
       ['/suivi', owing(0), THEO_ME],
       ['/suivi', owing(1), OWNER],

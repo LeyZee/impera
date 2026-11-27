@@ -382,6 +382,28 @@ export function permittedScripts(
   );
 }
 
+/**
+ * Whether a script may still open with him at this message, whatever the brain reads in it (recette REV-13): never in
+ * the care mode, never while a run is open (that message only moves it: an answer, a refusal, its next step), and
+ * never when the policy refuses even a hot fan who asks for paid content himself (he is not to be written to, his
+ * sales are frozen, his age is not confirmed). The brain is shown her scripts only then: the prompt says what the code
+ * permits, the code still decides.
+ */
+export function mayOpenScript(input: {
+  readonly offer: Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks'>;
+  readonly latest: Pick<ScriptRun, 'status' | 'startedAt'> | null;
+  readonly careMode: boolean;
+}): boolean {
+  if (input.careMode || input.latest?.status === 'open') return false;
+  return offerDecision({
+    ...input.offer,
+    lastOfferAt: later(input.offer.lastOfferAt, input.latest?.startedAt ?? null),
+    desire: Number.POSITIVE_INFINITY,
+    fanAsksForPaid: true,
+    risks: [],
+  }).allowed;
+}
+
 /** What goes to `sendScriptStep(conversationRef, scriptRef, stepIndex, key)`, with the price it was decided at. */
 export interface ScriptStepToSend {
   readonly scriptRef: string;

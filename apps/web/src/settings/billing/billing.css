@@ -375,6 +375,15 @@
   flex-direction: column;
   gap: var(--nv-space-2);
 }
+/* The same room everywhere (Design, 27/11): a legend sits as far from its field as a label does (a rendered legend
+   takes no part in the flex gap), and a field after a group of choices as far as from the field before. */
+.bf-fieldset > legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.bf-choices + .nv-field__label {
+  margin-top: calc(var(--nv-space-4) - 6px);
+}
 .bf-choice {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

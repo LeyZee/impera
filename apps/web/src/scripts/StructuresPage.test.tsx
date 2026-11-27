@@ -8,7 +8,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -30,7 +30,11 @@ function serve(): void {
   );
 }
 
-function renderPage(component: () => JSX.Element = StructuresPage): void {
+function Library(): JSX.Element {
+  return <StructuresPage queues={false} onQueues={() => undefined} />;
+}
+
+function renderPage(component: () => JSX.Element = Library): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rootRoute = createRootRoute();
   const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component });
@@ -68,5 +72,15 @@ describe('Structures, the library', () => {
     expect(views.parentElement?.querySelector('button.nv-btn')?.textContent).toBe('Nouvelle structure');
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
     expect(screen.queryByRole('link', { name: '← Créatrices' })).toBeNull();
+  });
+
+  it('shows the view the address names and hands a change back to it (recette COUV-09)', async () => {
+    serve();
+    const onQueues = vi.fn();
+    renderPage(() => <StructuresPage queues onQueues={onQueues} />);
+    const queues = await screen.findByRole('radio', { name: 'Files des créatrices' });
+    expect(queues.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Bibliothèque' }));
+    expect(onQueues).toHaveBeenCalledWith(false);
   });
 });

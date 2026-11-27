@@ -101,6 +101,9 @@ export const CHOICES: VaultChoicesView = {
       imported: true,
       description: 'described' as const,
       excerpt: `Description inventée ${id}`,
+      descriptionId: null,
+      detailed: `Description inventée ${id}`,
+      validated: true,
     })),
     {
       platformAccountId: ACCOUNT,
@@ -108,6 +111,9 @@ export const CHOICES: VaultChoicesView = {
       imported: true,
       description: 'none' as const,
       excerpt: null,
+      descriptionId: null,
+      detailed: null,
+      validated: false,
     },
   ],
 };
