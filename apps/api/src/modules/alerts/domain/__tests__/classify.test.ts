@@ -79,6 +79,22 @@ describe('which alert of her tab an event is (ADR 0150 § B)', () => {
     expect(classifyEvent('scripts_exhausted', { conversationId: CONVERSATION, scriptRef: 'x' })).toBeNull();
   });
 
+  it('tells a créneau begun with nobody, with no conversation (ADR 0094 § 1)', () => {
+    const payload = {
+      creatorId: '01900000-0000-7000-8000-0000000000c1',
+      platform: 'reveal',
+      platformAccountId: '01900000-0000-7000-8000-0000000000a1',
+      slotStartsAt: '2026-11-20T11:00:00.000Z',
+      slotEndsAt: '2026-11-20T17:00:00.000Z',
+      timeZone: 'Europe/Paris',
+    };
+    expect(classifyEvent('account_uncovered', payload)).toEqual({
+      code: 'uncovered_account',
+      conversationId: null,
+    });
+    expect(classifyEvent('account_uncovered', { ...payload, fan: 'x' })).toBeNull();
+  });
+
   it('skips what is none of the tab’s, and a payload that does not read', () => {
     expect(classifyEvent('handoff_requested', { conversationId: CONVERSATION, cause: 'guard' })).toBeNull();
     expect(classifyEvent('handoff_requested', { cause: 'minor' })).toBeNull();

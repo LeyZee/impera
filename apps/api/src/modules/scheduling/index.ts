@@ -69,6 +69,7 @@ import { createDrizzleShiftReportStore } from './infra/report-store';
 import { createSchedulingRoutes, type RequireRole } from './infra/routes';
 import { agencyTimeZone } from './infra/rows';
 import { createDrizzleSwapStore } from './infra/swap-store';
+import { createDrizzleUncoveredCheck } from './infra/uncovered-check';
 
 /** @public The accounts the automatic sales check compares (CRM-04 b3), read on the job's admin connection. */
 export { salesCheckReads } from './infra/sales-check-reads';
@@ -208,6 +209,12 @@ export interface SchedulingModule {
      */
     readonly checkAgencyShares: (correlationId: string) => Promise<number>;
     /**
+     * `scheduling.check_uncovered` (ADR 0094 § 1, lot a), every five minutes: the créneaux that began with nobody
+     * answering on an account a fan wrote to in the last 24 hours, one `account_uncovered` each; how many were new.
+     * It changes no shift, no mode and no pay.
+     */
+    readonly checkUncovered: (correlationId: string) => Promise<number>;
+    /**
      * `scheduling.check_reports` (ADR 0073 § 4), every five minutes: the submitted reports whose complete check against
      * the platform is within the threshold, validated in the name of the automatic check, each under the lock (member,
      * period) at the version it was found at. Replayable: it changes no amount and validates nothing twice.
@@ -288,6 +295,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const calendarReads = createDrizzleCalendarReads(deps.db);
   const incidentReads = createDrizzleIncidentNoticeReads(deps.adminDb);
   const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf, deps.notify);
+  const uncoveredCheck = createDrizzleUncoveredCheck(deps.adminDb);
   const reportStore = createDrizzleShiftReportStore(
     deps.db,
     deps.adminDb,
@@ -409,6 +417,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       makeShifts: (logger) => makeShifts(admin, logger, now()),
       lapseSwaps: () => colleagues.lapseSwapsUnscoped(now()),
       checkAgencyShares: (correlationId) => shareCheck.run(now(), correlationId),
+      checkUncovered: (correlationId) => uncoveredCheck.run(now(), correlationId),
       checkReports: () => services.reports.checkReports(),
       remindReports:
         notify === null
