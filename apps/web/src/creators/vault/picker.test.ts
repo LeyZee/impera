@@ -19,7 +19,6 @@ import {
   inImperaLine,
   mediaToggled,
   pickOf,
-  pickerFolderName,
   type PickDraft,
 } from './picker';
 
@@ -56,6 +55,9 @@ const imported = (id: string) => ({
   imported: true,
   description: 'none' as const,
   excerpt: null,
+  descriptionId: null,
+  detailed: null,
+  validated: false,
 });
 const EMPTY: PickDraft = new Map();
 
@@ -145,6 +147,5 @@ describe('« Choisir dans Reveal », the draft (ADR 0145 § 5, avenant du 20/11)
       [0, 500],
       [0, 200],
     ]);
-    expect(pickerFolderName(big)).toBe('Médias hors dossier');
   });
 });

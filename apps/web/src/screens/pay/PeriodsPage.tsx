@@ -28,7 +28,8 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 import { Failure } from '@/shell/states';
 
 /**
- * Paie › Historique (EQ-05; « Relevés » until 29/10, a statement being one member's computation): the periods, the most recent first, each with its state and one amount — what was paid, or
+ * Paie › Relevés (EQ-05; « Historique » from 29/10 to 21/11, « Relevés » again everywhere by Charles's choice of 21/11):
+ * the periods, the most recent first, each with its state and one amount — what was paid, or
  * what is left to pay — and its net, closing and statements beneath. One opens in Quinzaine.
  */
 export function PeriodsPage({
@@ -59,7 +60,7 @@ export function PeriodsPage({
     <Page>
       <PageHeader
         eyebrow="Paie"
-        title="Historique"
+        title="Relevés"
         lead="Chaque quinzaine, ce qui a été validé et versé."
         tabs={<PayNav user={user} period={period} />}
       />

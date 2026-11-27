@@ -48,12 +48,18 @@ export const ALERT_TEXT: Readonly<
     title: 'Session expirée',
     sentence: 'La connexion à la plateforme a expiré : l’IA ne lit plus rien.',
   },
+  uncovered_account: {
+    title: 'Compte sans personne',
+    sentence:
+      'Un créneau commence sans chatteur et l’IA n’est pas en Automatique, alors que des fans ont écrit dans les 24\u00a0h.',
+  },
 };
 
 export const FAMILY_TITLES: Readonly<Record<CreatorAlertFamily, string>> = {
   safety: 'Sécurité',
   sales: 'Ventes',
   conversation: 'Conversation',
+  steering: 'Pilotage',
   system: 'Système',
 };
 

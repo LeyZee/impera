@@ -1,5 +1,5 @@
 # EQ-16 S'entraîner : les recrues s'exercent contre des fans simulés
-Statut : blocked (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous » ; attend les clés comme le playground)
+Statut : todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : blocked (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous » ; attend les clés comme le playground)
 Phase : équipe (ADR 0023, ADR 0024), après le playground (P3-01, P3-05) et les clés
 Dépend de : EQ-10 (espace du chatteur), EQ-11, P3-01 et P3-05 (fans simulés, préréglages, notes), les clés des fournisseurs
 Branche : task/eq-16-recruit-practice

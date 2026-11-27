@@ -8,7 +8,7 @@ import {
   type LinkPlacement,
   type LinkProposal,
 } from '@impera/contracts';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
@@ -23,6 +23,7 @@ import {
 } from './api';
 import { linkProblems, middleCut, PLACEMENT_LABELS } from './model';
 
+import { fetchLinkService } from '@/settings/link-service/api';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
@@ -69,6 +70,14 @@ export function LinksSection({
 }): JSX.Element {
   const read = useRedirectLinks(creatorId);
   const client = useQueryClient();
+  // Read as Réglages reads it: an installation without the service offers no « Détecter ses liens » (PRO1-14).
+  const service = useQuery({
+    queryKey: ['settings', 'link-service'],
+    queryFn: fetchLinkService,
+    enabled: canEdit,
+    retry: false,
+  });
+  const serviceOff = service.data?.state === 'off';
   const [editing, setEditing] = useState<AgencyRedirectLink | LinkProposal | 'new' | null>(null);
   /** What « Détecter ses liens » last answered; null until the owner asks. */
   const [detected, setDetected] = useState<DetectOutcome | 'busy' | null>(null);
@@ -230,18 +239,20 @@ export function LinksSection({
             >
               <span aria-hidden="true">+</span> Ajouter un lien
             </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              disabled={detected === 'busy'}
-              aria-busy={detected === 'busy'}
-              onClick={() => {
-                setDetected('busy');
-                void detectLinks(creatorId).then(setDetected);
-              }}
-            >
-              {detected === 'busy' ? 'Lecture du service…' : 'Détecter ses liens'}
-            </button>
+            {serviceOff ? null : (
+              <button
+                type="button"
+                className="nv-btn nv-btn--soft nv-btn--sm"
+                disabled={detected === 'busy'}
+                aria-busy={detected === 'busy'}
+                onClick={() => {
+                  setDetected('busy');
+                  void detectLinks(creatorId).then(setDetected);
+                }}
+              >
+                {detected === 'busy' ? 'Lecture du service…' : 'Détecter ses liens'}
+              </button>
+            )}
           </div>
         )}
         {canEdit && detected !== null && detected !== 'busy' ? (
@@ -501,18 +512,6 @@ function LinkDialog({
             {refusal}
           </p>
         )}
-        {reauth ? (
-          <PasswordPrompt
-            lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
-            onConfirmed={() => {
-              setReauth(false);
-              void save();
-            }}
-            onCancel={() => {
-              setReauth(false);
-            }}
-          />
-        ) : null}
         <div className="tm-dialog__foot">
           <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
             Annuler
@@ -522,6 +521,18 @@ function LinkDialog({
           </button>
         </div>
       </form>
+      {reauth ? (
+        <PasswordPrompt
+          lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
+          onConfirmed={() => {
+            setReauth(false);
+            void save();
+          }}
+          onCancel={() => {
+            setReauth(false);
+          }}
+        />
+      ) : null}
     </Dialog>
   );
 }

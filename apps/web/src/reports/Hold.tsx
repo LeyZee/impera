@@ -13,7 +13,8 @@ import { createPortal } from 'react-dom';
 /**
  * « Annulable quelques secondes » (EQ-03), as a sale was in Imperium: a report or a validation waits here before it is
  * sent, and « Annuler » takes it back with nothing to undo at the server. What is held is sent when its time is up,
- * when another is held, when the app goes to the background or the page away (the request is `keepalive`). One hold
+ * when another is held, when the app goes to the background or the page away (the request is `keepalive`); while one is
+ * held, leaving the page is asked first (`beforeunload`). One hold
  * for the whole app (`HoldProvider`, in the shell): what the server answers is said wherever the reader went since.
  */
 
@@ -185,11 +186,17 @@ export function useHold(): Hold {
     const leave = (): void => {
       flush(false);
     };
+    // A reload or a full navigation during the hold may lose the write: the browser asks first (recette CHAT-02).
+    const warn = (event: BeforeUnloadEvent): void => {
+      if (held.current !== null) event.preventDefault();
+    };
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener('pagehide', leave);
+    window.addEventListener('beforeunload', warn);
     return () => {
       document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener('pagehide', leave);
+      window.removeEventListener('beforeunload', warn);
       live.current = false;
       if (fade.current !== null) window.clearTimeout(fade.current);
       flush(true);

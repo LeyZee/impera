@@ -32,7 +32,7 @@ export function ErrorPage({ error }: ErrorComponentProps): JSX.Element {
             Le lien est peut-être abîmé. Recharge la page, ou repars de {sectionLabel(home)}.
           </p>
           <Link to={home} className="nv-btn nv-btn--soft nv-btn--sm nv-notfound__back">
-            Revenir à {sectionLabel(home)}
+            Retour : {sectionLabel(home)}
           </Link>
         </div>
       </Panel>

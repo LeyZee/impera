@@ -247,6 +247,8 @@ describe('createDraftComposer', () => {
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'draft',
       bubbles: ['Je reste ici avec toi 😘'],
+      // The answer set aside is kept for the human who reads the second (IA-08).
+      retried: ['contact_info'],
     });
     expect(seen.voiceCalls).toBe(2);
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('a été refusée');
@@ -255,6 +257,22 @@ describe('createDraftComposer', () => {
     const still = composer({ voice: { bubbles: ['Écris-moi sur mon snap 😘'] } });
     expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
     expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('keeps a trace of an answer set aside only when one was (IA-08)', async () => {
+    const disclosed = composer({
+      voice: { bubbles: ['je suis une IA tu sais 🤖'] },
+      voiceAfter: { bubbles: ['Je reste ici avec toi 😘'] },
+    });
+    expect(await disclosed.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      retried: ['ai_disclosure'],
+    });
+    const clean = await composer({ voice: { bubbles: ['Je reste ici avec toi 😘'] } }).draftComposer.compose(
+      INPUT,
+    );
+    expect(clean.kind).toBe('draft');
+    expect(clean).not.toHaveProperty('retried');
   });
 
   it('never lets the voice give a help number itself: written once more, then a human; the code adds its own bubble (ADR 0088 § 4)', async () => {
@@ -1317,6 +1335,47 @@ describe('createDraftComposer, his limits (P3-02)', () => {
         because: ['distress', 'money_trouble'],
       },
     ]);
+  });
+
+  it('reads a sign of a minor only since a human confirmed his age, and always on a new one (IA-02)', async () => {
+    const before: AgentComposeInput['history'][number] = {
+      direction: 'inbound',
+      text: 'j’ai 16 ans et toi ?',
+      at: new Date('2026-10-17T09:00:00Z'),
+    };
+    const confirmed = limitsOf({ ageConfirmedAt: '2026-10-17T09:30:00.000Z' });
+    const settled = composer({}, undefined, confirmed.limits);
+    const after: AgentComposeInput = {
+      ...INPUT,
+      history: [
+        before,
+        {
+          direction: 'inbound',
+          text: 'ok cool, tu fais quoi ce soir ?',
+          at: new Date('2026-10-17T09:59:30Z'),
+        },
+      ],
+    };
+    expect(await settled.draftComposer.compose(after)).toMatchObject({ kind: 'draft' });
+    expect(confirmed.protections).toEqual([]);
+
+    const again = limitsOf({ ageConfirmedAt: '2026-10-17T09:30:00.000Z' });
+    const young = composer({}, undefined, again.limits);
+    const saysAgain: AgentComposeInput = {
+      ...INPUT,
+      history: [
+        before,
+        { direction: 'inbound', text: 'en vrai j’ai 16 ans', at: new Date('2026-10-17T09:59:30Z') },
+      ],
+    };
+    expect(await young.draftComposer.compose(saysAgain)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_suspected'],
+    });
+    expect(young.seen.traces).toHaveLength(0);
+    expect(again.protections.map((p) => p.protection.unconfirmAge)).toEqual([true]);
   });
 
   it('hands a fan who says he is 16 to a human before any model, and answers one who wants to end it with care', async () => {
@@ -3045,6 +3104,16 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
         step: { scriptRef: 'script-demo', stepIndex: 0, priceMinor: 1_500 },
       },
     });
+  });
+
+  it('shows the brain no script while his run is open or his age is not confirmed (recette REV-13)', async () => {
+    const running = composer({ brief: HOT }, undefined, limitsOf(ADULT).limits, deps(sent));
+    await running.draftComposer.compose({ ...free(INPUT), scriptRun: waiting });
+    expect(running.seen.brainInputs?.[0]?.scripts).toBeUndefined();
+
+    const unknownAge = composer({ brief: HOT }, undefined, limitsOf({}).limits, deps(PACK_SOURCE));
+    await unknownAge.draftComposer.compose(free(INPUT));
+    expect(unknownAge.seen.brainInputs?.[0]?.scripts).toBeUndefined();
   });
 
   describe('the script closest to his fantasy (Charles 26/11)', () => {

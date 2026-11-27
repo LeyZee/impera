@@ -211,7 +211,7 @@ describe('session lifetime by role (SEC-17)', () => {
     const response = await me(cookie);
     expect(response.statusCode).toBe(200);
     expect(String(response.headers['set-cookie'])).toMatch(/session_token=[^;]+;.*Max-Age=604800/);
-    // Not due again within the hour: no cookie.
+    // Not due again within the minute: no cookie.
     expect((await me(cookie)).headers['set-cookie']).toBeUndefined();
   });
 

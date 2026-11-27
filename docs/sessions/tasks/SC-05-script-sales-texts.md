@@ -1,5 +1,5 @@
 # SC-05 Textes de vente d'un script, proposés par le modèle et validés par l'agence
-Statut : blocked (clé xAI ; grille de prix P6-01)
+Statut : todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : blocked (clé xAI ; grille de prix P6-01)
 Phase : scripts (ADR 0056)
 Dépend de : SC-04, la passerelle LLM (P3-01), les gardes de voix (P3-13), P6-01
 Branche : task/sc-05-script-texts

@@ -91,6 +91,9 @@ function Days({
     setNotice(null);
     try {
       client.setQueryData(exceptionsQueryKey(creatorId), await write());
+      // Her switch in the header says whether she is in her hours: read again at once, not a minute later (CODE-03).
+      void client.invalidateQueries({ queryKey: ['dashboard', 'creators'] });
+      void client.invalidateQueries({ queryKey: ['dashboard', creatorId] });
       setEditing(null);
       setNotice(done);
     } catch (error) {

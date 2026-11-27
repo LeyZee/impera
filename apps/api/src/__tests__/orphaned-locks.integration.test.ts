@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
-import { countOrphanedJobs, releaseOrphanedLocks } from '../orphaned-locks';
+import { countOrphanedJobs, releaseIdleLocks, releaseOrphanedLocks } from '../orphaned-locks';
 import { startWorker } from '../worker-runner';
 
 import { testConfig } from './support/config';
@@ -90,6 +90,32 @@ describe('locks of dead workers', () => {
     ]);
     expect(await countOrphanedJobs(test.service.db)).toBe(0);
     expect(await releaseOrphanedLocks(test.service.db)).toEqual([]);
+  });
+
+  it('frees a live worker’s own locks on jobs it no longer runs, never on one it runs (recette COUV-14)', async () => {
+    await heartbeat('pool-live', 5);
+    await lockedJob('conv:lost-completion', 'pool-live', 10);
+    await lockedJob('conv:running', 'pool-live', 10);
+    await lockedJob('conv:just-taken', 'pool-live', 1);
+    const running = z
+      .array(z.object({ id: z.string() }))
+      .parse(
+        (
+          await test.admin.db.execute(sql`
+            select job.id::text as id from graphile_worker._private_jobs job
+              join graphile_worker._private_job_queues q on q.id = job.job_queue_id
+             where q.queue_name = 'conv:running'`)
+        ).rows,
+      )
+      .map((row) => row.id);
+
+    expect(await releaseIdleLocks(test.service.db, 'pool-live', new Set(running))).toBe(1);
+    expect(await locksOf('conv:lost-completion')).toEqual([{ locked_by: null, queue_locked_by: null }]);
+    expect(await locksOf('conv:running')).toEqual([{ locked_by: 'pool-live', queue_locked_by: 'pool-live' }]);
+    expect(await locksOf('conv:just-taken')).toEqual([
+      { locked_by: 'pool-live', queue_locked_by: 'pool-live' },
+    ]);
+    expect(await releaseIdleLocks(test.service.db, 'pool-live', new Set(running))).toBe(0);
   });
 
   it('a worker that starts runs the job a dead one left in its queue, and beats under its own pool id', async () => {

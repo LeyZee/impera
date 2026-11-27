@@ -58,6 +58,7 @@ function fakeReader(options: { held?: boolean; has?: boolean } = {}) {
     events: () => Promise.resolve(empty),
     desireCurve: () => Promise.resolve(null),
     sendingStopped: () => Promise.resolve(true),
+    expiredSessions: () => Promise.resolve(['reveal']),
   };
   return { reader, calls };
 }
@@ -136,7 +137,7 @@ describe('conversation reads (ADR 0026 § 1)', () => {
       code: 'conversation_forbidden',
     });
     await expect(reads.list(routed, OTHER, PAGE)).rejects.toMatchObject({ code: 'creator_forbidden' });
-    expect(await reads.stopped(routed, HER)).toBe(true);
+    expect(await reads.stopped(routed, HER)).toEqual({ stopped: true, expiredSessions: ['reveal'] });
 
     const held = fakeReader({ held: true });
     await expect(createConversationReads(held.reader).actorOn(routed, HER, CONVERSATION)).resolves.toBe(USER);

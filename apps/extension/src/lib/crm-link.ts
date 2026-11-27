@@ -10,7 +10,8 @@ import type { CrmSession } from './session';
  * person is not signed in. What protects is elsewhere: the host shown in full, the first link only, the link code.
  */
 
-export type LinkFailure = 'denied' | 'signed_out' | 'not_crm';
+/** `down`: nothing answers, or the CRM answers unwell (5xx): the address may be right, the CRM is not up (EXT-04). */
+export type LinkFailure = 'denied' | 'signed_out' | 'down' | 'not_crm';
 
 export type Linked =
   { readonly state: 'linked' } | { readonly state: 'failed'; readonly failure: LinkFailure };
@@ -46,7 +47,8 @@ export function linkCrm(next: string, deps: LinkDeps): Promise<Linked> {
     if (session.kind !== 'signed_in') {
       if (!before) await deps.remove(pattern).catch(() => false);
       const signedOut = session.kind === 'signed_out' || session.kind === 'second_factor_required';
-      return { state: 'failed', failure: signedOut ? 'signed_out' : 'not_crm' };
+      const down = session.kind === 'server_down' || session.kind === 'unreachable';
+      return { state: 'failed', failure: signedOut ? 'signed_out' : down ? 'down' : 'not_crm' };
     }
     const saved = await deps.saved();
     if (saved !== null && saved !== next) {

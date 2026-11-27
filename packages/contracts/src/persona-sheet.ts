@@ -90,7 +90,7 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('place_of_life', 'Lieu de vie', 'short', 'half'),
       q('timezone', 'Fuseau horaire', 'timezone', 'half'),
       q('spoken_languages', 'Langues parlées', 'languages', 'half', {
-        help: 'Sélectionnez les langues que le modèle parle couramment',
+        help: 'Les langues qu’elle parle couramment.',
         required: true,
       }),
     ],
@@ -134,7 +134,7 @@ export const PERSONA_SHEET: readonly SheetSection[] = [
       q('roleplaying_description', 'Description du jeu de rôle', 'long', 'full'),
       q('favourite_emojis', 'Émojis favoris', 'short', 'full'),
       q('conversation_description', 'Description de la conversation', 'long', 'full', {
-        help: 'Décrivez le ton, le style ou les sujets de conversation typiques.',
+        help: 'Le ton, le style ou les sujets de ses conversations.',
       }),
       q('spelling_description', "Style d'orthographe", 'long', 'full'),
       q('compliment_description', 'Style de compliments', 'long', 'full'),

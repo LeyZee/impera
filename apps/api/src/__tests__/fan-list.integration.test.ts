@@ -3,6 +3,7 @@ import {
   CreatorIdSchema,
   FanIdSchema,
   FanListPageSchema,
+  MessageIdSchema,
   newId,
   PlatformAccountIdSchema,
   SalesLineIdSchema,
@@ -218,8 +219,20 @@ describe('GET /v1/fans, every fan of a creator for the agency (ADR 0124)', () =>
     // Chloé: paid in dollars this week, in care.
     await conversation(await fan('fan_chloe', 'Chloé'), { inbound: 3, outbound: 3, care: true });
     await sale('fan_chloe', 'sale_c1', 2, 1500, { currency: 'USD' });
-    // Dan: never paid, never answered by us.
-    await conversation(await fan('fan_dan', 'Dan'), { inbound: 5 });
+    // Dan: never paid, never answered by us. His message was written 5 days ago, read in just now by a catch-up of the
+    // connector: his last message is the platform's time, never the time it was read in (PRO1-05).
+    const danConversation = await conversation(await fan('fan_dan', 'Dan'), { inbound: 0.01 });
+    await test.admin.db.insert(schema.messages).values({
+      id: newId(MessageIdSchema),
+      creatorId,
+      platformAccountId: accountId,
+      conversationId: danConversation,
+      platformMessageId: 'msg_dan_1',
+      direction: 'inbound',
+      author: 'fan',
+      text: 'Un message inventé',
+      platformCreatedAt: new Date(now - 5 * DAY),
+    });
     // Ève: known, never wrote, no conversation.
     await fan('fan_eve', 'Ève');
     // A fan of another creator: never in her list.
@@ -252,6 +265,7 @@ describe('GET /v1/fans, every fan of a creator for the agency (ADR 0124)', () =>
       states: ['care'],
     });
     expect(dan).toMatchObject({ paidEver: { eurMinor: 0, usdMinor: 0 }, lastPaidAt: null, unanswered: true });
+    expect(dan?.lastMessageAt).toBe(new Date(now - 5 * DAY).toISOString());
     // His refund taken off; a human holds him, named.
     expect(bruno).toMatchObject({
       paidEver: { eurMinor: 3000, usdMinor: 0 },

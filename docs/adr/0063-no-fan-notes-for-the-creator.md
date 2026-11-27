@@ -1,5 +1,13 @@
 # 0063. La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0065 · La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans](0065-creator-sees-who-wrote-and-fan-figures.md) : Remplace : dans l'ADR 0042 § 2, la phrase « l'auteur d'un message envoyé (chatteur ou agent, ADR 0021). Elle voit le message, jamais qui l'a écrit. » ; dans l'ADR 0063 § 3, les mots « sans jamais voir qui a écrit un message (ADR 0021) ».
+>
+> Toutes les décisions du même sujet : [`docs/regles/fans.md`](../regles/fans.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 03/11/2026 13h32, « ok 0063 », sur les mots exacts des trois phrases du § Décision ; décision du même jour à 11h40 et 11h50) ; § 3, les mots « sans jamais voir qui a écrit un message (ADR 0021) » remplacés par l'ADR 0065, qui précise aussi le § 2
 Date : 2026-11-03
 Remplace : dans l'ADR 0042 § 2, la phrase « **Elle voit tout son compte**, en lecture : ses ventes avec le fan qui a acheté, ses fans (pseudo, dépenses, notes), les conversations de ses comptes, ses médias et leurs descriptions, les publications prévues et passées, qui est en poste sur elle (nom affiché et créneau). »

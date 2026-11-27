@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 
 import { CareBanner } from './CareBanner';
+import { useFanFlags } from './FanLimits';
 import { FanSheet } from './FanSheet';
 import {
   approveDraft,
@@ -15,11 +16,15 @@ import {
   type ConversationRead,
   type Decision,
 } from './api';
+import { isAgeDisputed } from './flags-model';
 import {
+  AGE_IN_DOUBT_TEXT,
   draftsOf,
   endsRun,
   graveHandoffOf,
   messageTime,
+  retriedLine,
+  scriptStepLine,
   stoppedText,
   threadOf,
   whyHuman,
@@ -275,6 +280,9 @@ function Loaded({
   const [outdated, setOutdated] = useState<string | null>(null);
 
   const [note, setNote] = useState('');
+  // A fan whose age is in doubt is not given back before his age is confirmed: the server refuses it (IA-01).
+  const flags = useFanFlags(creatorId, detail.fanId);
+  const ageInDoubt = isHuman && flags.data !== undefined && isAgeDisputed(flags.data.flags);
   // A grave handoff (minor, consent, distress) is given back only after a second, explicit click (PRO-26).
   const grave = isHuman ? graveHandoffOf(read) : null;
   const [confirming, setConfirming] = useState(false);
@@ -445,7 +453,8 @@ function Loaded({
               : ' Il répond dans Reveal ; l’agent n’écrit plus à ce fan jusqu’à ce qu’on lui rende la main.'}
             {canDecide && !canGiveBack ? ' C’est à lui de la rendre.' : ''}
           </p>
-          {canGiveBack ? (
+          {canGiveBack && ageInDoubt ? <p className="tr-line">{AGE_IN_DOUBT_TEXT}</p> : null}
+          {canGiveBack && !ageInDoubt ? (
             <div className="tr-hand__give">
               <label className="nv-field">
                 <span className="nv-field__label">Note pour l’agent (facultatif)</span>
@@ -653,6 +662,8 @@ function DraftPanel({
   const problem = step === 'editing' ? bubblesProblem(text) : null;
   // An invalid text is a retouch too: the button keeps its name while it is off.
   const isChanged = edited?.join('\n') !== draft.bubbles.join('\n');
+  const retried = retriedLine(draft.retried);
+  const stepLine = scriptStepLine(draft.scriptStep);
 
   const run = async (decide: () => Promise<Decision>): Promise<void> => {
     setPending(true);
@@ -686,6 +697,8 @@ function DraftPanel({
           ))}
         </div>
       )}
+      {stepLine === null ? null : <p className="nv-draft-panel__brief tr-draft__step">{stepLine}</p>}
+      {retried === null ? null : <p className="nv-draft-panel__brief tr-draft__retried">{retried}</p>}
       {step === 'rejecting' ? (
         <label className="nv-field">
           <span className="nv-field__label">Pourquoi ? (facultatif, ça sert à entraîner l’agent)</span>
