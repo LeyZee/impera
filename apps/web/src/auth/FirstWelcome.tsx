@@ -6,6 +6,7 @@ import { PublicBrand } from './PublicBrand';
 import './first-welcome.css';
 
 import { useCreators } from '@/creators/api';
+import { isStandalone } from '@/pwa/install';
 import { useMyShifts } from '@/scheduling/api';
 import { swapShiftLine } from '@/scheduling/model';
 import { readerZone } from '@/scheduling/time';
@@ -125,6 +126,7 @@ function CreatorWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
   // A key added just before (the offer after the backup codes) shows as done; a read that fails offers it again.
   const keys = useQuery({ queryKey: ['passkeys', 'own'], queryFn: fetchOwnPasskeys, retry: false });
   const hasKey = (keys.data?.length ?? 0) > 0;
+  const installed = isStandalone();
   return (
     <>
       <Hello
@@ -143,23 +145,27 @@ function CreatorWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
             onGo('/moi/securite');
           }}
         />
+        {/* Recette navigation 27/11 (MOD-03) : sur iPhone, les notifications n'arrivent que dans Impera posée sur
+            l'écran d'accueil ; l'installation vient donc avant elles, et une app déjà posée la montre faite. */}
         <Step
           n={2}
-          next={hasKey}
+          next={hasKey && !installed}
+          title="Mets Impera sur ton écran d’accueil"
+          text="Elle s’ouvre comme une app, en plein écran."
+          action="Me montrer"
+          done={installed ? 'Faite' : null}
+          onClick={() => {
+            onGo('/aide/installer');
+          }}
+        />
+        <Step
+          n={3}
+          next={hasKey && installed}
           title="Active les notifications"
           text="Tu sais tout de suite quand l’agence te demande un contenu, ou qu’un fan achète."
           action="Activer"
           onClick={() => {
             onGo('/notifications');
-          }}
-        />
-        <Step
-          n={3}
-          title="Mets Impera sur ton écran d’accueil"
-          text="Elle s’ouvre comme une app, en plein écran."
-          action="Me montrer"
-          onClick={() => {
-            onGo('/aide/installer');
           }}
         />
       </ol>
@@ -177,7 +183,7 @@ function CreatorWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
         >
           Voir ma journée
         </button>
-        <p className="fw__note">Ce qui n’est pas fait t’attendra dans Moi › Réglages.</p>
+        <p className="fw__note">Ce qui n’est pas fait t’attendra dans Moi › Préférences.</p>
       </div>
     </>
   );

@@ -136,8 +136,10 @@ function Lead({
         search={{ conversation: fan.conversationId, creatrice: creatorId }}
         className="nv-btn nv-btn--neon tt-lead__go"
       >
-        {silent ? 'Le relancer' : 'Lui répondre'}
+        {silent ? 'Voir avant de le relancer' : 'Voir sa conversation'}
       </Link>
+      {/* Recette navigation 27/11 (CH-02) : Suivi lit la conversation, on écrit dans Reveal avec le copilote. */}
+      <span className="tt-lead__where">Tu lui écris dans Reveal ; le copilote de l’extension t’aide.</span>
     </div>
   );
 }
