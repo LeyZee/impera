@@ -24,6 +24,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  type PgColumn,
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
@@ -34,6 +35,7 @@ import {
   enumCheck,
   enumText,
   id,
+  notCreatorAccount,
   tenantPolicy,
   timestampTz,
 } from './columns';
@@ -159,6 +161,12 @@ export const mediaPlatformRefs = pgTable(
     descriptionFailures: smallint('description_failures').notNull().default(0),
     /** The platform's blurred preview (a blurhash, `BlurhashSchema`): a few colours, never the image (ADR 0030 § 4). */
     previewBlurhash: text('preview_blurhash'),
+    /**
+     * When a sync first read it as sent for free by the platform (Reveal's `sentForFree`: offered in a message or a
+     * Mass DM), `null` until then. Kept once set, whatever a later read says: a media once offered is never sold again
+     * (ADR 0145 § 2, the media's mark).
+     */
+    sentForFreeAt: timestampTz('sent_for_free_at'),
     lastSyncedAt: timestampTz('last_synced_at').notNull(),
     removedAt: timestampTz('removed_at'),
     createdAt: createdAt(),
@@ -297,6 +305,60 @@ export function vaultImported(ref: {
     false)`;
 }
 
+const appUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
+
+/** A medium kept from one of her drops not withdrawn (ADR 0163 § 4): the only rows of hers she may review. */
+const herDroppedMedium = (t: { readonly creatorId: PgColumn; readonly mediaAssetId: PgColumn }): SQL =>
+  sql`exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
+       where f.media_asset_id = ${t.mediaAssetId} and d.creator_id = ${t.creatorId}
+         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate'))`;
+
+/**
+ * A description that waits for the agency (Sécurité on #995): a reason the code held it for a human (ADR 0083 § 3 to
+ * 5) or a flag of the vision. Hers to read, never hers to lift.
+ */
+const awaitsAgency = (t: { readonly reviewReasons: PgColumn; readonly content: PgColumn }): SQL =>
+  sql`(cardinality(${t.reviewReasons}) > 0 or jsonb_array_length(coalesce(${t.content} -> 'flags', '[]'::jsonb)) > 0)`;
+
+/** Some row of this medium, not validated yet, waits for the agency: her correction cannot lift it either. */
+const mediumAwaitsAgency = (t: { readonly mediaAssetId: PgColumn }): SQL =>
+  sql`exists (select 1 from media_descriptions w
+       where w.media_asset_id = ${t.mediaAssetId} and w.validated_at is null
+         and (cardinality(w.review_reasons) > 0
+              or jsonb_array_length(coalesce(w.content -> 'flags', '[]'::jsonb)) > 0))`;
+
+/**
+ * Whether a vault media was offered (ADR 0145 § 2, « un média offert n'est jamais revendu »): the platform read it as
+ * sent for free once (`sent_for_free_at`), or its file is kept by a live drop of hers that leaves for free (any drop
+ * but a script: feed, stories, Instagram, Telegram, Mass DM). Given the columns of a `media_platform_refs` row, in the
+ * caller's query and RLS. A media whose file is not read yet (`media_asset_id` null) answers by the platform's mark.
+ */
+export function vaultOffered(ref: { readonly sentForFreeAt: SQL; readonly mediaAsset: SQL }): SQL<boolean> {
+  return sql<boolean>`(${ref.sentForFreeAt} is not null or exists (
+    select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
+     where f.media_asset_id = ${ref.mediaAsset} and f.state in ('kept', 'duplicate') and f.replaced_at is null
+       and d.category <> 'script' and d.state <> 'withdrawn'))`;
+}
+
+/**
+ * Whether a media of hers is sold by a script (ADR 0145 § 2, « un média de script n'est jamais gratuit »): its file is
+ * kept by a live script drop of hers, or it is a sold media of a paid step of one of her active native scripts. Given
+ * a `media_assets` id, in the caller's query and RLS.
+ */
+export function mediaInScript(mediaAsset: SQL): SQL<boolean> {
+  return sql<boolean>`(exists (
+    select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
+     where f.media_asset_id = ${mediaAsset} and f.state in ('kept', 'duplicate') and f.replaced_at is null
+       and d.category = 'script' and d.state <> 'withdrawn')
+    or exists (
+    select 1 from media_platform_refs l
+      join platform_scripts ps on ps.platform_account_id = l.platform_account_id and ps.active
+      join platform_script_step_media sm on sm.platform_script_id = ps.id and sm.role = 'sold'
+        and sm.platform_media_ref = l.platform_media_id
+      join platform_script_steps st on st.platform_script_id = sm.platform_script_id and st.position = sm.position
+     where l.media_asset_id = ${mediaAsset} and st.price_minor > 0))`;
+}
+
 /**
  * A media of the vault the owner asked to describe (ADR 0145 § 5, amendment of 17/11), after the count and the cost
  * were shown: `media.describe_vault` takes only these. Once per media; `asked_key` is the gesture's, so a gesture
@@ -390,7 +452,25 @@ export const mediaDescriptions = pgTable(
       .on(t.mediaAssetId, t.promptHash)
       .where(sql`${t.author} = 'sense' and ${t.content} ? 'detailed'`),
     tenantPolicy(t.creatorId),
-    ...creatorReadsOnly(),
+    // She reads these rows, and since ADR 0163 § 4 she validates and corrects the description of a medium of her own
+    // drops, as the agency does: a human row validated by her account at its writing, or the two stamp columns of a
+    // row not validated yet (the column grant of migration 0152 and `refuse_description_change` hold the rest). The
+    // restrictive policies stay restrictive: nothing permissive can open more for her. A row waiting for the agency (a
+    // review reason, a flag of the vision) is never hers to validate or to correct (Sécurité on #995).
+    pgPolicy('creator_no_delete', { as: 'restrictive', for: 'delete', using: notCreatorAccount }),
+    pgPolicy('creator_no_insert', {
+      as: 'restrictive',
+      for: 'insert',
+      withCheck: sql`${notCreatorAccount} or (${t.author} = 'human' and ${t.model} = 'human'
+        and ${t.validatedBy} = ${appUser} and ${t.validatedAt} is not null and ${herDroppedMedium(t)}
+        and not ${awaitsAgency(t)} and not ${mediumAwaitsAgency(t)})`,
+    }),
+    pgPolicy('creator_no_update', {
+      as: 'restrictive',
+      for: 'update',
+      using: sql`${notCreatorAccount} or (${t.validatedAt} is null and ${herDroppedMedium(t)} and not ${awaitsAgency(t)})`,
+      withCheck: sql`${notCreatorAccount} or (${t.validatedBy} = ${appUser} and ${herDroppedMedium(t)})`,
+    }),
   ],
 );
 
@@ -420,6 +500,10 @@ export const mediaSends = pgTable(
     enumCheck('media_sends', t.currency, CurrencySchema.options),
     check('media_sends_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     index('media_sends_fan_media_idx').on(t.fanId, t.mediaAssetId),
+    // A medium given for free goes once to a fan (ADR 0163 § 7): the agent's note of a voice or a gift, replayable.
+    uniqueIndex('media_sends_free_once_idx')
+      .on(t.fanId, t.mediaAssetId)
+      .where(sql`${t.priceMinor} is null`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],

@@ -1,6 +1,7 @@
 import { useId, useState, type JSX } from 'react';
 
 import { useCreators } from '@/creators/api';
+import { LinkHours } from '@/creators/links/LinkHours';
 import { LinksSection } from '@/creators/links/LinksSection';
 import '@/creators/persona/persona.css';
 import { Select } from '@/shell/Select';
@@ -68,12 +69,15 @@ export function TrafficPage({
               Ses liens arrivent ici dès qu’une créatrice t’est confiée.
             </Empty>
           ) : (
-            <LinksSection
-              key={creator.id}
-              creatorId={creator.id}
-              creatorName={creator.displayName}
-              canEdit={canEdit}
-            />
+            <>
+              <LinkHours key={`hours-${creator.id}`} creatorId={creator.id} />
+              <LinksSection
+                key={creator.id}
+                creatorId={creator.id}
+                creatorName={creator.displayName}
+                canEdit={canEdit}
+              />
+            </>
           )}
         </section>
       </div>

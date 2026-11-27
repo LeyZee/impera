@@ -6,7 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { notifyCreatorSale } from './application/creator-sale';
 import { notify, recap, type NotifyDeps } from './application/notify';
 import { createCreatorSaleSource } from './infra/db/creator-sales';
-import { createDeliveryRegistry } from './infra/db/deliveries';
+import { createDeliveryRegistry, createInboxReader } from './infra/db/deliveries';
 import { createPreferencesStore, createServerKeyStore, createSubscriptionStore } from './infra/db/stores';
 import { createNotificationRoutes, type RequireRole } from './infra/http/routes';
 import { createPushSender } from './infra/push-sender';
@@ -56,7 +56,7 @@ export function createNotificationsModule(deps: NotificationsDeps): Notification
   const sales = createCreatorSaleSource(deps.adminDb);
   return {
     name: 'notifications',
-    routes: createNotificationRoutes(devices, deps.requireRole),
+    routes: createNotificationRoutes(devices, deps.requireRole, createInboxReader(deps.db)),
     notify: devices === null ? null : (request, at) => notify(devices, request, at),
     recap: devices === null ? null : (userId, at) => recap(devices, userId, at),
     creatorSale:

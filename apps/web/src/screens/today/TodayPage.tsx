@@ -10,6 +10,8 @@ import { useState, type JSX } from 'react';
 
 import { AnnouncementsCard } from './AnnouncementsCard';
 import { TodoCard } from './TodoCard';
+import { HerLines } from './her/HerLines';
+import { ToTalkCard } from './to-talk/ToTalkCard';
 import './today.css';
 
 import { urgencies } from '@/agent/queue';
@@ -75,7 +77,7 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
   });
 
   return (
-    <Page width="narrow">
+    <Page>
       {/* The title and the day say it all: no sentence under them (D-03). */}
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" />
       {mine.isError ? (
@@ -154,34 +156,43 @@ function Day({
           : { kind: 'later' };
   // Away from the team, that is the day's one state: no shift is his to hold (CHAT-09).
   const away = myAwayOf(user);
+  // His shift's creator while she is open to him: « À qui parler » reads her conversations (Charles, 21/11).
+  const open = state.kind === 'on' || state.kind === 'ended' || state.kind === 'soon' ? state.shift : null;
   return (
-    <div className="sc-today">
-      {away === null ? (
-        <Hero
-          state={state}
-          now={now}
-          zone={zone}
-          today={today}
-          report={report}
-          onReport={() => {
-            if (heroShift !== null) onReport(heroShift.id);
-          }}
-        />
-      ) : (
-        <MyAwayCard status={away} />
-      )}
-      {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
-      {user.team === null ? null : <AnnouncementsCard zone={zone} today={today} />}
-      {away === null ? <ShiftChallengeCard user={user} zone={zone} /> : null}
-      <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
-      {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
-      {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
-      {/* Where he stands in the game, and the way to Moi › Trophées (ADR 0134, lot 1). */}
-      <MyProgressCard user={user} />
-      {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
-      <RewardRevealGate user={user} />
-      <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
-      {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
+    <div className="sc-today sc-today--split">
+      <div className="sc-today__main">
+        {away === null ? (
+          <Hero
+            state={state}
+            now={now}
+            zone={zone}
+            today={today}
+            report={report}
+            onReport={() => {
+              if (heroShift !== null) onReport(heroShift.id);
+            }}
+            onFeedbackDue={onReport}
+          />
+        ) : (
+          <MyAwayCard status={away} />
+        )}
+        {away === null && open !== null ? <ToTalkCard creatorId={open.creatorId} now={now} /> : null}
+        {user.team === null ? null : <AnnouncementsCard zone={zone} today={today} />}
+        <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
+      </div>
+      {/* Where he stands, beside the work on a computer, under it on a phone (Charles, 21/11). */}
+      <div className="sc-today__side">
+        {/* The shift's challenge first: the one figure of this shift (ADR 0104 § 14); nothing without one. */}
+        {away === null ? <ShiftChallengeCard user={user} zone={zone} /> : null}
+        {/* His own figures, one compact card (CHF-01, ADR 0104 § 2). */}
+        {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
+        {/* Where he stands in the game, and the way to Moi › Trophées (ADR 0134, lot 1). */}
+        <MyProgressCard user={user} />
+        {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
+        <RewardRevealGate user={user} />
+        <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
+        {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
+      </div>
     </div>
   );
 }
@@ -210,6 +221,7 @@ function Hero({
   today,
   report,
   onReport,
+  onFeedbackDue,
 }: {
   state: DayState;
   now: Date;
@@ -217,6 +229,8 @@ function Hero({
   today: string;
   report: HeroReport;
   onReport: () => void;
+  /** The feedback of his last shift, owed before « Je prends mon poste » (retour léger, 26/11): it opens at once. */
+  onFeedbackDue: (shiftId: string) => void;
 }): JSX.Element {
   if (state.kind === 'none') {
     return (
@@ -294,6 +308,14 @@ function Hero({
         ) : null}
         {rangeAt(shift.startsAt, shift.endsAt, zone)}
       </p>
+      {/* Her limits and her voice before his first message (Charles, 21/11): the hours her creator is open to him. */}
+      {state.kind === 'later' ? null : <HerLines creatorId={shift.creatorId} />}
+      {state.kind === 'on' ? (
+        <span className="sc-hero__gauge-label">
+          Temps de poste écoulé{' '}
+          <b className="nv-num">{`${String(Math.round(progressOf(shift, now) * 100))} %`}</b>
+        </span>
+      ) : null}
       {state.kind === 'on' ? (
         <div
           className="nv-gauge sc-hero__gauge"
@@ -334,7 +356,7 @@ function Hero({
               Faire mon rapport
             </button>
           ) : null}
-          {toTake ? <CheckIn shiftId={shift.id} /> : null}
+          {toTake ? <CheckIn shiftId={shift.id} onFeedbackDue={onFeedbackDue} /> : null}
           {/* The report or the check-in, when due, takes the light; otherwise Suivi does, the shift's work being there. */}
           <Link
             to="/suivi"
@@ -375,7 +397,13 @@ function Hero({
  * « Je prends mon poste » (EQ-12): one tap dates the real start of the shift, the server holding the window and the
  * member's own shift. A second tap answers the first instant; a refusal is said under the button, never in silence.
  */
-function CheckIn({ shiftId }: { shiftId: string }): JSX.Element {
+function CheckIn({
+  shiftId,
+  onFeedbackDue,
+}: {
+  shiftId: string;
+  onFeedbackDue: (shiftId: string) => void;
+}): JSX.Element {
   const refresh = useRefreshPlanning();
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -388,6 +416,14 @@ function CheckIn({ shiftId }: { shiftId: string }): JSX.Element {
       await refresh();
       setBusy(false);
       return;
+    }
+    if (
+      outcome.kind === 'refused' &&
+      outcome.code === 'shift_check_in_feedback_due_conflict' &&
+      outcome.shiftId !== null
+    ) {
+      // The feedback of his last shift first: its panel opens, and the button waits for him to come back.
+      onFeedbackDue(outcome.shiftId);
     }
     setSaid(
       outcome.kind === 'refused'

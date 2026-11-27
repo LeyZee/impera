@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { isNight } from '../../../modules/agent/index';
 import { readScenario, type Scenario } from '../scenario';
-import { judgeSituationOf, scenarioFlags, scenarioMoment } from '../situation';
+import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow } from '../situation';
 
 const NOW = new Date('2026-11-06T20:00:00+02:00');
 
@@ -49,5 +50,24 @@ describe('judgeSituationOf', () => {
       flags: {},
     });
     expect(scenarioMoment(plain, NOW).relationshipStartedAt).toEqual(new Date(NOW.getTime() - 3_600_000));
+  });
+});
+
+describe('scenarioNow (passe 2 du 26/11, conversations 38 et 45)', () => {
+  it('reads her local time on her clock in Paris, winter time in November', () => {
+    const now = scenarioNow('2026-11-06', '22:30');
+    expect(now.toISOString()).toBe('2026-11-06T21:30:00.000Z');
+    expect(isNight(scenarioMoment(scenario('situation: {}'), now))).toBe(true);
+  });
+
+  it('reads summer time in October, and a time past midnight on the same day', () => {
+    expect(scenarioNow('2026-10-06', '22:30').toISOString()).toBe('2026-10-06T20:30:00.000Z');
+    expect(scenarioNow('2026-11-06', '00:30').toISOString()).toBe('2026-11-05T23:30:00.000Z');
+  });
+
+  it('keeps an evening before her night a day', () => {
+    expect(isNight(scenarioMoment(scenario('situation: {}'), scenarioNow('2026-11-06', '21:00')))).toBe(
+      false,
+    );
   });
 });

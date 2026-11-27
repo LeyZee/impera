@@ -23,7 +23,7 @@ import { RedirectLinkError } from '../../domain/errors';
 import { sameAddress, writeFault, type StoredRedirectLink } from '../../domain/links';
 import type { RedirectLinkActor, RedirectLinkStore, RedirectLinkWrite } from '../../domain/ports';
 
-const { auditLog, creators, redirectLinks } = schema;
+const { auditLog, creators, redirectLinkHours, redirectLinks } = schema;
 
 const columns = {
   id: redirectLinks.id,
@@ -185,6 +185,26 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
 
   return {
     listForAgency: (actor, creatorId) => assertAgency(db, actor, creatorId, (tx) => linksOf(tx, creatorId)),
+    hoursForAgency: (actor, creatorId, since) =>
+      assertAgency(db, actor, creatorId, async (tx) => {
+        const rows = await tx
+          .select({
+            linkId: redirectLinkHours.linkId,
+            hour: redirectLinkHours.hour,
+            pageviews: redirectLinkHours.pageviews,
+            clicks: redirectLinkHours.clicks,
+            robots: redirectLinkHours.robots,
+            closed: redirectLinkHours.closed,
+          })
+          .from(redirectLinkHours)
+          .where(and(eq(redirectLinkHours.creatorId, creatorId), sql`${redirectLinkHours.hour} >= ${since}`))
+          .orderBy(redirectLinkHours.hour, redirectLinkHours.linkId);
+        return rows.map((row) => ({
+          ...row,
+          linkId: RedirectLinkIdSchema.parse(row.linkId),
+          hour: row.hour.toISOString(),
+        }));
+      }),
     listOwn: (userId) => withCreatorAccount(db, userId, (tx, creatorId) => linksOf(tx, creatorId)),
     enabledUnscoped: (creatorId) =>
       withAdmin(adminDb, async (tx) => {

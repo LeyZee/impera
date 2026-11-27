@@ -8,11 +8,12 @@ import {
   type FanFlags,
   type FanId,
   type KycSlot,
+  type Language,
   type TeamScope,
   type UserId,
 } from '@impera/contracts';
 
-import { cardOf, planCardEdit, type Card, type CardEdit } from '../domain/card';
+import { cardOf, planCardEdit, planOtherRetraction, type Card, type CardEdit } from '../domain/card';
 import { cardLinesOf, proposalsOfRead, type ReadSource } from '../domain/card-read';
 import { FanNotFound } from '../domain/errors';
 import {
@@ -22,7 +23,15 @@ import {
   type FactProposal,
   type StoredFact,
 } from '../domain/facts';
-import type { Fan, FanSighting, FanStore, FactStore, FlagStore } from '../domain/fan';
+import type {
+  Fan,
+  FanSighting,
+  FanStore,
+  FactStore,
+  FlagStore,
+  KeptLanguage,
+  LanguageActor,
+} from '../domain/fan';
 import {
   withAgeDisputed,
   withDeclaredAge,
@@ -56,6 +65,17 @@ const after = ({ flags, scope }: { flags: FanFlags; scope: TeamScope | null }): 
 
 export interface FansService {
   upsertFanByPlatformId(sighting: FanSighting): Promise<Fan>;
+  /** His kept language (ADR 0168 § 3), `null` before any; 404 unknown. */
+  language(creatorId: CreatorId, fanId: FanId): Promise<KeptLanguage | null>;
+  /** Code read his language on his message: kept unless a person set it. */
+  keepDetectedLanguage(creatorId: CreatorId, fanId: FanId, language: Language): Promise<KeptLanguage | null>;
+  /** A person sets his language (`PUT /v1/fans/:id/language`), audited. */
+  setLanguage(
+    creatorId: CreatorId,
+    fanId: FanId,
+    language: Language,
+    actor: LanguageActor,
+  ): Promise<KeptLanguage>;
   getFan(creatorId: CreatorId, id: FanId): Promise<Fan | null>;
   /** Writes what is new in these proposals (append-only, `planFacts`) and returns the facts written. */
   proposeFacts(creatorId: CreatorId, fanId: FanId, proposals: readonly FactProposal[]): Promise<StoredFact[]>;
@@ -76,6 +96,11 @@ export interface FansService {
     edit: CardEdit,
     author: UserId,
   ): Promise<Card>;
+  /**
+   * A person takes a line of « Autres » off his card (trou béant 17) and gets the card back: an empty line in their
+   * name supersedes it. Not one of his active « Autres »: `FanCardOtherNotFound`.
+   */
+  retractOther(creatorId: CreatorId, fanId: FanId, factId: string, author: UserId): Promise<Card>;
   /** His card as the AI's read gets it (ADR 0085 § 7): one line per field it shows, with where it comes from. */
   cardLines(creatorId: CreatorId, fanId: FanId): Promise<string[]>;
   /**
@@ -152,6 +177,11 @@ export function createFansService(
   return {
     upsertFanByPlatformId: (sighting) => store.upsert(sighting, newId(FanIdSchema)),
     getFan: (creatorId, id) => store.get(creatorId, id),
+    language: (creatorId, fanId) => store.language(creatorId, fanId),
+    keepDetectedLanguage: (creatorId, fanId, language) =>
+      store.keepLanguage(creatorId, fanId, language, now()),
+    setLanguage: (creatorId, fanId, language, actor) =>
+      store.setLanguage(creatorId, fanId, language, actor, now()),
     proposeFacts: (creatorId, fanId, proposals) =>
       facts.write(creatorId, fanId, (current, pending) => planFacts(current, proposals, now(), pending)),
     cardLines: async (creatorId, fanId) => {
@@ -174,6 +204,12 @@ export function createFansService(
       await facts.write(creatorId, fanId, (current, pending) =>
         planCardEdit(field, edit, current, pending, author, at),
       );
+      const { active, pending, names } = await facts.card(creatorId, fanId);
+      return cardOf(active, pending, at, names);
+    },
+    retractOther: async (creatorId, fanId, factId, author) => {
+      const at = now();
+      await facts.write(creatorId, fanId, (current) => planOtherRetraction(factId, current, author, at));
       const { active, pending, names } = await facts.card(creatorId, fanId);
       return cardOf(active, pending, at, names);
     },

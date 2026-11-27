@@ -482,6 +482,12 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     z.object({ period }),
     (d) => `a donné un retour sur un shift (quinzaine ${frenchPeriod(d.period)})`,
   ),
+  'shift_incident.seen': action('team', z.object({ period }), () => 'a vu un incident de fin de shift'),
+  'shift_incident.resolved': action(
+    'team',
+    z.object({ period }),
+    () => 'a réglé un incident de fin de shift',
+  ),
   'sales_feed.chatter_linked': action(
     'team',
     chatterLink,
@@ -561,9 +567,20 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     none,
     (_d, c) => `a changé les réglages du copilote de ${c.creator(c.entityId)}`,
   ),
+  'creator.fan_tiers': action(
+    'agent',
+    none,
+    (_d, c) => `a changé les paliers de dépense des fans de ${c.creator(c.entityId)}`,
+  ),
   'automatic.on': agent('a allumé l’Automatique'),
   'conversation.takeover': agent('a pris la main sur une conversation'),
   'conversation.release': agent('a rendu une conversation à l’agent'),
+  // ADR 0168 § 3: the language she writes to him in, set by a person (the language only, never a word of his).
+  'fan.language_set': action(
+    'agent',
+    z.object({ language: code }),
+    (d) => `a fixé la langue d’un fan (${d.language})`,
+  ),
   'draft.placed': action(
     'agent',
     z.object({ edited: z.boolean().optional() }),
@@ -829,6 +846,24 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     'money',
     z.object({ period }),
     (d) => `a signalé une vente (quinzaine ${frenchPeriod(d.period)})`,
+  ),
+  'sale_claim.create': action(
+    'money',
+    z.object({ period }),
+    (d) => `a dit avoir été décisif sur une vente (quinzaine ${frenchPeriod(d.period)})`,
+  ),
+  'sale_claim.answer': action(
+    'money',
+    z.object({ period, outcome: code, memberId: id }),
+    (d, c) => {
+      const who = c.member(d.memberId);
+      if (d.outcome === 'withdrawn')
+        return `a retiré son signalement d’une vente décisive (quinzaine ${frenchPeriod(d.period)})`;
+      if (d.outcome === 'settled')
+        return `a réglé le signalement de vente de ${who} (quinzaine ${frenchPeriod(d.period)})`;
+      return `n’a pas retenu le signalement de vente de ${who} (quinzaine ${frenchPeriod(d.period)})`;
+    },
+    (d) => memberLink(d.memberId),
   ),
   'invoice.issue': action('money', issued, (d) =>
     d.reissuedInvoiceId === undefined

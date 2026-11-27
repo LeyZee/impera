@@ -15,9 +15,19 @@ export interface DialogueState {
   readonly desire: number;
   readonly availability: FanAvailabilityRecord;
   readonly scripts: ScriptsInput | undefined;
+  /** Absent: she never answered his asking to meet her. */
+  readonly meeting?: MeetingSeen;
 }
 
 type History = NonNullable<ScriptsInput['history']>;
+type MeetingAnswer = NonNullable<ComposedTurn['meetingAnswer']>;
+type MeetingReason = Extract<MeetingAnswer, { kind: 'reason' }>['reason'];
+
+/** What she already answered him about meeting her, as the journal would keep it (Charles 21/11). */
+interface MeetingSeen {
+  readonly given: readonly MeetingReason[];
+  readonly teased: boolean;
+}
 type Run = NonNullable<ScriptsInput['latest']>;
 
 /** What one turn of the engine left, as the respond job keeps it. */
@@ -29,6 +39,18 @@ export interface TurnLeft {
   readonly desire: ComposedTurn['desireRead'];
   readonly availability: ComposedTurn['availability'];
   readonly scripts: ComposedTurn['scripts'];
+  readonly meetingAnswer?: MeetingAnswer;
+}
+
+/** A reason she gave, or her one tease, kept once her answer went out: never given twice. */
+function meetingAfter(
+  seen: MeetingSeen | undefined,
+  answer: MeetingAnswer | undefined,
+): MeetingSeen | undefined {
+  if (answer === undefined) return seen;
+  const before = seen ?? { given: [], teased: false };
+  if (answer.kind === 'reason') return { ...before, given: [...before.given, answer.reason] };
+  return answer.kind === 'tease' ? { ...before, teased: true } : seen;
 }
 
 /** Reveal's history after a step went out: that step sent, once. */
@@ -74,12 +96,14 @@ export function afterTurn(state: DialogueState, left: TurnLeft): DialogueState {
       countsHisMessage: true,
     };
   }
+  const meeting = sent ? meetingAfter(state.meeting, left.meetingAnswer) : state.meeting;
   return {
     ...state,
     history,
     desire: left.desire?.score ?? state.desire,
     availability: left.availability?.record ?? state.availability,
     scripts,
+    ...(meeting !== undefined && { meeting }),
   };
 }
 

@@ -1,0 +1,164 @@
+/*
+ * Créatrices › IA › « Copilote dans l'extension » (ADR 0086 § 6). The answer on top (what her chatters get now), then a
+ * row per switch with its icon, its state and what it shows. Green when all is on; a switch off is her choice, said in
+ * the neutral ink, never in amber (Design 21/11). Tokens only.
+ */
+.cc-card {
+  padding: var(--nv-plate-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.cc-skeleton {
+  min-height: 220px;
+  animation: cc-skeleton var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
+}
+@keyframes cc-skeleton {
+  50% {
+    opacity: 0.55;
+  }
+}
+.cc-self-start {
+  align-self: flex-start;
+}
+.cc-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.cc-head__icon,
+.cc-row__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill-strong);
+  color: var(--nv-ink);
+}
+.cc-head__icon svg,
+.cc-row__icon svg {
+  width: 22px;
+  height: 22px;
+}
+.cc-head__words,
+.cc-row__words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Its size, weight and face are `nv-h3`'s, the failure's title included. */
+.cc-title {
+  margin: 0;
+  color: var(--nv-ink);
+  text-wrap: balance;
+}
+.cc-headline {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-trend-up-text);
+  text-wrap: pretty;
+}
+.cc-headline[data-tone='off'] {
+  color: var(--nv-ink-muted);
+}
+.cc-muted {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+.cc-rows {
+  margin: 0;
+  padding: var(--nv-space-2) 0 0;
+  border-top: 1px solid var(--nv-hairline);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-2);
+  border-radius: var(--nv-radius-md);
+  transition: background var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cc-row:hover {
+  background: var(--nv-fill-soft);
+}
+.cc-row__words {
+  flex: 1;
+}
+/* The switch stays in the middle of its row; the icon sits on the title's line. */
+.cc-row .nv-switch {
+  align-self: center;
+}
+.cc-row__title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  font-weight: 500;
+  color: var(--nv-ink);
+}
+.cc-row__name {
+  white-space: nowrap;
+}
+/* The state as a small word with its dot: green when on, faint when off. */
+.cc-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.cc-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: var(--nv-radius-full);
+  background: currentColor;
+  transition: background var(--nv-dur-base) var(--nv-ease-out);
+}
+.cc-row[data-on='true'] .cc-state {
+  color: var(--nv-trend-up-text);
+}
+.cc-row[data-on='true'] .cc-row__icon {
+  background: color-mix(in srgb, var(--nv-trend-up) 16%, transparent);
+  color: var(--nv-trend-up-text);
+}
+.cc-failed {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-warning);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-skeleton {
+    animation: none;
+  }
+  .cc-row,
+  .cc-state::before {
+    transition: none;
+  }
+}
+/* On a phone the state goes under the title on every row, never beside on one and under on the next (Design 21/11). */
+@media (max-width: 720px) {
+  .cc-row__title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}

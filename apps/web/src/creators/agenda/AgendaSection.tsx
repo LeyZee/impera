@@ -23,6 +23,7 @@ import {
 } from './model';
 import './agency-agenda.css';
 
+import { ProgressBand } from '@/creators/progress/ProgressBand';
 import { ReelBriefFields } from '@/creators/reel/ReelBriefFields';
 import { emptyReelDraft, reelBriefOf, reelProblems, type ReelDraft } from '@/creators/reel/model';
 import { WeekPlanPanel } from '@/creators/week/WeekPlanPanel';
@@ -164,6 +165,8 @@ export function AgendaSection({
           {notice}
         </p>
       )}
+      {/* Where she is, day by day and in her week, before what the agency plans next (trous béants n° 11). */}
+      <ProgressBand creatorId={creatorId} week={week} />
       <WeekPlanPanel
         creatorId={creatorId}
         creatorName={creatorName}

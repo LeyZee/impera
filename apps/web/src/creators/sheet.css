@@ -15,6 +15,8 @@
 
 /* Compte: its four subjects one under the other, each set apart from the next by more room than its own cards
    keep between them. A card reached by its address clears the page's header. */
+/* Her AI: the copilot's card, then her hours, one under the other like the cards of Compte. */
+.cr-ai,
 .cr-account {
   align-self: stretch;
   min-width: 0;

@@ -16,6 +16,10 @@ import {
   MessageIdSchema,
   PlatformAccountIdSchema,
   UserIdSchema,
+  CopilotTraceSchema,
+  DraftTranslationSchema,
+  type CopilotTrace,
+  type DraftTranslation,
 } from '@impera/contracts';
 import { sql, type schema } from '@impera/db';
 import { z } from 'zod';
@@ -95,8 +99,40 @@ const StoredPolicyTraceSchema = z.object({
     .optional(),
 });
 
-export function toStoredPolicyTrace(scriptStep: DraftScriptStep): z.infer<typeof StoredPolicyTraceSchema> {
-  return StoredPolicyTraceSchema.parse({ scriptStep });
+/** The copilot's trace beside it (ADR 0141 lot a), read on its own: a trace that does not read never hides the step. */
+const StoredCopilotTraceSchema = z.object({ copilot: CopilotTraceSchema });
+
+/** Her French for the team beside the draft (ADR 0168 § 9), read on its own: one that does not read is none. */
+const StoredTranslationSchema = z.object({ translation: DraftTranslationSchema });
+
+export function toStoredPolicyTrace(trace: {
+  readonly scriptStep?: DraftScriptStep | undefined;
+  readonly copilot?: CopilotTrace | undefined;
+  readonly translation?: DraftTranslation | undefined;
+}): z.infer<typeof StoredPolicyTraceSchema> & {
+  readonly copilot?: CopilotTrace;
+  readonly translation?: DraftTranslation;
+} {
+  const translation =
+    trace.translation === undefined ? undefined : DraftTranslationSchema.safeParse(trace.translation);
+  return {
+    ...StoredPolicyTraceSchema.parse({ scriptStep: trace.scriptStep }),
+    ...(trace.copilot !== undefined && { copilot: CopilotTraceSchema.parse(trace.copilot) }),
+    // A translation that does not read is dropped, never the draft (ADR 0168 § 9).
+    ...(translation?.success === true && { translation: translation.data }),
+  };
+}
+
+/** Her draft in French for the team (ADR 0168 § 9); `null` without one, or one that does not read. */
+export function readDraftTranslation(trace: unknown): DraftTranslation | null {
+  const parsed = StoredTranslationSchema.safeParse(trace);
+  return parsed.success ? parsed.data.translation : null;
+}
+
+/** What the code decided with a draft, for the copilot panel; `null` for a trace written before it or that does not read. */
+export function readCopilotTrace(trace: unknown): CopilotTrace | null {
+  const parsed = StoredCopilotTraceSchema.safeParse(trace);
+  return parsed.success ? parsed.data.copilot : null;
 }
 
 function readScriptStep(trace: unknown): DraftScriptStep | null {
@@ -112,6 +148,8 @@ export function toDraft(row: typeof schema.drafts.$inferSelect): Draft {
     bubbles: row.bubbles,
     finalBubbles: row.finalBubbles,
     createdAt: row.createdAt,
+    placedAt: row.placedAt,
+    placedBy: row.placedBy === null ? null : UserIdSchema.parse(row.placedBy),
     facts: readFacts(row.brief),
     scriptStep: readScriptStep(row.policyTrace),
   };

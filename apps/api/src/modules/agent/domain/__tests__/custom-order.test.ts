@@ -111,6 +111,23 @@ describe('checkNoCommitment', () => {
   it('reads the whole message as well', () => {
     expect(checkNoCommitment(['je te la fais', 'pour toi'])).not.toEqual([]);
   });
+
+  it.each([
+    ['je te le ferai quand je pourrai, promis'],
+    ['je te l’enverrai quand je serai rentrée'],
+    ['je vais te le faire 😏'],
+    ['promis 🙈'],
+    ['je te promets'],
+  ])('blocks a promise, said without a yes (passe 2, conversation 31): %s', (text) => {
+    expect(checkNoCommitment([text]).map((v) => v.code)).toEqual(['no_commitment']);
+  });
+
+  it.each([['je te promets rien 😏'], ['je te fais un bisou en attendant'], ['tu me feras rire toi']])(
+    'lets what promises nothing pass: %s',
+    (text) => {
+      expect(checkNoCommitment([text])).toEqual([]);
+    },
+  );
 });
 
 describe('customOrderStop (ADR 0159 § A.1)', () => {

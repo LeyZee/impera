@@ -104,13 +104,23 @@ describe('one card (T4: COH-03, COH-11, PIL-12, PIL-30, ETA-20, CHA-13)', () => 
   ]);
 
   /** The rules that style a card class itself (states and modifiers included), in every sheet. */
-  const cardRules = (name: string): { path: string; rule: Rule }[] =>
-    sheets.flatMap(([path, css]) =>
-      rulesOf(css)
-        .filter((one) => !one.selector.startsWith('@'))
+  const sheetRules = sheets.map(
+    ([path, css]) => [path, rulesOf(css).filter((one) => !one.selector.startsWith('@'))] as const,
+  );
+  const kept = new Map<string, { path: string; rule: Rule }[]>();
+  /** Each sheet is parsed once and each card's rules are kept: a scan per card and per test outgrew the time limit. */
+  const cardRules = (name: string): { path: string; rule: Rule }[] => {
+    const known = kept.get(name);
+    if (known !== undefined) return known;
+    const rules = sheetRules.flatMap(([path, all]) =>
+      all
+        .filter((one) => one.selector.includes(name))
         .filter((one) => one.selector.split(',').some((part) => targets(lastCompound(part), name)))
         .map((one) => ({ path, rule: one })),
     );
+    kept.set(name, rules);
+    return rules;
+  };
 
   /** A card set in a card: an item of a list in it, rounded at 18 (`radius-md`), never at the card's 26. */
   const isItem = (name: string): boolean =>

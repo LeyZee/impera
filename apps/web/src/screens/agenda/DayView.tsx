@@ -44,6 +44,7 @@ import {
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useFloatingTip } from '@/screens/dashboard/parts';
+import { Ring } from '@/shell/figures/figures';
 
 const WEEKDAY_SHORT = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'] as const;
 const MINUTE_MS = 60_000;
@@ -243,12 +244,6 @@ function DayStrip({
   );
 }
 
-const RING_RADIUS = 27;
-const ringDash = (share: number): string => {
-  const length = 2 * Math.PI * RING_RADIUS;
-  return `${(length * share).toFixed(1)} ${length.toFixed(1)}`;
-};
-
 /**
  * Where her day stands: done out of all, where to start, and what is now or next. Her streak beside it. Aujourd'hui
  * shows the same, read only, with its way into Agenda under it (CREA-19).
@@ -310,29 +305,14 @@ export function Glance({
   return (
     <section className="nv-plate ag-glance nv-enter" aria-label="Ta journée">
       <div className="ag-glance__top">
-        <div
-          className="nv-ring ag-ring"
-          data-full={total > 0 && left === 0 ? 'true' : undefined}
-          role="img"
-          aria-label={total === 0 ? 'Rien à faire' : `${String(done)} sur ${String(total)} fait`}
+        <Ring
+          className="ag-ring"
+          share={share}
+          full={total > 0 && left === 0}
+          label={total === 0 ? 'Rien à faire' : `${String(done)} sur ${String(total)} fait`}
         >
-          <svg viewBox="0 0 66 66" aria-hidden="true">
-            <circle className="nv-ring__track" cx="33" cy="33" r={RING_RADIUS} />
-            {/* At nothing done, no value at all: a round cap of length 0 still draws a lit dot (CRE-06). */}
-            {share === 0 ? null : (
-              <circle
-                className="nv-ring__value"
-                cx="33"
-                cy="33"
-                r={RING_RADIUS}
-                strokeDasharray={ringDash(share)}
-              />
-            )}
-          </svg>
-          <span className="nv-ring__label nv-num" aria-hidden="true">
-            {total === 0 ? '–' : `${String(done)}/${String(total)}`}
-          </span>
-        </div>
+          {total === 0 ? '–' : `${String(done)}/${String(total)}`}
+        </Ring>
         <div className="ag-glance__text">
           <b>{title}</b>
           <span>

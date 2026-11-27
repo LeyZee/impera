@@ -1,6 +1,10 @@
 import {
   AgencyInsightsSchema,
+  AgencySteeringSchema,
   calendarDayAt,
+  ConversationIdSchema,
+  EventIdSchema,
+  FanIdSchema,
   CreatorIdSchema,
   newId,
   PlatformAccountIdSchema,
@@ -31,6 +35,9 @@ const PASSWORD = 'correct horse battery';
  * only, never for a chatter, an operator of his own scope nor the creator, and never a fan. Everything is invented
  * (ADR 0010).
  */
+
+const shiftDayBy = (day: string, days: number): string =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
   let test: TestDb;
@@ -95,7 +102,7 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     saleId: string,
     chatter: string | null,
     at: Date,
-    patch: { event?: 'sale' | 'refund'; currency?: 'EUR' | 'USD'; gross?: number } = {},
+    patch: { event?: 'sale' | 'refund'; currency?: 'EUR' | 'USD'; gross?: number; fan?: string } = {},
   ) {
     position += 1;
     const gross = patch.gross ?? 1200;
@@ -111,7 +118,7 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       occurredAt: at,
       platformModelId: 'model_test_01',
       platformChatterId: chatter,
-      platformFanId: 'fan_test_01',
+      platformFanId: patch.fan ?? 'fan_test_01',
       currency: patch.currency ?? 'EUR',
       grossInclVatMinor: gross,
       grossExclVatMinor: Math.round((gross * 5) / 6),
@@ -413,6 +420,123 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect((await agency('owner', 'period=day')).subscribers?.current.activeBefore).toBe(120);
     expect((await agency('manager', 'period=week')).subscribers?.current.activeAtEnd).toBe(123);
     expect((await get('creator', 'period=week')).statusCode).toBe(403);
+  });
+
+  it('gives the owner and a manager the steering: the day, traffic to money, the fans it hangs on (ADR 0092)', async () => {
+    // A payer who bought thirty days ago and nothing since: named for the agency, never his messages (ADR 0092 § 3).
+    await line('sale_parti', 'chatter_theo', new Date(Date.now() - 30 * 86_400_000), {
+      gross: 5000,
+      fan: 'fan_test_02',
+    });
+    await test.admin.db.insert(schema.fans).values({
+      id: newId(FanIdSchema),
+      creatorId,
+      platformAccountId: accountId,
+      platformFanId: 'fan_test_02',
+      displayName: 'Payeur parti',
+    });
+    const steering = async (who: 'owner' | 'manager', query = '') => {
+      const answer = await server.inject({
+        method: 'GET',
+        url: `/v1/dashboard/agency/steering${query}`,
+        headers: { origin: DASHBOARD_ORIGIN, cookie: cookies.get(who) },
+      });
+      expect(answer.statusCode, answer.body).toBe(200);
+      return AgencySteeringSchema.parse(answer.json());
+    };
+    const owner = await steering('owner');
+    expect(owner.today).toBe(calendarDayAt(new Date(), 'Europe/Paris'));
+    expect(owner.creators).toEqual([{ creatorId, name: 'Nora' }]);
+    // Today's sales less the refund of one of them; the ghost refund has no sale and counts in nothing.
+    expect(owner.daily.todayMinor).toBe(6000);
+    expect(owner.daily.targetMinor).toBeNull();
+    expect(owner.daily.days).toHaveLength(30);
+    expect(owner.traffic).toMatchObject({
+      newSubscribers: 9,
+      wrote: null,
+      firstPurchase: 1,
+      regular: 1,
+      previous: { firstPurchase: 1, regular: 0 },
+    });
+    expect(owner.dependency).toMatchObject({
+      payingFans: 1,
+      topOneMinor: 8400,
+      totalMinor: 8400,
+      fansForEighty: 1,
+    });
+    expect(owner.dependency.lapsed).toEqual([
+      {
+        creatorId,
+        fanName: 'Payeur parti',
+        spentMinor: 5000,
+        lastPurchaseDay: owner.daily.days[0] === undefined ? '' : shiftDayBy(owner.daily.days[0].day, -1),
+        daysSince: 30,
+        conversationId: null,
+      },
+    ]);
+    // Never a platform id of a fan.
+    expect(JSON.stringify(owner)).not.toContain('fan_test_');
+    expect(await steering('manager')).toEqual(owner);
+    expect((await steering('owner', `?creatorId=${creatorId}`)).daily.todayMinor).toBe(6000);
+    for (const who of ['operator', 'chatter', 'creator'] as const) {
+      const refused = await server.inject({
+        method: 'GET',
+        url: '/v1/dashboard/agency/steering',
+        headers: { origin: DASHBOARD_ORIGIN, cookie: cookies.get(who) },
+      });
+      expect(refused.statusCode, who).toBe(403);
+    }
+  });
+
+  it('never names a lapsed payer in care or with an open doubt on his age, one given back is named (Sécurité 21/11)', async () => {
+    const long = new Date(Date.now() - 40 * 86_400_000);
+    const payer = async (platformFanId: string, displayName: string) => {
+      await line(`sale_${platformFanId}`, 'chatter_theo', long, { gross: 7000, fan: platformFanId });
+      const fanId = newId(FanIdSchema);
+      await test.admin.db
+        .insert(schema.fans)
+        .values({ id: fanId, creatorId, platformAccountId: accountId, platformFanId, displayName });
+      const conversationId = newId(ConversationIdSchema);
+      await test.admin.db.insert(schema.conversations).values({
+        id: conversationId,
+        creatorId,
+        platformAccountId: accountId,
+        fanId,
+        platformConversationId: `conv_${platformFanId}`,
+      });
+      return conversationId;
+    };
+    const event = async (conversationId: string, seq: number, type: string, payload: object) =>
+      test.admin.db.insert(schema.conversationEvents).values({
+        id: newId(EventIdSchema),
+        creatorId,
+        conversationId,
+        seq,
+        type,
+        payload: { conversationId, ...payload },
+        actor: 'ai',
+        correlationId: 'steering-withheld',
+      });
+    const care = await payer('fan_test_10', 'En soin');
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ careSince: new Date() })
+      .where(eq(schema.conversations.id, care));
+    const doubt = await payer('fan_test_11', 'Doute ouvert');
+    await event(doubt, 1, 'handoff_requested', { cause: 'minor' });
+    const lifted = await payer('fan_test_12', 'Rendu');
+    await event(lifted, 1, 'handoff_requested', { cause: 'minor' });
+    await event(lifted, 2, 'takeover_ended', {});
+    const answer = await server.inject({
+      method: 'GET',
+      url: '/v1/dashboard/agency/steering',
+      headers: { origin: DASHBOARD_ORIGIN, cookie: cookies.get('owner') },
+    });
+    expect(answer.statusCode, answer.body).toBe(200);
+    const names = AgencySteeringSchema.parse(answer.json()).dependency.lapsed.map((one) => one.fanName);
+    expect(names).toContain('Rendu');
+    expect(names).not.toContain('En soin');
+    expect(names).not.toContain('Doute ouvert');
   });
 
   it('gives the MCP the same figures by the same rule, a manager his list alone (supervision.reads, ADR 0026 § 1)', async () => {

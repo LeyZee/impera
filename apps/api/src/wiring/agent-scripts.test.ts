@@ -33,6 +33,7 @@ const media = (ref: string, described = true) => ({
   imported: true,
   mediaAssetId: null,
   described,
+  offered: false,
   description: null,
 });
 
@@ -134,6 +135,24 @@ describe('her native scripts as the agent decides on them (ADR 0098)', () => {
       proposable: false,
     });
     expect(agentScriptViewOf(unvalidated)?.scriptRef).toBe('seq-1c');
+  });
+
+  it('reads the language of our script and the one it is a version of, French and itself when it says none (ADR 0168 § 8)', () => {
+    const ours = oursOf(linearSteps);
+    expect(agentScriptViewOf(linear)).toMatchObject({
+      language: 'french',
+      family: linear.ours?.preparedScriptId,
+    });
+    // The fields come with the scripts' versions (#1029): a copy that carries them is read as it is.
+    const inEnglish = { ...ours, language: 'english', versionOf: 'prepared-source' };
+    const english = script('seq-en', linearSteps, { ours: inEnglish });
+    expect(agentScriptViewOf(english)).toMatchObject({ language: 'english', family: 'prepared-source' });
+    const isoCode = { ...ours, language: 'en', versionOf: null };
+    const unreadable = script('seq-xx', linearSteps, { ours: isoCode });
+    expect(agentScriptViewOf(unreadable)).toMatchObject({
+      language: 'french',
+      family: ours.preparedScriptId,
+    });
   });
 
   it('gives no moment to a script of ours played day and night, so it is offered at either (ADR 0112 § 27)', () => {

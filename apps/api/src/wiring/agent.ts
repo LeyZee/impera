@@ -10,6 +10,7 @@ import {
   startDraftComposer,
   startFollowUpPlan,
   startKycSlots,
+  startPersonaLanguages,
   type ActivePersonaSource,
   type AgentModule,
 } from '../modules/agent';
@@ -23,7 +24,7 @@ import { createDbVoiceExampleBank } from '../modules/playground';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
 
-import { createAgentScriptSource, createLastOfferAt } from './agent-scripts';
+import { createAgentScriptSource, createLastOfferAt, createLastPurchaseAt } from './agent-scripts';
 import type { Shared } from './shared';
 
 export interface WiredAgent {
@@ -36,6 +37,8 @@ export interface WiredAgent {
   readonly cardReader: CardReader;
   /** The canvas lines her active persona collects, for « À apprendre » in the Suivi (P5-01); every line without one. */
   readonly kycSlotsOf: ReturnType<typeof startKycSlots>;
+  /** The languages her active persona speaks, for his language on his card (ADR 0168); none without one. */
+  readonly personaLanguagesOf: ReturnType<typeof startPersonaLanguages>;
   /** The voice version the server writes with now, the one Automatique is proved on (ADR 0019): defined here only. */
   readonly activeVoice: { readonly voicePrompt: string; readonly voiceModel: string };
 }
@@ -95,6 +98,7 @@ export function wireAgent(
       // Her clock is the creator's (`creators.timezone`); Paris when the row cannot be read.
       scripts: createAgentScriptSource(scriptReads),
       lastOfferAt: createLastOfferAt(scriptReads),
+      lastPurchaseAt: createLastPurchaseAt(scriptReads),
       gridOf: (creatorId) => deps.customOrders.gridOf(CreatorIdSchema.parse(creatorId)),
       // Her bio on her platform profile, as the poll last read it (ADR 0154): beside her persona, it wins where they differ.
       profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),
@@ -138,6 +142,7 @@ export function wireAgent(
       },
     }),
     kycSlotsOf: startKycSlots({ activePersona }),
+    personaLanguagesOf: startPersonaLanguages({ activePersona }),
     activeVoice: {
       voicePrompt: loadPrompt('voice').header.version,
       voiceModel: DEFAULT_LLM_CONFIG.roles.voice.model,
