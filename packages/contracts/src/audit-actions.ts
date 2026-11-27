@@ -644,6 +644,16 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     (d, c) => `a corrigé la persona de ${c.creator(d.creatorId)}`,
     (d) => creatorLink(d.creatorId),
   ),
+  'agency_style.create': action(
+    'agent',
+    z.object({ version: z.int().positive() }),
+    (d) => `a enregistré la version ${String(d.version)} du style de base de l’agence`,
+  ),
+  'agency_style.activate': action(
+    'agent',
+    z.object({ version: z.int().positive() }),
+    (d) => `a activé la version ${String(d.version)} du style de base de l’agence`,
+  ),
   'custom_alert.create': agent('a créé une alerte personnalisée'),
   'custom_alert.update': agent('a modifié une alerte personnalisée'),
   'custom_alert.archive': agent('a archivé une alerte personnalisée'),

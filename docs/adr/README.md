@@ -116,6 +116,7 @@ Date : AAAA-MM-JJ
 | 0090 | Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence | accepted (amende 0079 § 4 et § 6 ; précise P4-01 et 0023) ; § A points 1 et 2 remplacés par 0159 |
 | 0091 | La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges | accepted (précise 0016 et le plafond du jour) |
 | 0092 | Piloter l'agence : la valeur de chaque chatteur, ce qui a changé chez une créatrice, les fans qui comptent | accepted (précise 0078, 0081, 0024 et 0043 § 7 ; amende 0078 « jamais nommé ici » et 0024 pour Entraîner) |
+| 0094 | Alertes de pilotage : Impera prévient aussi des problèmes de business | accepted (précise 0020, P4-01, 0045, 0049 et 0078) |
 | 0096 | Un compte propriétaire de secours : deux propriétaires au plus, un retrait après 72 h de préavis que le visé peut annuler | accepted (précise 0024, 0046 et 0068) |
 | 0098 | Le déroulé d'un script se tient fan par fan : le code choisit l'étape et le prix, la voix ne fait que les dire | accepted (précise P6-01, P6-02, 0018 § 5, 0056, 0064 et la politique d'offre) |
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
@@ -177,3 +178,4 @@ Date : AAAA-MM-JJ
 | 0168 | La langue du fan décidée par le code, donnée à la voix comme une consigne fixe ; couverture des langues par les gardes, fermée par défaut | accepted |
 | 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025 ; amendée le 26/11 : le retour léger) |
 | 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
+| 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |

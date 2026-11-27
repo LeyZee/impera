@@ -17,6 +17,7 @@ import {
   isBlocked,
   type GuardSettings,
   type GuardViolation,
+  type PersonaLanguages,
   type VoiceExample,
   type FollowUpDecision,
   measureDesire,
@@ -211,6 +212,8 @@ export interface PlaygroundDeps {
    * read, as her real drafts do (`examplesForTurn`).
    */
   readonly voiceExamples?: readonly VoiceExample[];
+  /** Her languages and her messages in each (`languagesOf`), as her real drafts read them (ADR 0168). */
+  readonly languages: PersonaLanguages;
   readonly timeZone?: string;
   readonly now?: () => Date;
   /**
@@ -622,7 +625,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       const voice = await gateway.voice(input);
       const written = voice.ok ? voice.value.output.bubbles : [];
       const violations = checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history));
-      const bubbles = asSent(written, deps.splitMessages);
+      const bubbles = asSent(written, deps.splitMessages, deps.guardSettings.form);
       return {
         bubbles,
         violations,
@@ -660,6 +663,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
           ...(voiceExamples.length > 0 && { voiceExamples }),
+          ...deps.languages,
         },
         {
           history: dated(),
@@ -744,6 +748,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
           ...(voiceExamples.length > 0 && { voiceExamples }),
+          ...deps.languages,
         },
         {
           history: dated(),

@@ -60,6 +60,10 @@ export const domainEvents = pgTable(
         sql`(${t.payload}->>'currency')`,
       )
       .where(sql`${t.type} = 'agency_share_changed'`),
+    // Once per account and créneau (ADR 0094 § 1): the job looks back over the last minutes, and may run again.
+    uniqueIndex('domain_events_account_uncovered_unique')
+      .on(sql`(${t.payload}->>'platformAccountId')`, sql`(${t.payload}->>'slotStartsAt')`)
+      .where(sql`${t.type} = 'account_uncovered'`),
     // « Is this service down already? » of `publishConnectionState` (Telegram P3-12): the latest row of one service,
     // read through this index rather than across the whole outbox.
     index('domain_events_connection_state_idx')
