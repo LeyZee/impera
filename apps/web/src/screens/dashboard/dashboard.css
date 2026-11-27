@@ -619,17 +619,7 @@
   border-radius: var(--nv-radius-lg);
   color: var(--nv-ink-muted);
 }
-/* The owner's banner on the daily export: amber, a copy is missing, not an urgency (the red stays the urgencies'). */
-.db-backup {
-  --_c: var(--nv-warning);
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--nv-space-3);
-  align-items: center;
-  padding: var(--nv-space-3) var(--nv-plate-pad);
-}
-/* The banners' one medallion (ADM-26): the backup's, then the reports', the invoices' and the AI budget's. */
-.db-backup__orb,
+/* The banners' one medallion (ADM-26): the AI budget's. */
 .db-orb {
   flex: none;
   width: var(--nv-space-10);
@@ -640,33 +630,11 @@
   color: var(--_c);
   background: color-mix(in srgb, var(--_c) 14%, transparent);
 }
-.db-backup__orb svg,
 .db-orb svg {
   width: var(--nv-space-5);
   height: var(--nv-space-5);
 }
-.db-backup__body {
-  min-width: 0;
-}
-.db-backup__title {
-  margin: 0;
-  font-size: var(--nv-text-body);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-.db-backup__text {
-  margin: var(--nv-space-1) 0 0;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-  text-wrap: pretty;
-}
-
-/*
- * The invoices' card (EQ-06 lot 8d) and the reports' (ADR 0073): each line its own dot, so the red stays on what is
- * late, the one urgency. The backup's face: medallion, title and lines, action on the right (ADM-26).
- */
-.db-paper,
+/* The day's AI budget (PIL-27): medallion, title and lines, action on the right (ADM-26). */
 .db-agency {
   --_c: var(--nv-ink-muted);
   display: grid;
@@ -675,64 +643,156 @@
   align-items: center;
   padding: var(--nv-space-3) var(--nv-plate-pad);
 }
-.db-paper[data-tone='warn'],
 .db-agency[data-tone='warn'] {
   --_c: var(--nv-warning);
 }
-.db-paper[data-tone='danger'],
 .db-agency[data-tone='bad'] {
   --_c: var(--nv-danger);
 }
 .db-agency[data-tone='ok'] {
   --_c: var(--nv-success);
 }
-.db-paper__body {
-  min-width: 0;
-}
-.db-paper__title {
-  margin: 0;
-  font-size: var(--nv-text-body);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-.db-paper__lines {
+
+/*
+ * « À faire » (pilotage 12/11, W3): one card for what waits on the reader. A line each, its dot says how pressing
+ * (red the one urgency, amber a warning), the whole line opens where it is settled.
+ */
+.db-todo {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-1);
-  margin: var(--nv-space-2) 0 0;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4) var(--nv-plate-pad) var(--nv-space-3);
+}
+.db-todo__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.db-todo__count {
+  min-width: var(--nv-space-6);
+  padding: 0 var(--nv-space-2);
+  border-radius: 999px;
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  line-height: var(--nv-space-6);
+  text-align: center;
+  color: var(--nv-ink);
+  background: var(--nv-select);
+}
+.db-todo__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 calc(-1 * var(--nv-space-3));
   padding: 0;
   list-style: none;
 }
-.db-paper__line {
+.db-todo__item + .db-todo__item {
+  box-shadow: 0 -1px 0 var(--nv-hairline);
+}
+.db-todo__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: var(--nv-space-3);
+  min-height: 44px;
+  padding: 10px var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+.db-todo__row--link {
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.db-todo__row--link:hover {
+  background: var(--nv-select);
+}
+.db-todo__row--link:active {
+  transform: scale(0.995);
+}
+.db-todo__row--link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.db-todo__dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--nv-ink-faint);
+}
+.db-todo__item[data-tone='warn'] .db-todo__dot {
+  background: var(--nv-warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-warning) 16%, transparent);
+}
+.db-todo__item[data-tone='danger'] .db-todo__dot {
+  background: var(--nv-danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-danger) 18%, transparent);
+}
+.db-todo__body {
   display: flex;
-  align-items: baseline;
-  gap: var(--nv-space-2);
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.db-todo__text {
+  font-size: var(--nv-text-body);
+  font-weight: 550;
+  text-wrap: pretty;
+}
+.db-todo__detail {
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
   text-wrap: pretty;
 }
-.db-paper__dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  transform: translateY(-1px);
-  background: var(--nv-ink-faint);
+.db-todo__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-1);
 }
-.db-paper__line[data-tone='warn'] .db-paper__dot {
-  background: var(--nv-warning);
+.db-todo__where {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-space-6);
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
 }
-.db-paper__line[data-tone='danger'] {
+.db-todo__more {
+  align-self: flex-start;
+  /* Its words under the lines' words, past the dot's column. */
+  margin-left: var(--nv-space-1);
+}
+@media (max-width: 560px) {
+  .db-todo__where {
+    display: none;
+  }
+  .db-todo__row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+.db-todo__go {
+  width: var(--nv-space-5);
+  height: var(--nv-space-5);
+  margin-top: 2px;
+  color: var(--nv-ink-faint);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.db-todo__row--link:hover .db-todo__go {
   color: var(--nv-ink);
+  transform: translateX(2px);
 }
-.db-paper__line[data-tone='danger'] .db-paper__dot {
-  background: var(--nv-danger);
-}
-.db-paper__who {
-  color: var(--nv-ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  .db-todo__row--link,
+  .db-todo__go {
+    transition: none;
+  }
+  .db-todo__row--link:active,
+  .db-todo__row--link:hover .db-todo__go {
+    transform: none;
+  }
 }
 
 /* A best fan the account cannot open in Suivi: the same row, without the chevron's column. */
@@ -831,14 +891,6 @@ div.db-fan {
   background: var(--nv-neon-solid);
 }
 @media (max-width: 560px) {
-  .db-backup {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .db-backup__go {
-    grid-column: 2;
-    justify-self: start;
-  }
-  .db-paper,
   .db-agency {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -900,4 +952,23 @@ div.db-fan {
 .nv-tip.db-tip--compact {
   min-width: 0;
   padding: 8px 10px;
+}
+/* « Elle n'a pas encore répondu » (INS-05): the number first, then her card of « À décider ». */
+.db-decisions {
+  display: grid;
+  gap: var(--nv-space-3);
+  /* The measure of her own card (Design, 26/11): two answers never stretch across a wide screen. */
+  max-inline-size: 640px;
+}
+.db-decisions__head {
+  display: grid;
+  gap: 2px;
+}
+.db-decisions__head h2 {
+  margin: 0;
+}
+.db-decisions__sub {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
 }

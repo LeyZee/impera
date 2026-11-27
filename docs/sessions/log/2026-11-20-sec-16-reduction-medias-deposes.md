@@ -1,0 +1,7 @@
+# 2026-11-20 — SEC-16, deuxième réduction : vignettes et descriptions des médias déposés (ADR 0087, lot c) — en cours
+Fait : les tâches `content_drops.make_thumbnail` et `content_drops.describe_file` lisent et écrivent sous le rôle applicatif, dans la créatrice de leur média (`withTenantJob`, tâche `drop_media`) ; la créatrice de la tâche est passée jusqu'au magasin, un média d'une autre créatrice n'est pas trouvé ; migration 0246 (lecture des trois tables des dépôts pour cette tâche seule) ; plafond des dépôts de contenu 29 → 23 ; data-model.md.
+Pas fait : la réception des fichiers, la conservation, les synthèses de scripts et les demandes du même module ; les deux rattrapages horaires restent au rôle de service (ils parcourent toutes les créatrices).
+Décisions : aucune nouvelle ; application de l'avenant du 20/11 à l'ADR 0087. Prévenu avant de coder : le fil Médias, propriétaire du module, qui relit.
+Découvertes : `content-drop-uploads.integration.test.ts` exige un stockage S3 (conteneur) et ne tourne pas sur un poste sans Docker ; le test nouveau n'en dépend pas. Le rôle applicatif garde un droit d'insertion sur l'identité des scripts de plateforme que plus aucun code n'utilise (à retirer dans une migration de cette série).
+Candidats à suppression : aucun.
+Vérifié : `drop-media-job.integration.test.ts` ✓ (la tâche lit les dépôts de sa créatrice seulement, ne les modifie pas ; cible, échec compté et vignette marquée dans la créatrice du média seulement) ; `script-drops.integration.test.ts` ✓ ; plafond ✓.

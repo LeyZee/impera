@@ -197,6 +197,7 @@ const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
   moment_unknown:
     'Cette structure se tourne de jour comme de nuit : le moment de ce script n’est pas encore fixé',
   too_large: 'Ce script pèse plus de 4 Go : il ne tient pas dans une seule archive',
+  redo_pending: 'Un média de ce dépôt est à refaire : l’archive attend son remplacement',
 };
 
 /** A script's archive refused (SC-03 c): `details.reason` says why, the sentence says it to the agency. */
@@ -231,14 +232,16 @@ export class ScriptSummaryCorrectionUnprocessable extends DomainError {
 
 /** A row named that is no longer the one shown (a newer came), or a row to see alone sent in a batch. */
 export class DropDescriptionReviewConflict extends DomainError {
-  constructor(reason: 'not_shown' | 'alone' | 'summary_stale') {
+  constructor(reason: 'not_shown' | 'alone' | 'summary_stale' | 'agency') {
     super(
       DROP_DESCRIPTION_REVIEW_CONFLICT,
-      reason === 'alone'
-        ? 'Une description à vérifier se valide seule, pas avec « Tout valider »'
-        : reason === 'summary_stale'
-          ? 'Cette synthèse n’est plus la dernière du script : recharge-le'
-          : 'Une description plus récente est arrivée entre-temps : recharge le script',
+      reason === 'agency'
+        ? 'L’agence doit d’abord relire cette description'
+        : reason === 'alone'
+          ? 'Une description à vérifier se valide seule, pas avec « Tout valider »'
+          : reason === 'summary_stale'
+            ? 'Cette synthèse n’est plus la dernière du script : recharge-le'
+            : 'Une description plus récente est arrivée entre-temps : recharge le script',
       { details: { reason } },
     );
   }

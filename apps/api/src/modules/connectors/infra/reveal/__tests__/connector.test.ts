@@ -318,6 +318,8 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect((await connector.getFanNote(fan('fan_02'))).text).toContain('Prénom : Prénom02');
     expect(await connector.getFanNote(fan('fan_01'))).toEqual({ text: '' });
     expect(await connector.getCreatorNotes()).toEqual([{ text: 'Note du modèle de test' }]);
+    // Her bio, read only (ADR 0154): the profile's own text.
+    expect(await connector.getCreatorProfile()).toEqual({ bio: 'Description de test' });
     const ppv = await connector.getFanPpvStats(fan('fan_02'));
     expect(ppv).toMatchObject({ purchased: 2, offered: 3, highestPriceMinor: 3_000, lowestPriceMinor: 500 });
     // Sequence 1's last step, sent to fan 02 at minute 2 240 of the world, never bought.
@@ -351,6 +353,16 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       media: [{ ref: { id: 'media_02' }, kind: 'image' }],
       previewMedia: [{ ref: { id: 'media_09' }, kind: 'video' }],
     });
+  });
+
+  it('carries the totals the platform counts on each step, sequence or loose (ADR 0129 § 12)', async () => {
+    const scripts = await connect(world()).listPlatformScripts();
+    // fan_02 bought the first two steps of sequence 1 and was sent the third; a step of a sequence takes its line's.
+    expect(scripts[0]?.steps.map((step) => [step.ref.id, step.totals])).toEqual([
+      ['script_1_1', { sent: 1, purchased: 1, paidMinor: 500 }],
+      ['script_1_2', { sent: 1, purchased: 1, paidMinor: 1_500 }],
+      ['script_1_3', { sent: 1, purchased: 0, paidMinor: 0 }],
+    ]);
   });
 
   it('reads the steps already sent to a fan, and which were bought (ADR 0018 § 5)', async () => {
@@ -417,6 +429,43 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       description: null,
       suggestedPriceMinor: null,
     });
+  });
+
+  it('reads which media Reveal sent for free, and only those (ADR 0145 § 2)', async () => {
+    const fake = world();
+    const [conversation] = fake.state().conversations;
+    if (conversation === undefined) throw new Error('fixture changed');
+    const sent = (
+      id: string,
+      mediaIds: string[],
+      bundle: { priceCents: number; mediaIds: string[] } | null,
+    ) =>
+      fake.state().messages.push({
+        id,
+        conversationId: conversation.id,
+        direction: 'out',
+        content: 'Texte inventé',
+        mediaIds,
+        bundle:
+          bundle === null
+            ? null
+            : { id: `${id}_b`, ...bundle, teasingMediaIds: [], paidAt: null, transactionId: null },
+        author: null,
+        scriptId: null,
+        isUnread: true,
+        createdAt: fake.state().now,
+      });
+    sent('msg_free_a', ['media_11'], null);
+    sent('msg_free_b', [], { priceCents: 0, mediaIds: ['media_12'] });
+    sent('msg_paid', [], { priceCents: 1_500, mediaIds: ['media_13'] });
+    const vault = await connect(fake).listVaultMedia({});
+    const free = (id: string) => vault.find((m) => m.ref.id === id)?.sentForFree;
+    expect([free('media_11'), free('media_12'), free('media_13'), free('media_14')]).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
   });
 
   it('cuts a vault folder’s name and a description longer than the contract allows, never half an emoji', async () => {

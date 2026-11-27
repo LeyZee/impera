@@ -2,6 +2,7 @@ import type { CreatorFan } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { CreatorReader } from './CreatorReader';
+import { EarningsCard } from './EarningsCard';
 import { FanInsights } from './FanInsights';
 import { useCreatorFanInsights, useCreatorFans } from './api';
 import { fanName, seenOf, unlockedOf } from './view';
@@ -10,13 +11,14 @@ import './sales.css';
 import { initialOf } from '@/lib/utils';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { ChatArt, FansArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
  * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her fans, what each unlocked and when he was last seen; a fan
- * opens his conversation, read only. Her earnings and her sales (CR-04) come above them once they exist; until then
- * the price is said « avant parts », what he paid and not what she earns (recette 05/11, reco 20). No note of a fan:
+ * opens his conversation, read only. Her part and her sales come first (CR-04, « Ta part »); beside a fan, the price
+ * is said « avant parts », what he paid and not what she earns (recette 05/11, reco 20). No note of a fan:
  * what the agency knows of him is its own (Charles, 03/11).
  */
 export function CreatorSalesPage({
@@ -52,6 +54,7 @@ export function CreatorSalesPage({
           }}
         />
       ) : null}
+      {silent ? null : <EarningsCard />}
       <FanInsights silent={silent} />
       {silent ? null : (
         <div className="vt-cols">
@@ -64,7 +67,7 @@ export function CreatorSalesPage({
               <Panel className="nv-enter" title="Tes fans">
                 <PanelSection>
                   {list.length === 0 ? (
-                    <Empty title="Aucun fan pour l’instant.">
+                    <Empty art={<FansArt />} title="Aucun fan pour l’instant.">
                       Ils arrivent ici dès leur premier message.
                     </Empty>
                   ) : (
@@ -102,7 +105,7 @@ export function CreatorSalesPage({
           </div>
           <div className="vt-side">
             {selected === null ? (
-              <Empty plate title="Choisis un fan pour lire sa conversation." />
+              <Empty plate art={<ChatArt />} title="Choisis un fan pour lire sa conversation." />
             ) : (
               <CreatorReader
                 key={selected}

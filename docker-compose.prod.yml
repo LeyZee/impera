@@ -4,8 +4,8 @@
 # (sslmode=verify-full). Every variable is set in Coolify, never in a file of the repository.
 #
 # Local rehearsal against the development Postgres, with a .env.prod (ignored by git) copied from .env.example and the
-# database host set to `postgres`, and the invoices' buckets as the CI job `images` writes them (two https hosts under
-# `.invalid`: nothing is issued, none is reached); the database first, the migrations need it up:
+# database host set to `postgres`, and the invoices' buckets and SENTRY_DSN as the CI job `images` writes them (https
+# hosts under `.invalid`: nothing is issued, none is reached); the database first, the migrations need it up:
 #   docker compose up -d --wait postgres
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
 x-api-env: &api-env
@@ -23,15 +23,18 @@ x-api-env: &api-env
   DATABASE_URL: ${DATABASE_URL:?}
   # The role the API and the worker cross creators with (ADR 0087): rows only, it owns nothing.
   DATABASE_SERVICE_URL: ${DATABASE_SERVICE_URL:?}
-  # The owner: `migrate` and the ops scripts run by hand in this image. The API and the worker never connect with it.
-  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
+  # No DATABASE_ADMIN_URL here: the API and the worker never connect as the owner. `migrate`, `ops` and `backup` alone
+  # receive it.
   SESSION_ENCRYPTION_KEYS: ${SESSION_ENCRYPTION_KEYS:?}
   CREDENTIALS_ENCRYPTION_KEYS: ${CREDENTIALS_ENCRYPTION_KEYS:?}
   AUTH_SECRET: ${AUTH_SECRET:?}
   AUTH_BASE_URL: ${AUTH_BASE_URL:?}
   WEB_ORIGIN: ${WEB_ORIGIN:?}
   PLAYGROUND_PERSONA_PATH: ${PLAYGROUND_PERSONA_PATH:-}
-  SENTRY_DSN: ${SENTRY_DSN:-}
+  # Required (OPS-18): production errors reach Sentry, EU region, scrubbed by the API (operations.md § Observabilité).
+  SENTRY_DSN: ${SENTRY_DSN:?}
+  # Optional: the origin of the redirect service; empty, the link connector is off (ADR 0120 § 3).
+  LINK_SERVICE_ORIGIN: ${LINK_SERVICE_ORIGIN:-}
   LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
   LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
   LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
@@ -66,7 +69,30 @@ services:
   migrate:
     <<: *api-image
     command: ['node', 'dist/scripts/migrate.js']
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # The owner, which the migrations run as.
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
+    restart: 'no'
+    healthcheck: { disable: true }
+
+  # The scripts run by hand as the owner (`ops-*`, deploy.md § 5): one container per command, removed after it, never
+  # started with the stack (profile `ops`):
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod --profile ops run --rm ops \
+  #     node dist/scripts/ops-kill-switch.js --on --scope global --reason "<raison>"
+  # Started without a command, it only prints how to use it and exits.
+  ops:
+    <<: *api-image
+    profiles: [ops]
+    command:
+      [
+        'node',
+        '-e',
+        'console.log("ops: docker compose --profile ops run --rm ops node dist/scripts/<script>.js")',
+      ]
+    environment:
+      <<: *api-env
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
     restart: 'no'
     healthcheck: { disable: true }
 
@@ -106,7 +132,13 @@ services:
       dockerfile: apps/web/Dockerfile
       # EXTENSION_CRM_ORIGIN set and empty: no built-in address (the CI's stack, served over http). Set to another site
       # than WEB_ORIGIN, the extension's build fails.
-      args: { EXTENSION_CRM_ORIGIN: '${EXTENSION_CRM_ORIGIN-${WEB_ORIGIN}}', WEB_ORIGIN: '${WEB_ORIGIN-}' }
+      # RELEASE: the commit, as the API's (OPS-18), for the release of the dashboard's error reports.
+      args:
+        {
+          EXTENSION_CRM_ORIGIN: '${EXTENSION_CRM_ORIGIN-${WEB_ORIGIN}}',
+          WEB_ORIGIN: '${WEB_ORIGIN-}',
+          RELEASE: '${SOURCE_COMMIT:-unknown}',
+        }
     environment:
       API_UPSTREAM: api:3000
       MEDIA_ORIGIN: ${S3_ENDPOINT:-}

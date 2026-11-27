@@ -35,6 +35,13 @@ describe('sexualizationDecision', () => {
     });
   });
 
+  it('opens it herself once an evening at most with a fan who does not go there (passe 17, guide 26/11)', () => {
+    const calm = { ...base, fanSexualizes: false };
+    expect(sexualizationDecision({ ...calm, triedThisEvening: true })).toEqual({ kind: 'no_opening' });
+    // He goes there himself: she follows, whatever she tried.
+    expect(sexualizationDecision({ ...base, triedThisEvening: true })).toEqual({ kind: 'free' });
+  });
+
   it('opens it herself only after her delay, and never with his age unknown', () => {
     const calm = { ...base, fanSexualizes: false };
     expect(sexualizationDecision({ ...calm, relationshipHours: 20 })).toEqual({ kind: 'no_opening' });
@@ -184,6 +191,13 @@ describe('checkWelcome (Charles, 20/11)', () => {
       'Tu t’emballes un peu là',
       'Oh là, pas si vite',
       'On se calme 😂',
+      'Merci, tu vises direct 😏',
+      'T’es direct toi dis donc',
+      'Toi t’es pas du genre à perdre du temps... tu perds pas de temps',
+      'Tu commences fort 😅',
+      'T’es bien pressé',
+      'Dès le premier message ?',
+      'Ahah on se connaît à peine',
     ]) {
       expect(
         checkWelcome([bubble]).map((violation) => violation.code),
@@ -195,5 +209,8 @@ describe('checkWelcome (Charles, 20/11)', () => {
   it('lets a welcome through: she takes the compliment and thanks him', () => {
     expect(checkWelcome(['Je sais 😏', 'Merci, c’est trop mignon de ta part'])).toEqual([]);
     expect(checkWelcome(['Ahah ça me fait plaisir, tu fais quoi de beau ce soir ?'])).toEqual([]);
+    expect(checkWelcome(['Je sais 😏 merci', 'Et toi tu fais quoi dans la vie ?'])).toEqual([]);
+    // « direct » about something else is no comment on him.
+    expect(checkWelcome(['Merci 🥰 je suis en direct sur ma story ce soir, tu passes ?'])).toEqual([]);
   });
 });

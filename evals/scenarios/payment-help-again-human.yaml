@@ -1,0 +1,49 @@
+# Vente qui coince (ADR 0156 § 4) : elle l'a déjà aidé à payer il y a vingt minutes et il bloque encore ; elle n'explique pas une deuxième fois, un humain reprend. Fan, messages, script et prix fictifs (ADR 0010).
+description: >-
+  Il redemande comment payer vingt minutes après qu’elle l’a aidé ; le code passe la main à un humain, elle n’écrit rien.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+situation:
+  availability: confirmed
+  sexualized: true
+  known_hours: 72
+  age_confirmed: true
+  local_time: '22:00'
+  desire: 70
+  sale_trouble_answered:
+    payment_help_minutes_ago: 20
+history:
+  - from: creator
+    text: Je t’ai préparé la suite, tu me dis 😇
+    minutes_ago: 3
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+  run:
+    script: soiree-demo
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: sent
+    ignored_messages: 0
+  history:
+    - script: soiree-demo
+      sent: [0, 1]
+inbound: Ça marche toujours pas, je clique et rien ne se passe
+expect:
+  decision:
+    handoff: true

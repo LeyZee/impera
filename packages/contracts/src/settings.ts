@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { LlmRoleSchema } from './enums';
+import { FanTiersSettingSchema } from './to-talk';
 
 /**
  * Per-creator settings, stored in `creators.settings` (data-model.md). Follow-ups are not here: they live in the
@@ -34,5 +35,7 @@ export const CreatorSettingsSchema = z.object({
     .prefault({}),
   /** Her two switches of the extension's copilot panel (ADR 0086 § 6): the fan's card on, the agent's drafts off. */
   copilot: z.object({ fanCard: z.boolean().default(true), drafts: z.boolean().default(false) }).prefault({}),
+  /** The thresholds of her fans' tiers, in euro cents, set by the owner (Charles, 21/11). */
+  fanTiers: FanTiersSettingSchema.prefault({}),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;

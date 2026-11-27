@@ -1,0 +1,5 @@
+# 2026-11-21 — INS-02 lot e1 (lecture des heures et des robots d'un lien) — in progress
+
+Fait : l'adaptateur du service de redirection lit, pour un lien, les pages vues et les clics par heure et le nombre de robots par heure, en lecture seule, par des schémas stricts (`infra/link-service/rest-link-service.ts`). Le port `LinkStatsConnector` rend les robots comme un compte par heure (`readRobotHours`) au lieu d'instants de visite ; `hoursWithoutRobots` et `FakeLinkStats` suivent. Tests : adaptateur (6 nouveaux), domaine, faux.
+Reste : lot e2 (référence du service gardée sur le lien après confirmation du propriétaire et revérifiée côté serveur, table des heures sous RLS, tâche horaire sous `withTenantJob`, migration en voie ordonnée), puis lot e3 (affichage dans Trafic, captures).
+Découvertes : le service ne compte à l'heure que sur 48 h ; une panne de la tâche de plus de 48 h laisse des heures que plus aucune lecture n'atteindra (à marquer comme manquées au lot e2, comme les relevés des médias).

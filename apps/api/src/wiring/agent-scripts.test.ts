@@ -3,6 +3,7 @@ import {
   FanIdSchema,
   PlatformAccountIdSchema,
   PlatformScriptIdSchema,
+  PreparedScriptIdSchema,
   ScriptIdentityIdSchema,
   newId,
 } from '@impera/contracts';
@@ -32,6 +33,7 @@ const media = (ref: string, described = true) => ({
   imported: true,
   mediaAssetId: null,
   described,
+  offered: false,
   description: null,
 });
 
@@ -69,6 +71,7 @@ function script(ref: string, steps: readonly HerStep[], over: Partial<HerScript>
     warnings: [],
     gaps: [],
     proposable: true,
+    ours: null,
     identity: {
       id: newId(ScriptIdentityIdSchema),
       inputHash: 'hash',
@@ -88,14 +91,27 @@ function script(ref: string, steps: readonly HerStep[], over: Partial<HerScript>
   };
 }
 
-const linear = script('seq-1', [
+/** Ours as an import recognised it on Reveal (ADR 0161): the same steps at the same prices, unless told otherwise. */
+const oursOf = (
+  steps: readonly HerStep[],
+  description = 'Une soirée complice inventée, de la douceur au plus chaud.',
+  moment: 'day' | 'night' | 'both' = 'night',
+) => ({
+  preparedScriptId: PreparedScriptIdSchema.parse(newId(PreparedScriptIdSchema)),
+  description,
+  moment,
+  steps: steps.map((each) => ({ branches: [{ priceMinor: each.priceMinor, currency: 'EUR' as const }] })),
+});
+
+const linearSteps = [
   step(0, 'step-a', 0),
   step(1, 'step-b', 0, ['media-1']),
   step(2, 'step-c', 1_500, ['media-2']),
-]);
+];
+const linear = script('seq-1', linearSteps, { ours: oursOf(linearSteps) });
 
 describe('her native scripts as the agent decides on them (ADR 0098)', () => {
-  it('reads a step as a bridge, an offered media or a paid one, with its own ref and her identity', () => {
+  it('reads a step as a bridge, an offered media or a paid one, with its own ref and our description', () => {
     const view = agentScriptViewOf(linear);
     expect(view?.steps).toEqual([
       { stepRef: 'step-a', kind: 'bridge', priceMinor: null, mediaRefs: [] },
@@ -103,14 +119,76 @@ describe('her native scripts as the agent decides on them (ADR 0098)', () => {
       { stepRef: 'step-c', kind: 'paid', priceMinor: 1_500, mediaRefs: ['media-2'] },
     ]);
     expect(view).toMatchObject({ scriptRef: 'seq-1', moment: 'night', mediaValidated: true });
-    expect(view?.description).toContain('complice et taquine');
+    expect(view?.description).toBe('Une soirée complice inventée, de la douceur au plus chaud.');
+    // Its own identity, validated or not, is no longer read (ADR 0161 § 5).
+    expect(view?.description).not.toContain('complice et taquine');
+    expect(
+      agentScriptViewOf(script('seq-1b', linearSteps, { ours: oursOf(linearSteps), identity: null })),
+    ).not.toBeNull();
   });
 
-  it('never offers a script that is not proposable, has no validated identity, or has a step of several branches', () => {
-    expect(agentScriptViewOf(script('seq-2', linear.steps, { proposable: false }))).toBeNull();
-    expect(agentScriptViewOf(script('seq-3', linear.steps, { identity: null }))).toBeNull();
-    const branched = script('seq-4', [step(0, 'step-x', 0), { ...step(1, 'step-y', 900), branches: 2 }]);
-    expect(agentScriptViewOf(branched)).toBeNull();
+  it('offers a recognised copy whose own identity was never validated: ours stands for it (ADR 0161 § 5)', () => {
+    const unvalidated = script('seq-1c', linearSteps, {
+      ours: oursOf(linearSteps),
+      identity: null,
+      gaps: ['identity_not_validated'],
+      proposable: false,
+    });
+    expect(agentScriptViewOf(unvalidated)?.scriptRef).toBe('seq-1c');
+  });
+
+  it('reads the language of our script and the one it is a version of, French and itself when it says none (ADR 0168 § 8)', () => {
+    const ours = oursOf(linearSteps);
+    expect(agentScriptViewOf(linear)).toMatchObject({
+      language: 'french',
+      family: linear.ours?.preparedScriptId,
+    });
+    // The fields come with the scripts' versions (#1029): a copy that carries them is read as it is.
+    const inEnglish = { ...ours, language: 'english', versionOf: 'prepared-source' };
+    const english = script('seq-en', linearSteps, { ours: inEnglish });
+    expect(agentScriptViewOf(english)).toMatchObject({ language: 'english', family: 'prepared-source' });
+    const isoCode = { ...ours, language: 'en', versionOf: null };
+    const unreadable = script('seq-xx', linearSteps, { ours: isoCode });
+    expect(agentScriptViewOf(unreadable)).toMatchObject({
+      language: 'french',
+      family: ours.preparedScriptId,
+    });
+  });
+
+  it('gives no moment to a script of ours played day and night, so it is offered at either (ADR 0112 § 27)', () => {
+    const both = script('seq-both', linearSteps, { ours: oursOf(linearSteps, undefined, 'both') });
+    expect(agentScriptViewOf(both)?.moment).toBeNull();
+    const day = script('seq-day', linearSteps, { ours: oursOf(linearSteps, undefined, 'day') });
+    expect(agentScriptViewOf(day)?.moment).toBe('day');
+  });
+
+  it('never offers a native script that is not the recognised copy of ours, even with a validated identity (ADR 0161 § 4)', () => {
+    expect(agentScriptViewOf(script('seq-native', linearSteps))).toBeNull();
+  });
+
+  it('no longer offers a copy changed on Reveal: a step more or less, another price or currency (ADR 0161 § 5)', () => {
+    const ours = oursOf(linearSteps);
+    const repriced = linearSteps.map((each) =>
+      each.ref === 'step-c' ? { ...each, priceMinor: 1_200 } : each,
+    );
+    expect(agentScriptViewOf(script('seq-7', repriced, { ours }))).toBeNull();
+    expect(agentScriptViewOf(script('seq-8', linearSteps.slice(0, 2), { ours }))).toBeNull();
+    const inDollars = linearSteps.map((each) => ({ ...each, currency: 'USD' as const }));
+    expect(agentScriptViewOf(script('seq-9', inDollars, { ours }))).toBeNull();
+  });
+
+  it('never offers a copy with a gap, inactive, or with a step of several branches', () => {
+    const ours = oursOf(linearSteps);
+    expect(
+      agentScriptViewOf(
+        script('seq-2', linearSteps, { gaps: ['media_not_described'], proposable: false, ours }),
+      ),
+    ).toBeNull();
+    expect(
+      agentScriptViewOf(script('seq-2b', linearSteps, { active: false, proposable: false, ours })),
+    ).toBeNull();
+    const branchedSteps = [step(0, 'step-x', 0), { ...step(1, 'step-y', 900), branches: 2 }];
+    expect(agentScriptViewOf(script('seq-4', branchedSteps, { ours: oursOf(branchedSteps) }))).toBeNull();
   });
 
   it('gives his history by step index, a step of a script gone ruling nothing', () => {
@@ -173,6 +251,15 @@ describe('the reads the composer makes for her scripts', () => {
     ).rejects.toThrow();
     const none = createAgentScriptSource({ ...deps, fans: { getFan: () => Promise.resolve(null) } });
     await expect(none.history(creatorId, accountId, 'conv-1', fanId)).rejects.toThrow();
+  });
+
+  it('gives no playable script to a creator with many native scripts and none of ours recognised (ADR 0161 § 4)', async () => {
+    const natives = Array.from({ length: 200 }, (_, index) => script(`native-${String(index)}`, linearSteps));
+    const source = createAgentScriptSource({
+      ...deps,
+      scripts: { accountScripts: () => Promise.resolve(natives) },
+    });
+    expect(await source.catalogue(creatorId, accountId)).toEqual([]);
   });
 
   it('does not ask the platform for his last offer when no script of hers may be offered', async () => {

@@ -1,4 +1,13 @@
-import type { CreatorId, LinkPlacement, RedirectLinkId, UserId } from '@impera/contracts';
+import type {
+  AgencyLinkHour,
+  CreatorId,
+  DetectedLink,
+  LinkPlacement,
+  LinkRef,
+  LinkServiceRefusalKind,
+  RedirectLinkId,
+  UserId,
+} from '@impera/contracts';
 
 import type { StoredRedirectLink } from './links';
 
@@ -42,4 +51,35 @@ export interface RedirectLinkStore {
     id: RedirectLinkId,
     write: RedirectLinkWrite,
   ): Promise<StoredRedirectLink>;
+  /**
+   * Attaches a link of hers to its link at the redirect service, by the owner alone, under his own policy and in
+   * her creator, with its line in the audit log. `ref` is what the server just read at the service for this link's
+   * address. Refused when that link of the service is already attached to another link, hers or not.
+   */
+  /** Her links' hours since `since`, oldest first, for the owner and an active manager of her list. */
+  hoursForAgency(
+    actor: RedirectLinkActor,
+    creatorId: CreatorId,
+    since: Date,
+  ): Promise<readonly AgencyLinkHour[]>;
+  attach(
+    actor: RedirectLinkActor,
+    creatorId: CreatorId,
+    id: RedirectLinkId,
+    /** The address the service was read for: a link that no longer has it is not found. */
+    address: string,
+    ref: LinkRef,
+  ): Promise<StoredRedirectLink>;
 }
+
+/**
+ * The links of the agency's account at the redirect service, read now by the `connectors` module (ADR 0120 § 3), or
+ * why they could not be. The account is the agency's, so the list crosses creators: it is the owner's alone.
+ */
+export type DetectLinks = () => Promise<
+  | { readonly ok: true; readonly links: readonly DetectedLink[] }
+  | {
+      readonly ok: false;
+      readonly error: { readonly kind: LinkServiceRefusalKind; readonly message: string };
+    }
+>;

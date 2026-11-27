@@ -67,10 +67,13 @@ const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   scripts_exhausted: 'Plus aucun script pour ce moment de la journée',
   no_pick: 'Elle n’a choisi aucun script',
   cold_session: 'Session pas assez chaude pour continuer le script',
+  in_tension: 'Il vient d’acheter : quelques messages dans la tension avant la suite',
   price_mismatch: 'Le prix du catalogue a changé : l’étape ne part pas',
   step_waiting: 'Une étape payante attend sa réponse',
   after_refusal: 'Il vient de refuser une étape : le script s’arrête',
   script_ended: 'Le script est terminé',
+  he_came: 'Il vient de jouir : rien à vendre juste après',
+  abandon_tease: 'Il est parti en plein script : elle le taquine d’abord',
 };
 
 /** What the cursor decided on going sexual (agent/domain/sexualization.ts `SexualizationDecision`). */

@@ -7,6 +7,7 @@ import type {
   MediaSlotKind,
   SaveScriptStructureBody,
   PersonaLimits,
+  Platform,
   PlatformAccountId,
   PlatformScript,
   PlatformScriptId,
@@ -14,6 +15,7 @@ import type {
   PlatformStepDiscount,
   PreparedScriptContent,
   PreparedScriptId,
+  PreparedScriptMoment,
   PreparedScriptState,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
@@ -28,7 +30,8 @@ import type {
 } from '@impera/contracts';
 
 import type { BranchSetting } from './branches';
-import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
+import type { DailyReading, MeasuredScript, PeriodRun } from './performance';
+import type { KnownPlatformScript, PlatformScriptsPlan, StepTotals } from './platform-scripts';
 import type { PreparedVaultMedia } from './prepared-scripts';
 import type { NativeScriptForMatch, PreparedForMatch, Recognition } from './recognition';
 
@@ -175,6 +178,17 @@ export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;
 interface ImportAccount {
   readonly id: PlatformAccountId;
   readonly creatorId: CreatorId;
+  readonly platform: Platform;
+}
+
+/**
+ * The platform's totals of the steps read by an import, for its day (ADR 0129 § 12): written with the plan, each over
+ * the row of the same day (the platform's last word); the days before stay as they were.
+ */
+export interface ImportTotals {
+  /** The platform's day of the read, `YYYY-MM-DD`. */
+  readonly day: string;
+  readonly steps: readonly StepTotals[];
 }
 
 /** The import's writes (`scripts.import_platform_scripts`, ADR 0099 § 1 time 2), as the service role. */
@@ -186,7 +200,12 @@ export interface PlatformScriptImportStore {
    * The whole plan in one transaction: a cut import leaves the account as it was. Gives the ids of the scripts added
    * or rewritten, whose identity is to write again.
    */
-  apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<readonly string[]>;
+  apply(
+    account: ImportAccount,
+    plan: PlatformScriptsPlan,
+    now: Date,
+    totals: ImportTotals | null,
+  ): Promise<readonly string[]>;
 }
 
 /**
@@ -224,6 +243,11 @@ interface VaultLink {
   readonly descriptionId: string | null;
   /** Chosen for the CRM, by its own tick or its folder's (ADR 0145 § 5): `false`, the agent does not see it. */
   readonly imported: boolean;
+  /**
+   * Offered once (ADR 0145 § 2): sent for free by the platform, or kept by a live drop of hers that leaves for free
+   * (`vaultOffered`). Never sold after.
+   */
+  readonly offered: boolean;
   /**
    * The description its media is told with (ADR 0030 § 3): the latest validated, else the latest written, by the vision
    * or by hand, for the agency to validate; never the platform's own text. `null` while it has none.
@@ -287,6 +311,8 @@ export interface StoredPlatformScript {
   readonly branches: readonly BranchSetting[];
   /** Every identity written for it, whatever the version (SC-04 lot c8); the domain picks the current one. */
   readonly identities: readonly StoredScriptIdentity[];
+  /** Ours when an import recognised it as the copy of a script prepared in Impera (ADR 0161); `null` otherwise. */
+  readonly ours: OurCopy | null;
 }
 
 /** An identity of a native script as the base keeps it (`script_identities`). */
@@ -324,7 +350,29 @@ export interface PlatformScriptReadStore {
    * read her.
    */
   discountedOf(creatorId: CreatorId, userId: string): Promise<readonly DiscountedPlatformScript[] | null>;
+  /**
+   * What the performance of her scripts counts besides the runs (ADR 0129, sous-lot 4c), read as `ofCreator` is and
+   * under the same rights: her active scripts recognised as ours and Reveal's daily readings of their steps. `null` for
+   * a reader who may not read her.
+   */
+  performanceOf(creatorId: CreatorId, userId: string): Promise<PerformanceInput | null>;
 }
+
+/** Her scripts as the performance measures them; readings by `readingKey(account, step ref)`. */
+interface PerformanceInput {
+  readonly scripts: readonly MeasuredScript[];
+  readonly readings: ReadonlyMap<string, readonly DailyReading[]>;
+}
+
+/**
+ * Her runs started from `since` (`conversations`, wired by the composition root), as a person of the agency reads them;
+ * `null` for anyone else.
+ */
+export type RunsSince = (
+  creatorId: CreatorId,
+  userId: string,
+  since: Date,
+) => Promise<readonly PeriodRun[] | null>;
 
 /** A native script of hers kept from being offered by a « Tarif réduit » on the platform, as long as it is there. */
 export interface DiscountedPlatformScript {
@@ -337,97 +385,27 @@ export interface DiscountedPlatformScript {
   readonly since: Date;
 }
 
-/** What the identity job reads of a script, as the service role. */
-export interface IdentityTarget {
-  readonly script: StoredPlatformScript;
-  /** The `detailed` text of each validated description its media name, by row. */
-  readonly descriptions: ReadonlyMap<string, string>;
-}
-
-/** A brain's identity, for one version of the script. */
-export interface WrittenIdentity {
-  readonly inputHash: string;
-  readonly content: ScriptIdentityContent;
-  readonly model: string;
-  readonly promptHash: string;
-}
-
-/** The identity job's reads and writes (`scripts.identify_platform_script`), as the service role. */
-export interface ScriptIdentityJobStore {
-  /** Hers, active, and she is not archived; `null` otherwise. */
-  target(creatorId: CreatorId, scriptId: string): Promise<IdentityTarget | null>;
-  /** Kept once: the same version and prompt written again changes nothing. */
-  save(creatorId: CreatorId, scriptId: string, identity: WrittenIdentity): Promise<void>;
-  /**
-   * Each hour: every active native script of a creator whose switch is on and who is not archived, those with no
-   * identity first, queued for the job, which decides. Gives how many.
-   */
-  enqueueBacklog(correlationId: string): Promise<number>;
-  /** Queues the job for these scripts of hers, now. */
-  enqueue(creatorId: CreatorId, scriptIds: readonly string[], correlationId: string): Promise<void>;
-}
-
-/** The brain that writes an identity (`brain/script-identity`, `llm`, wired by the composition root). */
-export interface ScriptIdentifier {
-  /** The prompt's version: an identity of another is written again. */
-  readonly promptHash: string;
-  identify(input: {
-    readonly creatorId: CreatorId;
-    readonly scriptName: string;
-    readonly steps: readonly {
-      readonly name: string;
-      readonly text: string;
-      readonly media: readonly {
-        readonly kind: MediaSlotKind;
-        readonly description: string | null;
-      }[];
-    }[];
-  }): Promise<
-    | {
-        readonly kind: 'identified';
-        readonly content: ScriptIdentityContent;
-        readonly model: string;
-        readonly promptHash: string;
-      }
-    | { readonly kind: 'budget' }
-    | { readonly kind: 'failed' }
-  >;
-}
-
-/** What a person of the agency does to an identity, given the script as it is now in the same transaction. */
-export type IdentityReview =
-  | { readonly kind: 'validate'; readonly identityId: ScriptIdentityId }
-  | { readonly kind: 'correct'; readonly content: ScriptIdentityContent };
-
 /** The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4). */
 export type DescriptionReview =
   | { readonly kind: 'validate'; readonly descriptionIds: readonly string[] }
   | { readonly kind: 'correct'; readonly descriptionId: string; readonly detailed: string };
 
 /**
- * The agency's validation and correction of an identity (SC-04 lot c8, ADR 0030 § 3), in the person's transaction,
- * under her RLS and his scope, audited. `currentHash` reads the version of the script as the same transaction sees
- * it: an identity of another version is `stale`.
+ * The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4), in the person's
+ * transaction, under her RLS and his scope, audited. Its identity is no longer reviewed by hand: the agent offers only
+ * the scripts written in Impera (ADR 0161).
  */
 export interface ScriptIdentityReviewStore {
-  review(
-    creatorId: CreatorId,
-    scriptId: string,
-    review: IdentityReview,
-    userId: string,
-    currentHash: (script: StoredPlatformScript) => string,
-  ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'>;
   /**
    * The descriptions of its media validated as shown, or one rewritten by hand and validated (ADR 0099 § 4), in the
    * same way: a description that is not the one a media of this script is shown with now is `stale`, one that waits
-   * for a person named with others `alone`. Each write asks the script's identity again (`scripts.identify_platform_script`).
+   * for a person named with others `alone`. No identity is asked after it any more (ADR 0161 § 5).
    */
   describe(
     creatorId: CreatorId,
     scriptId: string,
     review: DescriptionReview,
     userId: string,
-    correlationId: string,
   ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'>;
 }
 
@@ -510,4 +488,18 @@ export interface PreparedScriptStore {
     },
     userId: string,
   ): Promise<UpdatePreparedOutcome>;
+}
+
+/**
+ * The script of ours a native script is the recognised copy of (ADR 0161 § 5): what the agent offers it on. Its
+ * description and moment are ours, written by a person in the editor; its steps in order, each branch with the price we
+ * set, are what the agent checks the copy still matches before offering it.
+ */
+export interface OurCopy {
+  readonly preparedScriptId: PreparedScriptId;
+  readonly description: string;
+  readonly moment: PreparedScriptMoment;
+  readonly steps: readonly {
+    readonly branches: readonly { readonly priceMinor: number; readonly currency: Currency }[];
+  }[];
 }

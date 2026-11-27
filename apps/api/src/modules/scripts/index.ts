@@ -2,17 +2,16 @@
 import type {
   CreatorId,
   JobPayload,
+  Platform,
   PlatformAccountId,
   ScriptStructureVersion,
   ScriptVariantLetter,
   ShotMoment,
 } from '@impera/contracts';
 import type { Database } from '@impera/db';
-import type { LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { askScripts, type AskScriptsRun } from './application/ask-scripts';
-import { identifyPlatformScript, type IdentifyOutcome } from './application/identify-platform-script';
 import { importPlatformScripts, type ImportPlatformScriptsRun } from './application/import-platform-scripts';
 import {
   creatorPlatformScripts,
@@ -23,22 +22,21 @@ import {
   type PlatformScriptView,
 } from './application/platform-script-reads';
 import { creatorQueue, queuedDigest, type QueuedDigest, type ScriptsReader } from './application/reads';
+import { creatorScriptPerformance } from './application/script-performance';
 import { cardContent, cardSvg } from './domain/cards';
 import type {
   DiscountedPlatformScript,
   LimitsOf,
   PlatformScriptSource,
   RasterizeCard,
+  RunsSince,
   ScriptRequests,
   ScriptStructureStore,
 } from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
 import { createDrizzleScriptBranchStore } from './infra/db/branch-store';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
-import {
-  createDrizzleScriptIdentityJobStore,
-  createDrizzleScriptIdentityReviewStore,
-} from './infra/db/identity-store';
+import { createDrizzleScriptIdentityReviewStore } from './infra/db/identity-store';
 import { createImportQueue } from './infra/db/import-queue';
 import {
   createDrizzlePlatformScriptImportStore,
@@ -51,7 +49,6 @@ import { createFrozenVersionReader, createRequestFreezer } from './infra/db/vers
 import { createPlatformScriptRoutes } from './infra/http/platform-script-routes';
 import { createPreparedScriptRoutes } from './infra/http/prepared-routes';
 import { createScriptRoutes, type RequireRole } from './infra/http/routes';
-import { createGatewayScriptIdentifier } from './infra/script-identifier';
 
 export interface ScriptsModule {
   readonly name: 'scripts';
@@ -119,7 +116,8 @@ export interface ScriptsModule {
     platformScript(creatorId: CreatorId, scriptId: string): Promise<PlatformScriptView | null>;
     /**
      * Her native scripts on one account, by the ids of the conversation the agent answers: what it decides a script on
-     * for that fan (ADR 0098), the proposable ones and the others (their steps tell what he already received).
+     * for that fan (ADR 0098), the proposable ones and the others (their steps tell what he already received). Each
+     * carries `ours`, the script of ours it is the recognised copy of (ADR 0161 § 5): only those may be offered.
      */
     accountScripts(
       creatorId: CreatorId,
@@ -160,16 +158,6 @@ export interface ScriptsModule {
       now: Date,
       onRecognitionFailed?: (error: unknown) => void,
     ): Promise<ImportPlatformScriptsRun>;
-    /**
-     * `scripts.identify_platform_script` (SC-04 lot c8): one native script's identity written by the brain, once each
-     * of its photos and videos has a validated description, under her switch. Replayable; a brain that failed throws.
-     */
-    identifyPlatformScript(request: {
-      readonly creatorId: CreatorId;
-      readonly platformScriptId: string;
-    }): Promise<IdentifyOutcome>;
-    /** `scripts.identify_backlog`, each hour: the scripts whose identity may be due, queued; gives how many. */
-    identifyBacklog(correlationId: string): Promise<number>;
   };
 }
 
@@ -177,10 +165,18 @@ export interface ScriptsModule {
 interface PlatformScriptPorts {
   /** `connectors`: the scripts the platform lists for an account; `null` when its connector reads none now. */
   readonly source: PlatformScriptSource;
+  /** `connectors`: the zone of a platform's days, for the totals of its steps (ADR 0129 § 12); `null` for none. */
+  readonly dayZone: (platform: Platform) => string | null;
+  /** `conversations`: her runs started from a date, read by the team (ADR 0129, sous-lot 4c). */
+  readonly runsSince: RunsSince;
 }
 
-/** Until the connectors' read is wired: no account reads any script. */
-const NO_PLATFORM_SCRIPTS: PlatformScriptPorts = { source: () => Promise.resolve(null) };
+/** Until the connectors' read is wired: no account reads any script, and no run is counted. */
+const NO_PLATFORM_SCRIPTS: PlatformScriptPorts = {
+  source: () => Promise.resolve(null),
+  dayZone: () => null,
+  runsSince: () => Promise.resolve([]),
+};
 
 export interface ScriptsDeps {
   /** Application role: the library under the team's policies, the queue under her RLS too. */
@@ -198,8 +194,6 @@ export interface ScriptsDeps {
   readonly rasterizeCard?: RasterizeCard;
   /** The platform's scripts; absent, the import reads nothing (see `NO_PLATFORM_SCRIPTS`). */
   readonly platformScripts?: PlatformScriptPorts;
-  /** The brain that writes a native script's identity (`llm`, SC-04 lot c8), under the daily cap. */
-  readonly brain: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
 }
 
 export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
@@ -210,8 +204,6 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
   const platform = deps.platformScripts ?? NO_PLATFORM_SCRIPTS;
   const platformReads = { store: createDrizzlePlatformScriptReadStore(deps.db, deps.adminDb) };
   const platformImports = createDrizzlePlatformScriptImportStore(deps.adminDb);
-  const identities = createDrizzleScriptIdentityJobStore(deps.adminDb);
-  const identifier = createGatewayScriptIdentifier(deps.brain);
   return {
     name: 'scripts',
     structures,
@@ -250,6 +242,14 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       createDrizzleScriptIdentityReviewStore(deps.db),
       createDrizzleScriptBranchStore(deps.db),
       deps.requireRole,
+      (creatorId, reader, days) =>
+        creatorScriptPerformance(
+          { store: platformReads.store, dayZone: platform.dayZone, runsSince: platform.runsSince },
+          reader,
+          creatorId,
+          days,
+          new Date(),
+        ),
     ),
     preparedScriptRoutes: createPreparedScriptRoutes(
       createDrizzlePreparedScriptStore(deps.db),
@@ -272,17 +272,13 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
           {
             store: platformImports,
             source: platform.source,
+            dayZone: platform.dayZone,
             recognition: createDrizzlePreparedRecognitionStore(deps.adminDb),
-            askIdentities: (creatorId, scriptIds, correlationId) =>
-              identities.enqueue(creatorId, scriptIds, correlationId),
             ...(onRecognitionFailed === undefined ? {} : { onRecognitionFailed }),
           },
           request,
           now,
         ),
-      identifyPlatformScript: (request) =>
-        identifyPlatformScript({ store: identities, brain: identifier }, request),
-      identifyBacklog: (correlationId) => identities.enqueueBacklog(correlationId),
     },
   };
 }

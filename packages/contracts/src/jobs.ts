@@ -16,17 +16,22 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
-import { PlatformScriptIdSchema } from './scripts';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
 
 /**
  * Graphile Worker job names and payloads (ADR 0006). A job that touches a conversation runs on the serial queue
  * `conv:<conversationId>`; a poll runs on `account:<platformAccountId>`, one at a time per account.
  */
+
+/** The sales that wake his conversation for a word after it (ADR 0156 § 2): a step he bought, a tip. */
+export const AFTER_SALE_TYPES = ['ppv', 'tip'] as const;
+export type AfterSaleType = (typeof AFTER_SALE_TYPES)[number];
 
 const conversationJob = z.object({
   creatorId: CreatorIdSchema,
@@ -38,9 +43,11 @@ export const JOB_NAMES = [
   'conversation.respond',
   'conversation.send',
   'conversation.follow_up',
+  'conversation.after_sale',
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
+  'conversation.settle_placed',
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
@@ -59,12 +66,14 @@ export const JOB_NAMES = [
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
+  'creator_week.plan',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
   'scheduling.check_uncovered',
   'scheduling.check_reports',
   'scheduling.remind_reports',
+  'scheduling.notify_incident',
   'team.apply_roles',
   'owners.watch',
   'payroll.recalculate',
@@ -93,15 +102,15 @@ export const JOB_NAMES = [
   'content_drops.describe_backlog',
   'content_drops.make_thumbnail',
   'content_drops.thumbnail_backlog',
+  'instagram_captions.propose',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
-  'scripts.identify_platform_script',
-  'scripts.identify_backlog',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
   'connector.copy_avatar',
   'connector.read_daily_stats',
+  'connector.read_link_hours',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -122,9 +131,11 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.respond': 'Réponse aux fans',
   'conversation.send': 'Envoi des messages',
   'conversation.follow_up': 'Relances des fans',
+  'conversation.after_sale': 'Mot d’après-achat',
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
+  'conversation.settle_placed': 'Brouillons placés dans Reveal',
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
@@ -143,12 +154,14 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
+  'creator_week.plan': 'Semaine de la créatrice',
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
   'scheduling.check_uncovered': 'Comptes sans personne',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
+  'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
   'team.apply_roles': 'Rôles de l’équipe',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
@@ -175,16 +188,16 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'content_drops.describe_backlog': 'Rattrapage des descriptions',
+  'instagram_captions.propose': 'Légendes proposées pour ses Reels',
   'content_drops.make_thumbnail': 'Vignettes des médias déposés',
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
   'scripts.import_platform_scripts': 'Import des scripts Reveal',
-  'scripts.identify_platform_script': 'Identité des scripts Reveal',
-  'scripts.identify_backlog': 'Rattrapage des identités de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
   'connector.read_daily_stats': 'Statistiques quotidiennes Reveal',
+  'connector.read_link_hours': 'Vues et clics des liens de redirection',
   'connector.copy_avatar': 'Copie de la photo d’une créatrice',
   'telegram.scan': 'Alertes Telegram',
   'telegram.flush_chat': 'Envoi des messages Telegram',
@@ -219,6 +232,20 @@ export const JOB_PAYLOADS = {
     step: z.number().int().min(0).max(4),
   }),
   /**
+   * A fresh sale of his woke his conversation (ADR 0156 § 2): a step he bought or a tip, recorded by the sales ledger in
+   * the transaction of its line under the key `conversation.after_sale:<saleId>`. The sale names his account and his
+   * platform id, not the conversation: the job finds it, and a fan nobody knows wakes nothing.
+   */
+  'conversation.after_sale': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    platformFanId: z.string().min(1),
+    saleId: SalesLineIdSchema,
+    saleType: z.enum(AFTER_SALE_TYPES),
+    occurredAt: z.iso.datetime(),
+    correlationId: z.string().min(1),
+  }),
+  /**
    * What she learnt about the fan becomes facts (P3-02): the facts the brief proposed for a draft a human approved,
    * or the note a chatter left on giving the conversation back. `at` fixes the note's slot, so a replay rewrites
    * nothing.
@@ -230,6 +257,8 @@ export const JOB_PAYLOADS = {
         kind: z.literal('operator_note'),
         note: z.string().min(1).max(300),
         at: z.iso.datetime(),
+        /** Who left it, shown on his card (trou béant 17); absent from a job queued before 21/11. */
+        userId: UserIdSchema.optional(),
       }),
     ]),
   }),
@@ -240,6 +269,11 @@ export const JOB_PAYLOADS = {
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
   /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
   'conversation.release_unavailable': z.object({}),
+  /**
+   * The window of a draft placed from the copilot panel closed (ADR 0086 § 5): what left of it decides its verdict,
+   * nothing left and it expires. One per draft (`settlePlacedJobKey`); a draft decided before is left as it is.
+   */
+  'conversation.settle_placed': conversationJob.extend({ draftId: DraftIdSchema }),
   'connector.dispatch': z.object({}),
   'connector.poll': z.object({
     creatorId: CreatorIdSchema,
@@ -319,6 +353,11 @@ export const JOB_PAYLOADS = {
     state: z.enum(['accepted', 'declined']),
     day: z.iso.date(),
   }),
+  /**
+   * Each hour (ADR 0140 § 2): for each creator whose Sunday 18 h has passed in her zone, the week after computed as a
+   * draft for the owner. Replayable: one week per creator, a draft already there is kept.
+   */
+  'creator_week.plan': z.object({}),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -343,6 +382,8 @@ export const JOB_PAYLOADS = {
    * the next one within its window, never later.
    */
   'scheduling.remind_reports': z.object({}),
+  // The creator rides with the feedback so that the read of its facts is bounded to her (Sécurité, #992).
+  'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -503,6 +544,16 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * A medium of hers was described: three captions are proposed for each live Reel that holds it, on a decision card
+   * (ADR 0164 § 9). Enqueued after each description under `instagram_captions.propose:<id>`; put off by itself when the
+   * day's budget is spent. Replayable: a Reel already asked is left alone.
+   */
+  'instagram_captions.propose': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
    * A script she sent, told step by step with its synthesis once each of its media is described (ADR 0083 § 6).
    * Enqueued when she sends it and after each of its media is described, under `content_drops.summarize_script:<id>`;
    * waits for the last description, puts itself off when the day's budget is spent. Nothing while her switch is off.
@@ -538,26 +589,13 @@ export const JOB_PAYLOADS = {
   /**
    * The account's native scripts mirrored from the platform (ADR 0099 § 1 time 2): steps in the platform's order, prices
    * as they are, a script gone deactivated. Asked with each vault sync the owner asks, never by a cron for now;
-   * replayable, writes nothing when nothing changed.
+   * replayable, writes nothing when nothing changed but the day's totals of its steps (ADR 0129 § 12).
    */
   'scripts.import_platform_scripts': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
-  /**
-   * A native script's identity (SC-04 lot c8), written by the brain once each of its media has a validated description,
-   * under her descriptions switch. Asked after each import that adds or changes a script, and by the hourly backlog;
-   * replayable: the same texts and descriptions with the same prompt are left alone, and a validated identity is
-   * never written over.
-   */
-  'scripts.identify_platform_script': z.object({
-    creatorId: CreatorIdSchema,
-    platformScriptId: PlatformScriptIdSchema,
-    correlationId: z.string().min(1),
-  }),
-  /** Each hour: every active native script of a creator whose switch is on, asked again; the job decides. */
-  'scripts.identify_backlog': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -583,6 +621,11 @@ export const JOB_PAYLOADS = {
    */
   'connector.read_daily_stats': z.object({}),
   /**
+   * Each hour (ADR 0120 § 3): the page views, clicks and robots of every redirect link its owner attached, hour by
+   * hour, one creator at a time. Totals only; an hour once closed is never written again.
+   */
+  'connector.read_link_hours': z.object({}),
+  /**
    * The photo of a creator just imported from a platform (CRM-07 a2b, ADR 0069 § 3): read again from the platform's
    * model list, fetched, re-encoded and kept in the media bucket under `creators/<id>/avatar`. Replayable: the object
    * is written over and `creators.avatar_key` set to the same key.
@@ -606,10 +649,12 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.respond': 3,
   'conversation.send': 3,
   'conversation.follow_up': 3,
+  'conversation.after_sale': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
   'conversation.release_unavailable': 1,
+  'conversation.settle_placed': 3,
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
@@ -637,6 +682,8 @@ export const JOB_MAX_ATTEMPTS = {
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
   'creator_tasks.suggestion_decided': 5,
+  // Each hour: the next run is the retry, and a week is written once.
+  'creator_week.plan': 1,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
@@ -646,6 +693,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.check_reports': 1,
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
+  'scheduling.notify_incident': 3,
   'team.apply_roles': 1,
   // Every minute: the next run is the retry.
   'owners.watch': 1,
@@ -693,6 +741,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.drop_received': 5,
   // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
   'content_drops.describe_file': 5,
+  // Every model failed: a few tries; a spent budget is not a failure, the job puts itself off.
+  'instagram_captions.propose': 5,
   // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
   'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.
@@ -705,10 +755,6 @@ export const JOB_MAX_ATTEMPTS = {
   'scripts.ask_scripts': 1,
   // A platform that did not answer: a few tries; a failed read changes nothing for the account.
   'scripts.import_platform_scripts': 3,
-  // A brain that failed: a few tries; the budget spent waits for the hourly backlog.
-  'scripts.identify_platform_script': 3,
-  // Each hour: the next run is the retry.
-  'scripts.identify_backlog': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
@@ -719,6 +765,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.copy_avatar': 5,
   // Each hour: the next run is the retry, and a reading is replayable (each row written over).
   'connector.read_daily_stats': 1,
+  // Each hour as well: the next run is the retry, and an open hour is written over.
+  'connector.read_link_hours': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,
@@ -765,6 +813,11 @@ export function pauseEndJobKey(creatorId: string): string {
   return `conversation.reopen:pause:${creatorId}`;
 }
 
+/** The one settling of a placed draft (ADR 0086 § 5): placed again, it is not scheduled twice. */
+export function settlePlacedJobKey(draftId: string): string {
+  return `conversation.settle_placed:${draftId}`;
+}
+
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {
   return `account:${platformAccountId}`;
 }
@@ -789,3 +842,17 @@ export const RESUME_SPACING_SECONDS = 15;
 export function resumeRunAt(index: number, now: Date): Date {
   return new Date(now.getTime() + index * RESUME_SPACING_SECONDS * 1_000);
 }
+
+/**
+ * The background jobs that write a creator's rows under the app role, one creator at a time (ADR 0087, avenant du
+ * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
+ * (`withTenantJob`) refuses any other.
+ */
+export const TenantJobSchema = z.enum([
+  'daily_stats',
+  'media_insights',
+  'link_hours',
+  'drop_media',
+  'creator_decisions',
+]);
+export type TenantJob = z.infer<typeof TenantJobSchema>;

@@ -4,6 +4,7 @@ import {
   RedirectLinkIdSchema,
   newId,
   type CreatorId,
+  type LinkRef,
 } from '@impera/contracts';
 import {
   and,
@@ -19,10 +20,10 @@ import {
 } from '@impera/db';
 
 import { RedirectLinkError } from '../../domain/errors';
-import { writeFault, type StoredRedirectLink } from '../../domain/links';
+import { sameAddress, writeFault, type StoredRedirectLink } from '../../domain/links';
 import type { RedirectLinkActor, RedirectLinkStore, RedirectLinkWrite } from '../../domain/ports';
 
-const { auditLog, creators, redirectLinks } = schema;
+const { auditLog, creators, redirectLinkHours, redirectLinks } = schema;
 
 const columns = {
   id: redirectLinks.id,
@@ -32,6 +33,7 @@ const columns = {
   placement: redirectLinks.placement,
   usageNote: redirectLinks.usageNote,
   enabled: redirectLinks.enabled,
+  attached: sql<boolean>`${redirectLinks.serviceRef} is not null`,
 };
 
 interface LinkRow {
@@ -42,6 +44,7 @@ interface LinkRow {
   readonly placement: string | null;
   readonly usageNote: string;
   readonly enabled: boolean;
+  readonly attached: boolean;
 }
 
 function toLink(row: LinkRow): StoredRedirectLink {
@@ -53,7 +56,18 @@ function toLink(row: LinkRow): StoredRedirectLink {
     placement: row.placement === null ? null : LinkPlacementSchema.parse(row.placement),
     usageNote: row.usageNote,
     enabled: row.enabled,
+    attached: row.attached,
   };
+}
+
+/** Whether a failed write hit the constraint named: Drizzle wraps the driver's error as `cause`. */
+function hitUnique(error: unknown, constraint: string): boolean {
+  for (let current = error; typeof current === 'object' && current !== null;) {
+    if ('code' in current && current.code === '23505')
+      return 'constraint' in current && current.constraint === constraint;
+    current = 'cause' in current ? current.cause : null;
+  }
+  return false;
 }
 
 /** Every link of the creator, in the order the screens show them. The policies decide which rows the role reads. */
@@ -99,7 +113,7 @@ async function lockCreatorLinks(tx: Transaction, creatorId: string): Promise<voi
 async function audit(
   tx: Transaction,
   actor: RedirectLinkActor,
-  action: 'redirect_link.create' | 'redirect_link.update',
+  action: 'redirect_link.create' | 'redirect_link.update' | 'redirect_link.attach',
   link: StoredRedirectLink,
   /** The address changed: said as a fact, the address itself never written here. */
   urlChanged: boolean,
@@ -141,7 +155,10 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
         id === undefined ? values : { id, name: values.name, url: values.url },
       );
       if (fault !== null) throw new RedirectLinkError(fault);
-      const row = { ...values, updatedBy: actor.userId };
+      const previous = before.find((one) => one.id === id);
+      // Another address is another link at the service: what was attached no longer holds, in this same write.
+      const detached = previous !== undefined && sameAddress(previous.url) !== sameAddress(values.url);
+      const row = { ...values, updatedBy: actor.userId, ...(detached ? { serviceRef: null } : {}) };
       const [saved] =
         id === undefined
           ? await tx
@@ -155,7 +172,6 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
               .returning(columns);
       if (saved === undefined) throw new RedirectLinkError('link_not_found');
       const link = toLink(saved);
-      const previous = before.find((one) => one.id === id);
       await audit(
         tx,
         actor,
@@ -169,6 +185,26 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
 
   return {
     listForAgency: (actor, creatorId) => assertAgency(db, actor, creatorId, (tx) => linksOf(tx, creatorId)),
+    hoursForAgency: (actor, creatorId, since) =>
+      assertAgency(db, actor, creatorId, async (tx) => {
+        const rows = await tx
+          .select({
+            linkId: redirectLinkHours.linkId,
+            hour: redirectLinkHours.hour,
+            pageviews: redirectLinkHours.pageviews,
+            clicks: redirectLinkHours.clicks,
+            robots: redirectLinkHours.robots,
+            closed: redirectLinkHours.closed,
+          })
+          .from(redirectLinkHours)
+          .where(and(eq(redirectLinkHours.creatorId, creatorId), sql`${redirectLinkHours.hour} >= ${since}`))
+          .orderBy(redirectLinkHours.hour, redirectLinkHours.linkId);
+        return rows.map((row) => ({
+          ...row,
+          linkId: RedirectLinkIdSchema.parse(row.linkId),
+          hour: row.hour.toISOString(),
+        }));
+      }),
     listOwn: (userId) => withCreatorAccount(db, userId, (tx, creatorId) => linksOf(tx, creatorId)),
     enabledUnscoped: (creatorId) =>
       withAdmin(adminDb, async (tx) => {
@@ -177,5 +213,39 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
       }),
     create: (actor, creatorId, values) => write(actor, creatorId, undefined, values),
     update: (actor, creatorId, id, values) => write(actor, creatorId, id, values),
+    attach: async (actor, creatorId, id, address, ref: LinkRef) => {
+      try {
+        // The owner's own door: the policy `owner_attach` and the grant on this one column let it through.
+        return await assertAgency(
+          db,
+          actor,
+          creatorId,
+          async (tx) => {
+            const [saved] = await tx
+              .update(redirectLinks)
+              .set({ serviceRef: ref, updatedAt: sql`now()` })
+              // Only while the link still has the address the service was read for: an address changed in between
+              // is another link at the service, and this write then touches nothing.
+              .where(
+                and(
+                  eq(redirectLinks.id, id),
+                  eq(redirectLinks.creatorId, creatorId),
+                  eq(redirectLinks.url, address),
+                ),
+              )
+              .returning(columns);
+            if (saved === undefined) throw new RedirectLinkError('link_not_found');
+            const link = toLink(saved);
+            await audit(tx, actor, 'redirect_link.attach', link, false);
+            return link;
+          },
+          true,
+        );
+      } catch (error) {
+        if (hitUnique(error, 'redirect_links_service_ref_unique'))
+          throw new RedirectLinkError('attached_elsewhere');
+        throw error;
+      }
+    },
   };
 }

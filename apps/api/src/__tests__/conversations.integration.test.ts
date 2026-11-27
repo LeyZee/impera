@@ -585,6 +585,38 @@ describe('conversations module (P0-05)', () => {
     expect(stepRow).toEqual({ text: 'Rien que pour toi', platformMedia: media });
   });
 
+  it('marks a step he bought paid from its synced copy, never locked again (ADR 0156 § 2)', async () => {
+    const { conversationId } = await ingest('c-step-bought');
+    const draftId = await respond(conversationId);
+    await withStep(draftId, 1_500, 'step:c-step-bought:0');
+    await conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Pour toi'] });
+    await conversations.jobs.send({ creatorId, conversationId, draftId, correlationId: 'test' }, NO_LOG, 1);
+    const copy = (isPaid: boolean): ExternalMessage => ({
+      ...fanMessage('c-step-bought', 'Rien que pour toi', 'out-step:c-step-bought:0'),
+      direction: 'outbound',
+      author: 'ai',
+      media: [{ ref: { platform: 'reveal', id: 'media-b' }, kind: 'image', isLocked: !isPaid }],
+      priceMinor: 1_500,
+      currency: 'EUR',
+      isPaid,
+    });
+    const stepRow = async () => {
+      const [row] = await test.admin.db
+        .select({ isPaid: schema.messages.isPaid, platformMedia: schema.messages.platformMedia })
+        .from(schema.messages)
+        .where(eq(schema.messages.platformMessageId, 'out-step:c-step-bought:0'));
+      return row;
+    };
+
+    expect((await ingest('c-step-bought', copy(false))).isNew).toBe(false);
+    expect(await stepRow()).toMatchObject({ isPaid: false, platformMedia: [{ isLocked: true }] });
+    expect((await ingest('c-step-bought', copy(true))).isNew).toBe(false);
+    expect(await stepRow()).toMatchObject({ isPaid: true, platformMedia: [{ isLocked: false }] });
+    // A later copy that still says locked (a stale page) never unbuys it.
+    await ingest('c-step-bought', copy(false));
+    expect(await stepRow()).toMatchObject({ isPaid: true, platformMedia: [{ isLocked: false }] });
+  });
+
   it('records a step whose answer was lost once, as the platform shows it, without sending it again', async () => {
     const { conversationId } = await ingest('c-step-lost');
     const draftId = await respond(conversationId);

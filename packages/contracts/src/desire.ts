@@ -40,12 +40,17 @@ export const DESIRE_BRAIN_SIGNALS = [
   'busy_now',
   'slows_down',
   'discomfort',
+  // He says he just came (ADR 0156 § 6): the hot moment is over.
+  'just_came',
   // His availability (ADR 0103, amendement du 13/11): read here, held by code in `fan_availability`.
   'alone',
   'at_home',
   'free_now',
   'someone_nearby',
   'leaving_soon',
+  'says_goodnight',
+  // He says he is tired, worn out (passe 2 du 26/11): no step of a script goes while he says so.
+  'tired',
 ] as const;
 
 /**
@@ -69,6 +74,9 @@ export const DESIRE_SIGNALS = [
   'minor_suspected',
   'age_disputed',
   'frozen',
+  // He came (he says so, or he just bought the last step of a script): back to his rest level (ADR 0156 § 6).
+  'rest_new',
+  'rest_client',
 ] as const;
 export const DesireSignalSchema = z.enum(DESIRE_SIGNALS);
 export type DesireSignal = z.infer<typeof DesireSignalSchema>;

@@ -1,13 +1,19 @@
 import type {
+  AfterSaleType,
   AgentHours,
+  CustomPriceGrid,
   DatedRanges,
   AlertTrigger,
+  CopilotTrace,
+  DraftTranslation,
   FanFlags,
   HandoffCause,
+  Language,
   MediaDescription,
   MediaFlag,
   MessageOrigin,
   ObjectionReplies,
+  OpenCustomOrder,
   Result,
 } from '@impera/contracts';
 import {
@@ -32,6 +38,8 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
+import { copilotTrace } from '../domain/copilot-trace';
+import { herDayEndsSoon } from '../domain/day-end';
 import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
@@ -44,10 +52,13 @@ import {
   type HoldDecision,
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
+import type { LanguageDecision } from '../domain/language';
+import type { MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
 import { originNote } from '../domain/origin';
 import type { OfferLimits } from '../domain/policy';
 import { safetySigns } from '../domain/safety-net';
+import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../domain/sale-trouble';
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
@@ -56,6 +67,7 @@ import { handoffCauseOf } from '../domain/traps';
 import {
   composeTurn,
   type ComposedTurn,
+  type ComposeTurnInput,
   type ComposerPersona,
   type OfferInput,
   type ScriptsInput,
@@ -138,12 +150,31 @@ export interface AgentComposeInput {
     /** His last message: the silence it follows up on. */
     readonly silentSince: Date;
   };
+  /**
+   * Her word after a sale of his (ADR 0156 § 2): a step he bought or a tip, not an answer to a message of his. Written
+   * like a follow-up, at the hours a follow-up may go out.
+   */
+  readonly aftercare?: {
+    readonly saleType: AfterSaleType;
+    /** When he paid. */
+    readonly occurredAt: Date;
+  };
   /** A custom order of his already waits for the team (ADR 0090 § A): she does not open another. */
   readonly customOrderOpen?: boolean;
+  /**
+   * His custom order as the custom-orders module keeps it (ADR 0159 § A.2), read in the turn's first transaction:
+   * `null`, none open. Absent, no order is kept and she answers as before (ADR 0090 § A).
+   */
+  readonly openCustomOrder?: OpenCustomOrder | null;
   /** The replies of her objection bank he already received (ADR 0090 § B): never twice. */
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRun | null;
+  /**
+   * His runs before `scriptRun` that went cold, and how many times she teased him about `scriptRun` when he left it
+   * (Charles 20/11). Absent: none, never.
+   */
+  readonly scriptAbandon?: { readonly earlier: readonly ScriptRun[]; readonly teased: number };
   /** His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
@@ -151,6 +182,12 @@ export interface AgentComposeInput {
    * whatever he writes, until a manager or the owner closes it. `helpGiven`: the help bubble already went out in it.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+  /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7), as the journal keeps it. */
+  readonly saleTrouble?: SaleTroubleSeen;
+  /** What she already answered him about meeting her, and how close he is (Charles 21/11); absent, nothing given. */
+  readonly meeting?: ComposeTurnInput['meeting'];
+  /** Her last outgoing messages to all her fans, newest first: her worn phrases (passe 2 du 26/11). Absent: none read. */
+  readonly herRecent?: readonly string[];
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -235,10 +272,22 @@ type AgentComposeResult = (
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
   readonly customOrderOpened?: true;
+  /** The turn on his custom order (ADR 0159 § A.2), for the custom-orders module to keep, whatever the answer becomes. */
+  readonly customOrderTurn?: NonNullable<ComposedTurn['customOrderTurn']>;
   /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
   readonly scriptsExhausted?: true;
+  /** She answered a sale gone wrong in this draft (`sale_trouble`, ADR 0156 § 4 and § 7): a human gets the next one. */
+  readonly saleTrouble?: SaleTroubleKind;
+  /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
+  readonly abandonTeased?: true;
+  /** What she answered in this draft to his asking to see her (Charles 21/11): the reason given, never twice. */
+  readonly meetingAnswer?: MeetingAnswer;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
+  /** What the code decided with the draft, as the copilot panel reads it (ADR 0141 lot a): kept with the draft. */
+  readonly copilot?: CopilotTrace;
+  /** Her draft in French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+  readonly translation?: DraftTranslation;
   /**
    * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
    * draft, only what his message and Reveal changed: a step not written was not sent.
@@ -327,6 +376,11 @@ export interface DraftComposerDeps {
    */
   readonly alertsOf?: (creatorId: string) => Promise<AlertSettings>;
   /**
+   * Her grid of custom prices in force (ADR 0159 § C), read when his order is kept (`openCustomOrder`): its supplements
+   * for the brain, its price for her card. `null`, never filled in; absent, no grid.
+   */
+  readonly gridOf?: (creatorId: string) => Promise<CustomPriceGrid | null>;
+  /**
    * Whether a chatter is on shift on her accounts now: a doubt on who she is (P4-01) and a custom order (ADR 0090)
    * go to them. Unknown: no.
    */
@@ -365,6 +419,10 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
     history: null,
     latest: input.scriptRun ?? null,
     countsHisMessage: (input.waited ?? 0) === 0,
+    ...(input.scriptAbandon !== undefined && {
+      earlier: input.scriptAbandon.earlier,
+      teased: input.scriptAbandon.teased,
+    }),
   };
   if (deps.scripts === undefined || platformAccountId === undefined || platformConversationId === undefined)
     return closed;
@@ -432,6 +490,9 @@ function withScripts(
   };
   return Object.keys(scriptRun).length === 0 ? base : { ...base, scriptRun };
 }
+
+/** Why a draft is held when the voice wrote only hollow bubbles. */
+const EMPTY = 'no_voice';
 
 const failureDetail = (error: LlmFailure): readonly string[] =>
   error.attempts.map((a) => `${a.model}: ${a.outcome}`);
@@ -529,6 +590,10 @@ function adultOnCard(
 }
 
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
+
+/** A step of hers he bought, as his latest run records it (Reveal's history, ADR 0156 § 2). */
+const paidStepOf = (run: ScriptRun | null | undefined): boolean =>
+  run?.steps.some((step) => step.outcome === 'bought') === true;
 
 /**
  * The AI could not answer him with care (a refusal, a failure, no budget, a guard): never silence, a human writes to
@@ -667,28 +732,37 @@ const NOT_FOLLOWED_UP = (detail: string, costUsd = 0): Held => ({
   costUsd,
 });
 
+/** A turn of hers that answers nothing of his: a follow-up on his silence, or her word after a sale of his. */
+type QuietTurn =
+  | { readonly kind: 'follow_up'; readonly step: number; readonly steps: number; readonly silentSince: Date }
+  | { readonly kind: 'aftercare'; readonly saleType: AfterSaleType };
+
 /**
- * A follow-up on his silence (P3-10): his limits read first, then `followUpDecision`, then the voice and every
- * guard. A silent fan is no emergency: whatever stops it (limits unknown, no model, no budget) writes nothing and
- * alerts nobody; only a blocking guard hands it to a human, as for an answer.
+ * A follow-up on his silence (P3-10), or her word after a sale of his (ADR 0156 § 2): his limits read first, then
+ * `followUpDecision` (a word after a sale goes out at the hours a follow-up may, never to a fan nobody may write to, in
+ * distress or whose age is in doubt), then the voice and every guard. Neither is an emergency: whatever stops it
+ * (limits unknown, no model, no budget) writes nothing and alerts nobody; only a blocking guard hands it to a human,
+ * as for an answer.
  */
-async function followUp(
+async function quietTurn(
   deps: DraftComposerDeps,
   input: AgentComposeInput,
-  asked: NonNullable<AgentComposeInput['followUp']>,
+  turn: QuietTurn,
 ): Promise<AgentComposeResult> {
+  const prefix = turn.kind;
   // His limits unknown, nothing is written to him: never a message to a fan who may have been stopped.
-  if (deps.limits === undefined) return NOT_FOLLOWED_UP('follow_up_limits_unknown');
+  if (deps.limits === undefined) return NOT_FOLLOWED_UP(`${prefix}_limits_unknown`);
   let flags: FanFlags;
   try {
     flags = await deps.limits.flags(input.creatorId, input.fanId);
   } catch {
-    return NOT_FOLLOWED_UP('follow_up_limits_unreadable');
+    return NOT_FOLLOWED_UP(`${prefix}_limits_unreadable`);
   }
   const timeZone = await deps.timeZoneOf(input.creatorId);
   const decision = followUpDecision({
-    step: asked.step,
-    steps: asked.steps,
+    // Her word after a sale is one message: the first and only step.
+    step: turn.kind === 'follow_up' ? turn.step : 0,
+    steps: turn.kind === 'follow_up' ? turn.steps : 1,
     flags,
     now: input.now,
     timeZone,
@@ -698,11 +772,12 @@ async function followUp(
   });
   if (decision.kind === 'skip') return NOT_FOLLOWED_UP(decision.reason);
   if (decision.kind === 'later') return { ...NOT_FOLLOWED_UP(decision.reason), retryAt: decision.at };
-  // Without her active persona, nothing is written to a silent fan: no alert either, he is no emergency.
+  // Without her active persona, nothing is written: no alert either, he is no emergency.
   const her = await herPersona(deps, input);
-  if ('missing' in her) return NOT_FOLLOWED_UP(`follow_up_${her.missing}`);
-  if (voiceUnavailable(deps.gateway)) return NOT_FOLLOWED_UP('follow_up_no_voice');
+  if ('missing' in her) return NOT_FOLLOWED_UP(`${prefix}_${her.missing}`);
+  if (voiceUnavailable(deps.gateway)) return NOT_FOLLOWED_UP(`${prefix}_no_voice`);
   const composed = await composeTurn(deps.gateway, her.deps.persona, {
+    keptLanguage: await keptLanguageOf(deps.limits, input),
     history: input.history.map((m) => ({
       from: m.direction === 'inbound' ? 'fan' : 'creator',
       text: m.text,
@@ -720,10 +795,20 @@ async function followUp(
       ...(input.hours !== undefined && { night: input.hours.night }),
     },
     trace: { creatorId: input.creatorId, conversationId: input.conversationId, draftId: input.draftId },
-    followUp: {
-      silentHours: (input.now.getTime() - asked.silentSince.getTime()) / 3_600_000,
-      spirit: her.deps.followUpSpirit ?? null,
-    },
+    ...(turn.kind === 'follow_up'
+      ? {
+          followUp: {
+            silentHours: (input.now.getTime() - turn.silentSince.getTime()) / 3_600_000,
+            spirit: her.deps.followUpSpirit ?? null,
+          },
+        }
+      : {
+          aftercare: {
+            saleType: turn.saleType,
+            // A step bought while his run is open: the script goes on, so does the moment (Charles, 20/11).
+            scriptGoesOn: turn.saleType === 'ppv' && input.scriptRun?.status === 'open',
+          },
+        }),
   });
   const { costUsd } = composed;
   if (composed.droppedNotes !== undefined) {
@@ -737,9 +822,13 @@ async function followUp(
   if (blocking.length > 0) {
     return { kind: 'held', reason: 'guard_blocked', detail: blocking.map((v) => v.code), costUsd };
   }
+  // Her bubbles were all hollow (« . »), twice: nothing to send, a human answers (passe 2, conversation 37).
+  if (composed.bubbles.length === 0)
+    return { kind: 'held', reason: 'llm_unavailable', detail: [EMPTY], costUsd };
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
+    ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: [],
@@ -792,9 +881,79 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
   return {
     ...result,
     ...(opened && { customOrderOpened: true }),
+    ...(composed.saleTrouble?.kind === 'answer' &&
+      result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
+    ...(composed.abandonTeased !== undefined && result.kind === 'draft' && { abandonTeased: true }),
+    ...(composed.meetingAnswer !== undefined &&
+      result.kind === 'draft' && { meetingAnswer: composed.meetingAnswer }),
+    ...(composed.customOrderTurn !== undefined && { customOrderTurn: composed.customOrderTurn }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
   };
+}
+
+/** What her answer does with his custom order, as the copilot names the gesture (ADR 0141 § 1). */
+function customOrderMove(composed: ComposedTurn): 'decline' | 'wait' | undefined {
+  const turn = composed.customOrderTurn;
+  if (turn?.kind === 'reply' && turn.event?.type === 'custom_order_declined') return 'decline';
+  if (turn?.kind === 'reply' || composed.customOrder?.kind === 'reply') return 'wait';
+  return undefined;
+}
+
+/** The copilot's trace of a draft (ADR 0141 lot a), from what this turn already decided: no model, no new rule. */
+const copilotOf = (
+  composed: ComposedTurn,
+  scripts: { readonly catalogue: readonly PlatformScriptView[]; readonly latest: ScriptRun | null },
+): CopilotTrace => {
+  const customOrder = customOrderMove(composed);
+  return copilotTrace({
+    ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
+    ...(customOrder !== undefined && { customOrder }),
+    objectionAnswered: composed.objectionReply !== undefined,
+    ...(composed.scripts !== undefined && { scripts: composed.scripts }),
+    catalogue: scripts.catalogue,
+    latest: scripts.latest,
+    ...(composed.scriptStart !== undefined && { scriptStart: composed.scriptStart }),
+    ...(composed.desireRead !== undefined && { desireRead: composed.desireRead }),
+    care: composed.care === true,
+    rewritten: composed.rewritten === true,
+    ...(composed.language !== undefined && { language: composed.language }),
+  });
+};
+
+/**
+ * Her draft in French for the team (ADR 0168 § 9), one bubble per bubble of hers: the voice's French, and the code's
+ * own bubble after it when one is added. None when the voice gave none that fits.
+ */
+function translationFor(
+  composed: Pick<ComposedTurn, 'translation'>,
+  added?: string,
+): { readonly translation?: DraftTranslation } {
+  if (composed.translation === undefined) return {};
+  const bubbles = added === undefined ? [...composed.translation] : [...composed.translation, added];
+  return { translation: { language: 'french', bubbles } };
+}
+
+/** His kept language (ADR 0168 § 3); `null` when none, without his limits, or when it does not read. */
+async function keptLanguageOf(
+  limits: FanLimits | undefined,
+  input: AgentComposeInput,
+): Promise<{ readonly value: Language; readonly source: 'detected' | 'set' } | null> {
+  if (limits?.language === undefined) return null;
+  return limits.language(input.creatorId, input.fanId).catch(() => null);
+}
+
+/**
+ * Keeps the language code read on his message (ADR 0168 § 3). Not kept is no harm: the next message reads it again,
+ * and the language of this answer was decided on his words.
+ */
+async function keepLanguage(
+  limits: FanLimits | undefined,
+  input: AgentComposeInput,
+  decision: LanguageDecision | undefined,
+): Promise<void> {
+  if (limits?.keepLanguage === undefined || decision?.keep === undefined || decision.keep === null) return;
+  await limits.keepLanguage(input.creatorId, input.fanId, decision.keep).catch(() => undefined);
 }
 
 /** A result with the notices of her alerts that went off, when there are any. */
@@ -838,7 +997,11 @@ async function settleCare(
     .join('\n');
   return {
     kind: 'draft',
-    bubbles: help ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText))] : composed.bubbles,
+    bubbles: help
+      ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText, composed.language?.reply ?? null))]
+      : composed.bubbles,
+    // The help bubble is the code's own: its French beside the voice's (ADR 0168 § 9).
+    ...translationFor(composed, help ? helpBubble('french') : undefined),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
@@ -895,6 +1058,9 @@ async function settle(
       costUsd,
     };
   // A custom order with a chatter on shift (ADR 0090 § A): they take it, the voice did not write.
+  // The same sale trouble again soon after her answer (ADR 0156 § 4 and § 7): a human answers, she did not write.
+  if (composed.saleTrouble?.kind === 'handoff')
+    return { ...HANDOFF, cause: 'sale_trouble', detail: [composed.saleTrouble.trouble], costUsd };
   if (composed.customOrder?.kind === 'handoff')
     return { ...HANDOFF, cause: 'custom_order', detail: ['custom_order'], costUsd };
   // He stated an adult age himself, or his card gives one: confirmed (Charles, 27/10 and 16/11), never once his age
@@ -931,9 +1097,13 @@ async function settle(
   if (blocking.length > 0) {
     return { kind: 'held', reason: 'guard_blocked', detail: blocking.map((v) => v.code), costUsd };
   }
+  // Her bubbles were all hollow (« . »), twice: nothing to send, a human answers (passe 2, conversation 37).
+  if (composed.bubbles.length === 0)
+    return { kind: 'held', reason: 'llm_unavailable', detail: [EMPTY], costUsd };
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
+    ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: withoutOrders(composed.brief.factsProposed),
@@ -947,7 +1117,10 @@ async function settle(
 export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer {
   return {
     async compose(input) {
-      if (input.followUp !== undefined) return followUp(deps, input, input.followUp);
+      if (input.followUp !== undefined)
+        return quietTurn(deps, input, { kind: 'follow_up', ...input.followUp });
+      if (input.aftercare !== undefined)
+        return quietTurn(deps, input, { kind: 'aftercare', saleType: input.aftercare.saleType });
       const stop = await stopped(deps.limits, input);
       if ('held' in stop) return stop.held;
       const lastAnswer = input.history.findLastIndex((m) => m.direction === 'outbound');
@@ -973,7 +1146,9 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // He says plainly he is a minor (recette AGT-01): a human answers him before any model, whatever the brain would
       // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
-      const signs = safetySigns(fanText, input.now);
+      // His kept language (ADR 0168 § 4): a bare number in a short message of his is read by his covered language.
+      const keptLanguage = await keptLanguageOf(deps.limits, input);
+      const signs = safetySigns(fanText, input.now, keptLanguage?.value ?? null);
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
@@ -1027,8 +1202,10 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const offer = await offerInput(withHer, input, stop.flags);
       const scripts = await scriptsInput(deps, input);
       const waited = (input.waited ?? 0) >= 1;
+      const timeZone = await deps.timeZoneOf(input.creatorId);
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
+        keptLanguage,
         fanText: ownText,
         media,
         fanNotes: input.fan.notes.join('\n'),
@@ -1044,13 +1221,15 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         situation: {
           now: input.now,
-          timeZone: await deps.timeZoneOf(input.creatorId),
+          timeZone,
           relationshipStartedAt: input.fan.firstMessageAt ?? input.now,
           spentCents: input.fan.spentMinor,
           ...(input.hours !== undefined && { night: input.hours.night }),
         },
         trace: { creatorId: input.creatorId, conversationId: input.conversationId, draftId: input.draftId },
         ...(waited && { waited }),
+        ...(input.hours !== undefined &&
+          herDayEndsSoon(input.hours, timeZone, input.now, input.exceptions) && { herDayEnds: true }),
         desire: {
           ...(input.desire !== undefined && { previous: input.desire }),
           measured: measureDesire(
@@ -1079,6 +1258,10 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           chatterOnShift: chatter,
           orderOpen: input.customOrderOpen === true,
           flags: stop.flags,
+          ...(input.openCustomOrder !== undefined && {
+            order: input.openCustomOrder,
+            grid: deps.gridOf === undefined ? null : await deps.gridOf(input.creatorId),
+          }),
         },
         ...(withHer.objectionReplies !== undefined && {
           objections: {
@@ -1088,7 +1271,15 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
+        ...(input.meeting !== undefined && { meeting: input.meeting }),
+        ...(input.herRecent !== undefined && { herRecent: input.herRecent }),
+        saleTrouble: {
+          seen: input.saleTrouble ?? NO_SALE_TROUBLE,
+          // He bought from her: Reveal's spending, or a step of hers recorded paid.
+          hasBought: input.fan.spentMinor > 0 || paidStepOf(input.scriptRun),
+        },
       });
+      await keepLanguage(deps.limits, input, composed.language);
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);
       // A risk of his outranks her alert: the handoff keeps the risk's cause, and the alert is a notice of its own.
@@ -1104,9 +1295,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
+      const traced =
+        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(composed, scripts) } : settled;
       const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
       const withAvailability =
-        availability === undefined ? settled : { ...settled, fanAvailability: availability };
+        availability === undefined ? traced : { ...traced, fanAvailability: availability };
       if (composed.desire === undefined) return withAvailability;
       const { before, score, signals, weightsVersion } = composed.desire;
       return { ...withAvailability, desire: { before, score, signals, weightsVersion } };

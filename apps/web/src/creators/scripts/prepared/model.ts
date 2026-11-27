@@ -2,7 +2,7 @@ import type {
   BranchCondition,
   CopyDifference,
   Currency,
-  PlatformScriptMoment,
+  PreparedScriptMoment,
   PreparedBranch,
   PreparedScriptContent,
   PreparedScriptGap,
@@ -38,7 +38,7 @@ export const emptyStep = (): PreparedStep => ({ key: newKey(), rhythm: 0, branch
 export const newContent = (
   name: string,
   description: string,
-  moment: PlatformScriptMoment,
+  moment: PreparedScriptMoment,
 ): PreparedScriptContent => ({
   name: name.trim(),
   description: description.trim(),
@@ -149,6 +149,7 @@ const GAP_TEXTS: Readonly<Record<PreparedScriptGap['code'], string>> = {
   media_missing: 'aucun média',
   media_absent: 'un média n’est plus dans son coffre',
   media_not_described: 'un média n’a pas de description validée',
+  media_offered: 'un média a déjà été offert, il ne se revend pas',
   branch_unsettled: 'dis quand prendre cette branche',
   branch_two_defaults: 'deux branches par défaut, une seule permise',
   branch_cheaper_on_spend: 'une condition de dépense mène à une branche moins chère que celle par défaut',
@@ -310,7 +311,8 @@ export function stateLabel(view: PreparedScriptView): {
   return { text: view.gaps.length === 1 ? '1 manque' : `${String(view.gaps.length)} manques`, tone: 'warn' };
 }
 
-export const momentLabel = (moment: PlatformScriptMoment): string => (moment === 'day' ? 'Jour' : 'Nuit');
+export const momentLabel = (moment: PreparedScriptMoment): string =>
+  moment === 'day' ? 'Jour' : moment === 'night' ? 'Nuit' : 'Jour et nuit';
 
 /** What changes in a script, one gesture at a time: each returns a new content, the old one untouched. */
 export function withStep(

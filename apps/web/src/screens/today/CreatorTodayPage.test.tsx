@@ -9,7 +9,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorTodayPage } from './CreatorTodayPage';
@@ -35,7 +35,7 @@ const shift = (displayName: string, startsAt: string, endsAt: string) => ({
 const nb = (text: string): string =>
   text.replace(/(\d) (h|min)/gu, '$1\u00a0$2').replace(/h (\d)/gu, 'h\u00a0$1');
 
-function serve(body: unknown, status = 200, agenda: unknown = null, content: unknown = null): void {
+function serve(body: unknown, status = 200, agenda: unknown = null, content: object | null = null): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
@@ -45,7 +45,7 @@ function serve(body: unknown, status = 200, agenda: unknown = null, content: unk
           : url.startsWith('/v1/creator-space/agenda?') && agenda !== null
             ? new Response(JSON.stringify(agenda), { status: 200 })
             : url === '/v1/creator-space/content' && content !== null
-              ? Response.json(content)
+              ? Response.json({ redone: [], ...content })
               : new Response('null', { status: 404 }),
       ),
     ),
@@ -102,6 +102,51 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
     const go = screen.getByRole('link', { name: 'Déposer la première' });
     expect(go.className).toContain('nv-btn--neon');
     expect(go.getAttribute('href')).toMatch(/^\/contenu\?demande=/u);
+  });
+
+  it('puts what waits on her answer on top, and sends her answer (ADR 0164)', async () => {
+    const decision = {
+      id: '01936f00-0000-7000-8000-000000000001',
+      kind: 'publish_time',
+      category: 'post',
+      question: 'Je publie ton Reel à 18 h 30 ?',
+      context: 'C’est l’heure où tes abonnés sont le plus là.',
+      layout: 'buttons',
+      answers: [
+        { key: 'yes', label: 'Oui, à 18 h 30', text: null, noted: 'Je publie à 18 h 30.' },
+        { key: 'change', label: 'Changer l’heure', text: null, noted: 'On change l’heure.' },
+      ],
+      otherIdeasLeft: 0,
+      expiresAt: '2026-11-21T17:30:00.000Z',
+    };
+    const sent: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url === '/v1/creator-space/decisions')
+          return Promise.resolve(Response.json({ decisions: sent.length === 0 ? [decision] : [] }));
+        if (url === `/v1/creator-space/decisions/${decision.id}/answer`) {
+          sent.push(typeof init?.body === 'string' ? init.body : '');
+          return Promise.resolve(Response.json({ noted: 'Je publie à 18 h 30.' }));
+        }
+        return Promise.resolve(
+          url === '/v1/creator-space/on-duty'
+            ? Response.json({ current: [], next: [] })
+            : new Response('null', { status: 404 }),
+        );
+      }),
+    );
+    show();
+    const question = await screen.findByRole('heading', { level: 2, name: decision.question });
+    const cards = [...document.querySelectorAll('.sc-today > *')];
+    expect(cards[0]?.contains(question)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Oui, à 18 h 30' }));
+    expect(await screen.findByText('Je publie à 18 h 30.')).toBeTruthy();
+    expect(sent).toEqual([JSON.stringify({ answer: 'yes' })]);
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
+    await waitFor(() => {
+      expect(screen.queryByText('À décider')).toBeNull();
+    });
   });
 
   it('says nothing of her content while nothing is due', async () => {
@@ -217,6 +262,21 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     expect(send?.compareDocumentPosition(day)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     // One request alone: the button needs no ordinal.
     expect(screen.getByRole('link', { name: 'Déposer' })).toBeDefined();
+  });
+
+  it('opens on « L’essentiel du jour », counting her tasks and what she owes, before anything else (Charles, 21/11)', async () => {
+    serve({ current: [], next: [] }, 200, agendaOf(), {
+      requests: [requestOf({ dueOn: '2026-11-01', reason: 'La séance promise' })],
+      drops: [],
+    });
+    show();
+    const hero = (await screen.findByRole('heading', { level: 2, name: 'Ce qu’on attend de toi' })).closest(
+      'section',
+    );
+    expect(await screen.findByText('1 envoi à faire')).toBeDefined();
+    expect(screen.getByRole('button', { name: /^Tâches\s*\d+\/\d+$/u })).toBeDefined();
+    const send = (await screen.findByRole('heading', { level: 2, name: 'À envoyer' })).closest('section');
+    expect(send === null ? null : hero?.compareDocumentPosition(send)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('counts what the agency waits on her for, and takes her to her week to answer', async () => {

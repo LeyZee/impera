@@ -16,12 +16,14 @@ import {
   figuresCurrency,
   fortnightBars,
   fortnightChange,
+  hasMoneyKinds,
   hasOtherCurrency,
   hasRecords,
   heatGrid,
   heatSlots,
   hourEndText,
   hourText,
+  moneySlices,
   netIn,
   recordToday,
   slotWords,
@@ -35,7 +37,9 @@ import { amountText, periodLine } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
 import { cityOf, dayNumber, longDay } from '@/scheduling/time';
+import { sharesOf } from '@/screens/dashboard/agency/view';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
+import { Donut, useLit } from '@/shell/figures/figures';
 import { Panel } from '@/shell/layout';
 
 /*
@@ -437,6 +441,98 @@ function Hours({
   );
 }
 
+/**
+ * « D'où vient mon argent » (§ 6): the net of the fortnight under way by what was sold, in the Dashboard's ring. A
+ * slice lit by the pointer, the keyboard or a tap shows in the middle with its count of sales, no tip over the legend
+ * (avis Design 20/11); at rest the middle says the total, « réparti » while some sales wait for their type. A sale
+ * whose statement kept no type yet is said « pas encore comptée », never drawn as a zero.
+ */
+function Money({ figures, currency }: { figures: MyFigures; currency: Currency }): JSX.Element {
+  const { lit, setLit, row } = useLit();
+  const slices = moneySlices(figures, currency);
+  const total = slices.reduce((sum, slice) => sum + slice.cents, 0);
+  // Settled together, so the legend adds up to 100 % where each share rounded alone could say 99 or 101.
+  const shares = sharesOf(
+    slices.map((slice) => slice.cents),
+    total,
+  );
+  const litSlice = lit === null ? undefined : slices[lit];
+  const untyped = figures.kinds.untyped;
+  const totalText = roundAmountText(total, currency);
+  return (
+    <Panel
+      className="nv-enter mf"
+      eyebrow={<Named kind="sales">D’où vient mon argent</Named>}
+      title="Ta quinzaine par type de vente"
+    >
+      <div className="mf-sec">
+        {slices.length === 0 ? (
+          <p className="mf-note">
+            Pas encore compté : la répartition arrive avec ta prochaine vente relevée.
+          </p>
+        ) : (
+          <div className="mf-money">
+            <Donut
+              label={`Ton net par type de vente : ${slices
+                .map((slice, i) => `${slice.label} ${String(shares[i] ?? 0)} %`)
+                .join(', ')}`}
+              slices={slices.map((slice) => ({ key: slice.key, colour: slice.colour, value: slice.cents }))}
+              lit={lit}
+              onLit={setLit}
+            >
+              {litSlice === undefined ? (
+                <>
+                  <b
+                    className={
+                      totalText.length > 7 ? 'nv-donut__value nv-num is-long' : 'nv-donut__value nv-num'
+                    }
+                  >
+                    {totalText}
+                  </b>
+                  <span className="nv-donut__sub">{untyped > 0 ? 'de net réparti' : 'de net'}</span>
+                </>
+              ) : (
+                <>
+                  <b className="nv-donut__value nv-num">{String(shares[lit ?? 0] ?? 0)}&nbsp;%</b>
+                  <span className="nv-donut__sub">{litSlice.label}</span>
+                  <span className="nv-donut__sub">{counted(litSlice.sales, 'vente', 'ventes')}</span>
+                </>
+              )}
+            </Donut>
+            <ul className="nv-breakdown mf-kinds">
+              {slices.map((slice, i) => {
+                return (
+                  <li key={slice.key}>
+                    <button
+                      type="button"
+                      className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
+                      {...row(i)}
+                    >
+                      <span className="nv-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                      <span className="nv-breakdown__label">{slice.label}</span>
+                      <span className="nv-breakdown__value nv-num">
+                        {roundAmountText(slice.cents, currency)}
+                      </span>
+                      <span className="nv-breakdown__share nv-num">{String(shares[i] ?? 0)}&nbsp;%</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {untyped > 0 && slices.length > 0 ? (
+          <p className="mf-note">
+            {untyped === 1
+              ? '1 vente pas encore comptée par type : elle arrive avec ta prochaine vente relevée.'
+              : `${String(untyped)} ventes pas encore comptées par type : elles arrivent avec ta prochaine vente relevée.`}
+          </p>
+        ) : null}
+      </div>
+    </Panel>
+  );
+}
+
 /** « Mes records » (§ 8): the best day and the best fortnight, and what today still lacks to take the first. */
 function Records({ figures, tip }: { figures: MyFigures; tip: FloatingTip }): JSX.Element {
   const { bestDay, bestPeriod } = figures.records;
@@ -568,7 +664,7 @@ export function MyDaysCard(): JSX.Element | null {
 }
 
 /**
- * Commissions › « Mes records » and « Quand je vends » (ADR 0104 § 5, § 8), in the column of the member's
+ * Commissions › « Mes records », « D'où vient mon argent » and « Quand je vends » (ADR 0104 § 5, § 6, § 8), in the column of the member's
  * performance. Each card shows only once it has something of theirs to say.
  */
 export function MyFiguresAside(): JSX.Element | null {
@@ -577,11 +673,14 @@ export function MyFiguresAside(): JSX.Element | null {
   if (figures === undefined) return null;
   const hours = figures.hours.sales > 0;
   const records = hasRecords(figures);
-  if (!hours && !records) return null;
+  const currency = figuresCurrency(figures);
+  const money = hasMoneyKinds(figures, currency);
+  if (!hours && !records && !money) return null;
   return (
     <>
       {records ? <Records figures={figures} tip={tip} /> : null}
-      {hours ? <Hours figures={figures} currency={figuresCurrency(figures)} tip={tip} /> : null}
+      {money ? <Money figures={figures} currency={currency} /> : null}
+      {hours ? <Hours figures={figures} currency={currency} tip={tip} /> : null}
       {tip.element}
     </>
   );

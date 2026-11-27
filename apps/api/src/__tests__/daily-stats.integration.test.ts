@@ -5,7 +5,16 @@ import {
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withTenantMember } from '@impera/db';
+import {
+  and,
+  eq,
+  schema,
+  sql,
+  withTenant,
+  withTenantJob,
+  withTenantMember,
+  type Transaction,
+} from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -318,21 +327,90 @@ describe('daily statistics of the platform (ADR 0081)', () => {
     expect(await read(users.creator)).toEqual([]);
   });
 
-  it('lets the app write neither table, even as the owner', async () => {
-    await expect(
-      withTenantMember(app.db.db, nora, ownerId, (tx) =>
-        tx.execute(sql`update platform_daily_stats set ppv_purchased = 9`),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      withTenantMember(app.db.db, nora, ownerId, (tx) =>
-        tx.execute(sql`update platform_chatter_daily_stats set ppv_purchased = 9`),
-      ),
-    ).rejects.toThrow();
+  it('lets no account write either table, the owner included', async () => {
+    const before = [await photo(), await chatterPhoto()];
+    for (const table of ['platform_daily_stats', 'platform_chatter_daily_stats']) {
+      const { rowCount } = await withTenantMember(app.db.db, nora, ownerId, (tx) =>
+        tx.execute(sql`update ${sql.identifier(table)} set ppv_purchased = 9`),
+      );
+      // The right on the counters is the hourly job's (ADR 0087 lot c): an account's session passes no write policy.
+      expect(rowCount).toBe(0);
+      await expect(
+        withTenantMember(app.db.db, nora, ownerId, (tx) =>
+          tx.execute(sql`delete from ${sql.identifier(table)}`),
+        ),
+      ).rejects.toThrow();
+    }
+    expect([await photo(), await chatterPhoto()]).toEqual(before);
     await expect(
       withTenantMember(app.db.db, nora, ownerId, (tx) =>
         tx.execute(sql`select * from sales_feed_stats_calls`),
       ),
+    ).rejects.toThrow();
+  });
+
+  it('lets the hourly job write a day in the creator it is in, never in another (ADR 0087 lot c)', async () => {
+    const count = (tx: Transaction) =>
+      tx.execute<{ days: number }>(sql`select count(*)::int as days from platform_daily_stats`);
+    const kept = (await photo()).length;
+    expect(kept).toBeGreaterThan(0);
+    // In her creator, the job reads the days it writes over; in another, or without its name, none of them.
+    expect((await withTenantJob(app.db.db, nora, 'daily_stats', count)).rows[0]?.days).toBe(kept);
+    expect((await withTenantJob(app.db.db, ines, 'daily_stats', count)).rows[0]?.days).toBe(0);
+    expect((await withTenant(app.db.db, nora, count)).rows[0]?.days).toBe(0);
+    // The job's name is one of a closed list, and an account's session never carries it.
+    await expect(
+      // @ts-expect-error a name outside the list is refused by the types too
+      withTenantJob(app.db.db, nora, 'another_job', count),
+    ).rejects.toThrow();
+    const asChatter = await withTenantMember(app.db.db, nora, users.chatter, count);
+    expect(asChatter.rows[0]?.days).toBe(0);
+
+    const day = {
+      platform: 'reveal',
+      platformAccountId: noraAccount,
+      creatorId: nora,
+      day: addDays(today, -90),
+      newSubscribers: 1,
+      activeSubscribers: 1,
+      ppvPurchased: 1,
+      readAt: new Date(),
+    };
+    // A day of hers written from another creator's transaction, or without the job's name: refused.
+    await expect(
+      withTenantJob(app.db.db, ines, 'daily_stats', (tx) => tx.insert(schema.platformDailyStats).values(day)),
+    ).rejects.toThrow();
+    await expect(
+      withTenant(app.db.db, nora, (tx) => tx.insert(schema.platformDailyStats).values(day)),
+    ).rejects.toThrow();
+    const fromAnother = await withTenantJob(app.db.db, ines, 'daily_stats', (tx) =>
+      tx.execute(sql`update platform_daily_stats set ppv_purchased = 9`),
+    );
+    expect(fromAnother.rowCount).toBe(0);
+    const byChatter = await withTenantJob(app.db.db, ines, 'daily_stats', (tx) =>
+      tx.execute(sql`update platform_chatter_daily_stats set ppv_purchased = 9`),
+    );
+    expect(byChatter.rowCount).toBe(0);
+    // Even in her creator, the job changes counters only: a day never moves to another creator, nor goes.
+    await expect(
+      withTenantJob(app.db.db, nora, 'daily_stats', (tx) =>
+        tx.execute(sql`update platform_daily_stats set creator_id = ${ines}`),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      withTenantJob(app.db.db, nora, 'daily_stats', (tx) =>
+        tx.execute(sql`delete from platform_daily_stats`),
+      ),
+    ).rejects.toThrow();
+    expect(await photo()).toHaveLength(kept);
+  });
+
+  it('writes nothing on the service connection: the photos are closed to its writes', async () => {
+    await expect(
+      test.service.db.execute(sql`update platform_daily_stats set ppv_purchased = 9`),
+    ).rejects.toThrow();
+    await expect(
+      test.service.db.execute(sql`update platform_chatter_daily_stats set ppv_purchased = 9`),
     ).rejects.toThrow();
   });
 

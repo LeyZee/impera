@@ -3,12 +3,14 @@ import { Link, Navigate, Outlet, useRouterState } from '@tanstack/react-router';
 import { Fragment, useState, useSyncExternalStore, type JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
+import { AgentsSection } from '@/settings/agents/AgentsSection';
 import { BudgetSection } from '@/settings/ai-budget/BudgetSection';
 import { aiBudgetQueryKey } from '@/settings/ai-budget/api';
 import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
 import { BillingSection } from '@/settings/billing/BillingSection';
+import { LinkServiceCard } from '@/settings/link-service/LinkServiceCard';
 import { PayRulesSection } from '@/settings/pay/PayRulesSection';
 import { SalesFeedSection } from '@/settings/sales-feed/SalesFeedSection';
 import { newModelsQuery } from '@/settings/sales-feed/api';
@@ -43,21 +45,31 @@ const item = (to: ScreenPath): SettingsItem => ({ to, label: screenLabel(to) });
  * everyone's, lives in the account's menu (NAV-03). The AI keys, the platforms' sales feeds (CRM-01), the AI spend and
  * credits (ADR 0091), the bots and groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what
  * each invoice prints (EQ-06), the backups (ADR 0028) and the security of every account (SEC-04).
- * A list, not nine tabs (recette visuelle 16/11, GES-04, decided on 16/11): grouped by theme, in the order the tabs had.
+ * A list, not nine tabs (recette visuelle 16/11, GES-04, decided on 16/11), in the four groups of ADR 0134 § 6:
+ * Connexions (Plateformes, Bots Telegram), IA, Argent, Sécurité. The addresses keep their words (`/reglages/ventes`,
+ * `/reglages/telegram`): only what the screens are called changed.
  * Every section is the owner's, as the routes guard them: a section a role could not open would not be listed.
  */
 const GROUPS: readonly SettingsGroup[] = [
-  { title: 'Connexions', items: [item('/reglages/modeles-ia'), item('/reglages/ventes')] },
+  { title: 'Connexions', items: [item('/reglages/ventes'), item('/reglages/telegram')] },
   {
-    title: 'IA et alertes',
-    items: [item('/reglages/consommation-ia'), item('/reglages/alertes'), item('/reglages/telegram')],
+    title: 'IA',
+    items: [
+      item('/reglages/modeles-ia'),
+      item('/reglages/consommation-ia'),
+      item('/reglages/agents-connectes'),
+    ],
   },
-  { title: 'Paie et factures', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
-  { title: 'Données et accès', items: [item('/reglages/sauvegardes'), item('/reglages/securite')] },
+  { title: 'Argent', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
+  {
+    title: 'Sécurité',
+    items: [item('/reglages/alertes'), item('/reglages/sauvegardes'), item('/reglages/securite')],
+  },
+  { title: 'Aide', items: [item('/reglages/aide')] },
 ];
 
 /** The section Réglages opens on, on a computer: the list's first. */
-const FIRST: ScreenPath = '/reglages/modeles-ia';
+const FIRST: ScreenPath = '/reglages/ventes';
 
 /** The section open, by the address; `null` on Réglages itself, the list. */
 function openItem(pathname: string): SettingsItem | null {
@@ -196,9 +208,22 @@ export function AiUsagePage(): JSX.Element {
   return <AiUsageSection />;
 }
 
-/** Réglages › Ventes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01). */
+/** Réglages › Agents connectés (ADR 0026 § 3, ADR 0105 § 1): the owner's agents, their tokens and what they read. */
+export function AgentsPage(): JSX.Element {
+  return <AgentsSection />;
+}
+
+/**
+ * Réglages › Plateformes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01), then the
+ * key of the redirect service (INS-02).
+ */
 export function SalesFeedPage(): JSX.Element {
-  return <SalesFeedSection />;
+  return (
+    <div className="sv-page">
+      <SalesFeedSection />
+      <LinkServiceCard />
+    </div>
+  );
 }
 
 /** Réglages › Alertes: her own alerts and the system's, on each creator (P4-01). */
@@ -206,7 +231,7 @@ export function AlertsPage(): JSX.Element {
   return <AlertsSection />;
 }
 
-/** Réglages › Telegram: bots, groups and who gets which alert (fiche P3-07), the tab in the address. */
+/** Réglages › Bots Telegram: bots, groups and who gets which alert (fiche P3-07), the tab in the address. */
 export function TelegramPage({
   tab,
   onTab,

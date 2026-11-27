@@ -1,6 +1,6 @@
-import type { CreatorId, PlatformAccountId } from '@impera/contracts';
+import { calendarDayAt, type CreatorId, type Platform, type PlatformAccountId } from '@impera/contracts';
 
-import { planPlatformScripts } from '../domain/platform-scripts';
+import { planPlatformScripts, stepTotalsOf } from '../domain/platform-scripts';
 import type {
   PlatformScriptImportStore,
   PlatformScriptSource,
@@ -30,23 +30,20 @@ interface ImportDeps {
   readonly source: PlatformScriptSource;
   /** Ties the scripts « prêt à copier » to the native scripts they became (ADR 0112 § 23). */
   readonly recognition: PreparedRecognitionStore;
-  /** Queues the identity of the scripts added or rewritten (SC-04 lot c8); the job decides whether to write one. */
-  readonly askIdentities: (
-    creatorId: CreatorId,
-    scriptIds: readonly string[],
-    correlationId: string,
-  ) => Promise<void>;
   /** Hears a recognition that failed, with its cause, for the log: the import stays written, the next one retries. */
   readonly onRecognitionFailed?: (error: unknown) => void;
+  /** The zone of a platform's days (`connectors`); `null` for one without, whose totals are then not kept. */
+  readonly dayZone: (platform: Platform) => string | null;
 }
 
 /**
  * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2, P6-01): one account's native scripts read from the platform
  * and mirrored, replayable. A script read for the first time is added; one changed on the platform, or back after it
  * was gone, is rewritten whole and active; one gone is deactivated, never deleted. A failed read throws and changes
- * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer. A script
- * added or rewritten has its identity asked again (SC-04 lot c8), after the import is written. A script « prêt à copier »
- * that a native script now matches in everything is then tied to it (ADR 0112 § 23).
+ * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer. No identity
+ * is asked any more (ADR 0161 § 5): the agent reads ours on a recognised copy. A script « prêt à copier »
+ * that a native script now matches in everything is then tied to it (ADR 0112 § 23). The totals the platform gives of
+ * each step are kept for the day (ADR 0129 § 12).
  */
 export async function importPlatformScripts(
   deps: ImportDeps,
@@ -62,8 +59,10 @@ export async function importPlatformScripts(
   const listed = await deps.source(account);
   if (listed === null) return { outcome: 'skipped' };
   const plan = planPlatformScripts(await deps.store.known(account.id), listed);
-  const written = await deps.store.apply(account, plan, now);
-  if (written.length > 0) await deps.askIdentities(account.creatorId, written, request.correlationId);
+  // The platform's totals of each step on its day (ADR 0129 § 12): read anyway, kept instead of lost.
+  const zone = deps.dayZone(account.platform);
+  const totals = zone === null ? null : { day: calendarDayAt(now, zone), steps: stepTotalsOf(listed) };
+  await deps.store.apply(account, plan, now, totals);
   // After the import is written, so that a script copied by hand since the last one is read first. A recognition that
   // fails (a tie written at the same moment by hand) never fails the import: the next one finds the script again.
   let recognised = 0;

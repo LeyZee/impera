@@ -4,8 +4,14 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { readAgencyInsights, type AgencyReader } from './application/agency-reads';
+import { createObjectivesStore } from './infra/db/objectives-store';
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';
-import { createAgencyInsightsReader, type DailyStatsOf } from './infra/views/agency-insights-reader';
+import {
+  createAgencyInsightsReader,
+  type DailyStatsOf,
+  type RefundListOf,
+} from './infra/views/agency-insights-reader';
+import { createAgencySteeringReader } from './infra/views/agency-steering-reader';
 import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
@@ -13,7 +19,7 @@ import { createSetupReader, type BillingReadiness, type TelegramReach } from './
 
 export interface SupervisionModule {
   readonly name: 'supervision';
-  /** `GET /v1/dashboard`, `/dashboard/todos`, `/dashboard/creators`, `/dashboard/agency` and `/dashboard/setup/*`, mounted under `/v1` by the server. */
+  /** `GET /v1/dashboard`, `/dashboard/todos`, `/dashboard/creators`, `/dashboard/agency`, `/dashboard/agency/steering` and `/dashboard/setup/*`, mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
   /** What another module reads, as the person reading (ADR 0026 § 1). */
   readonly reads: {
@@ -32,7 +38,7 @@ export interface SupervisionModule {
 
 export interface SupervisionDeps extends Omit<
   DashboardRouteDeps,
-  'reader' | 'revealSales' | 'overview' | 'agency' | 'agencyTimeZone' | 'setup'
+  'reader' | 'revealSales' | 'overview' | 'agency' | 'agencyTimeZone' | 'setup' | 'objectives' | 'steering'
 > {
   /** Application role: the Dashboard reads in tenant transactions (RLS). */
   readonly db: Database;
@@ -48,6 +54,8 @@ export interface SupervisionDeps extends Omit<
   readonly salesTimeZone: (platform: Platform) => string | null;
   /** The connectors' snapshot of the platforms' daily statistics (ADR 0081), read under the caller's RLS. */
   readonly dailyStatsOf: DailyStatsOf;
+  /** The connectors' refunds one by one (ADR 0092 § 4), for the agency's list. */
+  readonly refundListOf: RefundListOf;
 }
 
 export function createSupervisionModule(deps: SupervisionDeps): SupervisionModule {
@@ -56,6 +64,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
     deps.salesTotalsOf,
     deps.salesTimeZone,
     deps.dailyStatsOf,
+    deps.refundListOf,
   );
   const agencyTimeZone = deps.salesTimeZone('reveal') ?? 'Europe/Paris';
   return {
@@ -66,6 +75,8 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       revealSales: createRevealSalesReader(deps.db, deps.salesTotalsOf),
       agency,
       agencyTimeZone,
+      steering: createAgencySteeringReader(deps.db, deps.salesTimeZone, deps.dailyStatsOf),
+      objectives: createObjectivesStore(deps.db),
       setup: createSetupReader(deps.adminDb, deps.telegramReach, deps.billingReadiness, agencyTimeZone),
       overview: createCreatorsOverviewReader(deps.db),
     }),

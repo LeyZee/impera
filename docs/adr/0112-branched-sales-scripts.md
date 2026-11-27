@@ -106,6 +106,12 @@ Le 17/11/2026, Charles constate que l'onglet Scripts de la fiche montre le coffr
 
 Conséquences de l'amendement : une migration (Bilan) pour garder le script en préparation, son moment, son état « prêt à copier » et son rattachement ; la reconnaissance à l'import s'ajoute à l'import des séquences ; la vue Performances lit les tables d'envoi et d'achat existantes, sans nouvelle donnée de fan.
 
+## Amendement du 20/11/2026 : jour, nuit, ou jour et nuit (accepté)
+
+Décision de Charles du 20/11/2026 (16 h 48, heure de Paris), relayée par le coordinateur.
+
+27. **Le moment d'un script en préparation** (§ 21) prend trois valeurs : « se joue le jour », « la nuit » ou « jour et nuit » (un script polyvalent). La créatrice ou l'agence le choisit à la main sur le script. Il ne se déduit jamais de la description des médias, qui décrit ce qu'elle voit (tenue, couleur, lieu) sans trancher le moment. Le nom recopié dans Reveal est celui du script, sans emoji ajouté par Impera. Pour l'agent, un script « jour et nuit » n'a pas de moment imposé (ADR 0098 § 3).
+
 ## Conséquences
 
 Positives :

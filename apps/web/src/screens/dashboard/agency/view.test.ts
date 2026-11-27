@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { AGENCY_WEEK } from './fixture';
 import {
-  arcs,
   bestSlot,
   busiest,
   byWeek,
@@ -28,7 +27,6 @@ import {
   shortEuros,
   slotLabel,
   STACKS,
-  topFansWords,
   zoneLabel,
 } from './view';
 
@@ -103,12 +101,6 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     expect(hoursLabel(18)).toBe('18\u00a0h\u00a0–\u00a019\u00a0h');
     expect(hourLabel(0)).toBe('0\u00a0h');
     expect(busiest(Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)))).toBeNull();
-  });
-
-  it('draws a ring whose arcs follow each other', () => {
-    const [first, second] = arcs([1, 3], 10, 0);
-    expect(first?.offset).toBe(0);
-    expect(second?.offset).toBeCloseTo(-15.71, 1);
   });
 });
 
@@ -222,16 +214,10 @@ describe('sharesOf', () => {
   });
 });
 
-describe('percentText and topFansWords (PAY-16)', () => {
+describe('percentText (PAY-16)', () => {
   it('says a share with its tenth only when it has one', () => {
     expect(percentText(37.5)).toBe('37,5\u00a0%');
     expect(percentText(62)).toBe('62\u00a0%');
-  });
-
-  it('names ten biggest fans at most, as many as there are below ten', () => {
-    expect(topFansWords(42).lead).toBe('Les 10 fans qui dépensent le plus font');
-    expect(topFansWords(3).lead).toBe('Les 3 fans qui dépensent le plus font');
-    expect(topFansWords(1)).toEqual({ lead: 'Le fan qui dépense le plus fait', short: 'le plus gros fan' });
   });
 });
 

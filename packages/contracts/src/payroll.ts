@@ -23,7 +23,7 @@ import { CurrencySchema, PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
 import { EarningsBaseSchema } from './pay-rules';
 import { TimezoneSchema } from './persona';
-import { SaleEventSchema, SaleStatusSchema } from './sales-feed';
+import { SaleEventSchema, SaleStatusSchema, SaleTypeSchema } from './sales-feed';
 import { BasisPointsSchema } from './team';
 import { CalendarDaySchema } from './team-members';
 
@@ -1306,6 +1306,11 @@ export const MySaleSchema = z.object({
   /** The line's own instant; `null` on a statement written before it was kept. */
   occurredAt: z.iso.datetime().nullable(),
   lateFrom: PayPeriodSchema.nullable(),
+  /**
+   * For a refund that comes late (`lateFrom`), the instant of the sale it takes back, read on the member's own earlier
+   * statement; `null` otherwise, or when that statement does not keep it.
+   */
+  saleOccurredAt: z.iso.datetime().nullable(),
   state: MySaleStateSchema,
   signal: z.object({ note: PayReasonSchema.nullable(), signalledAt: z.iso.datetime() }).nullable(),
   /** A sale the validator gave, whole or shared (ADR 0101); `null` otherwise. */
@@ -1364,6 +1369,14 @@ export const MyFiguresDaySchema = z.object({
 });
 export type MyFiguresDay = z.infer<typeof MyFiguresDaySchema>;
 
+/** What the member sold of one type in the period under way: how many sales, and their net (refunds taken off). */
+export const MyFiguresKindSchema = z.object({
+  type: SaleTypeSchema,
+  sales: z.number().int().min(0),
+  nets: z.array(MyNetSchema),
+});
+export type MyFiguresKind = z.infer<typeof MyFiguresKindSchema>;
+
 /** An hour of a weekday (1 Monday to 7 Sunday) in the member's own zone: the sales that fell in it and their net. */
 export const MyFiguresCellSchema = z.object({
   weekday: z.number().int().min(1).max(7),
@@ -1389,6 +1402,10 @@ export const MyFiguresSchema = z.object({
   timeZone: TimezoneSchema,
   days: z.array(MyFiguresDaySchema),
   nets: z.array(MyNetSchema),
+  kinds: z.object({
+    items: z.array(MyFiguresKindSchema),
+    untyped: z.number().int().min(0),
+  }),
   previous: z
     .object({
       period: PayPeriodSchema,
@@ -1438,6 +1455,12 @@ export type MyFigures = z.infer<typeof MyFiguresSchema>;
  * author, the validator, or gone with a validated final statement), or a share of a sale of the agent (ADR 0101) ;
  * `pay_sale_signal_conflict` 409, the same signal `id` with other values ;
  * `pay_sale_signal_state_conflict` 409, a line already signalled, or a withdrawal without a signal in force ;
+ * `sale_claim_not_found` 404, a claim the reader may not read (ADR 0101 § 18) ;
+ * `sale_claim_conflict` 409, the same claim `id` with other values ;
+ * `sale_claim_shift_conflict` 409, a shift he may not claim on: not his, not ended, begun more than 15 days ago, in a
+ * closed fortnight, or claimed already ;
+ * `sale_claims_too_many_conflict` 409, a fourth claim waiting (`details.max`) ;
+ * `sale_claim_answered_conflict` 409, a claim already answered otherwise, or an answer its reader may not give ;
  * `pay_rule_started_invalid` 400, tiers or a payout minimum from a period that has begun (PAIE-22, `details.period`) ;
  * `collective_goal_late_invalid` 400, a goal for a period past its 3rd day (PAIE-22, `details.period`) ;
  * `exchange_rate_missing_conflict` 409, a currency without a rate read ;
@@ -1484,6 +1507,11 @@ export const PAYROLL_ERROR_CODES = [
   'pay_sale_recipient_conflict',
   'pay_sale_signal_conflict',
   'pay_sale_signal_state_conflict',
+  'sale_claim_not_found',
+  'sale_claim_conflict',
+  'sale_claim_shift_conflict',
+  'sale_claims_too_many_conflict',
+  'sale_claim_answered_conflict',
   'pay_rule_started_invalid',
   'collective_goal_late_invalid',
   'exchange_rate_missing_conflict',

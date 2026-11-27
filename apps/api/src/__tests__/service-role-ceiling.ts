@@ -7,14 +7,22 @@
  */
 export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/ai-budget': 2,
-  'modules/ai-usage': 9,
+  // +1 for the forecast (ADR 0091 § 8): the owner's screen reads every creator's calls, sales and name, sums only.
+  'modules/ai-usage': 10,
   'modules/alerts': 1,
+  'modules/audit': 3,
   'modules/backups': 1,
-  'modules/connectors': 36,
-  'modules/content-drops': 29,
+  // +3 for the agency's key of the redirect service (INS-02): a table closed to the app role, read, kept and removed
+  // through the owner's gesture; +1 for its re-sealing after a rotation of the encryption keys (ops command); +1 for
+  // the hourly reading of the links' hours, which asks which creators have an attached link (identifiers only).
+  'modules/connectors': 40,
+  'modules/content-drops': 14,
   'modules/contractors': 6,
   'modules/conversations': 1,
   'modules/creator-tasks': 1,
+  'modules/creator-week': 2,
+  // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.
+  'modules/custom-orders': 1,
   'modules/fans': 1,
   'modules/invoicing': 12,
   'modules/mcp': 1,
@@ -24,20 +32,28 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/providers': 7,
   'modules/redirect-links': 2,
   'modules/rewards': 7,
-  'modules/scheduling': 29,
-  'modules/scripts': 20,
+  // +1 (EQ-23): the incident notice reads its facts and the agency's recipients across creators, under withAdmin.
+  // +1 for the light feedback (ADR 0170, 26/11): each member's last opened shift and whether it has its feedback,
+  // across creators, bounded to the members named; read only.
+  // +1 for « compte sans personne » (ADR 0094 § 1): its job reads every creator's planning, agent and last fan
+  // message to publish one event per account and créneau.
+  'modules/scheduling': 31,
+  'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,
   'modules/telegram': 10,
   'modules/trends': 8,
   root: 52,
   scripts: 1,
-  wiring: 4,
+  wiring: 7,
 };
 
 /**
- * The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. Raised once
- * since: 266 with « compte sans personne » (ADR 0094 § 1), whose job reads every creator's planning, agent and last fan
- * message to publish one event per account and créneau (scheduling, +1).
+ * The whole on 20/11/2026, when the ceiling reached main (264): the sum of the units never goes above it again. Raised
+ * since: 269 by her week (CR-16, +5), 270 by the agent's read of her custom price grid (ADR 0159, +1), then 273 with
+ * the audit journal (EQ-18), which reads `audit_log`, out of RLS by design, for the owner alone (+3), then 276 with
+ * the agency's key of the redirect service (INS-02), a table closed to the app role (+3), and 277 with its
+ * re-sealing by the ops command after a rotation of the encryption keys (+1), and 278 with the forecast of the AI
+ * bill (ADR 0091 § 8), the owner's sums of every creator's calls and sales in one read (+1).
  */
-export const SERVICE_ROLE_TOTAL_AT_START = 266;
+export const SERVICE_ROLE_TOTAL_AT_START = 278;

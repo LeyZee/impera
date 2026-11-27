@@ -33,6 +33,8 @@ import {
 } from './nav';
 
 import { useCreatorScope } from '@/agent/scope';
+import { creatorsSearch, sheetsFor, useRememberedSheet, type CreatorSheet } from '@/creators/search';
+import { GuidesBesideProvider } from '@/help/beside';
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
 import { useFollowDeviceZone } from '@/pwa/device-zone';
@@ -65,6 +67,8 @@ export interface Account {
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   const rail = useMemo(() => railOf(user), [user]);
+  const creatorSheets = useMemo(() => sheetsFor(user), [user]);
+  const creatorSheet = useRememberedSheet(creatorSheets) ?? 'persona';
   // A member's record takes the zone of the phone at each opening (recette CHT-01): his screens speak his hour.
   useFollowDeviceZone(user);
   const account = useMemo(
@@ -159,10 +163,13 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             onSignOut={onSignOut}
             account={account}
             head={scopesCreators(user) ? <CreatorScope place="rail" /> : undefined}
+            creatorSheet={creatorSheet}
           >
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
-          <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
+          <GuidesBesideProvider user={user} pathname={pathname}>
+            <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
+          </GuidesBesideProvider>
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
           <div className="nv-offline-region" role="status">
@@ -234,9 +241,12 @@ export function RailNav({
   onSignOut,
   account,
   head,
+  creatorSheet = 'persona',
   children,
 }: {
   rail: Rail;
+  /** The sheet Créatrices opens the chosen creator on: the tab left open last on this device (ADR 0149 § 2). */
+  creatorSheet?: CreatorSheet;
   /** Under the mark, before the tabs: the creator selector of the accounts that choose one (ADR 0134 § 3). */
   head?: JSX.Element | undefined;
   /** The section on screen, or null outside every section (an unknown address): no tab is lit. */
@@ -312,12 +322,22 @@ export function RailNav({
   }, [current]);
 
   const { chosen: scoped } = useCreatorScope();
+  const playIcon = (event: { readonly currentTarget: Element }): void => {
+    const icon = event.currentTarget.querySelector('svg');
+    if (icon !== null) playOnce(icon, 'is-playing');
+  };
+
   const link = (item: NavItem): JSX.Element => (
     <Link
       key={item.to}
       to={item.to}
-      // Créatrices opens on the creator the selector is set on: there the address is the choice (ADR 0134 § 3).
-      {...(item.to === '/creatrices' && scoped !== null ? { search: { creatrice: scoped } } : {})}
+      // Créatrices opens on the creator the selector is set on: there the address is the choice (ADR 0134 § 3), on the
+      // tab of her sheet left open last on this device (ADR 0149 § 2). Trafic opens on her too.
+      {...(item.to === '/creatrices' && scoped !== null
+        ? { search: { ...creatorsSearch(creatorSheet, null), creatrice: scoped } }
+        : item.to === '/trafic' && scoped !== null
+          ? { search: { creatrice: scoped } }
+          : {})}
       data-section={item.to}
       data-phone={rail.more.has(item.to) ? 'more' : 'bar'}
       className="nv-rail__item"
@@ -326,6 +346,8 @@ export function RailNav({
       // only the exact address counts, so that /equipe/nexiste-pas lights nothing (NAV-01).
       activeOptions={{ exact: item.to !== current }}
       title={item.label}
+      // Every click plays the icon's gesture, on the tab already open too (Charles, 21/11).
+      onClick={playIcon}
     >
       <NavIcon name={item.icon} />
       <span className="nv-rail__label">{item.label}</span>
@@ -389,7 +411,8 @@ export function RailNav({
           aria-haspopup="dialog"
           aria-expanded={isMoreOpen}
           data-current={isInMore}
-          onClick={() => {
+          onClick={(event) => {
+            playIcon(event);
             setIsMoreOpen(!isMoreOpen);
           }}
         >

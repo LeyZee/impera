@@ -20,7 +20,7 @@ export function scopesCreators(me: Pick<Me, 'role' | 'teamScope'>): boolean {
 }
 
 /** The screens the selector applies to: elsewhere it stays in the menu and only keeps the choice. */
-const SCOPED = ['/', '/creatrices', '/suivi', '/suivi/fans'] as const;
+const SCOPED = ['/', '/creatrices', '/suivi', '/suivi/fans', '/trafic', '/entrainer/corrections'] as const;
 export function isScoped(pathname: string): boolean {
   return SCOPED.some((path) => path === pathname);
 }
@@ -32,7 +32,7 @@ function urgencies(count: number): string | undefined {
 
 /**
  * The creator selector (ADR 0134 § 3): at the head of the menu on a computer, at the head of the page on a phone. It
- * says which creator the Dashboard, Suivi, Fans and Créatrices show, « Toutes » for the agency's views, and keeps the
+ * says which creator the Dashboard, Suivi, Fans, Trafic and Créatrices show, « Toutes » for the agency's views, and keeps the
  * choice on the device. On Créatrices the choice opens her sheet, or the list. Nothing with no creator: there is nothing
  * to choose.
  */
@@ -95,13 +95,16 @@ export function CreatorScope({ place }: { place: 'rail' | 'page' }): JSX.Element
   );
 }
 
-/** « Toutes »: three discs overlapping, the mark of several faces. */
+/** « Toutes »: three people, one in front (three bare discs did not read as faces; Charles, 21/11). */
 function AllFaces(): JSX.Element {
   return (
     <svg className="nv-scope__all" viewBox="0 0 22 22" aria-hidden="true">
-      <circle cx="7" cy="11" r="5" />
-      <circle cx="11" cy="11" r="5" />
-      <circle cx="15" cy="11" r="5" />
+      <circle cx="5.2" cy="8.6" r="2.7" />
+      <path d="M.8 18.4c0-3 1.9-5 4.4-5s4.4 2 4.4 5z" />
+      <circle cx="16.8" cy="8.6" r="2.7" />
+      <path d="M12.4 18.4c0-3 1.9-5 4.4-5s4.4 2 4.4 5z" />
+      <circle cx="11" cy="7.4" r="3.5" />
+      <path d="M4.6 19.8c0-3.9 2.8-6.6 6.4-6.6s6.4 2.7 6.4 6.6z" />
     </svg>
   );
 }

@@ -104,7 +104,7 @@ export function AlertsTab({
         <p className="ca-head__aside">
           Les groupes Telegram de l’agence se règlent à part, dans{' '}
           <Link to="/reglages/telegram" className="ca-link">
-            Réglages › Telegram
+            Réglages › Bots Telegram
           </Link>
           .
         </p>

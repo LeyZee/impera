@@ -1,0 +1,260 @@
+/* ── Créatrices › Agenda › Semaine de tournage (ADR 0140) ──────────────────────────────────────────────────────── */
+.wp-card {
+  padding: var(--nv-plate-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  border-radius: var(--nv-radius-lg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c, var(--nv-hairline)) 24%, var(--nv-hairline));
+  background:
+    radial-gradient(
+      110% 80% at 100% 0%,
+      color-mix(in srgb, var(--ag-c, transparent) 12%, transparent),
+      transparent 60%
+    ),
+    var(--nv-plate);
+}
+.wp-card--empty {
+  gap: var(--nv-space-1);
+}
+.wp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.wp-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wp-heading p,
+.wp-card--empty p {
+  margin: 0;
+}
+.wp-title {
+  margin: 0;
+  font-family: var(--nv-font-display);
+  font-weight: 650;
+  font-size: var(--nv-text-headline);
+}
+/* « À relire »: amber, a gesture awaited; never red, which says an emergency. */
+.wp-state {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  background: color-mix(in srgb, var(--nv-warning) 18%, transparent);
+  color: var(--nv-warning);
+}
+.wp-state[data-state='validated'] {
+  background: color-mix(in srgb, var(--nv-success) 16%, transparent);
+  color: var(--nv-success);
+}
+.wp-facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.wp-days {
+  display: grid;
+  gap: var(--nv-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.wp-day,
+.wp-deferred {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  transition: box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+/* Over what a day holds: amber, a warning the owner may keep. */
+.wp-day[data-over] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 55%, transparent);
+}
+.wp-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.wp-day__date::first-letter {
+  text-transform: uppercase;
+}
+.wp-load {
+  flex: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.wp-load[data-over],
+.wp-warn {
+  color: var(--nv-warning);
+}
+.wp-warn,
+.wp-failed,
+.wp-day > .ps-muted,
+.wp-card > .ps-muted {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+}
+.wp-failed {
+  color: var(--nv-warning);
+}
+.wp-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wp-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+}
+.wp-need {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  background: var(--nv-fill-track);
+  white-space: nowrap;
+}
+.wp-need[data-need='script'] {
+  background: color-mix(in srgb, var(--ag-c) 20%, transparent);
+}
+.wp-line__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wp-line__min {
+  color: var(--nv-ink-muted);
+}
+.wp-move {
+  position: relative;
+  display: inline-flex;
+}
+/* A compact icon button: 36 px drawn, 44 px to the touch. */
+.wp-icon {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--nv-ink-muted);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  transition:
+    color var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.wp-icon::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.wp-icon:hover,
+.wp-icon[aria-expanded='true'] {
+  color: var(--nv-ink);
+}
+.wp-icon:active {
+  transform: scale(0.9);
+}
+.wp-icon:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.wp-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wp-menu.nv-glass {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: var(--nv-radius-md);
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(165deg, var(--nv-glass-fill-strong) 0%, var(--nv-glass-fill) 62%),
+    color-mix(in srgb, var(--nv-surface-raised) 92%, transparent);
+  animation: wp-pop var(--nv-dur-fast) var(--nv-ease-out);
+}
+@keyframes wp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.wp-menu button {
+  appearance: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink);
+  background: transparent;
+  border-radius: var(--nv-radius-sm);
+  padding: 0 12px;
+  min-height: var(--nv-target-min);
+  cursor: pointer;
+}
+.wp-menu button:hover,
+.wp-menu button:focus-visible {
+  background: var(--nv-fill-track);
+  outline: none;
+}
+.wp-day:has(.wp-menu) {
+  z-index: 2;
+  position: relative;
+}
+/* Its text on the content's left edge, as the day and the tags above it. */
+.wp-remove.nv-btn {
+  align-self: flex-start;
+  padding-inline: 0;
+}
+.wp-deferred {
+  background: color-mix(in srgb, var(--nv-ink) 3%, transparent);
+}
+.wp-deferred__title {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  color: var(--nv-ink-muted);
+}
+.wp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+@media (max-width: 520px) {
+  .wp-line__label {
+    white-space: normal;
+  }
+}

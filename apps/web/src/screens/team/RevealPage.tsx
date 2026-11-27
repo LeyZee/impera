@@ -68,7 +68,7 @@ type Busy =
   | null;
 
 /**
- * Équipe › Reveal (ADR 0076): each account of the platform's team with its link or a proposal, that the owner or an
+ * Équipe › Comptes Reveal (ADR 0076): each account of the platform's team with its link or a proposal, that the owner or an
  * active manager confirms, ticked rows in one batch, an invitation one row at a time. Nothing is linked or created
  * without a click; the server answers what this viewer may do on each row, and refuses the rest whatever shows.
  */
@@ -321,7 +321,7 @@ export function RevealPage({
         {data.rows.length === 0 ? (
           <Notice
             title={`Aucun compte de l’équipe ${name} pour l’instant`}
-            text={`La liste arrive de ${name} quand la clé de l’API CRM est posée, par le propriétaire, dans Réglages › Ventes.`}
+            text={`La liste arrive de ${name} quand la clé de l’API CRM est posée, par le propriétaire, dans Réglages › Plateformes.`}
           />
         ) : null}
 

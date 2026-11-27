@@ -47,6 +47,7 @@ interface Store {
     run: ScriptRunState,
   ): Promise<StoredScriptRun | null>;
   save(creatorId: CreatorId, stored: StoredScriptRun): Promise<boolean>;
+  stalled(creatorId: CreatorId, conversationId: ConversationId): Promise<StoredScriptRun[]>;
 }
 
 describe('script runs kept per fan (ADR 0098)', () => {
@@ -65,6 +66,7 @@ describe('script runs kept per fan (ADR 0098)', () => {
       open: (creator, conversation, run) =>
         uow.inTenant(creator, (tx) => tx.scriptRuns.open(conversation, run)),
       save: (creator, stored) => uow.inTenant(creator, (tx) => tx.scriptRuns.save(stored)),
+      stalled: (creator, conversation) => uow.inTenant(creator, (tx) => tx.scriptRuns.stalled(conversation)),
     };
     // Two invented creators, one fan each (ADR 0010).
     await withAdmin(test.admin.db, async (tx) => {
@@ -147,6 +149,17 @@ describe('script runs kept per fan (ADR 0098)', () => {
         run: { ...record.run, scriptRef: 'script-demo', status: 'open', endedAt: null },
       }),
     ).toBe(false);
+  });
+
+  it('reads back the runs that went cold, latest first', async () => {
+    expect(await store.stalled(creatorId, conversationId)).toEqual([]);
+    const open = await store.latest(creatorId, conversationId);
+    if (open === null) throw new Error('no run');
+    const cold: ScriptRunState = { ...open.run, status: 'stalled', ignoredMessages: 0, endedAt: later(9) };
+    expect(await store.save(creatorId, { ...open, run: cold })).toBe(true);
+    const stalled = await store.stalled(creatorId, conversationId);
+    expect(stalled.map((stored) => [stored.id, stored.run.status])).toEqual([[open.id, 'stalled']]);
+    expect(await store.stalled(otherCreatorId, conversationId)).toEqual([]);
   });
 
   it('keeps each creator to her own runs', async () => {

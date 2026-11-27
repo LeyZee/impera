@@ -7,14 +7,17 @@ scenarios/      comportement attendu : KYC, mémoire, relance, médias, langue, 
 adversarial/    le fan attaque : injection (directe, jeu de rôle, en plusieurs messages), « t'es un bot ? », rencontre, contact ou paiement hors plateforme, promesse d'amour, mineur, détresse, harcèlement, produit dangereux, abus réel
 regression/     bugs réels rejoués (nommés par fiche de tâche)
 card/           la fiche du fan lue dans ses messages (ADR 0085 § 7, `fans.read_card`) : ce que la lecture doit proposer, une fois vérifié par le code, et ce qu'elle ne doit jamais écrire ; sans juge
-thresholds.json seuils par critère pour `smoke` (nuit) et `full`
+thresholds.json seuils par critère pour `smoke` (CI, chaque semaine et à chaque changement de l'IA) et `full`
 run.ts          garde : refuse une suite trop courte ou sans clé, puis lance l'exécuteur
 probe/          test express d'un modèle (`pnpm probe`)
+fans/           fans simulés inventés et leur catalogue à thèmes (`pnpm fan-sim`) : des semaines de conversation jouées par un modèle d'une autre famille que la voix
 ```
 
 L'exécuteur vit dans `apps/api/src/scripts/evals.ts` (il appelle le code de l'agent) ; le format d'un scénario est `apps/api/src/scripts/evals/scenario.ts`, les vérifications `apps/api/src/scripts/evals/check.ts`. Les rubriques du juge sont dans `packages/llm/prompts/judge/`.
 
 Commandes : `pnpm evals` (smoke : tout sauf `tier: full`), `pnpm evals -- --full`, `pnpm evals -- --file evals/adversarial/asks-if-bot.yaml` (chemin depuis la racine).
+
+Jeux : `pnpm evals -- --full --match compliment-` rejoue seuls les scénarios dont le nom de fichier contient `compliment-` (le jeu « compliments » de Charles, 20/11 : onze compliments sans rien de sexuel, accueillis avec assurance et un merci, sans commentaire sur l’audace ni le rythme du fan). On le rejoue à chaque changement du cerveau, de la voix ou de leurs consignes.
 
 Tirages : chaque scénario est tiré trois fois (`--draws`, de 1 à 5). La voix est réglée pour varier, et un seul tirage peut passer ou échouer par hasard. Un scénario échoue si un de ses tirages échoue ; ses notes sont la moyenne des tirages, et son minimum (`judge:` du scénario) se lit sur le pire tirage.
 
@@ -22,6 +25,12 @@ Persona en vigueur : `pnpm evals -- --key-from-crm --persona-from-crm` fait pass
 
 Juge : il note mieux ce qu'un autre modèle a écrit. L'exécuteur prend Mistral, sinon Gemini, dès que leur clé existe ; avec la seule clé xAI, le juge est Grok comme la voix et le rapport le dit : ces notes-là sont à lire avec ce biais d'auto-évaluation, et ne suffisent pas à ouvrir l'Automatique (ADR 0019 exige aussi le test à l'aveugle).
 
-Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 20 €/jour de l'agent ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
+Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 25 €/jour de l'agent (20 € jusqu'au 21/11, choix de Charles) ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
 
 Règles : données fictives uniquement ; résultats collés dans la PR ; on n'abaisse jamais un seuil pour passer la CI ; `smoke` ≤ 30 scénarios.
+
+## Fans simulés (`pnpm fan-sim`)
+
+Un fan inventé (`evals/fans/<id>.yaml` : sa vie, sa façon d'écrire, son fantasme principal, son argent, ses sessions datées) parle au Playground sur des jours simulés. Le code tient son état caché et décide ses achats ; le modèle du fan (Gemini, sinon Mistral, jamais celui de la voix) écrit ses messages et son journal intérieur. Elle vend dans `evals/fans/catalogue.yaml`, un script par thème, pour vérifier qu'elle choisit celui qui colle à son fantasme. À la fin, un juge d'une autre famille lit la conversation, le journal et les mesures du code.
+
+`pnpm fan-sim --fan evals/fans/julien.yaml --days 7 --cap-eur 5` : semaine 1 de Julien. `--rubric <fichier>` donne le barème de l'agence, gardé hors du dépôt ; sans lui, le barème d'exemple inventé (`packages/llm/prompts/judge/relationship-example.md`). Persona de démo, sorties sous `.scratch/fan-sim/<id>/` : `conversation.md`, `conversation-et-journal.md`, `chiffres.json`, `juge.json`. Plafond par lancement : 15 € au plus, annoncé à Charles avant.

@@ -218,7 +218,7 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     serve({});
     renderSection();
     expect(
-      await screen.findByText('Aucun lien allumé pour l’instant : ajoute-en un dans l’onglet « Liens ».'),
+      await screen.findByText('Aucun lien allumé pour l’instant : ajoute-en un dans Trafic.'),
     ).toBeDefined();
     expect(screen.queryByRole('list', { name: 'Liens de redirection' })).toBeNull();
   });

@@ -160,7 +160,7 @@ describe('SubNav', () => {
     expect(scrollBy).toHaveBeenLastCalledWith(expect.objectContaining({ left: 136 + 130 + 52 - 300 - 120 }));
   });
 
-  // Recette 11/11 (GES-04): Équipe › Reveal's tab comes with the server's answer; opened directly, it had no glass.
+  // Recette 11/11 (GES-04): Équipe › Comptes Reveal's tab comes with the server's answer; opened directly, it had no glass.
   it('puts its glass under the lit tab when that tab arrives after the others', async () => {
     const releves: SubNavItem = { to: '/paie/releves', label: 'Relevés' };
     renderNav([releves]);
@@ -201,7 +201,7 @@ describe('SubNav', () => {
   it('brings the lit tab into view when a view of the same screen is chosen', async () => {
     const views = (lit: string): readonly SubNavItem[] => [
       { to: '/paie/quinzaine', search: { onglet: 'agenda' }, label: 'Agenda', current: lit === 'Agenda' },
-      { to: '/paie/quinzaine', search: { onglet: 'profil' }, label: 'Profil', current: lit === 'Profil' },
+      { to: '/paie/quinzaine', search: { onglet: 'compte' }, label: 'Profil', current: lit === 'Profil' },
     ];
     renderNav(views('Agenda'));
     const last = await screen.findByRole('link', { name: 'Profil' });

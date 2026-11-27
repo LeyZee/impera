@@ -1,10 +1,16 @@
 import {
+  AgencyLinkHoursResponseSchema,
   AgencyRedirectLinkSchema,
   AgencyRedirectLinksResponseSchema,
   ApiErrorSchema,
+  LinkProposalsResponseSchema,
+  LinkServiceRefusalBodySchema,
   REAUTHENTICATION_ERROR_CODE,
+  refusalOf,
+  type AgencyLinkHour,
   type AgencyRedirectLink,
   type AgencyRedirectLinkWrite,
+  type LinkProposal,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -22,6 +28,8 @@ const REFUSALS: Readonly<Record<string, string>> = {
   redirect_links_full_conflict: 'Elle a déjà le nombre maximal de liens.',
   redirect_link_not_found: 'Ce lien n’existe plus : recharge la page.',
   redirect_link_forbidden: 'Tu ne peux pas régler les liens de cette créatrice.',
+  redirect_link_unmatched_conflict: 'Aucun lien du service de redirection n’a cette adresse.',
+  redirect_link_attached_conflict: 'Ce lien du service de redirection est déjà relié à un autre lien.',
 };
 
 const path = (creatorId: string): string => `/v1/creators/${encodeURIComponent(creatorId)}/redirect-links`;
@@ -41,6 +49,23 @@ export function useRedirectLinks(creatorId: string): UseQueryResult<readonly Age
     queryFn: () => fetchLinks(creatorId),
     retry: 1,
     retryDelay: 400,
+  });
+}
+
+export const hoursQueryKey = (creatorId: string): readonly string[] => ['redirect-links', creatorId, 'hours'];
+
+/** The last 48 hours of her linked links (INS-02 lot e3), read again every five minutes while the page is open. */
+export function useLinkHours(creatorId: string): UseQueryResult<readonly AgencyLinkHour[]> {
+  return useQuery({
+    queryKey: hoursQueryKey(creatorId),
+    queryFn: async () => {
+      const response = await fetch(`${path(creatorId)}/hours`, { credentials: 'include' });
+      if (!response.ok) throw new Error(`GET redirect-links/hours: ${String(response.status)}`);
+      return AgencyLinkHoursResponseSchema.parse(await response.json()).hours;
+    },
+    retry: 1,
+    retryDelay: 400,
+    refetchInterval: 5 * 60_000,
   });
 }
 
@@ -81,4 +106,73 @@ export async function saveRedirectLink(
     kind: 'refused',
     message: (error.success ? REFUSALS[error.data.error.code] : undefined) ?? UNAVAILABLE,
   };
+}
+
+export type DetectOutcome =
+  | { readonly kind: 'ok'; readonly proposals: readonly LinkProposal[] }
+  /** `needsKey`: no key of the redirect service yet, which Réglages › Plateformes settles. */
+  | { readonly kind: 'refused'; readonly message: string; readonly needsKey: boolean };
+
+/**
+ * « Détecter ses liens » (INS-02): the links of the agency's account at the redirect service, each with a name and a
+ * place proposed. Nothing is written by it: each link is added by the owner, one by one, with `saveRedirectLink`.
+ */
+export async function detectLinks(creatorId: string): Promise<DetectOutcome> {
+  const refused = (message: string, needsKey = false): DetectOutcome => ({
+    kind: 'refused',
+    message,
+    needsKey,
+  });
+  let response: Response;
+  try {
+    response = await fetch(`${path(creatorId)}/detect`, { method: 'POST', credentials: 'include' });
+  } catch {
+    return refused(UNAVAILABLE);
+  }
+  const body: unknown = await response.json().catch(() => null);
+  if (response.ok) {
+    const answer = LinkProposalsResponseSchema.safeParse(body);
+    return answer.success ? { kind: 'ok', proposals: answer.data.proposals } : refused(UNAVAILABLE);
+  }
+  if (response.status === 422) {
+    const refusal = LinkServiceRefusalBodySchema.safeParse(body);
+    if (!refusal.success) return refused(UNAVAILABLE);
+    const { kind, message } = refusalOf(refusal.data);
+    return refused(message, kind === 'not_connected' || kind === 'unauthorized');
+  }
+  if (response.status === 401) return refused('Ta session a expiré. Reconnecte-toi.');
+  if (response.status === 429) return refused('Trop d’essais. Attends une minute avant de réessayer.');
+  if (response.status === 403) return refused('Seul le propriétaire détecte les liens.');
+  return refused(UNAVAILABLE);
+}
+
+/**
+ * « Relier » (INS-02 lot e2): the server reads the agency's account at the redirect service and keeps the reference
+ * of the link that has exactly this address, so that its hours are read. A refusal comes back as the sentence to show.
+ */
+export async function attachLink(
+  creatorId: string,
+  linkId: string,
+): Promise<{ readonly kind: 'ok' } | { readonly kind: 'refused'; readonly message: string }> {
+  const refused = (message: string) => ({ kind: 'refused' as const, message });
+  let response: Response;
+  try {
+    response = await fetch(`${path(creatorId)}/${encodeURIComponent(linkId)}/attach`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch {
+    return refused(UNAVAILABLE);
+  }
+  if (response.ok) return { kind: 'ok' };
+  const body: unknown = await response.json().catch(() => null);
+  if (response.status === 422) {
+    const refusal = LinkServiceRefusalBodySchema.safeParse(body);
+    return refused(refusal.success ? refusalOf(refusal.data).message : UNAVAILABLE);
+  }
+  if (response.status === 401) return refused('Ta session a expiré. Reconnecte-toi.');
+  if (response.status === 429) return refused('Trop d’essais. Attends une minute avant de réessayer.');
+  if (response.status === 403) return refused('Seul le propriétaire relie un lien.');
+  const error = ApiErrorSchema.safeParse(body);
+  return refused((error.success ? REFUSALS[error.data.error.code] : undefined) ?? UNAVAILABLE);
 }

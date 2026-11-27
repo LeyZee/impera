@@ -79,6 +79,28 @@ describe('voice guards', () => {
     expect(codes(['Je passe chez toi ce soir'])).toEqual(['meeting_promise']);
   });
 
+  it('lets « on se retrouve demain » go as she says goodnight, to talk again here (passe 2, conversation 40)', () => {
+    expect(codes(['Dors bien toi', 'on se retrouve demain 😘'])).toEqual([]);
+    expect(codes(['Bonne nuit, on se retrouve demain'])).toEqual([]);
+    expect(codes(['on se retrouve demain ici 😌'])).toEqual([]);
+  });
+
+  it('still blocks a real meeting said with a goodnight', () => {
+    for (const meeting of [
+      'Bonne nuit, on se retrouve demain au café',
+      'Dors bien, on se retrouve demain chez toi',
+      'Bonne nuit, on se retrouve demain à 20 h',
+      'Bonne nuit, on se retrouve demain à Lyon',
+      'Bonne nuit, on se voit demain',
+      'Bonne nuit, on se retrouve samedi',
+      'Bonne nuit 😘 viens chez moi demain',
+    ]) {
+      expect(codes([meeting]), meeting).toContain('meeting_promise');
+    }
+    // Without a goodnight nor « ici », the day alone stays a meeting.
+    expect(codes(['on se retrouve demain'])).toContain('meeting_promise');
+  });
+
   it('lets ordinary jobs and sexting through', () => {
     expect(codes(['Je suis modèle photo, et toi ?'])).toEqual([]);
     expect(codes(['Avant je suis assistante dentaire, tu imagines'])).toEqual([]);
@@ -252,6 +274,16 @@ describe('voice guards', () => {
     expect(codes(['Cette vidéo, tu l’ouvres en touchant le cadenas'])).toEqual([]);
   });
 
+  it('blocks « mdr » and its stretched forms, never a word that only starts like it (eval passe-15)', () => {
+    for (const laugh of ['mdr t’es bête', 'Mdrr', 'MDRRR 😂', 'non mais mdrrrr']) {
+      expect(codes([laugh]), laugh).toContain('forbidden_term');
+    }
+    const blocked = checkVoiceOutput(['mdrr'], DEFAULT_GUARD_SETTINGS);
+    expect(isBlocked(blocked)).toBe(true);
+    expect(codes(['T’es bête toi 😅'])).toEqual([]);
+    expect(codes(['On dit mdrine en Bretagne ?'])).toEqual([]);
+  });
+
   it('blocks a discount or a negotiation, and lets her refusal of one through', () => {
     for (const bubble of [
       'Allez je te fais un petit prix 😘',
@@ -301,6 +333,23 @@ describe('voice guards', () => {
     expect(codes(['you are as wise as you are cute'])).toEqual([]);
   });
 
+  it('lets only the price code allowed through, sum by sum (ADR 0156 § 4)', () => {
+    const allowed = (bubbles: string[]) =>
+      checkVoiceOutput(bubbles, DEFAULT_GUARD_SETTINGS, { allowedPriceMinor: 1_250 }).map((v) => v.code);
+    for (const bubble of ['C’est 12,50 € mon cœur', 'Elle est à 12.50€ 😘', '€12.50 and it is yours']) {
+      expect(allowed([bubble]), bubble).not.toContain('price_outside_offer');
+    }
+    for (const bubble of [
+      'C’est 15 € mon cœur',
+      'C’est 12,50 €, ou 10 € pour toi',
+      'Pour 12 euros tu as tout',
+    ]) {
+      expect(allowed([bubble]), bubble).toContain('price_outside_offer');
+    }
+    // Split over two bubbles, another sum is still read on the whole message.
+    expect(allowed(['C’est 12,50 €', 'ou 1', '0 € pour toi'])).toContain('price_outside_offer');
+  });
+
   it('blocks a price in her words, the offer carries it; her thanks for a tip pass (recette MOT-04)', () => {
     for (const bubble of [
       'ma vidéo est à 5€ seulement',
@@ -326,6 +375,17 @@ describe('voice guards', () => {
     expect(violations.map((v) => [v.code, v.severity])).toEqual([['guilt_trip', 'soft']]);
     expect(codes(['Tant pis, une prochaine fois 😌'])).toEqual([]);
     expect(codes(['Tu me déçois pas 😏'])).toEqual([]);
+  });
+
+  it('blocks any child or minor she names, joking or sexual, never « beau gosse » (Charles 21/11)', () => {
+    for (const text of [
+      'T’es qu’un gamin',
+      'Comme une écolière 😏',
+      'On dirait un ado',
+      'like a little girl',
+    ])
+      expect(codes([text])).toContain('minor_reference');
+    expect(codes(['Salut beau gosse 😏'])).not.toContain('minor_reference');
   });
 
   it('asks for a regeneration on a pet name she never gives, and lets hers through', () => {

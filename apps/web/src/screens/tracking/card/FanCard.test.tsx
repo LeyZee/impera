@@ -2,13 +2,16 @@
 import {
   FAN_CARD_FIELDS,
   FanIdSchema,
+  RetractFanCardOtherBodySchema,
   SetFanCardFieldBodySchema,
+  UserIdSchema,
   type FanCardEntry,
+  type FanCardOther,
   type FanCardValue,
   type FanCardView,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fanKycKey } from '../api';
@@ -54,6 +57,14 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && input.includes('/card/others/retract')) {
+        const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : null;
+        puts.push({ path: input, body });
+        if (answer !== null)
+          return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status }));
+        const { factId } = RetractFanCardOtherBodySchema.parse(body);
+        view = { ...view, others: view.others.filter((other) => other.factId !== factId) };
+      }
       if (init?.method === 'PUT') {
         const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : null;
         puts.push({ path: input, body });
@@ -120,8 +131,9 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       },
     });
     renderCard();
-    const him = await group('Lui');
-    // The first name is among the essentials, unfolded on top: the group counts the fields it holds.
+    const him = await group('Le reste sur lui');
+    // The first name shows on top among the essentials: the fold counts what it holds, and says it is the rest (Design
+    // 21/11).
     expect(within(him).getByText('1 sur 9')).toBeTruthy();
     const name = field(await essentials(), /^Son prénom/u);
     expect(within(name).getByText('Marc')).toBeTruthy();
@@ -186,7 +198,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
   it('sets a closed value in one tap', async () => {
     view = card({});
     renderCard();
-    const intimate = await group('Intime');
+    const intimate = await group('Le reste, côté intime');
     const row = field(intimate, /^L’intensité qu’il cherche/u);
     fireEvent.click(within(row).getByRole('radio', { name: 'Coquin' }));
     await act(() => Promise.resolve());
@@ -204,7 +216,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       },
     });
     renderCard();
-    const him = await group('Lui');
+    const him = await group('Le reste sur lui');
     expect(within(him).getByText('1 à vérifier ·')).toBeTruthy();
     const check = within(field(him, /^Son métier/u)).getByRole('group', { name: 'Son métier : à vérifier' });
     expect(within(check).getByText(/« aide-soignant »/u)).toBeTruthy();
@@ -229,5 +241,60 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       'La fiche ne garde ni adresse, ni numéro, ni e‑mail, ni compte ailleurs : rien n’a été écrit.',
     );
     expect(within(row).getByRole('textbox')).toBeTruthy();
+  });
+
+  describe('« Autres » (trou béant 17)', () => {
+    const note: FanCardOther = {
+      factId: id(9),
+      key: 'note_1',
+      value: 'Ne jamais parler de sa femme',
+      source: 'noted',
+      observedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      notedBy: UserIdSchema.parse(id(7)),
+      notedByName: 'Léa',
+    };
+
+    it('names who left a note, and « Retirer » takes it off in two steps', async () => {
+      view = { ...card({}), others: [note] };
+      renderCard();
+      const others = await group('Autres');
+      const row = field(others, /^Ne jamais parler de sa femme$/u);
+      expect(within(row).getByText(/^Noté par Léa, /u)).toBeTruthy();
+
+      fireEvent.click(within(row).getByRole('button', { name: 'Retirer' }));
+      // The first click only asks: « Garder » leaves it as it was.
+      expect(puts).toEqual([]);
+      fireEvent.click(within(row).getByRole('button', { name: 'Garder' }));
+      fireEvent.click(within(row).getByRole('button', { name: 'Retirer' }));
+      fireEvent.click(within(row).getByRole('button', { name: 'Oui, retirer' }));
+      await act(() => Promise.resolve());
+      expect(puts).toEqual([
+        {
+          path: `/v1/fans/${fanId}/card/others/retract?creatorId=${creatorId}`,
+          body: { factId: note.factId },
+        },
+      ]);
+      // The line leaves with the card the server answers, whenever it comes.
+      await waitFor(() => {
+        expect(screen.queryByText('Ne jamais parler de sa femme')).toBeNull();
+      });
+    });
+
+    it('says why a line was not retracted, and keeps it', async () => {
+      view = { ...card({}), others: [{ ...note, notedBy: null, notedByName: null, source: 'inferred' }] };
+      answer = {
+        status: 404,
+        body: { error: { code: 'fan_card_other_not_found', message: 'x', details: {}, requestId: 'r' } },
+      };
+      renderCard();
+      const row = field(await group('Autres'), /^Ne jamais parler de sa femme$/u);
+      expect(within(row).queryByText(/Noté par/u)).toBeNull();
+      fireEvent.click(within(row).getByRole('button', { name: 'Retirer' }));
+      fireEvent.click(within(row).getByRole('button', { name: 'Oui, retirer' }));
+      expect((await within(row).findByRole('alert')).textContent).toBe(
+        'Cette ligne n’est déjà plus sur sa fiche.',
+      );
+      expect(within(row).getByText('Ne jamais parler de sa femme')).toBeTruthy();
+    });
   });
 });

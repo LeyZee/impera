@@ -6,6 +6,7 @@ import {
   CUSTOM_ORDER_OPEN_BRIEF,
   CUSTOM_ORDER_WAIT_BRIEF,
   customOrderDecision,
+  customOrderStop,
   type CustomOrderContext,
 } from '../custom-order';
 
@@ -109,5 +110,63 @@ describe('checkNoCommitment', () => {
 
   it('reads the whole message as well', () => {
     expect(checkNoCommitment(['je te la fais', 'pour toi'])).not.toEqual([]);
+  });
+
+  it.each([
+    ['je te le ferai quand je pourrai, promis'],
+    ['je te l’enverrai quand je serai rentrée'],
+    ['je vais te le faire 😏'],
+    ['promis 🙈'],
+    ['je te promets'],
+  ])('blocks a promise, said without a yes (passe 2, conversation 31): %s', (text) => {
+    expect(checkNoCommitment([text]).map((v) => v.code)).toEqual(['no_commitment']);
+  });
+
+  it.each([['je te promets rien 😏'], ['je te fais un bisou en attendant'], ['tu me feras rire toi']])(
+    'lets what promises nothing pass: %s',
+    (text) => {
+      expect(checkNoCommitment([text])).toEqual([]);
+    },
+  );
+});
+
+describe('customOrderStop (ADR 0159 § A.1)', () => {
+  const adult = { risks: [], flags: { ageConfirmedAt: '2026-10-01T10:00:00Z' } } as const;
+
+  it('lets his order go on when nothing stops it', () => {
+    expect(customOrderStop(adult)).toBe('none');
+  });
+
+  it('sells nothing to a fan whose sales are frozen, who must not be written to, or at risk', () => {
+    expect(
+      customOrderStop({
+        ...adult,
+        flags: { ...adult.flags, salesFrozen: { reason: 'operator', since: '2026-11-01T00:00:00Z' } },
+      }),
+    ).toBe('no_sale');
+    expect(customOrderStop({ ...adult, flags: { ...adult.flags, doNotContact: true } })).toBe('no_sale');
+    expect(customOrderStop({ ...adult, risks: ['money_trouble'] })).toBe('no_sale');
+  });
+
+  it('declines what she never does', () => {
+    expect(customOrderStop({ ...adult, neverDoes: true })).toBe('never_does');
+  });
+
+  it('opens nothing while his limits are unknown or his age is not confirmed', () => {
+    expect(customOrderStop({ risks: [], flags: undefined })).toBe('hold');
+    expect(customOrderStop({ ...adult, ageConfirmed: false })).toBe('hold');
+  });
+
+  it('puts no sale above his age: a frozen fan is declined, never kept waiting', () => {
+    expect(customOrderStop({ risks: ['distress'], flags: undefined })).toBe('no_sale');
+  });
+});
+
+describe('checkNoCommitment, a tip (ADR 0159 § A.4)', () => {
+  it('blocks a tip asked for his order', () => {
+    expect(checkNoCommitment(['envoie un petit pourboire et je vois 😏']).map((v) => v.code)).toEqual([
+      'no_commitment',
+    ]);
+    expect(checkNoCommitment(['a few tips and it’s yours'])).not.toEqual([]);
   });
 });

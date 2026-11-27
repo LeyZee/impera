@@ -28,10 +28,8 @@ import {
 import { and, eq, inArray, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { DropSenseInput, LlmGateway } from '@impera/llm';
-import { AwsClient } from 'aws4fetch';
 import { strFromU8, unzipSync } from 'fflate';
 import { runOnce } from 'graphile-worker';
-import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -43,6 +41,14 @@ import { createDrizzleReceiptStore } from '../modules/content-drops/infra/db/sto
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import {
+  jpegOf,
+  PHOTO_DEVICE,
+  PHOTO_PLACE,
+  sendWhole as sendWholeFile,
+  startMediaStore,
+  type MediaStore,
+} from './support/media-store';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /** A day ahead of the server's real clock: a request is never asked for a day already past (recette MED-10). */
@@ -55,57 +61,12 @@ const DUE_ON = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
  * resumes after a cut, and the receipt job receives the file, cleans it (no position, no device left), keeps it in her
  * library or finds it a duplicate, and erases the raw bytes. Invented data only (ADR 0010).
  */
-const IMAGE = 'coollabsio/minio:RELEASE.2025-10-15T17-29-55Z';
-const USER = process.env['IMPERA_TEST_S3_USER'] ?? 'impera-test';
-const PASSWORD = process.env['IMPERA_TEST_S3_PASSWORD'] ?? 'impera-test-password';
-const REGION = 'us-east-1';
 const ACCOUNT_PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 const MB = 1024 * 1024;
-const DEVICE = 'Telephone Invente 9';
-const PLACE = '48.8566N 2.3522E';
+const DEVICE = PHOTO_DEVICE;
+const PLACE = PHOTO_PLACE;
 
-const be16 = (n: number): number[] => [(n >> 8) & 0xff, n & 0xff];
-/**
- * A JPEG of exactly `bytes` bytes, `width` × `height`, with the EXIF a phone writes (an invented device and a position
- * as text): the cleaning follows its markers, never decodes it. `seed` makes two photos of one size differ.
- */
-function jpegOf(bytes: number, width = 30, height = 40, seed = 0x11): Uint8Array {
-  const text = (value: string): number[] => [...Buffer.from(value, 'latin1')];
-  const segment = (marker: number, payload: number[]): number[] => [
-    0xff,
-    marker,
-    ...be16(payload.length + 2),
-    ...payload,
-  ];
-  const exif = segment(0xe1, [
-    ...text('Exif\0\0MM'),
-    0,
-    0x2a,
-    0,
-    0,
-    0,
-    8,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    ...text(`${DEVICE} ${PLACE}`),
-  ]);
-  const head = [
-    0xff,
-    0xd8,
-    ...exif,
-    ...segment(0xc0, [8, ...be16(height), ...be16(width), 1, 1, 0x11, 0]),
-    ...segment(0xda, [1, 1, 0, 0, 63, 0]),
-  ];
-  const out = new Uint8Array(bytes).fill(seed);
-  out.set(head);
-  out.set([0xff, 0xd9], bytes - 2);
-  return out;
-}
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 /**
@@ -157,10 +118,10 @@ const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes
 };
 
 describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () => {
-  let container: StartedTestContainer | undefined;
-  let endpoint = process.env['IMPERA_TEST_S3_URL'] ?? '';
-  const bucket = `medias-${String(Date.now())}`;
-  const s3 = new AwsClient({ accessKeyId: USER, secretAccessKey: PASSWORD, service: 's3', region: REGION });
+  let store: MediaStore;
+  let endpoint = '';
+  let bucket = '';
+  let s3: MediaStore['s3'];
   let test: TestDb;
   let app: App;
   let server: Server;
@@ -190,27 +151,14 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
   }
 
   beforeAll(async () => {
-    if (endpoint === '') {
-      container = await new GenericContainer(IMAGE)
-        .withEnvironment({ MINIO_ROOT_USER: USER, MINIO_ROOT_PASSWORD: PASSWORD })
-        .withCommand(['server', '/data'])
-        .withExposedPorts(9000)
-        .withWaitStrategy(Wait.forHttp('/minio/health/live', 9000))
-        .start();
-      endpoint = `http://${container.getHost()}:${String(container.getMappedPort(9000))}`;
-    }
-    const created = await s3.fetch(`${endpoint}/${bucket}`, { method: 'PUT' });
-    expect(created.status, await created.text()).toBe(200);
+    store = await startMediaStore();
+    ({ endpoint, bucket, s3 } = store);
 
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({
       DATABASE_URL: test.appUrl,
       DATABASE_SERVICE_URL: test.serviceUrl,
-      S3_ENDPOINT: endpoint,
-      S3_REGION: REGION,
-      S3_BUCKET: bucket,
-      S3_ACCESS_KEY_ID: USER,
-      S3_SECRET_ACCESS_KEY: PASSWORD,
+      ...store.config,
     });
     app = await createApp(config, createLogger(config), { dropVision });
     server = await buildServer({
@@ -260,7 +208,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     await server.close();
     await app.shutdown();
     await test.close();
-    await container?.stop();
+    await store.stop();
   });
 
   /** A drop of one photo, by her or by the manager for her, in `category`; its file and the file's bytes. */
@@ -499,11 +447,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     one: { readonly base: string; readonly bytes: Uint8Array },
     who: 'nora' | 'manager' = 'nora',
   ) {
-    const plan = await upload(one.base, who);
-    const sent = await put(plan.missing[0]?.url ?? '', one.bytes);
-    const done = await call('POST', `${one.base}/complete`, who, {
-      parts: [{ number: 1, etag: sent.headers.get('etag') ?? '' }],
-    });
+    const done = await sendWholeFile(server, cookies[who], one.base, one.bytes);
     expect(done.statusCode, done.body).toBe(200);
   }
 
@@ -1059,7 +1003,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
    */
   it('never leaves a medium held without its bytes when she gives it again while it is erased', async () => {
     const receipts = createDrizzleReceiptStore(test.service.db);
-    const retention = createDrizzleRetentionStore(test.service.db);
+    const retention = createDrizzleRetentionStore(test.service.db, app.db.db);
     const removeRaw = (key: string) =>
       s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' }).then(() => undefined);
     const keptAgain = async (fileId: string, medium: Awaited<ReturnType<typeof mediumOf>>) => {

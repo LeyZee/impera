@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe('Entraîner header', () => {
-  it('shows the two modes, Chatting and the post of her channel, as tabs, and no tab for screens to come (ADR 0024)', async () => {
+  it('shows Chatting, the post of her channel and the corrections as tabs, and no tab for screens to come (ADR 0024)', async () => {
     const router = createAppRouter(
       { user: owner, onSignOut: () => undefined },
       createMemoryHistory({ initialEntries: ['/entrainer/playground'] }),
@@ -65,7 +65,51 @@ describe('Entraîner header', () => {
     expect(tabs.closest('.nv-page__actions')).toBeNull();
     expect(within(tabs).getByRole('link', { name: 'Chatting' })).toBeTruthy();
     expect(within(tabs).getByRole('link', { name: 'Post du canal' })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Corrections' })).toBeNull();
+    expect(within(tabs).getByRole('link', { name: 'Corrections' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Tests' })).toBeNull();
+  });
+
+  it('opens a manager the chat alone, without her channel’s posts nor any tab bar (ADR 0092 § 8)', async () => {
+    const manager: Me = {
+      ...owner,
+      id: 'u2',
+      role: 'operator',
+      team: { role: 'manager', status: 'active' },
+      teamScope: 'agency',
+    };
+    const router = createAppRouter(
+      { user: manager, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: ['/entrainer/playground'] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chatting' })).toBeTruthy();
+    expect(screen.queryByRole('navigation', { name: 'Entraîner' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Post du canal' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Corrections' })).toBeNull();
+  });
+
+  it('leads a manager who has the corrections’ address to the Playground (ADR 0092 § 8)', async () => {
+    const manager: Me = {
+      ...owner,
+      id: 'u2',
+      role: 'operator',
+      team: { role: 'manager', status: 'active' },
+      teamScope: 'agency',
+    };
+    const router = createAppRouter(
+      { user: manager, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: ['/entrainer/corrections'] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chatting' })).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/entrainer/playground');
   });
 });

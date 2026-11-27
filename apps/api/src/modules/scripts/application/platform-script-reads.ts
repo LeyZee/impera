@@ -19,7 +19,6 @@ import type {
   BranchInput,
   DescriptionReview,
   DiscountedPlatformScript,
-  IdentityReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
   SetBranchesOutcome,
@@ -48,6 +47,8 @@ interface PlatformStepMediaView {
   /** The media it is once its file is read; `null` before, or absent from the vault. */
   readonly mediaAssetId: string | null;
   readonly described: boolean;
+  /** Offered once (ADR 0145 § 2): never sold by a paid step. */
+  readonly offered: boolean;
   /** The description the agency reviews: the latest validated, else the latest written; `null` while none. */
   readonly description: ShownDescription | null;
 }
@@ -128,6 +129,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     imported: media.vault?.imported ?? false,
     mediaAssetId: media.vault?.mediaAssetId ?? null,
     described: (media.vault?.descriptionId ?? null) !== null,
+    offered: media.vault?.offered ?? false,
     description: media.vault?.shown ?? null,
   });
   // By rank, then the branches of a rank in the agency's order (ADR 0112 § 6): how the screen and the agent read them.
@@ -154,7 +156,9 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
   const gaps = platformScriptGaps(
     steps.map((step) => ({
       discounted: step.discount !== null,
+      paid: step.priceMinor > 0,
       media: [...step.media, ...step.previewMedia],
+      sold: step.media,
     })),
     identity?.validatedAt != null,
     branchGaps(branchSteps, script.branches),
@@ -181,6 +185,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     gaps,
     proposable: script.active && gaps.length === 0,
     identity,
+    ours: script.ours,
   };
 }
 
@@ -238,24 +243,8 @@ export async function accountPlatformScriptsForJob(
 }
 
 /**
- * The agency validates the identity shown for the script's current version, or writes one by hand (SC-04 lot c8, ADR
- * 0030 § 3): the owner and the active managers of her list. An identity of another version is `stale`.
- */
-export async function reviewScriptIdentity(
-  deps: { readonly store: ScriptIdentityReviewStore },
-  reader: PlatformScriptsReader,
-  creatorId: CreatorId,
-  scriptId: string,
-  review: IdentityReview,
-): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'> {
-  if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
-  return deps.store.review(creatorId, scriptId, review, reader.userId, currentInputHash);
-}
-
-/**
  * The agency validates the descriptions of a native script's media as shown, or rewrites one by hand (ADR 0030 § 3,
- * ADR 0099 § 4): the owner and the active managers of her list, as for its identity. Each write asks the identity
- * again, which is told only from validated descriptions.
+ * ADR 0099 § 4): the owner and the active managers of her list. No identity is asked after it any more (ADR 0161 § 5).
  */
 export async function reviewScriptDescriptions(
   deps: { readonly store: ScriptIdentityReviewStore },
@@ -263,10 +252,9 @@ export async function reviewScriptDescriptions(
   creatorId: CreatorId,
   scriptId: string,
   review: DescriptionReview,
-  correlationId: string,
 ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'> {
   if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
-  return deps.store.describe(creatorId, scriptId, review, reader.userId, correlationId);
+  return deps.store.describe(creatorId, scriptId, review, reader.userId);
 }
 
 /**

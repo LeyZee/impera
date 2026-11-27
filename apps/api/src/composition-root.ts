@@ -36,13 +36,17 @@ import type {
   AvatarPorts,
   ConnectorRegistry,
   ConnectorsModule,
+  LinkServiceReader,
   SalesFeedRegistry,
 } from './modules/connectors';
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
+import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './modules/creator-decisions';
 import type { CreatorTasksModule } from './modules/creator-tasks';
+import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
+import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
 import type { NotificationsModule } from './modules/notifications';
@@ -57,6 +61,8 @@ import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
+import { createClientErrorRoutes } from './observability/client-errors';
+import { INERT_ERROR_REPORTER, type ErrorReporter } from './observability/error-reporter';
 import { applyOwnerRemovalsUnscoped, createOwnersRoutes, relayOwnerAlertsUnscoped } from './owners';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { createPasswordResetRoutes } from './password-reset';
@@ -69,14 +75,20 @@ import { wireAgent } from './wiring/agent';
 import { wireAiBudget } from './wiring/ai-budget';
 import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
+import { wireAudit } from './wiring/audit';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
 import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
+import { wireCreatorLimits } from './wiring/creator-limits';
+import { wireCreatorMessages } from './wiring/creator-messages';
 import { wireCreatorTasks } from './wiring/creator-tasks';
+import { wireCreatorWeek } from './wiring/creator-week';
+import { wireCustomOrders } from './wiring/custom-orders';
 import { wireFans } from './wiring/fans';
+import { wireInstagramCaptions } from './wiring/instagram-captions';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
 import { wireMedia, wireVaultDescriptions } from './wiring/media';
@@ -108,6 +120,12 @@ interface Modules {
   readonly media: MediaModule;
   readonly notifications: NotificationsModule;
   readonly creatorTasks: CreatorTasksModule;
+  /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
+  readonly creatorWeek: CreatorWeekModule;
+  /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
+  readonly creatorDecisions: CreatorDecisionsModule;
+  /** The captions proposed for her Reels (ADR 0164 § 9): its job, called by the tests. */
+  readonly instagramCaptions: InstagramCaptionsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -149,6 +167,8 @@ export interface App {
    * own with a statement timeout. The worker builds it unused: its pool opens no connection until a first request.
    */
   readonly rateLimitStore: FastifyRateLimitStoreCtor;
+  /** Where production errors go (OPS-18): the server's 5xx, the worker's failed jobs, the dashboard's reports. */
+  readonly errorReporter: ErrorReporter;
   /** Closes the queue and the pools; the server and the worker are stopped before. */
   shutdown(): Promise<void>;
 }
@@ -186,6 +206,8 @@ export interface AppOptions {
   readonly connectorRegistry?: ConnectorRegistry;
   /** Tests plug FakeReveal's CRM API here; Reveal's own (`api.reveal.me`) otherwise. */
   readonly salesFeeds?: SalesFeedRegistry;
+  /** Tests plug a redirect service in memory here; the service over HTTPS otherwise (ADR 0120 § 3). */
+  readonly linkServiceReaderOf?: (key: string) => LinkServiceReader;
   /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
   readonly composer?: DraftComposer;
   /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
@@ -194,10 +216,10 @@ export interface AppOptions {
   readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
   readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
-  /** Tests plug a brain with a fixed identity here, for her native scripts (SC-04 lot c8); the app's gateway otherwise. */
-  readonly scriptIdentityBrain?: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
+  /** Tests only: another voice than the gateway's for the captions of her Reels (ADR 0164 § 9). */
+  readonly captionVoice?: Pick<LlmGateway, 'proposeCaptions'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -212,6 +234,8 @@ export interface AppOptions {
    * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
+  /** Tests only: the clock of « À décider » (ADR 0164), to pass a question's end. */
+  readonly decisionsClock?: () => Date;
   /**
    * Tests set the connectors' clock here, to make an unreachable register last a quarter of an hour (Telegram P3-12);
    * the system's otherwise.
@@ -234,6 +258,8 @@ export interface AppOptions {
   readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
+  /** The entry points give the one they started (`startErrorReporting`); inert otherwise (tests, scripts). */
+  readonly errorReporter?: ErrorReporter;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -312,6 +338,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const requireRole = createRequireRole(auth, db.db, shiftCreators);
   const passwordBreaches = options.passwordBreaches ?? breachCheckOf(config, logger);
+  const errorReporter = options.errorReporter ?? INERT_ERROR_REPORTER;
   const shared: Shared = {
     config,
     logger,
@@ -339,6 +366,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     ...(options.connectorRegistry !== undefined && { registry: options.connectorRegistry }),
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
+    ...(options.linkServiceReaderOf !== undefined && { linkServiceReaderOf: options.linkServiceReaderOf }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });
@@ -367,7 +395,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
-  const redirectLinks = wireRedirectLinks(shared);
+  const redirectLinks = wireRedirectLinks(shared, { detectLinks: connectors.module.detectedLinks });
+  const customOrders = wireCustomOrders(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
     channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
@@ -383,6 +412,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const creatorTasks = wireCreatorTasks(shared, {
     notifications: notifications.module,
     persona: persona.module,
+  });
+  const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
+  const creatorLimits = wireCreatorLimits(shared);
+  const creatorMessages = wireCreatorMessages(shared, { allCreatorIds: persona.allCreatorIds });
+  const creatorDecisions = createCreatorDecisionsModule({
+    db: shared.db,
+    requireRole: shared.requireRole,
+    // Late bound: the captions ask through this module's door, and this module asks them for other ideas.
+    otherIdeas: { caption: (ask) => instagramCaptions.module.otherIdeas(ask) },
+    notify: notifications.module.notify,
+    ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
   });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
@@ -402,6 +442,16 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
+    // Late bound: the captions read her described drops, and her drops tell them of each description.
+    onDescribed: (creatorId, mediaAssetId, correlationId) =>
+      instagramCaptions.module.described(creatorId, mediaAssetId, correlationId),
+  });
+  const instagramCaptions = wireInstagramCaptions(shared, {
+    gateway: options.captionVoice ?? llm.gateway,
+    contentDrops: contentDrops.module,
+    activePersona: persona.activePersona,
+    asking: creatorDecisions.asking,
+    ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
   });
   // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
   const vaultDescriptions = wireVaultDescriptions(shared, {
@@ -415,7 +465,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     contentDrops: contentDrops.module,
     connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
-    brain: options.scriptIdentityBrain ?? llm.gateway,
   });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
@@ -444,8 +493,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
+    connectors: connectors.module,
     scripts: scripts.module,
-    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
+    personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.6.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
@@ -458,6 +508,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     scripts: scripts.module,
     connectors: connectors.module,
+    customOrders: customOrders.module,
     ...(options.composer !== undefined && { composer: options.composer }),
   });
   const conversations = wireConversations(shared, {
@@ -467,6 +518,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     alerts: alerts.module,
     agent,
     media,
+    customOrders: customOrders.module,
     copilot: {
       // The copilot panel writes with the person's extension link (ADR 0086 § 8), read as a session would read him:
       // his creators and his shift's at each gesture (ADR 0025).
@@ -479,6 +531,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const audit = wireAudit(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
   // ElevenLabs bills characters, not money: its month comes from its own check (ADR 0091 § 7).
   const aiUsage = wireAiUsage(shared, llm, () => providers.module.voiceQuota());
@@ -535,6 +588,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media: media.module,
     notifications: notifications.module,
     creatorTasks: creatorTasks.module,
+    creatorWeek: creatorWeek.module,
+    creatorDecisions,
+    instagramCaptions: instagramCaptions.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -558,9 +614,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...instagramCaptions.tasks,
     ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
+    ...creatorWeek.tasks,
     ...trends.tasks,
     // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
     // never waits for push: with push off the alerts reach Telegram only.
@@ -648,6 +706,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         passwordBreaches,
         privateChat: telegram.module?.privateChat ?? null,
       }),
+      createClientErrorRoutes({ requireRole, reporter: errorReporter }),
       createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),
       createSecuritySettingsRoutes({
         auth,
@@ -675,13 +734,19 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         },
         // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
         async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+        agent.personaLanguagesOf,
       ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
       ...redirectLinks.routes,
+      ...creatorLimits.routes,
+      ...creatorMessages.routes,
+      ...customOrders.routes,
       ...creatorTasks.routes,
+      ...creatorWeek.routes,
+      creatorDecisions.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,
       ...contractors.routes,
@@ -689,6 +754,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
+      ...audit.routes,
       ...rewards.routes,
       ...aiUsage.routes,
       ...aiBudget.routes(llm),
@@ -703,6 +769,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),
     rateLimitStore: postgresRateLimitStore({ db: rateLimitDb.db, logger }),
+    errorReporter,
     async shutdown() {
       modules.providers.stop();
       llmLog.stop();

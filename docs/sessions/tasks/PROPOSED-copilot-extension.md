@@ -1,5 +1,6 @@
 # Poste du chatteur en copilote, dans l'extension sur Reveal : l'interface (ID à attribuer)
 Statut : proposed (décision de Charles le 17/10 à 21h44, recommandation du coordinateur ; à coder après la clé xAI et la capture Reveal)
+Avancement (21/11) : panneau de l'ADR 0141 lot a, synchro à l'ouverture (0147) et rapprochement des brouillons placés (0086 § 5) en PR #985. Reste : les boutons du lot b et « Réécrire avec une consigne » (après la route d'Agent), le nom de l'étape au survol, les interrupteurs du copilote dans la fiche créatrice et la fiche du fan modifiable dans le panneau (rapport « trous béants »).
 Phase : 3
 Dépend de : `docs/sessions/tasks/PROPOSED-copilot-api.md` (fil Bilan : contrat `copilot.ts`, routes, notes `live`), capture HAR Reveal (P1-02), lot A Reveal
 Branche : task/<id>-copilot-extension

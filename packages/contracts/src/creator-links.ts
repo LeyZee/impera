@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { LINK_PLACEMENTS, LinkPlacementSchema, type LinkPlacement } from './link-stats';
+import {
+  LINK_PLACEMENTS,
+  LinkHourTotalSchema,
+  LinkPlacementSchema,
+  LinkRefSchema,
+  type LinkPlacement,
+} from './link-stats';
 import {
   RedirectLinkIdSchema,
   RedirectLinkSchema,
@@ -93,9 +99,68 @@ export const AgencyRedirectLinkWriteSchema = RedirectLinkSchema.omit({ id: true 
 });
 export type AgencyRedirectLinkWrite = z.infer<typeof AgencyRedirectLinkWriteSchema>;
 
-/** A redirect link as the owner and an active manager read it: placed or not, on or off. */
-export const AgencyRedirectLinkSchema = AgencyRedirectLinkWriteSchema.extend({ id: RedirectLinkIdSchema });
+/**
+ * A redirect link as the owner and an active manager read it: placed or not, on or off. `attached` says whether the
+ * owner attached it to its link at the redirect service, so that its hours are read; how the service names it is
+ * never sent.
+ */
+export const AgencyRedirectLinkSchema = AgencyRedirectLinkWriteSchema.extend({
+  id: RedirectLinkIdSchema,
+  attached: z.boolean(),
+});
 export type AgencyRedirectLink = z.infer<typeof AgencyRedirectLinkSchema>;
 
 export const AgencyRedirectLinksResponseSchema = z.object({ links: z.array(AgencyRedirectLinkSchema) });
 export type AgencyRedirectLinksResponse = z.infer<typeof AgencyRedirectLinksResponseSchema>;
+
+/** The longest name the redirect service is read with: a longer one is cut by the adapter, never refused. */
+export const DETECTED_LINK_NAME_MAX = 200;
+
+/**
+ * A link as the redirect service lists it (ADR 0120 § 3): how the service names it, the name the agency gave it
+ * there, its address. Strict: nothing of a visitor, nor any figure, crosses with it.
+ */
+export const DetectedLinkSchema = z.strictObject({
+  ref: LinkRefSchema,
+  name: z.string().max(DETECTED_LINK_NAME_MAX),
+  url: RedirectUrlSchema,
+});
+export type DetectedLink = z.infer<typeof DetectedLinkSchema>;
+
+/**
+ * What « Détecter ses liens » proposes for one link found at the service: a name and a place prefilled by the code,
+ * to be corrected and confirmed by a person. `knownAs` is the link of hers that already has this address, null for
+ * a link we do not keep yet. A proposal writes nothing: only a person's click associates a link.
+ */
+export const LinkProposalSchema = z.strictObject({
+  ref: LinkRefSchema,
+  name: z.string().min(1).max(60),
+  url: RedirectUrlSchema,
+  placement: LinkPlacementSchema.nullable(),
+  knownAs: RedirectLinkIdSchema.nullable(),
+});
+export type LinkProposal = z.infer<typeof LinkProposalSchema>;
+
+/** What « Détecter ses liens » answers: the proposals, to be confirmed one by one. Nothing was written. */
+export const LinkProposalsResponseSchema = z.strictObject({ proposals: z.array(LinkProposalSchema) });
+export type LinkProposalsResponse = z.infer<typeof LinkProposalsResponseSchema>;
+
+/** How far back Trafic reads her links hour by hour: today against yesterday (INS-02 lot e3). */
+export const LINK_HOURS_SHOWN = 48;
+
+/** One hour of one of her links as the agency reads it: robots already removed, their number beside. */
+export const AgencyLinkHourSchema = LinkHourTotalSchema.extend({
+  linkId: RedirectLinkIdSchema,
+  /** The hour is over and its figures will not move. */
+  closed: z.boolean(),
+});
+export type AgencyLinkHour = z.infer<typeof AgencyLinkHourSchema>;
+
+/**
+ * `GET /v1/creators/:creatorId/redirect-links/hours`: the last `LINK_HOURS_SHOWN` hours of each of her links that the
+ * service counts, oldest first; an hour the service has not counted yet is absent, never a zero made up.
+ */
+export const AgencyLinkHoursResponseSchema = z.strictObject({
+  hours: z.array(AgencyLinkHourSchema).max(LINK_HOURS_SHOWN * 50),
+});
+export type AgencyLinkHoursResponse = z.infer<typeof AgencyLinkHoursResponseSchema>;

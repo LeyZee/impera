@@ -1,18 +1,34 @@
 /** Public entry point of the `creator-tasks` module (CR-05, ADR 0042 § 3 and § 4). Other modules import this file only. */
-import type { AgencySuggestion, NotificationOutcome, NotificationRequest } from '@impera/contracts';
+import type {
+  AgencySuggestion,
+  CreatorTask,
+  NotificationOutcome,
+  NotificationRequest,
+} from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { remind } from './application/remind';
 import type { AgendaFeedEntry } from './domain/feed';
-import type { ShootGuard, ShootSuggestion } from './domain/ports';
+import type { ShootGuard, ShootSuggestion, WeekAgendaStore } from './domain/ports';
 import { createDrizzleCreatorAgendaStore } from './infra/db/agenda-store';
 import { createDrizzleAgendaFeed } from './infra/db/feed-reads';
 import { createReminderSource } from './infra/db/reminder-source';
 import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
+import { createDrizzleWeekAgendaStore } from './infra/db/week-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 
-export type { GuardedShoot, ShootGuardFault, ShootSuggestion } from './domain/ports';
+export type {
+  GuardedShoot,
+  HerWeekFrame,
+  HerWeekRead,
+  ShootGuardFault,
+  ShootSuggestion,
+  WeekAgendaStore,
+  WeekFrames,
+} from './domain/ports';
+/** @public Her shooting days of a week and her dispos by weekday (ADR 0140 § 1), for the week's job. */
+export { dispoMinutesByWeekdayUnscoped, shootDaysOfWeekUnscoped } from './infra/db/week-store';
 /** @public Her days as the creator's game counts them (ADR 0107), for the composition root. */
 export { creatorDaysForGameUnscoped, type CreatorDaysForGame } from './infra/db/game-reads';
 
@@ -38,6 +54,13 @@ export interface CreatorTasksModule {
     userId: string,
     window: { readonly from: Date; readonly to: Date },
   ) => Promise<readonly AgendaFeedEntry[]>;
+  /** Her week in her agenda (ADR 0140 § 22 to § 27): written by the owner's validation, read and ticked by her. */
+  readonly week: WeekAgendaStore;
+  /**
+   * A suggestion she accepts as it is, in her own account: « Accepter ma semaine » (ADR 0140 § 27) accepts each frame
+   * by its own rules (placement, the past). Replayed, it answers the task it made.
+   */
+  readonly accept: (userId: string, suggestionId: string, now: Date) => Promise<CreatorTask>;
   /**
    * The task of `creator_tasks.remind` (CR-05 lot b3): her accounts told that a task is coming; null when push is off
    * (the reminder is then only in her agenda).
@@ -69,19 +92,16 @@ export interface CreatorTasksDeps {
 
 export function createCreatorTasksModule(deps: CreatorTasksDeps): CreatorTasksModule {
   const suggestions = createDrizzleSuggestionStore(deps.db);
+  const agenda = createDrizzleCreatorAgendaStore(deps.db);
   const source = createReminderSource(deps.adminDb);
   const { notify } = deps;
   return {
     name: 'creator-tasks',
-    routes: createCreatorTaskRoutes(
-      createDrizzleCreatorAgendaStore(deps.db),
-      suggestions,
-      deps.guardShoot,
-      deps.requireRole,
-      deps.clock,
-    ),
+    routes: createCreatorTaskRoutes(agenda, suggestions, deps.guardShoot, deps.requireRole, deps.clock),
     feedOf: createDrizzleAgendaFeed(deps.db),
     suggestShoot: (creatorId, userId, shoot, now) => suggestions.suggestShoot(creatorId, userId, shoot, now),
+    week: createDrizzleWeekAgendaStore(deps.db),
+    accept: (userId, suggestionId, now) => agenda.accept(userId, suggestionId, {}, now),
     remind: notify === null ? null : (payload, at) => remind({ source, notify }, payload, at),
   };
 }

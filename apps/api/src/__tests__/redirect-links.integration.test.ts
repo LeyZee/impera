@@ -1,4 +1,5 @@
 import {
+  AgencyLinkHoursResponseSchema,
   AgencyRedirectLinkSchema,
   AgencyRedirectLinksResponseSchema,
   CreatorIdSchema,
@@ -234,6 +235,49 @@ describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', (
       link('Canal'),
     );
     expect(elsewhere.statusCode, elsewhere.body).toBe(404);
+  });
+
+  it('gives the agency the last 48 hours of her links, and nobody else', async () => {
+    const { links } = AgencyRedirectLinksResponseSchema.parse(
+      (await call('GET', `/v1/creators/${nora}/redirect-links`, 'owner')).json(),
+    );
+    const story = links.find((one) => one.name === 'Story du jour');
+    if (story === undefined) throw new Error('fixture: the link « Story du jour » is missing');
+    const hourMs = 3_600_000;
+    const thisHour = Math.floor(Date.now() / hourMs) * hourMs;
+    const row = (hoursAgo: number, clicks: number) => ({
+      id: newId(z.uuid().brand<'RedirectLinkHourId'>()),
+      creatorId: nora,
+      linkId: story.id,
+      hour: new Date(thisHour - hoursAgo * hourMs),
+      pageviews: clicks * 2,
+      clicks,
+      robots: 1,
+      closed: hoursAgo > 0,
+      readAt: new Date(thisHour - hoursAgo * hourMs + (hoursAgo > 0 ? hourMs : 0)),
+    });
+    await test.admin.db
+      .insert(schema.redirectLinkHours)
+      .values([row(50, 9), row(47, 4), row(1, 3), row(0, 2)]);
+
+    for (const who of ['owner', 'manager'] as const) {
+      const read = await call('GET', `/v1/creators/${nora}/redirect-links/hours`, who);
+      expect(read.statusCode, read.body).toBe(200);
+      const { hours } = AgencyLinkHoursResponseSchema.parse(read.json());
+      // Oldest first, the 50th hour back left out, the hour still running not closed.
+      expect(hours.map((one) => [one.clicks, one.closed])).toEqual([
+        [4, true],
+        [3, true],
+        [2, false],
+      ]);
+      expect(hours.every((one) => one.linkId === story.id)).toBe(true);
+    }
+    const other = await call('GET', `/v1/creators/${ines}/redirect-links/hours`, 'owner');
+    expect(AgencyLinkHoursResponseSchema.parse(other.json()).hours).toEqual([]);
+    for (const who of ['nora', 'ines', 'chatter', 'outsideManager'] as const) {
+      const refused = await call('GET', `/v1/creators/${nora}/redirect-links/hours`, who);
+      expect(refused.statusCode, who).toBe(403);
+    }
   });
 
   it('asks the owner for a fresh confirmation before a write, never before a read', async () => {

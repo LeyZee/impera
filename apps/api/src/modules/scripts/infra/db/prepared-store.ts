@@ -38,6 +38,7 @@ const VaultRowSchema = z.object({
   platform_media_id: z.string(),
   kind: MediaSlotKindSchema,
   described: z.boolean(),
+  offered: z.boolean(),
 });
 
 /** The Postgres code behind a failed query (Drizzle wraps it as `cause`). */
@@ -59,7 +60,7 @@ const refsOf = (content: PreparedScriptContent) => [
 /**
  * Where these media stand in her vault for this account (`media_platform_refs`), under the caller's RLS: a link the
  * platform no longer lists (`removed_at`) is not in it; described = a description of its media a human validated, with
- * its `detailed` text, as the native scripts read it.
+ * its `detailed` text, as the native scripts read it; offered = offered once (ADR 0145 § 2, `vaultOffered`).
  */
 async function vaultOf(
   tx: Transaction,
@@ -75,7 +76,8 @@ async function vaultOf(
     select l.platform_media_id, l.kind,
       exists (select 1 from ${mediaDescriptions} md
         where md.media_asset_id = l.media_asset_id and md.validated_at is not null and md.content ? 'detailed')
-        as described
+        as described,
+      ${schema.vaultOffered({ sentForFreeAt: sql`l.sent_for_free_at`, mediaAsset: sql`l.media_asset_id` })} as offered
     from ${mediaPlatformRefs} l
     where l.platform_account_id = ${platformAccountId}::uuid
       and l.platform_media_id in (${list})
@@ -84,7 +86,10 @@ async function vaultOf(
     z
       .array(VaultRowSchema)
       .parse(result.rows)
-      .map((row) => [row.platform_media_id, { kind: row.kind, described: row.described }]),
+      .map((row) => [
+        row.platform_media_id,
+        { kind: row.kind, described: row.described, offered: row.offered },
+      ]),
   );
 }
 

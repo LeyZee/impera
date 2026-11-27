@@ -1,6 +1,6 @@
 # 0145. Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed, le code lit le rôle et jamais le nom
 
-Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; avenant du § 5 accepté le 17/11/2026, 14 h 17, « oki parfait » ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
+Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; avenant du § 5 accepté le 17/11/2026, 14 h 17, « oki parfait » ; second avenant du § 5 le 20/11/2026, l'écran ne montre que ce qui est dans Impera, accepté avec le lot de captures `coffre-choisir-1` ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
 Date : 2026-11-16
 Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR. Avenant du 17/11 : amende aussi l'ADR 0113 § 5 (la description du coffre ne part plus seule, par lots, mais sur une sélection confirmée) et l'ADR 0083 § 9 (plus d'interrupteur des descriptions : un dépôt est décrit à son arrivée).
 Précise : l'ADR 0056 (§ 5 la nomenclature, § 7 vers Reveal dans l'ordre), l'ADR 0113 § 5 (ce qui est décrit), l'ADR 0018 (garde d'écriture), l'ADR 0136 (feed) et l'ADR 0137 (Mass DM).
@@ -62,6 +62,14 @@ La garde vit dans le domaine. Elle est testée en unitaire et contre `FakeReveal
 - **Qui choisit.** Le propriétaire coche et lance. Un manager actif voit ce qui est importé et décrit, sans cocher ni lancer.
 - Les coches de l'écran sont des contrôles du design system, jamais des cases natives.
 
+*Avenant du 20/11/2026, sur la demande de Charles après avoir ouvert l'écran sur son PC (fil Bilan, 20/11, 16 h 29 et 16 h 33 UTC : « ça doit m'ouvrir ce qu'il y a dans Reveal […] et d'une fois que je clique synchroniser, ça m'importe uniquement les dossiers […] que j'ai sélectionnés » ; « les dossiers sont déjà tous importés de base […] il faut refaire le système »). En base, rien n'était importé : l'écran montrait toute la liste lue chez Reveal comme si elle l'était. Proposé avec le lot de captures `coffre-choisir-1` ; accepté avec son « ok captures ». Il remplace le troisième point ci-dessus et précise les autres :*
+
+- **L'écran du coffre ne montre que ce qui est dans Impera** : les dossiers dont au moins un média est importé (ou cochés entiers), et dans un dossier ses seuls médias importés. Ce qu'un dossier garde dans Reveal est dit en une ligne, avec un chemin pour le choisir.
+- **Un seul bouton, « Choisir dans Reveal »** (en tête du coffre, et dans l'état vide) : il relance la synchronisation (lecture gratuite, inchangée) et ouvre une fenêtre qui montre ce qu'elle lit, ses dossiers en cartes, la racine en dernier sous le nom « Médias hors dossier ». Une carte coche son dossier entier ; « Voir les médias » l'ouvre pour cocher média par média. Rien n'est écrit avant « Importer », qui dit ce qui entre et ce qui sort. Un média non importé n'est visible que dans cette fenêtre.
+- **« Retirer d'Impera »** se fait depuis un dossier importé, sur une sélection, après une fenêtre qui dit ce qui reste : rien ne bouge dans Reveal, les descriptions sont gardées pour un import ultérieur.
+- **Le flou suit partout le réglage du menu** (« Flou des médias »), dans la fenêtre comme en mode Sélectionner.
+- Les règles des coches, de la description à la demande et de qui choisit ne changent pas. Le serveur ne change pas.
+
 ### 6. Ce que la capture a montré, et l'idempotence
 
 La capture ciblée a été faite le 16/11 sur le PC de Charles et lue sur place par le fil Bilan, formes seulement. Créer un dossier, c'est un appel qui prend un nom. Téléverser se fait en trois temps (une URL signée, l'envoi des octets vers un hôte de stockage déjà écrit dans le code par l'ADR 0113 § 2, puis la création du média rattaché à son dossier). Aucun appel pour déplacer un média existant n'a été vu. Reveal n'offre ni en-tête d'idempotence ni contrôle de doublon connu : l'idempotence est la nôtre. Avant de créer un dossier, le connecteur relit la liste et reprend un dossier du même nom. Avant de créer un média, il cherche dans le dossier le fichier de même empreinte, et chaque envoi porte sa clé dans notre journal. Ces formes entrent dans `docs/reference/reveal-api-observed.md`, puis dans `FakeReveal` avant tout code. Le renommage, l'archivage et la suppression vus dans la capture sont notés « jamais appelés ». Rien n'est créé sur un vrai compte sans le mot de Charles écrit dans le fil qui exécute.
@@ -85,3 +93,13 @@ La capture ciblée a été faite le 16/11 sur le PC de Charles et lue sur place 
 
 1. Le nom d'un dossier de script : « fais ce que tu me recommandes », avec la tenue que porte la modèle en plus du thème (§ 3).
 2. Les dossiers système « Mass DM » et « Feed » de Reveal : « si on peut directement ajouter des médias dans ces dossiers-là, alors go » (17 h 35). La capture a montré que non. Amendement de Charles (17 h 41) : « il va bien falloir qu'on les crée nous, comme ça on peut les ajouter nous et les gérer nous » (§ 3).
+
+## Avenant du 21/11/2026 : la garde du § 2 est codée par la marque du média
+
+La règle de Charles (« un média offert n'est jamais revendu, un média de script n'est jamais gratuit ») est codée sans attendre les rôles de dossier. Elle lit la **marque du média**, qui l'emporte déjà sur le dossier (§ 2) :
+
+- **Offert.** Un média est offert dès que la synchronisation du coffre lit que Reveal l'a envoyé gratuitement (son `sentForFree`). La date de cette première lecture est gardée (`media_platform_refs.sent_for_free_at`) et ne s'efface jamais, même si Reveal cesse de le dire. Un média dont le fichier part dans un dépôt gratuit de la créatrice (feed, story, Instagram, Telegram, Mass DM), non retiré, est offert aussi.
+- **Jamais revendu.** Une étape payante d'un script natif qui vend un média offert rend le script non proposable (manque `media_offered`) : l'agent ne le propose plus. Un script en préparation dont une branche payante vend un média offert ne passe pas « prêt à copier ». Une étape offerte ou un aperçu ne sont pas concernés : rien n'y est vendu.
+- **Jamais gratuit.** Un média gardé par un dépôt de script non retiré, ou vendu par une étape payante d'un script natif actif, est laissé hors de l'archive d'un dépôt gratuit, et la fiche le dit. Toute autre sortie gratuite (publication Telegram, Mass DM automatique) lit la même règle (`mediaInScript`).
+
+Les rôles de dossier (§ 1) et leur écran restent à faire : pas de nouvel écran sans le feu vert de Charles. Ce que Reveal compte exactement dans `sentForFree` (les aperçus d'un PPV payant, par exemple) sera vu à la première vraie lecture ; `FakeReveal` compte les médias joints à un message et ceux d'un PPV à 0.

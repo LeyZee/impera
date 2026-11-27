@@ -5,6 +5,7 @@ import {
   MessageIdSchema,
   newId,
   PlatformAccountIdSchema,
+  UserIdSchema,
   type CreatorId,
   type FanCardView,
   type FanId,
@@ -47,6 +48,13 @@ describe('the fan’s card (GET /v1/fans/:id/card, PUT /v1/fans/:id/card/:field,
       url: `/v1/fans/${fan}/card/${field}?creatorId=${creatorId}`,
       headers: { cookie, origin: DASHBOARD_ORIGIN },
       payload,
+    });
+  const retract = (cookie: string, factId: string, creatorId: string = anna) =>
+    server.inject({
+      method: 'POST',
+      url: `/v1/fans/${fan}/card/others/retract?creatorId=${creatorId}`,
+      headers: { cookie, origin: DASHBOARD_ORIGIN },
+      payload: { factId },
     });
   const entry = (card: FanCardView, field: string) => card.fields.find((one) => one.field === field);
   const read = async (cookie: string): Promise<FanCardView> =>
@@ -242,6 +250,45 @@ describe('the fan’s card (GET /v1/fans/:id/card, PUT /v1/fans/:id/card/:field,
       sourceQuote: 'je bosse à l’hôpital, de nuit',
     });
     expect(entry(card, 'pets')?.current).toMatchObject({ sourceMessageId: hers, sourceQuote: null });
+  });
+
+  it('names who left a line of « Autres », and « Retirer » takes it off for the agent too (trou béant 17)', async () => {
+    await app.modules.fans.proposeFacts(anna, fan, [
+      {
+        category: 'operator_note',
+        key: 'note_1',
+        value: 'Ne jamais parler de sa femme',
+        kind: 'declared',
+        confidence: 1,
+        sourceMessageId: null,
+        observedAt: new Date('2026-11-03T10:00:00Z'),
+        notedBy: UserIdSchema.parse(operatorId),
+      },
+    ]);
+    const [line] = (await read(owner)).others.filter((other) => other.key === 'note_1');
+    expect(line).toMatchObject({ source: 'noted', notedBy: operatorId, notedByName: 'Operator' });
+    if (line === undefined) throw new Error('no line');
+
+    // The creator never; another creator's id never reaches Anna's fan.
+    expect((await retract(creator, line.factId)).statusCode).toBe(403);
+    expect((await retract(owner, line.factId, bea)).statusCode).toBe(404);
+
+    const after = await retract(owner, line.factId);
+    expect(after.statusCode).toBe(200);
+    expect(FanCardViewSchema.parse(after.json()).others.some((other) => other.key === 'note_1')).toBe(false);
+    expect(
+      (await app.modules.fans.activeFacts(anna, fan)).some(
+        (fact) => fact.value === 'Ne jamais parler de sa femme',
+      ),
+    ).toBe(false);
+    // Nothing deleted: the line stays in the history, superseded by an empty line in the owner's name.
+    const rows = await test.admin.db
+      .select({ value: schema.fanFacts.value, supersededBy: schema.fanFacts.supersededBy })
+      .from(schema.fanFacts)
+      .where(eq(schema.fanFacts.key, 'note_1'));
+    expect(rows).toHaveLength(2);
+    // Twice, or a field: not one of his « Autres ».
+    expect((await retract(owner, line.factId)).statusCode).toBe(404);
   });
 
   it('refuses the creator, another creator and an unknown fan', async () => {

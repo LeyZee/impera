@@ -41,7 +41,7 @@ function script(steps: PreparedBranch[][], over: Partial<PreparedScriptContent> 
 }
 
 const described = (refs: string[]): Map<string, PreparedVaultMedia> =>
-  new Map(refs.map((ref) => [ref, { kind: 'image', described: true }]));
+  new Map(refs.map((ref) => [ref, { kind: 'image', described: true, offered: false }]));
 
 const none: BranchCondition = { kind: 'none' };
 const text: BranchCondition = { kind: 'text', text: "S'il a dit aimer les robes" };
@@ -51,6 +51,8 @@ describe('what keeps a script in preparation from being ready to copy', () => {
   it('has no gap when every field is written and every media is in her vault, described', () => {
     const content = script([[branch(1)], [branch(2, { priceMinor: 1200 })]]);
     expect(preparedScriptGaps(content, described(['m1', 'm2']), noLimits)).toEqual([]);
+    // Played the day and the night alike (« polyvalent »): a moment like the others, no gap of its own.
+    expect(preparedScriptGaps({ ...content, moment: 'both' }, described(['m1', 'm2']), noLimits)).toEqual([]);
   });
 
   it('names the missing name, description, offer text and media, where they are', () => {
@@ -64,10 +66,21 @@ describe('what keeps a script in preparation from being ready to copy', () => {
     ]);
   });
 
+  it('never sells a media offered once: a paid branch with one is a gap, an offered branch is not (ADR 0145 § 2)', () => {
+    const vault = new Map<string, PreparedVaultMedia>([
+      ['m1', { kind: 'image', described: true, offered: true }],
+      ['m2', { kind: 'image', described: true, offered: true }],
+    ]);
+    const content = script([[branch(1, { priceMinor: 0 })], [branch(2, { priceMinor: 1200 })]]);
+    expect(preparedScriptGaps(content, vault, noLimits).map((gap) => [gap.code, gap.step])).toEqual([
+      ['media_offered', 1],
+    ]);
+  });
+
   it('asks a description for a photo or a video, never for a voice note, and the media to be in her vault', () => {
     const vault = new Map<string, PreparedVaultMedia>([
-      ['m1', { kind: 'image', described: false }],
-      ['m2', { kind: 'audio', described: false }],
+      ['m1', { kind: 'image', described: false, offered: false }],
+      ['m2', { kind: 'audio', described: false, offered: false }],
     ]);
     const content = script([[branch(1)], [branch(2)], [branch(3)]]);
     const gaps = preparedScriptGaps(content, vault, noLimits).map((gap) => [gap.code, gap.step]);

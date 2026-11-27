@@ -28,6 +28,7 @@ import { createLogger } from '../../../../logger';
 import { buildServer } from '../../../../server';
 import type { CalibrationRecord, CalibrationStore, VoiceExample } from '../../../agent/index';
 import { createPlaygroundModule, type HerScriptsSource } from '../../index';
+import type { VoiceBankStore } from '../db/rating-store';
 
 const BRIEF: Brief = {
   intent: 'small_talk',
@@ -88,6 +89,7 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     instagramComment: () => Promise.reject(new Error('not used')),
+    proposeCaptions: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
@@ -114,15 +116,24 @@ const ownerOnly: preValidationAsyncHookHandler = async (request, reply) => {
     await reply.code(403).send({ error: 'forbidden' });
     return;
   }
+  // `x-test-as`: a manager (his list in `x-test-creators`) or a chatter, as `requireRole('owner', 'operator')` lets in.
+  const as = request.headers['x-test-as'];
+  const list = request.headers['x-test-creators'];
+  const operator = as === 'manager' || as === 'chatter';
   request.user = {
     id,
     email: `${id}@example.test`,
     name: id,
-    role: 'owner',
-    creatorIds: [],
+    role: operator ? 'operator' : 'owner',
+    creatorIds: typeof list === 'string' && list !== '' ? list.split(',') : [],
     routedCreatorIds: [],
     shiftCreatorIds: [],
   };
+  request.membership = operator
+    ? as === 'manager'
+      ? { teamScope: 'agency', team: { role: 'manager', status: 'active' } }
+      : { teamScope: 'self', team: { role: 'chatter', status: 'active' } }
+    : null;
 };
 
 /** The fictional demo persona of the repository, stored as a creator's version (ADR 0010: never a real one). */
@@ -144,6 +155,7 @@ async function server(
     creatorId?: string | null;
     herScripts?: HerScriptsSource;
     voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
+    bank?: VoiceBankStore;
   } = {},
 ) {
   const records: CalibrationRecord[] = [];
@@ -189,6 +201,7 @@ async function server(
     ...(options.creatorId !== undefined && { creatorId: () => Promise.resolve(options.creatorId ?? null) }),
     ...(options.herScripts !== undefined && { herScripts: options.herScripts }),
     ...(options.voiceExamplesOf !== undefined && { voiceExamplesOf: options.voiceExamplesOf }),
+    ...(options.bank !== undefined && { bank: options.bank }),
   });
   const config = testConfig();
   const app = await buildServer({
@@ -304,8 +317,8 @@ describe('/v1/playground', () => {
   it('reads her own scripts with one of her versions, and says at once why the trial ones play instead (ADR 0103 § 15)', async () => {
     const asked: [string, string][] = [];
     const { post } = await server({
-      herScripts: (creatorId, userId) => {
-        asked.push([creatorId, userId]);
+      herScripts: (creatorId, trainer) => {
+        asked.push([creatorId, trainer.userId]);
         return Promise.resolve({ kind: 'none', reason: 'none_ready' });
       },
     });
@@ -639,5 +652,102 @@ describe('POST /v1/alerts/test (P4-01)', () => {
       payload: { alert, message: 'coucou' },
     });
     expect(response.statusCode).toBe(400);
+  });
+});
+
+describe('/v1/playground for a manager (ADR 0092 § 8, trou 11)', () => {
+  const OTHER = CreatorIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c2');
+  const emptyBank: VoiceBankStore = {
+    list: () => Promise.resolve([]),
+    withdraw: () => Promise.resolve(true),
+  };
+
+  async function asManager(list: readonly string[] = [MIA]) {
+    const built = await server({ bank: emptyBank });
+    const manager = {
+      ...built.headers,
+      'x-test-user': 'pierre',
+      'x-test-as': 'manager',
+      'x-test-creators': list.join(','),
+    };
+    return { ...built, manager };
+  }
+
+  it('plays the creators of his list alone', async () => {
+    const { post, manager } = await asManager();
+    const hers = await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT }, manager);
+    expect(hers.statusCode).toBe(200);
+    expect(stateOf(hers).persona.played).toMatchObject({ creatorId: MIA });
+    const other = await post('/persona', { kind: 'version', creatorId: OTHER, versionId: DRAFT }, manager);
+    expect(other.statusCode).toBe(403);
+    expect(codeOf(other)).toBe('creator_forbidden');
+  });
+
+  it('finds the invented persona again once she is taken off his list', async () => {
+    const { app, post, manager } = await asManager();
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT }, manager);
+    const after = { ...manager, 'x-test-creators': OTHER };
+    const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers: after }));
+    expect(state.persona).toEqual({ name: 'Lina', played: null });
+  });
+
+  it('notes and corrects, but files nothing in her bank: that stays the owner’s', async () => {
+    const { post, stored, manager } = await asManager();
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT }, manager);
+    await post('/messages', { text: 'Salut' }, manager);
+    const filed = await post(
+      '/rating',
+      { verdict: { kind: 'corrected', text: 'Coucou toi ✨' }, destination: 'voice_example' },
+      manager,
+    );
+    expect(filed.statusCode).toBe(403);
+    expect(codeOf(filed)).toBe('voice_bank_owner_forbidden');
+
+    const corrected = await post(
+      '/rating',
+      { verdict: { kind: 'corrected', text: 'Coucou toi ✨' } },
+      manager,
+    );
+    expect(corrected.statusCode).toBe(200);
+    expect(PlaygroundRatingResultSchema.parse(corrected.json()).destination).not.toBe('voice_example');
+    expect(stored.at(-1)).toMatchObject({ verdict: { kind: 'corrected', text: 'Coucou toi ✨' } });
+    expect(stored.at(-1)?.destination).not.toBe('voice_example');
+  });
+
+  it('reads her bank, withdraws nothing, and tests no alert', async () => {
+    const { app, post, manager } = await asManager();
+    const bank = (creatorId: string) =>
+      app.inject({
+        method: 'GET',
+        url: `/v1/playground/bank?creatorId=${creatorId}&versionId=${DRAFT}`,
+        headers: manager,
+      });
+    expect((await bank(MIA)).statusCode).toBe(200);
+    expect(codeOf(await bank(OTHER))).toBe('creator_forbidden');
+    const withdraw = await post(
+      '/bank/withdraw',
+      { creatorId: MIA, versionId: DRAFT, id: '0199f2a0-0000-7000-8000-0000000000f1' },
+      manager,
+    );
+    expect(codeOf(withdraw)).toBe('voice_bank_owner_forbidden');
+    const alert = await app.inject({
+      method: 'POST',
+      url: '/v1/alerts/test',
+      headers: manager,
+      payload: {
+        creatorId: MIA,
+        alert: { phrase: 'Il demande une vidéo', keywords: ['vidéo'] },
+        message: 'Salut',
+      },
+    });
+    expect(codeOf(alert)).toBe('role_forbidden');
+  });
+
+  it('stays closed to a chatter', async () => {
+    const { app, headers } = await server();
+    const chatter = { ...headers, 'x-test-user': 'lea', 'x-test-as': 'chatter', 'x-test-creators': MIA };
+    const response = await app.inject({ method: 'GET', url: '/v1/playground', headers: chatter });
+    expect(response.statusCode).toBe(403);
+    expect(codeOf(response)).toBe('role_forbidden');
   });
 });

@@ -90,20 +90,6 @@ export function percentText(share: number): string {
   return `${share.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u00a0%`;
 }
 
-/**
- * How « Les fans qui paient » names its biggest spenders: ten at most, the count they are below ten, one alone in the
- * singular (PAY-16: « Les 10 fans » said of three).
- */
-export function topFansWords(paying: number): { readonly lead: string; readonly short: string } {
-  const count = Math.min(10, Math.max(1, paying));
-  return count === 1
-    ? { lead: 'Le fan qui dépense le plus fait', short: 'le plus gros fan' }
-    : {
-        lead: `Les ${String(count)} fans qui dépensent le plus font`,
-        short: `les ${String(count)} plus gros fans`,
-      };
-}
-
 /** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
 export function exactEuros(cents: number): string {
   return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
@@ -296,7 +282,8 @@ export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
 export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>> = {
   member: 'Les ventes des membres de l’équipe, reliés à leur compte Reveal.',
   agent: 'Ce que l’agent a vendu seul, sur la clé de l’agence.',
-  unlinked: 'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Reveal).',
+  unlinked:
+    'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Comptes Reveal).',
   none: 'Une vente sans chatteur : un abonnement, un renouvellement, un tip spontané.',
 };
 
@@ -433,29 +420,6 @@ export function heatOf(cents: number, max: number): number {
   return max > 0 ? Math.round((cents / max) * 100) / 100 : 0;
 }
 
-/** An arc of a ring of `radius`: its dash and where it starts, clockwise from the top, a gap between arcs. */
-export function arcs(
-  values: readonly number[],
-  radius: number,
-  gap = 2,
-): { readonly dash: string; readonly offset: number }[] {
-  const circumference = 2 * Math.PI * radius;
-  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
-  const shown = values.filter((value) => value > 0).length;
-  const round = (n: number): number => Math.round(n * 100) / 100;
-  let start = 0;
-  return values.map((value) => {
-    const length = total > 0 ? (Math.max(0, value) / total) * circumference : 0;
-    const visible = shown > 1 ? Math.max(0, length - gap) : length;
-    const arc = {
-      dash: `${String(round(visible))} ${String(round(circumference))}`,
-      offset: start === 0 ? 0 : round(-start),
-    };
-    start += length;
-    return arc;
-  });
-}
-
 /** « heure de Paris » for the platform's zone: the city of an IANA zone, its last part. */
 export function zoneLabel(timeZone: string): string {
   const city = timeZone.split('/').pop()?.replaceAll('_', ' ') ?? timeZone;
@@ -483,4 +447,49 @@ export function ppvRate(sent: number | null, purchased: number): number | null {
 export function signedCount(n: number): string {
   const text = Math.abs(n).toLocaleString('fr-FR');
   return n > 0 ? `+${text}` : n < 0 ? `−${text}` : '0';
+}
+
+/** A refund's kind, one sale's word (ADR 0092 § 4): the ring's names, the folded ones said each. */
+export const REFUND_KIND: Readonly<Record<AgencySaleKind, string>> = {
+  subscriptions: 'Abonnement',
+  ppv: 'PPV en privé',
+  mass_dm: 'Mass DM',
+  tips: 'Tip',
+  payment_links: 'Lien de paiement',
+  boudoir: 'Boudoir',
+  paid_messages: 'Message payant',
+  other: 'Autre vente',
+};
+
+/** How long after its sale a refund came: « le jour même », « 3 jours après »; none for a sale out of the register. */
+export function refundDelayLabel(days: number | null): string {
+  if (days === null) return 'vente hors registre';
+  if (days === 0) return 'le jour même';
+  return `${days.toLocaleString('fr-FR')} jour${days > 1 ? 's' : ''} après`;
+}
+
+/** When a refund came, always with its day: « 6 nov., 14 h 05 », in the platform's zone. */
+export function refundDateLabel(iso: string, timeZone: string): string {
+  const at = new Date(iso);
+  const time = at
+    .toLocaleTimeString('fr-FR', { timeZone, hour: 'numeric', minute: '2-digit' })
+    .replace(':', '\u00a0h\u00a0');
+  return `${at.toLocaleDateString('fr-FR', { timeZone, day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+/** A seller's key in the refunds' filter: a member by id, the others by kind. */
+export const sellerKeyOf = (seller: DashboardSalesSeller): string =>
+  seller.kind === 'member' ? `member:${seller.memberId}` : seller.kind;
+
+/** The refunds a filter keeps: one creator or all, one seller or all (`'all'`). */
+export function refundsKept(
+  list: AgencyInsights['refundList'],
+  creatorId: string,
+  seller: string,
+): AgencyInsights['refundList'] {
+  return list.filter(
+    (one) =>
+      (creatorId === 'all' || one.creatorId === creatorId) &&
+      (seller === 'all' || sellerKeyOf(one.seller) === seller),
+  );
 }

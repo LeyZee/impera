@@ -107,7 +107,12 @@ function playground(client: Pick<PlaygroundClient, 'bank' | 'withdrawExample'>):
   };
 }
 
-function mount(state: PlaygroundState, bank: VoiceBank, withdraw?: (id: string) => Promise<VoiceBank>) {
+function mount(
+  state: PlaygroundState,
+  bank: VoiceBank,
+  withdraw?: (id: string) => Promise<VoiceBank>,
+  mayWithdraw = true,
+) {
   const asked: string[] = [];
   const pg = playground({
     bank: () => Promise.resolve(bank),
@@ -119,7 +124,7 @@ function mount(state: PlaygroundState, bank: VoiceBank, withdraw?: (id: string) 
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={queries}>
-      <VoiceBankFold state={state} pg={pg} />
+      <VoiceBankFold state={state} pg={pg} mayWithdraw={mayWithdraw} />
     </QueryClientProvider>,
   );
   return { asked, view };
@@ -171,5 +176,12 @@ describe('Sa banque (ADR 0102 § 5)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
     fireEvent.click(last(screen.getAllByRole('button', { name: 'Retirer' })));
     expect((await screen.findByRole('alert')).textContent).toContain('Pas retiré');
+  });
+
+  it('lets a manager read her bank, never withdraw from it (ADR 0092 § 8)', async () => {
+    mount(STATE, { examples: [READ, STOPPED] }, undefined, false);
+    expect(await screen.findByText('Hey toi, tu fais quoi ?')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Retirer' })).toBeNull();
+    expect(screen.getByText(/^Les corrections rangées en Exemple de voix par le propriétaire,/)).toBeTruthy();
   });
 });

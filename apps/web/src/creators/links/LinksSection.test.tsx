@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
-import { REAUTHENTICATION_ERROR_CODE } from '@impera/contracts';
+import { AgencyRedirectLinkSchema, REAUTHENTICATION_ERROR_CODE } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { LinksSection } from './LinksSection';
 
 import { choose } from '@/test/select';
+
+// The one router link of the section (to Réglages) as a plain anchor: the section is rendered without a router.
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, className, children }: { to: string; className?: string; children: ReactNode }) => (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  ),
+}));
 
 /* An invented creator and invented links: no real person, no real address. */
 const CREATOR = '0192f3a0-0000-7000-8000-0000000000c1';
@@ -19,6 +29,7 @@ const STORY = {
   placement: 'story_daily',
   usageNote: 'À coller dans ta story du jour',
   enabled: true,
+  attached: false,
 };
 const OLD = {
   id: '0192f3a0-0000-7000-8000-0000000000e2',
@@ -28,6 +39,7 @@ const OLD = {
   placement: null,
   usageNote: '',
   enabled: true,
+  attached: false,
 };
 
 interface Write {
@@ -93,7 +105,7 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     await waitFor(() => {
       expect(writes).toHaveLength(1);
     });
-    const { id, ...rest } = STORY;
+    const { id, ...rest } = AgencyRedirectLinkSchema.omit({ attached: true }).parse(STORY);
     expect(writes[0]).toEqual({
       method: 'PUT',
       path: `/v1/creators/${CREATOR}/redirect-links/${id}`,
@@ -106,7 +118,11 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
       [],
       (write) =>
         new Response(
-          JSON.stringify({ ...z.record(z.string(), z.unknown()).parse(write.body), id: STORY.id }),
+          JSON.stringify({
+            ...z.record(z.string(), z.unknown()).parse(write.body),
+            id: STORY.id,
+            attached: false,
+          }),
         ),
     );
     renderSection();
@@ -214,5 +230,148 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     expect(screen.queryByText(/confirme ton mot de passe/u)).toBeNull();
     expect(screen.getByRole('switch').getAttribute('aria-label')).toBe(before);
     expect(writes).toHaveLength(1);
+  });
+});
+
+/* Invented links of an invented account: opaque references, an address that leads nowhere. */
+const FOUND = [
+  {
+    ref: 'ref-1',
+    name: 'Story à la une',
+    url: 'https://liens.example.test/a',
+    placement: 'story_highlight',
+    knownAs: null,
+  },
+  {
+    ref: 'ref-2',
+    name: 'Lien d’une autre',
+    url: 'https://liens.example.test/b',
+    placement: null,
+    knownAs: null,
+  },
+  { ref: 'ref-3', name: 'Story du jour', url: STORY.url, placement: 'story_daily', knownAs: STORY.id },
+];
+
+describe('« Détecter ses liens » (INS-02)', () => {
+  const detectPath = `/v1/creators/${CREATOR}/redirect-links/detect`;
+
+  it('lists what the service has that she does not, and adds one only through the dialog, prefilled', async () => {
+    const writes = serve([STORY], (write) =>
+      write.path === detectPath
+        ? new Response(JSON.stringify({ proposals: FOUND }))
+        : new Response(
+            JSON.stringify({ ...z.record(z.string(), z.unknown()).parse(write.body), id: OLD.id }),
+          ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Détecter ses liens' }));
+    const found = await screen.findByRole('list', { name: 'Liens trouvés dans le service' });
+    expect(within(found).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText('2 liens trouvés')).toBeDefined();
+    expect(screen.getByText(/n’ajoute que ceux de Nora/u)).toBeDefined();
+    expect(screen.getByText('1 autre est déjà dans ses liens.')).toBeDefined();
+    // Reading wrote nothing: one call, the detection itself, with no body.
+    expect(writes).toEqual([{ method: 'POST', path: detectPath, body: null }]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter le lien « Story à la une »' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Nom').value).toBe('Story à la une');
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Adresse').value).toBe(
+      'https://liens.example.test/a',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(2);
+    });
+    // Saved as any new link, by the route that asks the owner: nothing of the service's reference goes with it.
+    expect(writes[1]).toEqual({
+      method: 'POST',
+      path: `/v1/creators/${CREATOR}/redirect-links`,
+      body: {
+        name: 'Story à la une',
+        url: 'https://liens.example.test/a',
+        destination: '',
+        placement: 'story_highlight',
+        usageNote: '',
+        enabled: true,
+      },
+    });
+  });
+
+  it('says so when the account has nothing she lacks', async () => {
+    serve([STORY], () => new Response(JSON.stringify({ proposals: [FOUND[2]] })));
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Détecter ses liens' }));
+    expect(await screen.findByText('Rien de nouveau')).toBeDefined();
+    expect(screen.queryByRole('list', { name: 'Liens trouvés dans le service' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
+    expect(screen.queryByText('Rien de nouveau')).toBeNull();
+  });
+
+  it('sends the owner to Réglages when no key is kept, in the server’s own words', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'link_service_unprocessable',
+              message: 'Aucune clé du service de liens n’est enregistrée. Colle-la dans Réglages.',
+              details: { kind: 'not_connected' },
+              requestId: 'r1',
+            },
+          }),
+          { status: 422 },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Détecter ses liens' }));
+    expect(await screen.findByText(/Aucune clé du service de liens/u)).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Ouvrir Réglages › Plateformes' }).getAttribute('href')).toBe(
+      '/reglages/ventes',
+    );
+  });
+
+  it('is not offered to a manager', async () => {
+    serve([STORY]);
+    renderSection(false);
+    await screen.findByRole('list', { name: 'Liens de redirection' });
+    expect(screen.queryByRole('button', { name: 'Détecter ses liens' })).toBeNull();
+  });
+
+  it('lets the owner link a link to the service, says « Relié » to all once done, and nothing to a manager', async () => {
+    const writes = serve([STORY], () => new Response(JSON.stringify({ ...STORY, attached: true })));
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /^Relier le lien « Story du jour »/u }));
+    await waitFor(() => {
+      expect(writes).toEqual([
+        { method: 'POST', path: `/v1/creators/${CREATOR}/redirect-links/${STORY.id}/attach`, body: null },
+      ]);
+    });
+    cleanup();
+    serve([{ ...STORY, attached: true }, OLD]);
+    renderSection(false);
+    await screen.findByText('Relié');
+    expect(screen.queryByRole('button', { name: /^Relier/u })).toBeNull();
+  });
+
+  it('says why a link could not be linked, in the words of the screen', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: { code: 'redirect_link_unmatched_conflict', message: 'x', details: {}, requestId: 'r2' },
+          }),
+          {
+            status: 409,
+          },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /^Relier le lien « Story du jour »/u }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Aucun lien du service de redirection n’a cette adresse.',
+    );
   });
 });

@@ -93,6 +93,12 @@ export const platformAccounts = pgTable(
      * shows. Written by `connector.vault_sync` only; the media themselves are in `media_platform_refs`.
      */
     vaultSyncedAt: timestampTz('vault_synced_at'),
+    /**
+     * Her bio on her platform profile, as last read (ADR 0154): what every subscriber could read, given to the agent
+     * beside her persona. Read only, never written to the platform; a failed read keeps the last one. `null` until read.
+     */
+    profileBio: text('profile_bio'),
+    profileBioReadAt: timestampTz('profile_bio_read_at'),
     /** Circuit breaker (connectors.md): failed polls in a row, and until when the account stays quiet. */
     consecutiveErrors: integer('consecutive_errors').notNull().default(0),
     pausedUntil: timestampTz('paused_until'),

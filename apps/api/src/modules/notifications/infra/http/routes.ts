@@ -1,5 +1,8 @@
 import {
   NotificationKindsSchema,
+  NOTIFICATION_INBOX_DAYS,
+  NOTIFICATION_INBOX_MAX,
+  NotificationInboxSchema,
   NotificationPreferencesSchema,
   PushPublicKeySchema,
   PushSubscriptionInputSchema,
@@ -13,6 +16,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { preferencesOf, publicKey, sendTest, subscribe, type DevicesDeps } from '../../application/devices';
+import type { InboxReader } from '../../domain/ports';
 
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
@@ -30,6 +34,8 @@ function signedIn(user: { readonly id: string } | null): string {
 export function createNotificationRoutes(
   deps: DevicesDeps | null,
   requireRole: RequireRole,
+  inbox: InboxReader,
+  now: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
   const ready = (): DevicesDeps => {
     if (deps === null) {
@@ -101,6 +107,17 @@ export function createNotificationRoutes(
       async (request) => {
         await ready().preferences.putKinds(signedIn(request.user), request.body);
         return request.body;
+      },
+    );
+
+    // « Tes notifications » (trou 9 du 21/11): read back whether push is on or off on this server.
+    app.get(
+      '/notifications/inbox',
+      { preValidation: guard, schema: { response: { 200: NotificationInboxSchema } } },
+      async (request) => {
+        const since = new Date(now().getTime() - NOTIFICATION_INBOX_DAYS * 24 * 60 * 60 * 1000);
+        const items = await inbox.recent(signedIn(request.user), since, NOTIFICATION_INBOX_MAX);
+        return { items: [...items] };
       },
     );
 

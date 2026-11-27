@@ -13,6 +13,8 @@ export interface StoredRedirectLink {
   readonly placement: LinkPlacement | null;
   readonly usageNote: string;
   readonly enabled: boolean;
+  /** Attached by the owner to its link at the redirect service: its hours are read. */
+  readonly attached: boolean;
 }
 
 /** Two names are the same link to the eye: case and outer spaces do not tell them apart. */
@@ -21,7 +23,7 @@ function sameName(a: string, b: string): boolean {
 }
 
 /** One address however it is typed: the host in lower case (`URL` does it), no trailing slash. */
-function sameAddress(url: string): string {
+export function sameAddress(url: string): string {
   try {
     return new URL(url).href.replace(/\/+$/u, '');
   } catch {
@@ -43,4 +45,16 @@ export function writeFault(
   if (others.some((link) => sameAddress(link.url) === sameAddress(write.url))) return 'url_taken';
   if (write.id === undefined && existing.length >= REDIRECT_LINKS_MAX) return 'too_many_links';
   return null;
+}
+
+/**
+ * The link of the redirect service a link of hers is attached to: the one with exactly her link's address, or null.
+ * The reference kept is the service's own answer for that address, never something a browser sent.
+ */
+export function serviceLinkOf<Detected extends { readonly url: string }>(
+  link: Pick<StoredRedirectLink, 'url'>,
+  detected: readonly Detected[],
+): Detected | null {
+  const address = sameAddress(link.url);
+  return detected.find((one) => sameAddress(one.url) === address) ?? null;
 }

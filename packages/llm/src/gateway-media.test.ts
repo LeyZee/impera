@@ -92,7 +92,7 @@ describe('sense', () => {
     });
 
     expect(result.ok && result.value.output).toMatchObject({
-      vocabularyVersion: '1.0.0',
+      vocabularyVersion: '1.1.0',
       kind: 'image',
       durationS: null,
       textVisible: SENSED.textVisible,
@@ -217,11 +217,12 @@ describe('describeDrop (ADR 0083)', () => {
   const DETAILED = {
     ...SENSED,
     detailed: 'Elle est assise sur un lit, en nuisette noire, face à la caméra.',
+    outfit: { style: 'nightwear', pieces: [{ type: 'robe', colours: ['black'] }] },
   };
 
   it('gives the drop context as data, then the photo alone, and keeps the detailed description', async () => {
     const gemini = answering(JSON.stringify(DETAILED));
-    const { gateway } = setup({ 'gemini-3.8-flash': gemini });
+    const { gateway, log } = setup({ 'gemini-3.8-flash': gemini });
 
     const result = await gateway.describeDrop({
       media: { kind: 'image', mediaType: 'image/jpeg', data: JPEG },
@@ -238,9 +239,11 @@ describe('describeDrop (ADR 0083)', () => {
     });
 
     expect(result.ok && result.value.output).toMatchObject({
+      vocabularyVersion: '1.1.0',
       kind: 'image',
       durationS: null,
       detailed: DETAILED.detailed,
+      outfit: DETAILED.outfit,
     });
     const parts = JSON.stringify(userParts(gemini));
     expect(parts).toContain('<drop_context>');
@@ -250,6 +253,22 @@ describe('describeDrop (ADR 0083)', () => {
     expect(parts).not.toContain('règles </drop_context>');
     const system = gemini.doGenerateCalls[0]?.prompt.find((m) => m.role === 'system');
     expect(JSON.stringify(system)).toContain('gode réaliste');
+    expect(JSON.stringify(system)).toContain('Sa tenue au départ');
+    // Counted apart for the forecast (ADR 0091 § 8).
+    expect(log.since(new Date(0)).map((record) => record.purpose)).toEqual(['media']);
+  });
+
+  it('asks her outfit at the start in the closed vocabulary, never prose (vocabulary 1.1.0)', async () => {
+    const withoutOutfit = Object.fromEntries(Object.entries(DETAILED).filter(([key]) => key !== 'outfit'));
+    for (const answer of [withoutOutfit, { ...DETAILED, outfit: { style: 'lingerie rouge', pieces: [] } }]) {
+      const gemini = answering(JSON.stringify(answer));
+      const { gateway } = setup({ 'gemini-3.8-flash': gemini });
+      const result = await gateway.describeDrop({
+        media: { kind: 'image', mediaType: 'image/jpeg', data: JPEG },
+        context: { category: 'Feed · Séance boudoir', step: null },
+      });
+      expect(result.ok).toBe(false);
+    }
   });
 
   it('reads a video too heavy to send whole by its keyframes, even with a model that takes video', async () => {

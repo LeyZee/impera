@@ -43,7 +43,7 @@ const DailyBudgetSchema = z.object({
    * watch's calls are refused; a fan's answer is never.
    */
   trendWatchCapEur: z.number().positive(),
-  /** Share of the cap that raises the alert (0.8: 16 € out of 20 €). */
+  /** Share of the cap that raises the alert (0.8: 20 € out of 25 €). */
   alertRatio: z.number().gt(0).lt(1),
   /** The budget day starts at midnight in this zone. */
   timeZone: z.string().min(1),
@@ -117,7 +117,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
     },
   },
   maxTransientRetries: 2,
-  dailyBudget: { capEur: 20, trendWatchCapEur: 1, alertRatio: 0.8, timeZone: 'Europe/Paris', usdPerEur: 1.1 },
+  dailyBudget: { capEur: 25, trendWatchCapEur: 1, alertRatio: 0.8, timeZone: 'Europe/Paris', usdPerEur: 1.1 },
 });
 
 /** API keys from the environment: the fallback outside production (ADR 0016); never logged. */

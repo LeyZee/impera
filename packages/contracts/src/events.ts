@@ -92,6 +92,11 @@ const draftPayload = z.object({
    */
   leavesFanWaiting: z.literal(true).optional(),
   /**
+   * On `draft_approved` and `draft_edited`: a chatter sent it himself on the platform, from the copilot panel, and what
+   * left decided the verdict (ADR 0086 § 5). Nothing is sent after it; the message itself already answered the fan.
+   */
+  sentOnPlatform: z.literal(true).optional(),
+  /**
    * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
    * on the fixed help bubble, given once per episode. Absent everywhere else.
    */
@@ -123,6 +128,10 @@ const controlPayload = z.object({
   mode: ConversationModeSchema.optional(),
 });
 
+/** What went wrong with a sale of his that she answers once before a human (ADR 0156 § 4 and § 7). */
+export const SALE_TROUBLE_KINDS = ['payment_help', 'purchase_complaint'] as const;
+export type SaleTroubleKind = (typeof SALE_TROUBLE_KINDS)[number];
+
 /**
  * Why the agent hands a conversation to a human. Closed list: alerts rank on it (urgent or important), never on the
  * free `reason` text.
@@ -153,6 +162,11 @@ export const HANDOFF_CAUSES = [
    * timed by them, never by the agent. Ranked « important », never urgent: nothing is set on his limits.
    */
   'custom_order',
+  /**
+   * A sale still goes wrong after she answered it once (ADR 0156 § 4 and § 7): he still cannot open the step waiting,
+   * or he complains again about what he bought. A human takes over; the detail says which.
+   */
+  'sale_trouble',
 ] as const;
 export const HandoffCauseSchema = z.enum(HANDOFF_CAUSES);
 export type HandoffCause = z.infer<typeof HandoffCauseSchema>;
@@ -256,6 +270,8 @@ export const EVENT_TYPES = [
   'script_step_refused',
   'script_ended',
   'scripts_exhausted',
+  'sale_trouble',
+  'script_abandon_teased',
   'offer_proposed',
   'session_state_changed',
   'budget_threshold_crossed',
@@ -452,6 +468,20 @@ export const EVENT_PAYLOADS = {
    * is playable for him any more (ADR 0150 § 9): once per episode, until a script starts again for him. Nothing else.
    */
   scripts_exhausted: z.strictObject({ conversationId: ConversationIdSchema }),
+  /**
+   * A sale went wrong for him and she answered it once (ADR 0156 § 4 and § 7, ADR 0158 § 48): she helped him open the
+   * step waiting (`payment_help`), or answered his complaint about what he bought (`purchase_complaint`). The same
+   * trouble again soon after goes to a human (`sale_trouble`).
+   */
+  sale_trouble: z.strictObject({
+    conversationId: ConversationIdSchema,
+    kind: z.enum(SALE_TROUBLE_KINDS),
+  }),
+  /**
+   * He left in the middle of a script, a paid step still waiting (ADR 0158, Charles 20/11), and she teased him about
+   * it once on a hot message of his: one per tease, on the run he left, so that she never says it more than due.
+   */
+  script_abandon_teased: scriptPayload,
   /**
    * Something sold outside the scripts was put forward by the agent (ADR 0150 §§ 12–14): what she offers around her
    * practice (`practice_offer`, ADR 0143 § 10). `custom_order` and `service_request` are read from their own events.
@@ -799,6 +829,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('script_step_refused'),
   typedEvent('script_ended'),
   typedEvent('scripts_exhausted'),
+  typedEvent('sale_trouble'),
+  typedEvent('script_abandon_teased'),
   typedEvent('offer_proposed'),
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),

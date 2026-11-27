@@ -1,15 +1,26 @@
 import {
+  AgencyRedirectLinkWriteSchema,
   LINK_DESTINATION_MAX,
   LINK_PLACEMENTS,
   LINK_USAGE_NOTE_MAX,
   REDIRECT_LINKS_MAX,
   type AgencyRedirectLink,
   type LinkPlacement,
+  type LinkProposal,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
-import { linksQueryKey, saveRedirectLink, useRedirectLinks } from './api';
+import { Chain } from './Chain';
+import {
+  attachLink,
+  detectLinks,
+  linksQueryKey,
+  saveRedirectLink,
+  useRedirectLinks,
+  type DetectOutcome,
+} from './api';
 import { linkProblems, middleCut, PLACEMENT_LABELS } from './model';
 
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
@@ -58,7 +69,9 @@ export function LinksSection({
 }): JSX.Element {
   const read = useRedirectLinks(creatorId);
   const client = useQueryClient();
-  const [editing, setEditing] = useState<AgencyRedirectLink | 'new' | null>(null);
+  const [editing, setEditing] = useState<AgencyRedirectLink | LinkProposal | 'new' | null>(null);
+  /** What « Détecter ses liens » last answered; null until the owner asks. */
+  const [detected, setDetected] = useState<DetectOutcome | 'busy' | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   /** The switch waiting for the password and the code: it keeps its state until then, and « Annuler » leaves it. */
@@ -66,11 +79,21 @@ export function LinksSection({
   const links = read.data;
   const refresh = (): Promise<void> => client.invalidateQueries({ queryKey: linksQueryKey(creatorId) });
 
+  async function attach(link: AgencyRedirectLink): Promise<void> {
+    setBusyId(link.id);
+    setFailed(null);
+    const outcome = await attachLink(creatorId, link.id);
+    if (outcome.kind === 'refused') setFailed(`« ${link.name} » : ${outcome.message}`);
+    await refresh();
+    setBusyId(null);
+  }
+
   async function toggle(link: AgencyRedirectLink, enabled: boolean): Promise<void> {
     setBusyId(link.id);
     setFailed(null);
-    const { id, ...write } = link;
-    const outcome = await saveRedirectLink(creatorId, id, { ...write, enabled });
+    // What the agency writes of a link, and nothing it only reads (`attached`).
+    const write = AgencyRedirectLinkWriteSchema.parse(link);
+    const outcome = await saveRedirectLink(creatorId, link.id, { ...write, enabled });
     if (outcome.kind === 'refused') setFailed(outcome.message);
     if (outcome.kind === 'reauth') setPending({ link, enabled });
     await refresh();
@@ -92,8 +115,9 @@ export function LinksSection({
           Ses liens
         </h3>
         <p className="ps-lead">
-          Chaque lien a un endroit et une phrase d’usage : c’est ce que {creatorName} lit dans « Mes liens »,
-          avec un bouton pour le copier. Un lien éteint ou sans endroit ne lui est pas montré.
+          Chaque lien a un endroit et une phrase d’usage : c’est ce que {creatorName} lit dans{' '}
+          {'«\u00a0Mes liens\u00a0»'}, avec un bouton pour le copier. Un lien éteint ou sans endroit ne lui
+          est pas montré.
         </p>
         {links.length === 0 ? (
           <p className="ps-hint">
@@ -116,6 +140,12 @@ export function LinksSection({
                 ) : (
                   <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
                 )}
+                {link.attached ? (
+                  <span className="cl-row__linked">
+                    <Chain />
+                    Relié
+                  </span>
+                ) : null}
                 {canEdit ? (
                   <>
                     <label className="cl-row__switch">
@@ -132,6 +162,21 @@ export function LinksSection({
                         }}
                       />
                     </label>
+                    {link.attached ? null : (
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--soft nv-btn--sm"
+                        disabled={busyId === link.id}
+                        aria-busy={busyId === link.id}
+                        aria-label={`Relier le lien « ${link.name} » pour lire ses clics chaque heure`}
+                        onClick={() => {
+                          void attach(link);
+                        }}
+                      >
+                        <Chain />
+                        Relier
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="nv-btn nv-btn--soft nv-btn--sm"
@@ -175,21 +220,48 @@ export function LinksSection({
         ) : links.length >= REDIRECT_LINKS_MAX ? (
           <p className="ps-hint">{String(REDIRECT_LINKS_MAX)} liens au plus.</p>
         ) : (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm ps-self-start"
-            onClick={() => {
-              setEditing('new');
-            }}
-          >
-            <span aria-hidden="true">+</span> Ajouter un lien
-          </button>
+          <div className="cl-actions">
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              onClick={() => {
+                setEditing('new');
+              }}
+            >
+              <span aria-hidden="true">+</span> Ajouter un lien
+            </button>
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              disabled={detected === 'busy'}
+              aria-busy={detected === 'busy'}
+              onClick={() => {
+                setDetected('busy');
+                void detectLinks(creatorId).then(setDetected);
+              }}
+            >
+              {detected === 'busy' ? 'Lecture du service…' : 'Détecter ses liens'}
+            </button>
+          </div>
         )}
+        {canEdit && detected !== null && detected !== 'busy' ? (
+          <Detected
+            outcome={detected}
+            creatorName={creatorName}
+            links={links}
+            isFull={links.length >= REDIRECT_LINKS_MAX}
+            onAdd={setEditing}
+            onClose={() => {
+              setDetected(null);
+            }}
+          />
+        ) : null}
       </section>
       {editing === null ? null : (
         <LinkDialog
           creatorId={creatorId}
-          link={editing === 'new' ? null : editing}
+          link={editing === 'new' || 'ref' in editing ? null : editing}
+          proposal={editing !== 'new' && 'ref' in editing ? editing : null}
           onClose={() => {
             setEditing(null);
           }}
@@ -203,20 +275,121 @@ export function LinksSection({
   );
 }
 
+/**
+ * What the redirect service lists that she does not have yet. The account is the agency's and its list crosses
+ * creators: nothing is added by itself, the owner picks hers one by one and each goes through the dialog.
+ */
+function Detected({
+  outcome,
+  creatorName,
+  links,
+  isFull,
+  onAdd,
+  onClose,
+}: {
+  outcome: DetectOutcome;
+  creatorName: string;
+  links: readonly AgencyRedirectLink[];
+  isFull: boolean;
+  onAdd: (proposal: LinkProposal) => void;
+  onClose: () => void;
+}): JSX.Element {
+  if (outcome.kind === 'refused') {
+    return (
+      <div className="cl-detected" role="alert">
+        <p className="cl-detected__refusal">
+          <span className="cl-row__dot" aria-hidden="true" />
+          {outcome.message}
+        </p>
+        {outcome.needsKey ? (
+          <Link to="/reglages/ventes" className="nv-btn nv-btn--soft nv-btn--sm ps-self-start">
+            Ouvrir Réglages › Plateformes
+          </Link>
+        ) : null}
+      </div>
+    );
+  }
+  // A link added since the reading leaves the list at once: her links are read again after each save.
+  const kept = new Set(links.map((link) => link.url));
+  const fresh = outcome.proposals.filter((one) => one.knownAs === null && !kept.has(one.url));
+  const known = outcome.proposals.length - fresh.length;
+  return (
+    <div className="cl-detected" aria-live="polite">
+      <div className="cl-detected__head">
+        <h4 className="nv-h3 cl-detected__title">
+          {fresh.length === 0
+            ? 'Rien de nouveau'
+            : `${String(fresh.length)} ${fresh.length === 1 ? 'lien trouvé' : 'liens trouvés'}`}
+        </h4>
+        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onClose}>
+          Fermer
+        </button>
+      </div>
+      <p className="ps-hint">
+        {fresh.length === 0
+          ? outcome.proposals.length === 0
+            ? 'Le compte de l’agence n’a aucun lien pour l’instant.'
+            : `Les ${String(known)} liens du compte sont déjà dans les siens.`
+          : `Lus dans le service de liens, sur tout le compte de l’agence : n’ajoute que ceux de ${creatorName}. Rien n’est ajouté tant que tu n’as pas enregistré.`}
+      </p>
+      {fresh.length === 0 ? null : (
+        <ul className="cl-list" aria-label="Liens trouvés dans le service">
+          {fresh.map((proposal) => (
+            <li key={proposal.ref} className="cl-row cl-row--found">
+              <div className="cl-row__main">
+                <p className="cl-row__name">{proposal.name}</p>
+                <p className="cl-row__address">{middleCut(proposal.url, 48)}</p>
+              </div>
+              {proposal.placement === null ? null : (
+                <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[proposal.placement]}</span>
+              )}
+              <button
+                type="button"
+                className="nv-btn nv-btn--soft nv-btn--sm"
+                disabled={isFull}
+                aria-label={`Ajouter le lien « ${proposal.name} »`}
+                onClick={() => {
+                  onAdd(proposal);
+                }}
+              >
+                Ajouter
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {fresh.length > 0 && known > 0 ? (
+        <p className="ps-hint">
+          {known === 1
+            ? '1 autre est déjà dans ses liens.'
+            : `${String(known)} autres sont déjà dans ses liens.`}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function LinkDialog({
   creatorId,
   link,
+  proposal = null,
   onClose,
   onSaved,
 }: {
   creatorId: string;
   link: AgencyRedirectLink | null;
+  /** A link found at the service: its name, address and place prefilled, to be corrected then saved as any new link. */
+  proposal?: LinkProposal | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }): JSX.Element {
   const id = useId();
   const [draft, setDraft] = useState<Draft>(
-    link === null ? BLANK : { ...link, placement: link.placement ?? '' },
+    link !== null
+      ? { ...link, placement: link.placement ?? '' }
+      : proposal === null
+        ? BLANK
+        : { ...BLANK, name: proposal.name, url: proposal.url, placement: proposal.placement ?? '' },
   );
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);

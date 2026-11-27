@@ -1,4 +1,4 @@
-import { FactCategorySchema } from '@impera/contracts';
+import { FactCategorySchema, type UserId } from '@impera/contracts';
 
 import type { DraftFact, ProposedFact } from '../domain/ports';
 
@@ -39,7 +39,7 @@ export function readProposedFacts(
  * A chatter's note on giving the conversation back, as a fact of its own (P3-02). Its slot is its date: notes add
  * up instead of replacing each other, and a replayed job finds the same slot with the same value.
  */
-export function operatorNoteFact(note: string, at: Date): DraftFact {
+export function operatorNoteFact(note: string, at: Date, author?: UserId): DraftFact {
   return {
     category: 'operator_note',
     key: `note_${String(at.getTime())}`,
@@ -48,5 +48,6 @@ export function operatorNoteFact(note: string, at: Date): DraftFact {
     confidence: 1,
     sourceMessageId: null,
     observedAt: at,
+    ...(author !== undefined && { notedBy: author }),
   };
 }

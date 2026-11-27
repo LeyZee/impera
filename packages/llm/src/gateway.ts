@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+  CaptionProposalsSchema,
   CommentOutcomeSchema,
   err,
   FanCardReadSchema,
@@ -20,12 +21,16 @@ import { LlmRoleSchema, type ProviderId } from './config';
 import {
   alertsBlock,
   describeBrief,
+  describeLanguage,
   judgeSituationBlock,
   notesBlock,
+  customOrderBlock,
+  profileBioBlock,
   scriptsBlock,
   toMessages,
 } from './conversation-messages';
 import type {
+  CaptionProposalsInput,
   ChannelPostInput,
   FanCardReadInput,
   InstagramCommentInput,
@@ -69,6 +74,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
   const instagramCommentPrompt = prompts.instagramComment ?? loadPrompt('voice', 'instagram-comment');
+  const instagramCaptionPrompt = prompts.instagramCaption ?? loadPrompt('voice', 'instagram-caption');
   const scriptSummaryPrompt = prompts.scriptSummary ?? loadPrompt('brain', 'script-summary');
   const scriptIdentityPrompt = prompts.scriptIdentity ?? loadPrompt('brain', 'script-identity');
   const fanCardPrompt = prompts.fanCard ?? loadPrompt('brain', 'fan-card');
@@ -186,7 +192,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           return content === undefined ? undefined : [{ role: 'user', content }];
         },
         DropSenseOutputSchema,
-        input.trace,
+        { ...input.trace, purpose: 'media' },
       );
       if (!result.ok) return result;
       const { media } = input;
@@ -205,8 +211,10 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(prompts.brain, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         alerts: alertsBlock(input.alerts ?? []),
         scripts: scriptsBlock(input.scripts ?? [], input.scriptStepWaiting === true),
+        custom_order: customOrderBlock(input.customOrder),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
         canary,
@@ -225,9 +233,17 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(prompts.voice, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
-        brief: describeBrief(input.brief, input.objectionReply, input.scriptStep, input.maxBubbles),
+        language: describeLanguage(input.language),
+        brief: describeBrief(
+          input.brief,
+          input.objectionReply,
+          input.scriptStep,
+          input.maxBubbles,
+          input.waitingStep,
+        ),
         canary,
       });
       return run(
@@ -244,6 +260,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(judgePrompt, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         // What the agent saw (his age, his flags, the last offer): safety is read against it, not guessed.
         situation: judgeSituationBlock(input.situation),
@@ -357,24 +374,16 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const messages = (): Promise<{ role: 'user'; content: string }[]> =>
         Promise.resolve([{ role: 'user', content }]);
       if (input.kind === 'poll') {
-        const result = await run(
-          'voice',
-          channelPostPrompt,
-          system,
-          messages,
-          ChannelPollOutputSchema,
-          input.trace,
-        );
+        const result = await run('voice', channelPostPrompt, system, messages, ChannelPollOutputSchema, {
+          ...input.trace,
+          purpose: 'telegram',
+        });
         return result.ok ? ok({ ...result.value, output: { kind: 'poll', ...result.value.output } }) : result;
       }
-      const result = await run(
-        'voice',
-        channelPostPrompt,
-        system,
-        messages,
-        ChannelPostOutputSchema,
-        input.trace,
-      );
+      const result = await run('voice', channelPostPrompt, system, messages, ChannelPostOutputSchema, {
+        ...input.trace,
+        purpose: 'telegram',
+      });
       return result.ok ? ok({ ...result.value, output: { kind: 'post', ...result.value.output } }) : result;
     },
 
@@ -399,6 +408,27 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       );
     },
 
+    async proposeCaptions(input) {
+      const system = renderPrompt(instagramCaptionPrompt, {
+        creator_name: input.creatorName,
+        persona_sheet: input.personaSheet,
+        examples:
+          input.examples.length === 0
+            ? 'Aucune légende d’exemple pour l’instant.'
+            : wrapUntrusted('caption_examples', input.examples.join('\n\n---\n\n')),
+        canary,
+      });
+      const content = captionProposalsRequest(input);
+      return run(
+        'voice',
+        instagramCaptionPrompt,
+        system,
+        () => Promise.resolve([{ role: 'user', content }]),
+        CaptionProposalsSchema,
+        { ...input.trace, purpose: 'instagram_caption' },
+      );
+    },
+
     async summarizeScript(input) {
       const system = renderPrompt(scriptSummaryPrompt, { canary });
       const content = scriptSummaryRequest(input);
@@ -408,7 +438,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         system,
         () => Promise.resolve([{ role: 'user', content }]),
         ScriptDropSummarySchema,
-        input.trace,
+        { ...input.trace, purpose: 'media' },
       );
     },
 
@@ -421,7 +451,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         system,
         () => Promise.resolve([{ role: 'user', content }]),
         ScriptIdentityContentSchema,
-        input.trace,
+        { ...input.trace, purpose: 'media' },
       );
     },
 
@@ -553,6 +583,54 @@ function channelPostRequest(input: ChannelPostInput): string {
 
 const MEDIA_KIND_WORDS = { reel: 'un Reel', photo: 'une photo', carousel: 'un carrousel' } as const;
 
+const oneLine = (text: string): string => text.replace(/\s+/gu, ' ').trim();
+
+/** What this one Reel is: the facts written by the code, every text of hers or of the media in its block. */
+function captionProposalsRequest(input: CaptionProposalsInput): string {
+  const lines = [
+    input.durationS === null
+      ? 'Un Reel qu’elle vient de déposer.'
+      : `Un Reel de ${String(Math.round(input.durationS))} secondes qu’elle vient de déposer.`,
+    '',
+    `Ce qu’on voit dans la vidéo :\n${wrapUntrusted('creator_media_description', input.mediaDescription)}`,
+  ];
+  if (input.sentence !== null && input.sentence.trim() !== '')
+    lines.push(
+      '',
+      `Ce qu’elle a écrit en la déposant :\n${wrapUntrusted('creator_sentence', input.sentence)}`,
+    );
+  if (input.otherIdeas !== undefined) {
+    const { hints, note, seen } = input.otherIdeas;
+    const wishes = [
+      ...hints.map((hint) => `- ${hint}`),
+      ...(note.trim() === '' ? [] : [`- ${oneLine(note)}`]),
+    ];
+    lines.push(
+      '',
+      'Elle a lu des légendes et en veut d’autres. Ce qu’elle demande :',
+      wrapUntrusted('caption_hints', wishes.join('\n')),
+    );
+    if (seen.length > 0)
+      lines.push(
+        '',
+        'Les légendes qu’elle a déjà lues, à ne pas réécrire :',
+        wrapUntrusted('instagram_caption', seen.map((caption) => `- ${oneLine(caption)}`).join('\n')),
+      );
+  }
+  if (input.refusedBy !== undefined && input.refusedBy.length > 0)
+    lines.push(
+      '',
+      `Des légendes de ta première réponse ont été refusées (${input.refusedBy.join(', ')}). Écris-en trois autres, plus simples.`,
+    );
+  return lines.join('\n');
+}
+
+const EMOJI_SHAPE_WORDS = {
+  0: 'aucun emoji',
+  1: 'un seul emoji',
+  2: 'deux emojis',
+} as const;
+
 /** What this one comment is: the facts written by the code, the two texts in their blocks (CLAUDE.md rule 4). */
 function instagramCommentRequest(input: InstagramCommentInput): string {
   const { comment } = input;
@@ -570,7 +648,33 @@ function instagramCommentRequest(input: InstagramCommentInput): string {
       : `La légende de la publication :\n${wrapUntrusted('instagram_caption', comment.caption)}`,
     '',
     `Le commentaire :\n${wrapUntrusted('instagram_comment', comment.comment)}`,
+    '',
+    comment.emojiOnly
+      ? 'Il lui dit qu’il l’aime : si tu réponds, seulement un ou deux emojis, sans aucun mot ni question.'
+      : comment.mayAsk
+        ? 'Tu peux finir ta réponse par une question, seulement si le commentaire ouvre vraiment une discussion.'
+        : 'Pas de question dans ta réponse cette fois.',
   ];
+  const shape = input.replyShape;
+  if (shape !== undefined && !comment.emojiOnly)
+    lines.push(
+      `Cette fois, comme dans sa réponse la plus proche : ${shape.words <= 3 ? 'quelques mots' : `environ ${String(shape.words)} mots`}, ${EMOJI_SHAPE_WORDS[shape.emojis]}${shape.exclaims ? ', et un point d’exclamation' : ''}.`,
+    );
+  const near = input.nearExamples ?? [];
+  if (near.length > 0)
+    lines.push(
+      '',
+      'Ce qu’elle a répondu à des commentaires proches, pour le ton (jamais à recopier) :',
+      wrapUntrusted(
+        'her_replies',
+        near
+          .map(
+            (pair) =>
+              `Commentaire : ${pair.comment.replace(/\s+/gu, ' ').trim()}\nSa réponse : ${pair.reply.replace(/\s+/gu, ' ').trim()}`,
+          )
+          .join('\n---\n'),
+      ),
+    );
   if (input.recentReplies.length > 0)
     lines.push(
       '',

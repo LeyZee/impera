@@ -574,7 +574,7 @@ class FakeRevealWorld {
         avatarThumbUrl: `${PUBLIC_URL}/avatar-thumb`,
         bannerPreviewUrl: `${PUBLIC_URL}/banner-preview`,
         displayName: this.state.model.displayName,
-        description: 'Description de test',
+        description: this.state.model.bio ?? 'Description de test',
         userName: this.state.model.userName,
         incomingMediaPrice: 0,
         isVisible: true,
@@ -1109,7 +1109,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
       avatarUrl: `${PUBLIC_URL}/avatar`,
       bannerUrl: `${PUBLIC_URL}/banner`,
       displayName: model.displayName,
-      description: 'Description de test',
+      description: model.bio ?? 'Description de test',
       commission: AGENCY_PERCENTAGE,
       welcomeMessage: model.welcomeMessage ?? 'Bienvenue de test',
       welcomeMessageDelaySeconds: 0,
@@ -1281,11 +1281,18 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
         )
         .flatMap((m) => m.bundle?.mediaIds ?? []),
     );
+    // Sent for free: attached to one of her messages, deleted since or not, or in a bundle at 0 (what the real flag
+    // counts beyond that, the previews of a paid bundle for one, is not known: to see at the first real read).
+    const sentForFree = new Set(
+      world.state.messages
+        .filter((m) => m.direction === 'out')
+        .flatMap((m) => [...m.mediaIds, ...(m.bundle?.priceCents === 0 ? m.bundle.mediaIds : [])]),
+    );
     return out('vault.medias', {
       data: page.rows.map((m) => ({
         ...world.wireMedia(m),
         status: boughtBy.has(m.id) ? ['paid'] : [],
-        sentForFree: false,
+        sentForFree: sentForFree.has(m.id),
         description: m.description ?? null,
         suggestedMinPrice: m.suggestedMinPrice ?? null,
         suggestedMaxPrice: m.suggestedMaxPrice ?? null,

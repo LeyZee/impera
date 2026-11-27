@@ -11,10 +11,16 @@ import { Empty } from '@/shell/states';
 /** The pieces the list, the sheet and the add panel share. */
 
 /**
- * The member's initials, two letters as Équipe › Reveal writes them (« Chatteur Un » → « CU »), on his planning colour
+ * The member's initials, two letters as Équipe › Comptes Reveal writes them (« Chatteur Un » → « CU »), on his planning colour
  * once he has one: one letter made every « Chatteur … » the same « C » (recette visuelle 16/11, GES-21).
  */
-export function Avatar({ member, large = false }: { member: TeamMember; large?: boolean }): JSX.Element {
+export function Avatar({
+  member,
+  large = false,
+}: {
+  member: Pick<TeamMember, 'displayName' | 'color'>;
+  large?: boolean;
+}): JSX.Element {
   return (
     <span
       className={large ? 'nv-avatar tm-avatar' : 'nv-avatar nv-avatar--sm tm-avatar'}
@@ -39,14 +45,17 @@ export function StatusPill({ member }: { member: TeamMember }): JSX.Element {
 export function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: ReactNode;
 }): JSX.Element {
   return (
-    <Empty plate title={title} action={children}>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
       {text}
     </Empty>
   );

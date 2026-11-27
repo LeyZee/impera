@@ -136,36 +136,6 @@
   margin-top: auto;
   padding-top: 6px;
 }
-.ins-spark {
-  --_c: var(--nv-trend-up);
-  display: block;
-  width: 100%;
-  height: 28px;
-  overflow: visible;
-  clip-path: inset(-2px 100% -2px -2px);
-  animation: ins-draw var(--nv-dur-progress) var(--nv-ease-out) 260ms forwards;
-}
-.ins-spark--down {
-  --_c: var(--nv-trend-down);
-}
-.ins-spark__line {
-  fill: none;
-  stroke: var(--_c);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.ins-spark__area {
-  stroke: none;
-}
-.ins-spark__fill-top {
-  stop-color: var(--_c);
-  stop-opacity: 0.12;
-}
-.ins-spark__fill-bottom {
-  stop-color: var(--_c);
-  stop-opacity: 0;
-}
 .ins-curve__hits {
   position: absolute;
   inset: -8px 0;
@@ -197,7 +167,7 @@
   grid-column: 1 / -1;
 }
 /* The net's small curve under its sentence, the tile's width, low: it fills the tile's foot and never rivals the lead's. */
-.ins-figures > .ins-tiles > .ins-tile:first-child .ins-spark {
+.ins-figures > .ins-tiles > .ins-tile:first-child .nv-spark {
   height: 52px;
 }
 /* A third has no room for a long amount and its change side by side: always under it, the three tiles alike. */
@@ -421,170 +391,12 @@
   color: var(--nv-warning);
 }
 
-/* ── Keys of a legend: a small round swatch in the series colour, the text in ink. */
-.ins-key {
-  flex: none;
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: var(--nv-radius-full);
-  background: var(--_c);
-}
-.ins-keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.ins-keys li {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
 /* ── Daily revenue: stacked columns from one baseline, a recessive grid. */
 .ins-daily {
   padding: var(--nv-plate-pad);
 }
-.ins-daily__plot {
-  position: relative;
-  height: 220px;
-  padding-left: 52px;
-}
-.ins-daily__grid {
-  position: absolute;
-  inset: 0 0 22px 52px;
-  pointer-events: none;
-}
-.ins-daily__grid span {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--_y);
-  border-top: 1px solid var(--nv-plate-edge);
-}
-.ins-daily__grid i {
-  position: absolute;
-  right: calc(100% + 10px);
-  top: -8px;
-  font-style: normal;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--nv-ink-faint);
-}
-.ins-daily__bars {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--_n), minmax(0, 1fr));
-  /* A gap that shrinks with the columns: a bar keeps three quarters of its slot, whatever the width. */
-  column-gap: min(10px, calc(25% / var(--_n)));
-  height: 100%;
-}
-.ins-col {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  border-radius: var(--nv-radius-xs);
-  background: transparent;
-  font: inherit;
-  color: inherit;
-  cursor: default;
-}
-.ins-col:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-}
-/* A column takes the finger over half the gap on each side: 44px wide on a phone's week (ADM-22). */
-.ins-col::after {
-  content: '';
-  position: absolute;
-  inset: 0 -5px;
-}
-.ins-col__stack {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 2px;
-  border-radius: var(--nv-radius-xs);
-  transform-origin: bottom;
-  transition:
-    background var(--nv-dur-fast),
-    opacity var(--nv-dur-fast),
-    transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-/* The column under the pointer swells, the others step back: the eye lands on the day read (recette du 07/11). */
-.ins-col:hover .ins-col__stack,
-.ins-col:focus-visible .ins-col__stack {
-  background: var(--nv-select);
-  transform: scaleX(1.16);
-}
-.ins-daily__bars:has(.ins-col:hover, .ins-col:focus-visible)
-  .ins-col:not(:hover, :focus-visible)
-  .ins-col__stack {
-  opacity: 0.45;
-}
-/* A finger has no hover: the tapped column, focused, swells the same way. */
-@media (hover: none) {
-  .ins-col:focus .ins-col__stack {
-    background: var(--nv-select);
-    transform: scaleX(1.16);
-  }
-  .ins-daily__bars:has(.ins-col:focus) .ins-col:not(:focus) .ins-col__stack {
-    opacity: 0.45;
-  }
-}
-.ins-col__part {
-  flex: none;
-  height: var(--_h);
-  min-height: 2px;
-  background: var(--_c);
-  transform-origin: bottom;
-  animation: ins-grow var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
-  animation-delay: calc(var(--_i, 0) * 12ms + 80ms);
-}
-.ins-col__part:first-child {
-  border-radius: 0 0 2px 2px;
-}
-.ins-col__part:last-child {
-  border-radius: 4px 4px 0 0;
-}
-.ins-col__part:only-child {
-  border-radius: 4px 4px 2px 2px;
-}
-@keyframes ins-grow {
-  from {
-    transform: scaleY(0);
-  }
-}
-.ins-col__label {
-  height: 22px;
-  padding-top: 6px;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: visible;
-  color: var(--nv-ink-faint);
-  text-align: left;
-}
-/* The last day's label ends at its column's right edge: left-aligned, it ran past the card on a phone. */
-.ins-col:last-child .ins-col__label {
-  display: flex;
-  justify-content: flex-end;
-}
 
-/* ── Two rings side by side. */
+/* ── Two rings side by side: the ring, its legend and their lighting are the design system's (`nv-donut`). */
 .ins-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -603,162 +415,6 @@
   justify-content: space-between;
   gap: 12px;
   margin: 0;
-}
-.ins-ring-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.ins-ring {
-  position: relative;
-  flex: none;
-  width: 148px;
-  height: 148px;
-}
-.ins-ring svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transform: rotate(-90deg);
-}
-.ins-ring__track,
-.ins-ring__arc {
-  fill: none;
-  stroke-width: 14;
-}
-.ins-ring__track {
-  stroke: var(--nv-fill-track);
-}
-.ins-ring__arc {
-  stroke: var(--_c);
-  stroke-dasharray: 0 999;
-  cursor: pointer;
-  transform-box: view-box;
-  transform-origin: 66px 66px;
-  animation: ins-ring var(--nv-dur-data) var(--nv-ease-out) both;
-  animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
-  transition:
-    stroke-width var(--nv-dur-base) var(--nv-ease-spring),
-    transform var(--nv-dur-base) var(--nv-ease-spring),
-    opacity var(--nv-dur-fast),
-    filter var(--nv-dur-base);
-}
-@keyframes ins-ring {
-  to {
-    stroke-dasharray: var(--_dash);
-  }
-}
-.ins-ring.is-lit .ins-ring__arc {
-  opacity: 0.35;
-}
-.ins-ring.is-lit .ins-ring__arc.is-on {
-  opacity: 1;
-  stroke-width: 20;
-  /* The slice comes out of the ring, a little bigger and lit with its own colour (recette du 07/11). */
-  transform: scale(1.08);
-  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
-}
-.ins-ring__middle {
-  position: absolute;
-  inset: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
-}
-.ins-ring__value {
-  font-size: 22px;
-  line-height: 1.1;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: var(--nv-ink);
-}
-/* « 1 234,56 € » keeps its cents inside the ring: a long total takes a smaller size (ADM-05). */
-.ins-ring__value.is-long {
-  font-size: var(--nv-text-headline);
-}
-.ins-ring__sub {
-  margin-top: 2px;
-  font-size: var(--nv-text-caption);
-  line-height: 1.15;
-  color: var(--nv-ink-faint);
-}
-.ins-legend {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ins-legend__row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto 52px;
-  grid-template-areas: 'key label value share delta';
-  column-gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: var(--nv-radius-xs);
-  background: transparent;
-  font: inherit;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background var(--nv-dur-fast),
-    color var(--nv-dur-fast);
-}
-.ins-legend__row > .ins-key {
-  grid-area: key;
-  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-.ins-legend__row > .nv-delta {
-  grid-area: delta;
-  justify-self: end;
-  height: 18px;
-}
-.ins-legend__row:hover,
-.ins-legend__row.is-on {
-  background: var(--nv-select);
-  color: var(--nv-ink);
-}
-.ins-legend__row.is-on > .ins-key {
-  transform: scale(1.35);
-}
-.ins-legend__row:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 1px;
-}
-.ins-legend__label {
-  grid-area: label;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ins-legend__value {
-  grid-area: value;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--nv-ink);
-  white-space: nowrap;
-}
-.ins-legend__share {
-  grid-area: share;
-  min-width: 38px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--nv-ink-faint);
 }
 
 /* ── Who sold: a ranking, bars from the same start, a single hue (magnitude, not identity). */
@@ -835,8 +491,7 @@
   background: var(--nv-fill-track);
 }
 .ins-rank__bar,
-.ins-creator__bar,
-.ins-meter {
+.ins-creator__bar {
   position: relative;
   display: block;
   height: 8px;
@@ -866,8 +521,7 @@
   --_c: var(--nv-series-other);
 }
 .ins-rank__bar > span,
-.ins-creator__bar > span,
-.ins-meter > span {
+.ins-creator__bar > span {
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--_w);
@@ -977,6 +631,8 @@
   display: contents;
 }
 .ins-heat__hour {
+  /* Air between the hours and the grid, so the best slot's ring never touches its label (Design, 20/11). */
+  padding-bottom: 6px;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   font-variant-numeric: tabular-nums;
@@ -998,10 +654,31 @@
   border-radius: 3px;
   font: inherit;
   cursor: default;
-  background: color-mix(in srgb, var(--nv-data-1) calc(var(--_h) * 100%), var(--nv-fill-track));
+  /* One hue from pale to vivid (--nv-heat); the palest sale stays apart from an hour without any. */
+  --_ramp: var(--nv-heat);
+  background: color-mix(in srgb, var(--_ramp) calc(14% + var(--_h) * 86%), var(--nv-fill-track));
   transition:
     transform var(--nv-dur-fast) var(--nv-ease-spring),
     box-shadow var(--nv-dur-fast);
+}
+.ins-heat__cell[data-empty] {
+  background: var(--nv-fill-track);
+}
+/* The slot that brings in the most: one ring around its cells, lit, still (no animation). */
+.ins-heat__best {
+  z-index: 1;
+  margin: -4px;
+  border: 2px solid var(--nv-heat);
+  border-radius: 7px;
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--nv-heat) 55%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--nv-heat) 30%, transparent);
+  pointer-events: none;
+}
+/* Too few sales or too little hindsight: the map stays, grey and pale, nothing lit (colour says « fiable »). */
+.ins-hours[data-pending] .ins-heat__cell {
+  --_ramp: var(--nv-ink-faint);
+  opacity: 0.7;
 }
 .ins-heat__cell:focus-visible {
   outline: 2px solid var(--nv-focus);
@@ -1009,6 +686,8 @@
 }
 .ins-heat__cell:hover,
 .ins-heat__cell:focus-visible {
+  position: relative;
+  z-index: 2;
   transform: scale(1.25);
   box-shadow: 0 0 0 2px var(--nv-void);
 }
@@ -1025,7 +704,17 @@
   width: 96px;
   height: 8px;
   border-radius: var(--nv-radius-full);
-  background: linear-gradient(90deg, var(--nv-fill-track), var(--nv-data-1));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--_ramp) 14%, var(--nv-fill-track)),
+    var(--_ramp)
+  );
+}
+.ins-heat__scale {
+  --_ramp: var(--nv-heat);
+}
+.ins-hours[data-pending] .ins-heat__scale {
+  --_ramp: var(--nv-ink-faint);
 }
 
 /* ── The paying fans. */
@@ -1052,11 +741,14 @@
   font-weight: 680;
   font-variant-numeric: tabular-nums;
 }
-.ins-meter {
+.ins-fans .nv-meter {
   height: 12px;
 }
-.ins-meter > span {
-  background: var(--nv-data-1);
+.ins-fans .nv-meter > span {
+  background: var(--nv-heat);
+}
+.ins-fans[data-pending] .nv-meter > span {
+  background: var(--nv-ink-faint);
 }
 .ins-fans__hint {
   margin: 0;
@@ -1313,6 +1005,12 @@
   box-shadow: none;
   color: var(--nv-ink-muted);
 }
+/* The two quiet choices still show where the keyboard is (DS-03). */
+.ins-when__nav .ins-when__select .nv-select__field:focus-visible,
+.ins-when__compare .nv-select__field:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
 .ins-when__compare .nv-select__field:hover,
 .ins-when__compare .nv-select__field[aria-expanded='true'] {
   background: var(--nv-plate-hover);
@@ -1399,10 +1097,6 @@
   .ins-period {
     width: 100%;
   }
-  /* A legend row is a target too: 44px to the finger (ADM-22). */
-  .ins-legend__row {
-    min-height: 44px;
-  }
   .ins-period .nv-seg__opt {
     flex: 1 1 0;
     min-width: 0;
@@ -1434,20 +1128,6 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
-  }
-  .ins-daily__plot {
-    height: 180px;
-    padding-left: 40px;
-  }
-  .ins-daily__grid {
-    left: 40px;
-  }
-  .ins-ring-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .ins-ring {
-    align-self: center;
   }
   .ins-rank {
     display: flex;
@@ -1532,31 +1212,290 @@
 @media (prefers-reduced-motion: reduce) {
   .ins-curve__plot svg,
   .ins-subs__plot svg,
-  .ins-spark,
-  .ins-col__part,
-  .ins-ring__arc,
   .ins-rank__bar > span,
-  .ins-creator__bar > span,
-  .ins-meter > span {
+  .ins-creator__bar > span {
     animation: none;
   }
   /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
   .ins-curve__plot svg,
-  .ins-subs__plot svg,
-  .ins-spark {
+  .ins-subs__plot svg {
     clip-path: none;
   }
-  .ins-ring__arc {
-    stroke-dasharray: var(--_dash);
+}
+
+/* ── The refunds one by one (ADR 0092 § 4): a quiet table on a computer, a card per refund on a phone. */
+.ins-refunds {
+  padding: var(--nv-plate-pad);
+}
+.ins-refunds__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ins-refunds__select {
+  min-width: 200px;
+}
+.ins-refunds__none {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.ins-refunds__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-variant-numeric: tabular-nums;
+}
+.ins-refunds__table th {
+  padding: 0 12px 8px 0;
+  text-align: left;
+  font-size: var(--nv-text-caption);
+  font-weight: 500;
+  color: var(--nv-ink-faint);
+}
+.ins-refunds__table td {
+  padding: 10px 12px 10px 0;
+  border-top: 1px solid var(--nv-plate-edge);
+  color: var(--nv-ink);
+}
+.ins-refunds__table .ins-refunds__money {
+  text-align: right;
+  font-weight: 650;
+}
+.ins-refunds__table .ins-refunds__seller {
+  padding-left: 24px;
+}
+.ins-refunds__date,
+.ins-refunds__delay {
+  white-space: nowrap;
+}
+.ins-refunds__table .ins-refunds__delay {
+  color: var(--nv-ink-muted);
+}
+@media (max-width: 720px) {
+  .ins-refunds__select {
+    flex: 1 1 100%;
   }
-  /* Without motion the lit slice and column still stand out, at once, without growing. */
-  .ins-ring__arc,
-  .ins-col__stack {
-    transition: none;
+  .ins-refunds__table thead {
+    display: none;
   }
-  .ins-ring.is-lit .ins-ring__arc.is-on,
-  .ins-col:hover .ins-col__stack,
-  .ins-col:focus .ins-col__stack {
-    transform: none;
+  .ins-refunds__table,
+  .ins-refunds__table tbody {
+    display: block;
+  }
+  .ins-refunds__table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'date money'
+      'who delay'
+      'kind kind'
+      'seller seller';
+    gap: 2px 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--nv-plate-edge);
+  }
+  .ins-refunds__table td {
+    padding: 0;
+    border: 0;
+  }
+  .ins-refunds__table .ins-refunds__date {
+    grid-area: date;
+    color: var(--nv-ink-muted);
+  }
+  .ins-refunds__table .ins-refunds__money {
+    grid-area: money;
+  }
+  .ins-refunds__table .ins-refunds__who {
+    grid-area: who;
+    font-weight: 650;
+  }
+  .ins-refunds__table .ins-refunds__delay {
+    grid-area: delay;
+    text-align: right;
+  }
+  .ins-refunds__table .ins-refunds__kind {
+    grid-area: kind;
+  }
+  .ins-refunds__table .ins-refunds__seller {
+    grid-area: seller;
+    padding-left: 0;
+    color: var(--nv-ink-muted);
+  }
+  .ins-refunds__table .ins-refunds__seller[data-named]::before {
+    content: 'vendu par ';
+  }
+}
+
+/* ── The month's objectives (ADR 0092 § 6): the agency's figure big and first, each creator's quieter under it; a meter
+   in the trend's colour and a mark where the month stands, so ahead or behind reads without the colour. */
+.ins-goals {
+  display: grid;
+  gap: 16px;
+  padding: var(--nv-plate-pad);
+}
+.ins-goals__list {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ins-goal {
+  display: grid;
+  gap: 8px;
+}
+.ins-goal[data-lead] {
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--nv-plate-edge);
+}
+.ins-goal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 32px;
+}
+.ins-goal__name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ins-goal[data-lead] .ins-goal__name {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.ins-goal__figures {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink-faint);
+}
+.ins-goal__figures b {
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.ins-goal[data-lead] .ins-goal__figures b {
+  font-size: var(--nv-text-title-2);
+  font-weight: 700;
+  letter-spacing: var(--nv-text-title-2-tracking);
+}
+.ins-goal__edit {
+  min-width: 44px;
+  min-height: 44px;
+  margin: -6px -10px -6px 0;
+  padding: 0;
+}
+.ins-goal__edit-slot {
+  visibility: hidden;
+}
+.ins-goal__track {
+  position: relative;
+  display: block;
+}
+.ins-goal .nv-meter {
+  height: 8px;
+}
+.ins-goal[data-lead] .nv-meter {
+  height: 14px;
+}
+.ins-goal .nv-meter > span {
+  background: var(--nv-trend-up);
+}
+.ins-goal:has(.ins-goal__verdict[data-tone='down']) .nv-meter > span {
+  background: var(--nv-trend-down);
+}
+.ins-goal__pace {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--_p);
+  width: 2px;
+  border-radius: 1px;
+  background: var(--nv-ink);
+  transform: translateX(-1px);
+}
+.ins-goal__none,
+.ins-goal__verdict {
+  font-size: var(--nv-text-footnote);
+}
+.ins-goal__none {
+  color: var(--nv-ink-faint);
+}
+.ins-goal__verdict {
+  font-variant-numeric: tabular-nums;
+}
+.ins-goal[data-lead] .ins-goal__verdict {
+  font-size: var(--nv-text-body);
+}
+.ins-goal__verdict[data-tone='up'] {
+  color: var(--nv-trend-up-text);
+}
+.ins-goal__verdict[data-tone='down'] {
+  color: var(--nv-trend-down-text);
+}
+.ins-goal__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin-top: 4px;
+}
+.ins-goal__label {
+  display: grid;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.ins-goal__field {
+  position: relative;
+  display: block;
+  width: 180px;
+}
+.ins-goal__field input {
+  width: 100%;
+  padding-right: 32px;
+  text-align: right;
+}
+.ins-goal__suffix {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  color: var(--nv-ink-faint);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.ins-goal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ins-goal__remove {
+  /* Away from « Enregistrer » and « Annuler », so a thumb never takes it for them (Design, 20/11). */
+  margin-left: auto;
+}
+.ins-goal__error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-warning);
+}
+.ins-goals__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 640px) {
+  .ins-goal__label,
+  .ins-goal__field {
+    width: 100%;
   }
 }

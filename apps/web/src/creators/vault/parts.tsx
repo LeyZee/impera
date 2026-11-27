@@ -299,3 +299,100 @@ export function CloseIcon(): JSX.Element {
     </svg>
   );
 }
+
+/** One photo rising out of the chest: a little picture of a sun over hills, framed white, tilted by `turn`. */
+function ArtPhoto({
+  x,
+  y,
+  turn,
+  tone,
+}: {
+  x: number;
+  y: number;
+  turn: number;
+  tone: 'a' | 'b' | 'c';
+}): JSX.Element {
+  return (
+    <g transform={`translate(${String(x)} ${String(y)}) rotate(${String(turn)} 13 34)`}>
+      <g className={`vp-art__photo vp-art__photo--${tone}`}>
+        <rect className="vp-art__frame" x="0" y="0" width="26" height="32" rx="4" />
+        <rect className={`vp-art__sky vp-art__sky--${tone}`} x="3" y="3" width="20" height="21" rx="2.5" />
+        <circle className="vp-art__sun" cx={tone === 'b' ? 15 : 9} cy="9" r="3.2" />
+        <path className="vp-art__hill" d="M3 21.5c3.5-4.5 6.5-5 9.5-2s5-3.5 10.5-1.5V24H3Z" />
+      </g>
+    </g>
+  );
+}
+
+/** A four-pointed spark, the glint of something precious. */
+const artSpark = (x: number, y: number, size: number): string =>
+  `M${String(x)} ${String(y - size)}c${String(size * 0.18)} ${String(size * 0.62)} ${String(size * 0.2)} ${String(size * 0.8)} ${String(size)} ${String(size)}c-${String(size * 0.8)} ${String(size * 0.2)}-${String(size * 0.82)} ${String(size * 0.38)}-${String(size)} ${String(size)}c-${String(size * 0.18)}-${String(size * 0.62)}-${String(size * 0.2)}-${String(size * 0.8)}-${String(size)}-${String(size)}c${String(size * 0.8)}-${String(size * 0.2)} ${String(size * 0.82)}-${String(size * 0.38)} ${String(size)}-${String(size)}Z`;
+
+/**
+ * The vault's picture, when nothing of hers is in Impera yet: her chest thrown open, a light from inside, three of her
+ * photos rising out of it, a few glints. Drawn in the theme's colours, so it reads by day as by night.
+ */
+export function VaultArt(): JSX.Element {
+  return (
+    <svg className="vp-art" viewBox="0 0 160 132" aria-hidden="true">
+      <defs>
+        <radialGradient id="vp-art-light" cx="0.5" cy="0.62" r="0.5">
+          <stop className="vp-art__stop-light" offset="0" />
+          <stop className="vp-art__stop-clear" offset="1" />
+        </radialGradient>
+        <linearGradient id="vp-art-body" x1="0" y1="0" x2="0" y2="1">
+          <stop className="vp-art__stop-body-top" offset="0" />
+          <stop className="vp-art__stop-body-bottom" offset="1" />
+        </linearGradient>
+        <linearGradient id="vp-art-lid" x1="0" y1="1" x2="0" y2="0">
+          <stop className="vp-art__stop-lid-bottom" offset="0" />
+          <stop className="vp-art__stop-lid-top" offset="1" />
+        </linearGradient>
+        <linearGradient id="vp-art-ray" x1="0" y1="1" x2="0" y2="0">
+          <stop className="vp-art__stop-ray" offset="0" />
+          <stop className="vp-art__stop-clear" offset="1" />
+        </linearGradient>
+        <linearGradient id="vp-art-inside" x1="0" y1="0" x2="0" y2="1">
+          <stop className="vp-art__stop-inside-top" offset="0" />
+          <stop className="vp-art__stop-inside-bottom" offset="1" />
+        </linearGradient>
+      </defs>
+      <ellipse className="vp-art__ground" cx="80" cy="122" rx="54" ry="5" />
+      {/* The lid, thrown back: its inside seen, wider at the top, lit from the chest. */}
+      <path className="vp-art__lid" d="M34 68 L24 30 Q22 22 30 22 H130 Q138 22 136 30 L126 68 Z" />
+      <path
+        className="vp-art__lid-inside"
+        d="M39 66 L31 33 Q30 28 35 28 H125 Q130 28 129 33 L121 66 Z"
+        fill="url(#vp-art-lid)"
+      />
+      {/* Rays out of the opening. */}
+      <path
+        className="vp-art__rays"
+        d="M80 70 L44 8 L58 6 Z M80 70 L74 2 L86 2 Z M80 70 L102 6 L116 8 Z"
+        fill="url(#vp-art-ray)"
+      />
+      {/* The light from inside, and the opening it comes out of. */}
+      <ellipse className="vp-art__light" cx="80" cy="58" rx="64" ry="50" fill="url(#vp-art-light)" />
+      <path className="vp-art__inside" d="M30 66 H130 L126 76 H34 Z" fill="url(#vp-art-inside)" />
+      <g className="vp-art__photos">
+        <ArtPhoto x={42} y={36} turn={-18} tone="a" />
+        <ArtPhoto x={92} y={36} turn={16} tone="c" />
+        <ArtPhoto x={67} y={24} turn={0} tone="b" />
+      </g>
+      {/* The chest's front, drawn over the photos' feet. */}
+      <path
+        className="vp-art__body"
+        d="M30 74 H130 V108 Q130 118 120 118 H40 Q30 118 30 108 Z"
+        fill="url(#vp-art-body)"
+      />
+      <rect className="vp-art__rim" x="26" y="68" width="108" height="10" rx="5" />
+      <path className="vp-art__strap" d="M52 78 V118 M108 78 V118" />
+      <path className="vp-art__lock" d="M72 84 H88 V96 Q88 103 80 106 Q72 103 72 96 Z" />
+      <circle className="vp-art__keyhole" cx="80" cy="92" r="2.2" />
+      <path className="vp-art__keyhole" d="M79 93 H81 L81.6 98 H78.4 Z" />
+      <path className="vp-art__spark vp-art__spark--a" d={artSpark(140, 52, 4.4)} />
+      <path className="vp-art__spark vp-art__spark--b" d={artSpark(146, 16, 3.4)} />
+      <path className="vp-art__spark vp-art__spark--c" d={artSpark(16, 44, 3.6)} />
+    </svg>
+  );
+}

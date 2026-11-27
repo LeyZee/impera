@@ -14,7 +14,16 @@ export {
   type ChartPoint,
 } from './chart.js';
 
-export { funnelSteps, ringDash, tipPlacement, type Funnel, type FunnelStep, type Size } from './dashboard.js';
+export {
+  donutArcs,
+  funnelSteps,
+  ringDash,
+  tipPlacement,
+  type DonutArc,
+  type Funnel,
+  type FunnelStep,
+  type Size,
+} from './dashboard.js';
 
 export interface Point {
   readonly x: number;

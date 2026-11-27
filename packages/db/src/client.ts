@@ -2,8 +2,10 @@ import {
   TeamMemberStatusSchema,
   TeamRoleSchema,
   teamScopeFor,
+  TenantJobSchema,
   UserRoleSchema,
   type TeamScope,
+  type TenantJob,
 } from '@impera/contracts';
 import { and, eq, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -54,7 +56,32 @@ export function withTenant<T>(
   config?: TransactionConfig,
 ): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select set_config('app.creator_id', ${creatorId}, true)`);
+    // No job's name here, said outright: the policies written for a job (`withTenantJob`) never pass.
+    await tx.execute(
+      sql`select set_config('app.creator_id', ${creatorId}, true), set_config('app.job', '', true)`,
+    );
+    return fn(tx);
+  }, config);
+}
+
+/**
+ * Runs `fn` in a transaction scoped to one creator, for a named background job: as `withTenant`, plus `app.job`, which
+ * the job's own policies ask for. A user's session never sets it, so these policies open nothing to an account; and
+ * the job writes one creator at a time, where the service role would cross them all. `SET LOCAL`, as the rest. The
+ * name is one of the closed list (`TenantJobSchema`, contracts): any other throws before anything is set.
+ */
+export function withTenantJob<T>(
+  db: Database,
+  creatorId: string,
+  job: TenantJob,
+  fn: (tx: Transaction) => Promise<T>,
+  config?: TransactionConfig,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    const name = TenantJobSchema.parse(job);
+    await tx.execute(
+      sql`select set_config('app.creator_id', ${creatorId}, true), set_config('app.job', ${name}, true)`,
+    );
     return fn(tx);
   }, config);
 }
@@ -72,7 +99,8 @@ export function withMember<T>(
   config?: TransactionConfig,
 ): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`);
+    // An account's session never carries a job's name (`withTenantJob`): emptied outright.
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true), set_config('app.job', '', true)`);
     const [account] = await tx
       .select({ role: schema.user.role })
       .from(schema.user)
@@ -131,7 +159,7 @@ export function withCreatorAccount<T>(
     const [creatorId, ...others] = account?.creatorIds ?? [];
     if (account?.role !== 'creator' || creatorId === undefined || others.length > 0)
       throw new NotACreatorAccount();
-    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true), set_config('app.job', '', true)`);
     await tx.execute(sql`select set_config('app.account_role', 'creator', true)`);
     await tx.execute(sql`select set_config('app.creator_id', ${creatorId}, true)`);
     return fn(tx, creatorId);

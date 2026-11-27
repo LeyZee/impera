@@ -114,6 +114,8 @@ export interface AgencyFiguresStore {
     creatorId: CreatorId,
     userId: UserId,
     range: { readonly from: string; readonly previousFrom: string; readonly to: string },
+    /** A calendar month's first day: her revenue objective for it is read too (ADR 0092 § 6). */
+    objectiveMonth?: string | null,
   ): Promise<
     | { readonly kind: 'out_of_scope' }
     | { readonly kind: 'not_linked' }

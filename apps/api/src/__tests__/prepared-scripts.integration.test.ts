@@ -319,6 +319,39 @@ describe('the scripts in preparation', () => {
     });
   });
 
+  it('never lets a paid step sell a media offered once (ADR 0145 § 2)', async () => {
+    const id = newId(PreparedScriptIdSchema);
+    expect(
+      (await call('owner', 'POST', base(nora), { id, platformAccountId: noraAccount, content: CONTENT }))
+        .statusCode,
+    ).toBe(201);
+    const offered = (ref: string, at: Date | null) =>
+      test.admin.db
+        .update(schema.mediaPlatformRefs)
+        .set({ sentForFreeAt: at })
+        .where(
+          and(
+            eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+            eq(schema.mediaPlatformRefs.platformMediaId, ref),
+          ),
+        );
+    const gaps = async () =>
+      PreparedScriptViewSchema.parse((await call('manager', 'GET', `${base(nora)}/${id}`)).json()).gaps.map(
+        (gap) => [gap.code, gap.step],
+      );
+    // The offered step's media, sent for free: nothing sold, nothing said.
+    await offered('media_01', new Date());
+    expect(await gaps()).toEqual([]);
+    // The paid step's: never sold again, « prêt à copier » refused.
+    await offered('media_02', new Date());
+    expect(await gaps()).toEqual([['media_offered', 1]]);
+    const refused = await call('owner', 'POST', `${base(nora)}/${id}/ready`, { basedOnRevision: 1 });
+    expect(refused.statusCode).toBe(422);
+    await offered('media_01', null);
+    await offered('media_02', null);
+    expect(await gaps()).toEqual([]);
+  });
+
   it('closes a script an import recognised: no save, no state changed', async () => {
     const id = newId(PreparedScriptIdSchema);
     await call('owner', 'POST', base(nora), { id, platformAccountId: noraAccount, content: CONTENT });
@@ -343,6 +376,43 @@ describe('the scripts in preparation', () => {
     expect(codeOf(save.body)).toBe('prepared_script_closed_conflict');
     const back = await call('owner', 'POST', `${base(nora)}/${id}/editing`, { basedOnRevision: 1 });
     expect(codeOf(back.body)).toBe('prepared_script_closed_conflict');
+  });
+
+  it('gives a job each native script with the script of ours it copies, or none (ADR 0161 § 5)', async () => {
+    const native = async (name: string) => {
+      const id = newId(z.uuid());
+      await test.admin.db.insert(schema.platformScripts).values({
+        id,
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        platformScriptRef: `sequence_${id}`,
+        name,
+        fingerprint: `empreinte-${id}`,
+        syncedAt: new Date(),
+        versionAt: new Date(),
+      });
+      return id;
+    };
+    const ours = newId(PreparedScriptIdSchema);
+    await call('owner', 'POST', base(nora), { id: ours, platformAccountId: noraAccount, content: CONTENT });
+    const copy = await native('Soirée inventée');
+    // A native script of an earlier tool, never prepared here: it carries none.
+    const foreign = await native('Ancien script inventé');
+    await test.admin.db
+      .update(schema.preparedScripts)
+      .set({ state: 'matched', matchedPlatformScriptId: copy, matchedAt: new Date() })
+      .where(eq(schema.preparedScripts.id, ours));
+    const scripts = await app.modules.scripts.forJobs.accountScripts(nora, noraAccount);
+    expect(scripts.find((each) => each.id === copy)?.ours).toEqual({
+      preparedScriptId: ours,
+      description: 'Un soir de pluie inventé.',
+      moment: 'night',
+      steps: [
+        { branches: [{ priceMinor: 0, currency: 'EUR' }] },
+        { branches: [{ priceMinor: 1500, currency: 'EUR' }] },
+      ],
+    });
+    expect(scripts.find((each) => each.id === foreign)?.ours).toBeNull();
   });
 
   it('is read by the owner and the managers of her list only; anyone else is refused', async () => {

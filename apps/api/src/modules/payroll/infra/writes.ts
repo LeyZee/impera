@@ -20,7 +20,9 @@ type AuditedAction =
   | 'payout_minimum.create'
   | 'payroll_settings.update'
   | 'pay_sale_decision.create'
-  | 'pay_sale_signal.create';
+  | 'pay_sale_signal.create'
+  | 'sale_claim.create'
+  | 'sale_claim.answer';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -39,7 +41,8 @@ export async function audit(
       | 'payout_minimum'
       | 'payroll_settings'
       | 'pay_sale_decision'
-      | 'pay_sale_signal';
+      | 'pay_sale_signal'
+      | 'sale_claim';
     readonly id: string;
   },
   details: Record<string, unknown>,

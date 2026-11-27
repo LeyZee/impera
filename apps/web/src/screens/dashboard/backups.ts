@@ -32,11 +32,16 @@ export interface BackupBanner {
   readonly restore: string | null;
 }
 
-/** « 26 octobre à 03:12 », in the reader's time zone. */
+/** « 26 octobre à 3 h 12 », in the reader's time zone: the app's one way to write an hour. */
 function when(iso: string, timeZone: string | undefined): string {
-  const at = new Date(iso);
-  const clock = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone }).format(at);
-  return `${day(iso, timeZone)} à ${clock}`;
+  const parts = new Intl.DateTimeFormat('fr-FR', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  }).formatToParts(new Date(iso));
+  const of = (type: 'hour' | 'minute'): string => parts.find((part) => part.type === type)?.value ?? '';
+  return `${day(iso, timeZone)} à ${of('hour')}\u00a0h\u00a0${of('minute')}`;
 }
 
 /** « 12 juillet », « 1er août », in the reader's time zone. */
@@ -49,11 +54,11 @@ function day(iso: string, timeZone: string | undefined): string {
 }
 
 /**
- * Why the restore test is not fresh (ADR 0028 § 6), and what it holds back: a pay is not validated without one of
- * less than `RESTORE_TEST_FRESH_DAYS` days (EQ-17). Its counts only, never what the test printed.
+ * Why the restore test is not fresh (ADR 0028 § 6): one is due every `RESTORE_TEST_FRESH_DAYS` days. It holds no pay
+ * back (« ok 5 » de Charles, 21/11): an amber line, nothing more. Its counts only, never what the test printed.
  */
 function restoreLine(status: BackupStatus, timeZone: string | undefined): string {
-  const needed = `Il en faut un de moins de ${String(RESTORE_TEST_FRESH_DAYS)} jours pour valider une paie.`;
+  const needed = `Il en faut un tous les ${String(RESTORE_TEST_FRESH_DAYS)} jours : à refaire.`;
   const test = status.lastRestoreTest;
   if (test === null) return `Aucun essai de restauration n’est encore noté. ${needed}`;
   if (test.rowCountMismatches > 0) {
@@ -70,9 +75,7 @@ function restoreLine(status: BackupStatus, timeZone: string | undefined): string
 export function backupBannerOf(status: BackupStatus, timeZone?: string): BackupBanner | null {
   const restore = status.restoreTestFresh ? null : restoreLine(status, timeZone);
   if (status.state === 'ok') {
-    return restore === null
-      ? null
-      : { title: 'Aucun essai de restauration récent', text: restore, restore: null };
+    return restore === null ? null : { title: 'Essai de restauration à faire', text: restore, restore: null };
   }
   const running = status.lastRun?.status === 'running' ? ' Une sauvegarde est en cours.' : '';
   const failed = status.lastRun?.status === 'failed' ? 'La dernière tentative a échoué. ' : '';

@@ -1,18 +1,20 @@
 import {
   CorrectPlatformScriptDescriptionBodySchema,
-  CorrectScriptIdentityBodySchema,
   CreatorIdSchema,
   DomainError,
   MediaDescriptionIdSchema,
   PlatformScriptIdSchema,
   PlatformScriptListSchema,
   PlatformScriptViewSchema,
+  ScriptPerformanceListSchema,
+  ScriptPerformanceQuerySchema,
   SetScriptBranchesBodySchema,
   ValidatePlatformScriptDescriptionsBodySchema,
-  ValidateScriptIdentityBodySchema,
   type CreatorId,
   type PlatformScriptViewDto,
   type ScriptErrorCode,
+  type ScriptPerformanceDays,
+  type ScriptPerformanceList,
   type UserRole,
 } from '@impera/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -21,14 +23,12 @@ import { z } from 'zod';
 import {
   creatorPlatformScripts,
   reviewScriptDescriptions,
-  reviewScriptIdentity,
   setScriptBranches,
   type PlatformScriptsReader,
   type PlatformScriptView,
 } from '../../application/platform-script-reads';
 import type {
   DescriptionReview,
-  IdentityReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
   ScriptIdentityReviewStore,
@@ -53,15 +53,6 @@ class ScriptBranchesStale extends DomainError {
     super(
       'platform_script_branches_stale_conflict' satisfies ScriptErrorCode,
       'Les branches de cette étape ont changé dans Reveal depuis ta lecture : recharge le script',
-    );
-  }
-}
-
-class ScriptIdentityStale extends DomainError {
-  constructor() {
-    super(
-      'script_identity_stale_conflict' satisfies ScriptErrorCode,
-      'Le script a changé depuis ta lecture : recharge-le avant de valider son identité',
     );
   }
 }
@@ -152,7 +143,7 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
 /**
  * `/v1/creators/:creatorId/platform-scripts` (ADR 0099 § 1 time 2, SC-04 lot c8): her native scripts imported from
  * the platform, read by the owner and the active managers of her list, with what keeps each from being offered; the
- * identity of a script's current version validated, or written by hand, by the same. An operator who is not one of
+ * descriptions of their media validated, or rewritten by hand, by the same. An operator who is not one of
  * them reads nothing: the same 404 for a creator or a script that exists and one that does not.
  */
 export function createPlatformScriptRoutes(
@@ -160,41 +151,24 @@ export function createPlatformScriptRoutes(
   reviews: ScriptIdentityReviewStore,
   branches: ScriptBranchStore,
   requireRole: RequireRole,
+  performance: (
+    creatorId: CreatorId,
+    reader: PlatformScriptsReader,
+    days: ScriptPerformanceDays,
+  ) => Promise<ScriptPerformanceList | null>,
 ): FastifyPluginAsyncZod {
   const listed = async (creatorId: CreatorId, reader: PlatformScriptsReader) => {
     const scripts = await creatorPlatformScripts({ store: reads }, reader, creatorId);
     if (scripts === null) throw new PlatformScriptNotFound();
     return scripts;
   };
-  const reviewed = async (
-    creatorId: CreatorId,
-    scriptId: string,
-    reader: PlatformScriptsReader,
-    review: IdentityReview,
-  ): Promise<PlatformScriptViewDto> => {
-    const outcome = await reviewScriptIdentity({ store: reviews }, reader, creatorId, scriptId, review);
-    if (outcome === 'not_found') throw new PlatformScriptNotFound();
-    if (outcome === 'stale') throw new ScriptIdentityStale();
-    const script = (await listed(creatorId, reader)).find((each) => each.id === scriptId);
-    if (script === undefined) throw new PlatformScriptNotFound();
-    return dtoOf(script);
-  };
-
   const described = async (
     creatorId: CreatorId,
     scriptId: string,
     reader: PlatformScriptsReader,
     review: DescriptionReview,
-    correlationId: string,
   ): Promise<PlatformScriptViewDto> => {
-    const outcome = await reviewScriptDescriptions(
-      { store: reviews },
-      reader,
-      creatorId,
-      scriptId,
-      review,
-      correlationId,
-    );
+    const outcome = await reviewScriptDescriptions({ store: reviews }, reader, creatorId, scriptId, review);
     if (outcome === 'not_found') throw new PlatformScriptNotFound();
     if (outcome === 'stale') throw new ScriptDescriptionStale();
     if (outcome === 'alone') throw new ScriptDescriptionAlone();
@@ -237,6 +211,25 @@ export function createPlatformScriptRoutes(
       },
     );
 
+    // The performance of her active scripts over 7, 30 or 90 days (ADR 0129, sous-lot 4c): read only, the owner and
+    // the active managers of her list, the same 404 for anyone else.
+    app.get(
+      '/creators/:creatorId/platform-scripts/performance',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: CreatorParamsSchema,
+          querystring: ScriptPerformanceQuerySchema,
+          response: { 200: ScriptPerformanceListSchema },
+        },
+      },
+      async (request) => {
+        const list = await performance(request.params.creatorId, readerOf(request.user), request.query.days);
+        if (list === null) throw new PlatformScriptNotFound();
+        return list;
+      },
+    );
+
     app.get(
       '/creators/:creatorId/platform-scripts',
       {
@@ -259,13 +252,10 @@ export function createPlatformScriptRoutes(
         },
       },
       (request) =>
-        described(
-          request.params.creatorId,
-          request.params.scriptId,
-          readerOf(request.user),
-          { kind: 'validate', descriptionIds: request.body.descriptionIds },
-          request.id,
-        ),
+        described(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
+          kind: 'validate',
+          descriptionIds: request.body.descriptionIds,
+        }),
     );
 
     // A description rewritten by hand from the one shown, validated by whoever writes it.
@@ -280,50 +270,13 @@ export function createPlatformScriptRoutes(
         },
       },
       (request) =>
-        described(
-          request.params.creatorId,
-          request.params.scriptId,
-          readerOf(request.user),
-          { kind: 'correct', descriptionId: request.body.descriptionId, detailed: request.body.detailed },
-          request.id,
-        ),
-    );
-
-    // The identity shown, validated as it is: idempotent, a second validation changes nothing.
-    app.post(
-      '/creators/:creatorId/platform-scripts/:scriptId/identity/validate',
-      {
-        preValidation: requireRole('owner', 'operator'),
-        schema: {
-          params: ScriptParamsSchema,
-          body: ValidateScriptIdentityBodySchema,
-          response: { 200: PlatformScriptViewSchema },
-        },
-      },
-      (request) =>
-        reviewed(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
-          kind: 'validate',
-          identityId: request.body.identityId,
-        }),
-    );
-
-    // An identity written by hand for the script's current version, validated by whoever writes it.
-    app.post(
-      '/creators/:creatorId/platform-scripts/:scriptId/identity/correct',
-      {
-        preValidation: requireRole('owner', 'operator'),
-        schema: {
-          params: ScriptParamsSchema,
-          body: CorrectScriptIdentityBodySchema,
-          response: { 200: PlatformScriptViewSchema },
-        },
-      },
-      (request) =>
-        reviewed(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
+        described(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
           kind: 'correct',
-          content: request.body.content,
+          descriptionId: request.body.descriptionId,
+          detailed: request.body.detailed,
         }),
     );
+
     return Promise.resolve();
   };
 }

@@ -1,3 +1,5 @@
+import type { CreatorId, FanId } from '@impera/contracts';
+
 import type { TelegramNight } from '@/settings/telegram/NightBanner';
 
 /**
@@ -31,6 +33,8 @@ export interface Todo {
   /** « Reçu à 23 h 41 », her time: the exact hour, in the line's tip. */
   readonly at: string;
   readonly conversationId: string;
+  /** A « Demande sur mesure »: whose fan, to unfold his order's card under the line (ADR 0159, trous béants 6). */
+  readonly customOrder?: { readonly creatorId: CreatorId; readonly fanId: FanId };
 }
 
 /**
@@ -122,7 +126,7 @@ export interface RevealSeller {
   readonly kind: 'member' | 'agent' | 'unlinked' | 'none';
   /** « Théo », « L’agent », « Chatteur non relié », « Sans chatteur ». */
   readonly name: string;
-  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Équipe › Reveal »). */
+  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Équipe › Comptes Reveal »). */
   readonly line: string;
   /** In euros, a refund taken off: negative when refunds outweigh sales. */
   readonly revenue: number;
