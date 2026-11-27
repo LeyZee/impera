@@ -11,9 +11,9 @@ Le chatteur lit, après chaque shift pendant son accompagnement puis chaque sema
 - [x] Amendement de l'ADR 0170 (§§ 26 à 32).
 - [x] Contrat : `FaultLevel`, `FaultCode`, `FaultTone`.
 - [x] Domaine pur `team/domain/chatter-review` : compteur après explication, ton, ouverture d'un dossier, total manqué.
-- [ ] Interface des remarques lues dans l'`index.ts` de l'agent (type à figer avec le fil Agent).
+- [x] Port `ShiftRemarkSource` (type figé avec le fil Agent, 27/11) ; sans lui, chaque bilan est vide. Branchement à faire quand le module `agent` le livre.
 - [x] Migration 0281 (numéro donné par Bilan le 27/11) : niveaux par code de faute (saisis hors dépôt), explications, contestations, dossiers ; FORCE RLS, `REVOKE ALL`, `GRANT` explicites.
-- [ ] Routes « Mon bilan » (chatteur) et contestation ; balayage d'isolation.
+- [x] Routes `/v1/team/review` : « Mon bilan » d'un shift, « vu », contestation, décision ; balayage d'isolation.
 - [ ] Écran « Mon bilan » selon la maquette validée (v3) ; vérifier le vert du gain de « Bien fait ».
 - [ ] Tests : domaine, contrat, intégration, écran.
 

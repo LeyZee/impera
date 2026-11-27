@@ -1,4 +1,4 @@
-import type { FaultLevel, FaultTone } from '@impera/contracts';
+import type { Currency, FaultLevel, FaultTone } from '@impera/contracts';
 
 /**
  * The chatter's review, pure (ADR 0170 §§ 15 and 26 to 32). A fault's level comes from its code, saved out of the
@@ -8,6 +8,8 @@ import type { FaultLevel, FaultTone } from '@impera/contracts';
 /** How long the repetition window lasts (ADR 0170 § 15). */
 const REPEAT_WINDOW_DAYS = 14;
 const DAY_MS = 86_400_000;
+/** The repetition window, in milliseconds. */
+export const REPEAT_WINDOW_MS = REPEAT_WINDOW_DAYS * DAY_MS;
 
 /** Where a contested occurrence stands (§ 14): it counts only once the manager has upheld it. */
 export type ContestState = 'none' | 'pending' | 'upheld' | 'dropped';
@@ -84,7 +86,7 @@ export function caseOpens(input: {
   if (threshold === null) return false;
   if (threshold === 0) return true;
   if (input.inMentoring) return false;
-  const since = input.now.getTime() - REPEAT_WINDOW_DAYS * DAY_MS;
+  const since = input.now.getTime() - REPEAT_WINDOW_MS;
   const counted = input.occurrences.filter(
     (o) =>
       o.at.getTime() > since &&
@@ -97,7 +99,7 @@ export function caseOpens(input: {
 /** A missed sale, in minor units, as the code priced it (§ 27); null when it cannot be priced. */
 export interface MissedAmount {
   readonly minor: number;
-  readonly currency: string;
+  readonly currency: Currency;
 }
 
 /**
@@ -106,8 +108,8 @@ export interface MissedAmount {
  */
 export function missedTotals(
   cards: readonly { readonly missed: MissedAmount | null; readonly contest: ContestState }[],
-): ReadonlyMap<string, number> {
-  const totals = new Map<string, number>();
+): ReadonlyMap<Currency, number> {
+  const totals = new Map<Currency, number>();
   for (const card of cards) {
     if (card.missed === null || card.contest === 'pending' || card.contest === 'dropped') continue;
     totals.set(card.missed.currency, (totals.get(card.missed.currency) ?? 0) + card.missed.minor);

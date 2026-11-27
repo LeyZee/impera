@@ -13,6 +13,7 @@ const day = (d: number): Date => new Date(Date.UTC(2026, 10, d, 21));
 const seen = (d: number, contest: FaultOccurrence['contest'] = 'none'): FaultOccurrence => ({
   at: day(d),
   contest,
+  author: 'member',
 });
 
 describe('chatter review', () => {
@@ -24,6 +25,7 @@ describe('chatter review', () => {
     expect(occurrenceCounts('firm', seen(10, 'pending'), day(1))).toBe(false);
     expect(occurrenceCounts('firm', seen(10, 'dropped'), day(1))).toBe(false);
     expect(occurrenceCounts('firm', seen(10, 'upheld'), day(1))).toBe(true);
+    expect(occurrenceCounts('firm', { ...seen(10), author: 'deduced' }, day(1))).toBe(false);
     expect(occurrenceCounts('firm', { ...seen(10), author: 'deduced' }, day(1))).toBe(false);
   });
 
