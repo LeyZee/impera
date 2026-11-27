@@ -123,7 +123,7 @@ function Slot({
               data-muted={focus !== null && shift.memberId !== focus ? 'true' : undefined}
             >
               <span className="sc-chip__name">{nameFor(member, me)}</span>
-              <span className="cal-chip__cont">suite</span>
+              <ContinuesMark />
             </div>
           );
         }
@@ -805,5 +805,27 @@ export function AgencyLoad({
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * « Suite » of a shift that began the day before: a small mark, so the name keeps the room in a narrow column (Design,
+ * 27/11). The word stays for a reader and on hover.
+ */
+export function ContinuesMark(): JSX.Element {
+  return (
+    <span className="cal-chip__cont" title="suite">
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+        <path
+          d="M3 3v4.5a2 2 0 0 0 2 2h7.5M10 7l2.5 2.5L10 12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="sr-only">suite</span>
+    </span>
   );
 }

@@ -1793,6 +1793,14 @@
   font-weight: 600;
   color: var(--nv-ink);
 }
+.nv-install__short {
+  display: none;
+}
+@media (max-width: 820px) {
+  .nv-install .nv-install__short {
+    display: inline;
+  }
+}
 .nv-float__text {
   margin: 2px 0 0;
   font-size: var(--nv-text-footnote);
@@ -1846,6 +1854,23 @@
     margin: 0 0 var(--nv-space-4);
     box-shadow: none;
     animation: nv-more-fade var(--nv-dur-base) var(--nv-ease-out) both;
+    /* One line, so her day is what is read first (Design, 27/11): the short title and the two buttons, nothing else. */
+    display: flex;
+    align-items: center;
+    gap: var(--nv-space-2);
+    padding: 6px 6px 6px 16px;
+  }
+  .nv-install .nv-float__icon,
+  .nv-install .nv-float__text,
+  .nv-install .nv-install__long {
+    display: none;
+  }
+  .nv-install .nv-float__body {
+    flex: 1;
+  }
+  .nv-install .nv-float__actions {
+    flex: none;
+    gap: 2px;
   }
   .nv-stage:has(> .nv-install) .nv-page--fill {
     height: calc(100dvh - var(--nv-stage-top) - var(--nv-tabbar-room) - var(--nv-install-room, 0px));

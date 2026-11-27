@@ -413,9 +413,11 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     const glance = (): string => document.querySelector('.ag-glance__text')?.textContent ?? '';
     withDay(1);
     show();
-    expect(await screen.findByText('L’essentiel du jour : 1 sur 3 fait.')).toBeDefined();
-    expect(glance()).toContain('Rien à l’agenda');
+    // The ring and the title speak of her essentials, the empty agenda goes below (Design, 27/11).
+    expect(await screen.findByText('2 choses à faire aujourd’hui')).toBeDefined();
+    expect(glance()).toContain('Rien d’autre à l’agenda');
     expect(glance()).not.toContain('Rien à faire');
+    expect(document.querySelector('.ag-glance .ag-ring')?.textContent).toContain('1/3');
     cleanup();
     withDay(3);
     show();

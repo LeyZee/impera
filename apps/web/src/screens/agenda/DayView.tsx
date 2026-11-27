@@ -290,6 +290,11 @@ export function Glance({
     essentials === null
       ? ''
       : `L’essentiel du jour : ${String(essentials.done)} sur ${String(essentials.total)} fait.`;
+  // Nothing at the agenda but her essentials left: the ring and the title speak of them, the empty agenda goes below
+  // (Design, 27/11).
+  const essentialOnly =
+    total === 0 && plan.suggestions.length === 0 && !owes && essentialLeft ? essentials : null;
+  const essentialsLeft = essentialOnly === null ? 0 : essentialOnly.total - essentialOnly.done;
   const firstAny = firstOf(plan, nowMinute);
   const first = ahead && firstAny?.task.when.kind === 'routine' ? null : firstAny;
   const proposed = plan.suggestions.length;
@@ -298,9 +303,11 @@ export function Glance({
     total === 0
       ? proposed > 0
         ? `${String(proposed)} ${proposed > 1 ? 'propositions' : 'proposition'} à regarder`
-        : pending
-          ? 'Rien à l’agenda'
-          : 'Rien à faire'
+        : essentialOnly !== null
+          ? `${String(essentialsLeft)} ${essentialsLeft > 1 ? 'choses' : 'chose'} à faire aujourd’hui`
+          : pending
+            ? 'Rien à l’agenda'
+            : 'Rien à faire'
       : left === 0
         ? pending
           ? 'L’agenda est fait'
@@ -310,7 +317,8 @@ export function Glance({
           : past
             ? `${String(left)} ${left > 1 ? 'choses pas faites' : 'chose pas faite'}`
             : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
-  const share = total === 0 ? 0 : done / total;
+  const share =
+    essentialOnly !== null ? essentialOnly.done / essentialOnly.total : total === 0 ? 0 : done / total;
   // Her timed tasks whose time is over and that she has not ticked: said in amber, never left out of the glance
   // (recette visuelle 16/11, CRE-05).
   const missed =
@@ -331,14 +339,20 @@ export function Glance({
           share={share}
           full={total > 0 && left === 0}
           label={
-            total === 0
-              ? pending
-                ? 'Rien à l’agenda'
-                : 'Rien à faire'
-              : `${String(done)} sur ${String(total)} fait`
+            essentialOnly !== null
+              ? `L’essentiel du jour : ${String(essentialOnly.done)} sur ${String(essentialOnly.total)} fait`
+              : total === 0
+                ? pending
+                  ? 'Rien à l’agenda'
+                  : 'Rien à faire'
+                : `${String(done)} sur ${String(total)} fait`
           }
         >
-          {total === 0 ? '–' : `${String(done)}/${String(total)}`}
+          {essentialOnly !== null
+            ? `${String(essentialOnly.done)}/${String(essentialOnly.total)}`
+            : total === 0
+              ? '–'
+              : `${String(done)}/${String(total)}`}
         </Ring>
         <div className="ag-glance__text">
           <b>{title}</b>
@@ -350,6 +364,8 @@ export function Glance({
                 'Aucune tâche ce jour-là.'
               ) : owes ? (
                 'Tes envois sont juste au-dessus.'
+              ) : essentialOnly !== null ? (
+                'Ton essentiel du jour, juste au-dessus. Rien d’autre à l’agenda.'
               ) : essentialLeft ? (
                 essentialWords
               ) : (

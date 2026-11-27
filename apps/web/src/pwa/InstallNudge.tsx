@@ -74,7 +74,11 @@ export function InstallNudge({ home }: { home: string }): JSX.Element | null {
     <aside ref={card} className="nv-float nv-install nv-glass nv-glass--thick" aria-label="Installer Impera">
       <img className="nv-float__icon" src="/icons/icon-192.png" alt="" width={44} height={44} />
       <div className="nv-float__body">
-        <p className="nv-float__title">Impera sur ton écran d’accueil</p>
+        {/* On a phone the card is one line, so her day is read first (Design, 27/11): the short title says it there. */}
+        <p className="nv-float__title">
+          <span className="nv-install__long">Impera sur ton écran d’accueil</span>
+          <span className="nv-install__short">Installer Impera</span>
+        </p>
         <p className="nv-float__text">Ouverture en un geste, plein écran, et les notifications.</p>
       </div>
       <div className="nv-float__actions">

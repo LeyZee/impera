@@ -76,8 +76,8 @@
   line-height: var(--nv-text-caption-leading);
   font-weight: 600;
 }
-/* In a narrow column the name is cut at its end, never in the middle of a word, and « suite » stays whole (recette
-   CHAT-04). */
+/* In a narrow column the name is cut at its end, never in the middle of a word; « suite » is a small mark beside it,
+   so the name keeps the room (recette CHAT-04, Design 27/11). */
 .cal-chip--cont .sc-chip__name {
   min-width: 0;
   overflow: hidden;
@@ -86,7 +86,9 @@
 }
 .cal-chip__cont {
   flex: none;
-  white-space: nowrap;
+  display: inline-grid;
+  place-items: center;
+  color: var(--nv-ink-muted);
 }
 /* The agent is said once per creator, under her name: no edge on each créneau, no bar on a card's side (recette
    05/11, CHAT-27). On part of a créneau, a quiet tag says from or until when, « IA dès 9 h ». */
