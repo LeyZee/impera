@@ -228,7 +228,8 @@ export type Moment =
 export function momentOf(plan: DayPlan, now: number): Moment {
   const live = plan.timed.find((item) => item.start <= now && now < item.end);
   if (live !== undefined) return { kind: 'live', task: live.task, left: live.end - now };
-  const next = plan.timed.find((item) => item.start > now);
+  // A task she already ticked is not what comes next (recette MOD-06); one under way stays « en cours » (CREA-02).
+  const next = plan.timed.find((item) => !item.done && item.start > now);
   return next === undefined
     ? { kind: 'none' }
     : { kind: 'next', task: next.task, at: next.start, in: next.start - now };

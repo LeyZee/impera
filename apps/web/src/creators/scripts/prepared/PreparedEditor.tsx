@@ -10,11 +10,12 @@ import { useEffect, useId, useRef, useState, type JSX } from 'react';
 import { StepCard } from './StepCard';
 import { changePreparedState, savePrepared } from './api';
 import { ConditionDialog, MediaPicker } from './dialogs';
-import type { EditorMedia } from './media';
+import type { EditorMedia, PickerFolder } from './media';
 import {
   PATHS_SHOWN,
   branchAt,
   branchPlace,
+  crossScriptWarnings,
   emptyStep,
   gapText,
   priceLabel,
@@ -51,6 +52,7 @@ export function PreparedEditor({
   initial,
   media,
   folders,
+  others = [],
   onSaved,
   onReload,
   onCopy,
@@ -60,7 +62,9 @@ export function PreparedEditor({
   creatorName: string;
   initial: PreparedScriptView;
   media: ReadonlyMap<string, EditorMedia>;
-  folders: readonly { readonly key: string; readonly name: string }[];
+  folders: readonly PickerFolder[];
+  /** Her other scripts in preparation: a media sold in one and offered in another is said (REV-08). */
+  others?: readonly PreparedScriptView[];
   /** Each answer of the server, for the list to show the same. */
   onSaved: (view: PreparedScriptView) => void;
   /** Saved by someone else since: the list is read again and the editor starts from it. */
@@ -76,6 +80,8 @@ export function PreparedEditor({
   const [picking, setPicking] = useState<string | null>(null);
   const [conditioning, setConditioning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The branches whose price as typed is refused: the last good one is kept, never said « Enregistré » (PRO1-08).
+  const [refusedPrices, setRefusedPrices] = useState<ReadonlySet<string>>(new Set());
   const sent = useRef(initial.content);
   const latest = useRef(initial.content);
   latest.current = content;
@@ -110,8 +116,17 @@ export function PreparedEditor({
     };
   }, [save.kind, content, creatorId, view.id, view.revision, onSaved]);
 
-  const settled = save.kind === 'saved' && content === sent.current;
+  const refused = content.steps
+    .flatMap((step) => step.branches)
+    .filter((branch) => refusedPrices.has(branch.key))
+    .map(
+      (branch) =>
+        `${branchPlace(content, branch.key).replace(/^./u, (first) => first.toUpperCase())} : prix à corriger, l’ancien est gardé`,
+    );
+  const settled = save.kind === 'saved' && content === sent.current && refused.length === 0;
   const gaps = view.gaps;
+  const crossed = crossScriptWarnings(view, content, others);
+  const missing = gaps.length + refused.length;
   const toState = async (to: 'ready' | 'editing'): Promise<void> => {
     setBusy(true);
     const outcome = await changePreparedState(creatorId, view.id, view.revision, to);
@@ -145,7 +160,9 @@ export function PreparedEditor({
       : save.kind === 'dirty'
         ? 'Modifications en cours'
         : save.kind === 'saved'
-          ? 'Enregistré'
+          ? refused.length > 0
+            ? 'Un prix n’est pas enregistré'
+            : 'Enregistré'
           : save.message;
 
   return (
@@ -227,16 +244,19 @@ export function PreparedEditor({
                   </ul>
                 </div>
               </div>
-            ) : gaps.length > 0 ? (
+            ) : missing > 0 ? (
               <div className="se-missing" role="status">
                 <span className="se-missing__icon" aria-hidden="true">
                   !
                 </span>
                 <div className="se-missing__text">
                   <div className="se-missing__title">
-                    {gaps.length === 1 ? 'Il manque une chose' : `Il manque ${String(gaps.length)} choses`}
+                    {missing === 1 ? 'Il manque une chose' : `Il manque ${String(missing)} choses`}
                   </div>
                   <ul>
+                    {refused.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
                     {gaps.map((gap, at) => (
                       <li key={`${gap.code}-${String(at)}`}>{gapText(content, gap)}</li>
                     ))}
@@ -293,6 +313,15 @@ export function PreparedEditor({
                     },
                     onRemoveBranch: (key) => {
                       change((before) => withoutBranch(before, key));
+                    },
+                    onPriceRefused: (key, now) => {
+                      setRefusedPrices((before) => {
+                        if (before.has(key) === now) return before;
+                        const next = new Set(before);
+                        if (now) next.add(key);
+                        else next.delete(key);
+                        return next;
+                      });
                     },
                     onPickMedia: setPicking,
                     onCondition: setConditioning,
@@ -368,11 +397,16 @@ export function PreparedEditor({
               <p className="nv-eyebrow">Ce qu’un fan paie</p>
               <h2 className="nv-h3">Chaque chemin du script</h2>
             </div>
-            {view.warnings.length > 0 ? (
+            {view.warnings.length + crossed.length > 0 ? (
               <div className="se-warns">
                 {view.warnings.map((warning, at) => (
                   <span key={`${warning.code}-${String(at)}`} className="se-warn">
                     {warningText(content, warning)}
+                  </span>
+                ))}
+                {crossed.map((line) => (
+                  <span key={line} className="se-warn">
+                    {line}
                   </span>
                 ))}
               </div>
@@ -413,6 +447,7 @@ export function PreparedEditor({
           place={branchPlace(content, picking).replace(/^./u, (first) => first.toUpperCase())}
           folders={folders}
           media={media}
+          moment={content.moment}
           taken={picked.branch.media.map((one) => one.ref)}
           onClose={() => {
             setPicking(null);

@@ -1,15 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  readyVideoPriceMinor,
   ReservedMediaAskSchema,
   ReservedMediaSchema,
   ReservedMediaSentSchema,
   type ReservedMedia,
   type ReservedMediaAsk,
   type ReservedMediaSent,
+  SaleVideoAskSchema,
+  SaleVideoSchema,
+  type SaleVideo,
+  type SaleVideoAsk,
 } from '@impera/contracts';
 import { sql, withTenantJob, type Database, type Transaction } from '@impera/db';
 
+import type { ReadyVideoLines } from '../../domain/ports';
 import { ONCE_PER_FAN, PROVEN_GIFT_INTENSITIES } from '../../domain/reserved';
 
 /** A drop that reached the agency, out or not: its kept media are hers to send. */
@@ -37,6 +43,7 @@ async function pickReservedMedia(tx: Transaction, ask: ReservedMediaAsk): Promis
          and d.state in ${ARRIVED}
          and f.state in ('kept', 'duplicate')
          and f.replaced_at is null
+         and f.redo_sentence is null
          and f.media_asset_id is not null
     )
     select h.media_asset_id, h.kind
@@ -89,18 +96,78 @@ async function recordReservedMediaSent(tx: Transaction, sent: ReservedMediaSent)
   return inserted.rows.length > 0;
 }
 
+/**
+ * A video of hers to sell this fan (ADR 0163 § 7): kept, never replaced, never asked again, its description validated,
+ * its type one the owner still offers, never sent to this fan, free or sold. The oldest first, with its price drawn in
+ * its type's range, the video's id as seed: the agent freezes it in its offer. `null` when none is left for him.
+ */
+async function pickSaleVideo(
+  tx: Transaction,
+  ask: SaleVideoAsk,
+  lines: ReadyVideoLines,
+): Promise<SaleVideo | null> {
+  const { creatorId, fanId } = SaleVideoAskSchema.parse(ask);
+  const offered = (await lines(creatorId)).filter((line) => line.offered);
+  if (offered.length === 0) return null;
+  const types = sql.join(
+    offered.map((line) => sql`${line.id}`),
+    sql`, `,
+  );
+  const rows = await tx.execute<{ media_asset_id: string; ready_video_id: string }>(sql`
+    select f.media_asset_id, d.ready_video_id
+      from content_drop_files f
+      join content_drops d on d.id = f.drop_id
+     where d.creator_id = ${creatorId}
+       and d.category = 'sale_video'
+       and d.ready_video_id in (${types})
+       and d.state in ${ARRIVED}
+       and f.state in ('kept', 'duplicate')
+       and f.replaced_at is null
+       and f.redo_sentence is null
+       and f.media_asset_id is not null
+       and exists (
+         select 1 from media_descriptions md
+          where md.media_asset_id = f.media_asset_id and md.validated_at is not null
+       )
+       and not exists (
+         select 1 from media_sends s
+          where s.creator_id = ${creatorId} and s.fan_id = ${fanId} and s.media_asset_id = f.media_asset_id
+       )
+     order by d.created_at, f.position
+     limit 1
+  `);
+  const first = rows.rows[0];
+  const line = offered.find((one) => one.id === first?.ready_video_id);
+  if (first === undefined || line === undefined) return null;
+  return SaleVideoSchema.parse({
+    mediaAssetId: first.media_asset_id,
+    readyVideoId: line.id,
+    label: line.label,
+    priceMinor: readyVideoPriceMinor(line, first.media_asset_id),
+  });
+}
+
 /** What the AI sends from her coffre, read and noted for the agent (ADR 0163 § 7). */
 export interface ReservedMediaStore {
   pick(ask: ReservedMediaAsk): Promise<ReservedMedia | null>;
   noteSent(sent: ReservedMediaSent): Promise<boolean>;
+  /** A video to sell this fan and its price; the sale itself, and its price frozen, are the agent's. */
+  pickSaleVideo(ask: SaleVideoAsk): Promise<SaleVideo | null>;
 }
 
 /**
  * Under her tenant as the job that reads her dropped media (`drop_media`): her drops are read by herself, her team or
  * that job only, never by a bare tenant. One creator at a time; the note is a row of hers (`media_sends`).
  */
-export function createDrizzleReservedMedia(db: Database): ReservedMediaStore {
+export function createDrizzleReservedMedia(
+  db: Database,
+  readyVideos: ReadyVideoLines = () => Promise.resolve([]),
+): ReservedMediaStore {
   return {
+    pickSaleVideo: (ask) =>
+      withTenantJob(db, SaleVideoAskSchema.parse(ask).creatorId, 'drop_media', (tx) =>
+        pickSaleVideo(tx, ask, readyVideos),
+      ),
     pick: (ask) =>
       withTenantJob(db, ReservedMediaAskSchema.parse(ask).creatorId, 'drop_media', (tx) =>
         pickReservedMedia(tx, ask),

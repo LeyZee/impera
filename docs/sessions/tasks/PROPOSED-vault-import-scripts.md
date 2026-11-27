@@ -1,5 +1,5 @@
 # Coffre Reveal : importer les scripts existants et les relier aux médias du coffre
-Statut : in_progress (lancée par la coordination le 14/11/2026 ; ID à donner ; ADR 0099 temps 2, P6-01 ; propriétaire proposé : Médias pour le module `scripts`, Bilan pour la lecture Reveal déjà dans P2-02)
+Statut : superseded (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : l'import des scripts Reveal est retiré par « Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse » (décision du 20/11/2026) ; la lecture du coffre reste) ; statut précédent : in_progress (lancée par la coordination le 14/11/2026 ; ID à donner ; ADR 0099 temps 2, P6-01 ; propriétaire proposé : Médias pour le module `scripts`, Bilan pour la lecture Reveal déjà dans P2-02)
 Phase : 6
 Dépend de : P2-02 (`listScripts`), `PROPOSED-vault-sync.md`, P6-01, SC-04 c8 (identité de script, rattachable à un script de toute origine)
 Branche : task/<id>-vault-import-scripts

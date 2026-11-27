@@ -7,12 +7,28 @@ import {
   dueIn,
   dueWords,
   hasWeek,
+  heldByWeek,
   leftToDrop,
   progressOf,
   shootDaysWords,
 } from './week-model';
 
 describe('her week, as she reads it', () => {
+  it('holds the days of a week still to accept, and lets them go once accepted (choice of 21/11)', () => {
+    const day = HerShootDaySchema.parse({
+      suggestionId: '0192f3a0-0000-7000-8000-000000000301',
+      taskId: null,
+      state: 'suggested',
+      day: '2026-11-25',
+      items: [],
+    });
+    const week = { week: '2026-11-23', toAccept: true, shootDays: [day], delivery: null };
+    expect(heldByWeek(week, day.suggestionId)).toBe(true);
+    expect(heldByWeek(week, '0192f3a0-0000-7000-8000-000000000399')).toBe(false);
+    expect(heldByWeek({ ...week, toAccept: false }, day.suggestionId)).toBe(false);
+    expect(heldByWeek(undefined, day.suggestionId)).toBe(false);
+  });
+
   it('shows nothing before the agency sent it', () => {
     expect(hasWeek({ week: '2026-11-23', toAccept: false, shootDays: [], delivery: null })).toBe(false);
   });

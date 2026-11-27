@@ -141,6 +141,7 @@ describe('the session read, held, then sent', () => {
       readLink: () => Promise.resolve('x'.repeat(43)),
       capture: () => Promise.resolve({ state: 'session', session: SESSION }),
       expectedModel: () => Promise.resolve(null),
+      accountOfModel: () => Promise.resolve(null),
       ...overrides,
     };
   }
@@ -205,6 +206,26 @@ describe('the session read, held, then sent', () => {
       ACCOUNT,
     );
     expect(other).toMatchObject({ seen: 'other' });
+  });
+
+  // EXT-05: synchronising one account on a tab of another account's creator was refused only once sent.
+  it('holds nothing when the tab shows the creator of another account of the CRM', async () => {
+    const hold = sessionHold();
+    const accountOfModel = vi.fn<ReadDeps['accountOfModel']>(() => Promise.resolve(OTHER));
+    const read = await readReveal(reading({ accountOfModel }), hold, ACCOUNT);
+    expect(read).toEqual({ state: 'other-account', accountId: OTHER });
+    expect(accountOfModel).toHaveBeenCalledWith('model-a1', ACCOUNT);
+    expect(await sendHeld(sending(), hold, ACCOUNT)).toEqual({ state: 'expired' });
+    // Its own model is never looked up elsewhere.
+    const own = vi.fn<ReadDeps['accountOfModel']>(() => Promise.resolve(OTHER));
+    expect(
+      await readReveal(
+        reading({ expectedModel: () => Promise.resolve('model-a1'), accountOfModel: own }),
+        sessionHold(),
+        ACCOUNT,
+      ),
+    ).toMatchObject({ state: 'held', seen: 'same' });
+    expect(own).not.toHaveBeenCalled();
   });
 
   it('forgets the session after a minute, on cancel, and for another account', async () => {

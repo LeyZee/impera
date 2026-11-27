@@ -1,5 +1,15 @@
 # 0099. Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0145 · Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed, le code lit le rôle et jamais le nom](0145-vault-folders-by-role.md) : Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR. Avenant du 17/11 : amende aussi l'ADR 0113 § 5 (la description du coffre ne part plus seule, par lots, mais sur une sélection confirmée) et l'ADR 0083 § 9 (plus d'interrupteur des descriptions : un dépôt est décrit à son arrivée).
+>
+> - [0161 · Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse](0161-only-our-scripts-impera-to-reveal.md) : Amende : l'ADR 0099 § 1 (deuxième temps, « importer les scripts existants ») et § 5 (ordre des descriptions), l'ADR 0098 § 6 (le cerveau choisit un script sur son identité validée) et l'ADR 0112 §§ 20 et 23 (la liste de l'onglet Scripts, la reconnaissance d'une copie).
+>
+> Toutes les décisions du même sujet : [`docs/regles/vente-et-scripts.md`](../regles/vente-et-scripts.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (« ok 0099 » de Charles le 12/11/2026, 23 h 27, fil « Synchroniser le Vault Reveal », après son choix du 12/11 à 23 h 25 : scripts composés dans le CRM puis créés dans Reveal ; § 3 sur sa demande de 23 h 26)
 Date : 2026-11-12
 Précise : l'ADR 0030 (médiathèque, le coffre fait foi), l'ADR 0018 (port étendu, garde d'écriture), l'ADR 0083 (description détaillée, validée avant usage) et la fiche P6-01 (catalogue = index des scripts Reveal). Ne remplace rien.

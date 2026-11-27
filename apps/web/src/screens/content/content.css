@@ -60,10 +60,27 @@
   outline: none;
   box-shadow: var(--nv-shadow-focus);
 }
-.ct-tile__emoji {
-  font-size: 24px;
-  line-height: 1;
+.ct-tile .ct-kind {
   margin-bottom: var(--nv-space-1);
+}
+/* A kind without a colour: its emoji on the same plate, size and radius, in neutral (Design, 27/11). */
+.ct-kind--emoji {
+  --wk-c: var(--nv-ink-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.ct-kind--emoji[data-size='sm'] {
+  font-size: 14px;
+}
+/* A smaller mark in a card's head and the « Publié » rows. */
+.ct-kind[data-size='sm'] {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+}
+.ct-kind[data-size='sm'] .wk-icon {
+  width: 16px;
+  height: 16px;
 }
 .ct-tile__name {
   font-weight: 650;
@@ -94,10 +111,6 @@
   align-items: center;
   gap: var(--nv-space-2);
   min-width: 0;
-}
-.ct-card__emoji {
-  font-size: 18px;
-  line-height: 1;
 }
 .ct-card__name {
   flex: 1;
@@ -316,7 +329,7 @@
 /* ---- Publié: quiet lines ---- */
 .ct-out {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--nv-space-2);
   padding: var(--nv-space-2) 0;
   border-bottom: 1px solid var(--nv-hairline);
@@ -344,6 +357,17 @@
 }
 .ct-pick {
   width: 100%;
+}
+/* The types of a video to sell, as chips that wrap on a phone. */
+.ct-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+/* « Réessayer » in a note: the size of its word, under the sentence, never as wide as the way out. */
+.ct-retry {
+  justify-self: start;
+  margin-top: var(--nv-space-2);
 }
 .ct-chosen {
   list-style: none;

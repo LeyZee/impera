@@ -258,3 +258,10 @@
     white-space: normal;
   }
 }
+
+/* Reduced motion: the menu is simply there (DS-12). */
+@media (prefers-reduced-motion: reduce) {
+  .wp-menu.nv-glass {
+    animation: none;
+  }
+}

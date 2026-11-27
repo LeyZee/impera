@@ -1,6 +1,6 @@
 import type { Me } from '@impera/contracts';
 import { playLiquid, playOnce } from '@impera/design-system';
-import { Link, Outlet, useRouter, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useLinkProps, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   Fragment,
   useEffect,
@@ -101,8 +101,9 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
   const main = useRef<HTMLElement>(null);
   const shown = useRef(current);
 
-  // The tab's title names the screen and its section, so that several open tabs read apart (NAV-12).
-  useEffect(() => {
+  // The tab's title names the screen and its section, so that several open tabs read apart (NAV-12). Laid before the
+  // screen's own effects: a screen that knows more (a creator's sheet, NAV-06) says it after, and is not overwritten.
+  useLayoutEffect(() => {
     document.title = documentTitle(pathname, current);
   }, [pathname, current, rail.kind]);
 
@@ -168,7 +169,13 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
           <GuidesBesideProvider user={user} pathname={pathname}>
-            <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
+            <Stage
+              key={current ?? 'none'}
+              pathname={pathname}
+              stage={main}
+              scoped={scopesCreators(user)}
+              home={rail.home}
+            />
           </GuidesBesideProvider>
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
@@ -211,8 +218,11 @@ function Stage({
   pathname,
   stage,
   scoped,
+  home,
 }: {
   pathname: string;
+  /** The role's home screen, the only one the install card heads (choice of 21/11). */
+  home: string;
   stage: RefObject<HTMLElement | null>;
   /** The account chooses a creator: on a phone the selector heads the page, the menu having no room for it. */
   scoped: boolean;
@@ -222,12 +232,27 @@ function Stage({
   if (!within && pathname !== first) setWithin(true);
   return (
     <main className="nv-stage" id="contenu" tabIndex={-1} ref={stage} data-within={within ? '' : undefined}>
-      {/* On a phone the install card heads the page, in its flow: it never covers what the page shows (recette 11/11,
-          SOC-14). A computer keeps it in its corner. */}
-      <InstallNudge />
+      {/* On a phone the install card heads the role's home screen, in its flow: it never covers what the page shows
+          (recette 11/11, SOC-14). A computer keeps it in its corner. */}
+      <InstallNudge home={home} />
       {scoped ? <CreatorScope place="page" /> : null}
       <Outlet />
     </main>
+  );
+}
+
+/**
+ * The brand, a way home. Never `aria-current`: the home tab of the rail already says where the account is, and two
+ * links marked « page » would mislead a screen reader (NAV-09). The router's `Link` sets it on every active link, so
+ * its props are spread first and the mark taken off after.
+ */
+function RailBrand({ to, label }: { to: Rail['home']; label: string }): JSX.Element {
+  const link = useLinkProps({ to });
+  return (
+    <a {...link} className="nv-rail__brand" aria-label={label} aria-current={undefined}>
+      <img className="nv-rail__mark" src="/impera-mark.svg" alt="" width={30} height={30} />
+      <span className="nv-rail__name">Impera</span>
+    </a>
   );
 }
 
@@ -369,10 +394,7 @@ export function RailNav({
       aria-label="Navigation"
       data-tabs={rail.items.length + (rail.settings === null ? 0 : 1)}
     >
-      <Link to={rail.home} className="nv-rail__brand" aria-label={`Impera, ${home?.label ?? 'accueil'}`}>
-        <img className="nv-rail__mark" src="/impera-mark.svg" alt="" width={30} height={30} />
-        <span className="nv-rail__name">Impera</span>
-      </Link>
+      <RailBrand to={rail.home} label={`Impera, ${home?.label ?? 'accueil'}`} />
       {/* Always there, even empty: the lens is placed again when the selector comes in or goes (its creators read). */}
       <div className="nv-rail__head">{head}</div>
       <span className="nv-rail__lens" ref={lensRef} aria-hidden="true" />

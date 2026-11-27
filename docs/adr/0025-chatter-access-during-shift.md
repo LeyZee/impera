@@ -1,5 +1,13 @@
 # 0025. Le chatteur chatte dans Reveal ; dans Nirvana, il traite sa créatrice pendant son shift, et rien hors shift
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0049 · Créneaux libres, plusieurs chatteurs sur un compte, fans confiés ; la créatrice sans notification de shift](0049-free-slots-seats-and-shared-fans.md) : Remplace : le contrat `SchedulingSettingsSchema` (`slotStartMinute` et `slotLengthMinutes`, des créneaux tous de la même durée) ; la contrainte `shifts_account_overlap_excl` (migration 0021), qui interdit deux shifts qui se chevauchent sur un compte ; dans l'ADR 0045 § 4, la puce « La créatrice choisit dans Moi si elle veut être prévenue des shifts de ses comptes ; par défaut, non » ; dans l'ADR 0025 § « Un humain qui écrit dans Reveal », « le membre en poste sur ce compte (l'auteur Reveal si la capture montre quel membre a écrit) » quand plusieurs membres y sont en poste. Précise l'ADR 0045 § 2 et § 3, l'ADR 0048 § 1 (« IA seule ») et l'ADR 0043 (à qui revient une vente).
+>
+> Toutes les décisions du même sujet : [`docs/regles/chatteurs.md`](../regles/chatteurs.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 27/10/2026 : carte de 15h28, « Toute la créatrice, en shift » ; message de 15h30, « le chatteur, lui, il chatte via Reveal »)
 Date : 2026-10-27
 Remplace : dans l'ADR 0024, le point qui réduit le Suivi du chatteur aux passations `sale` qui lui sont routées ; dans l'ADR 0023 (§ Mode hybride), le point « Gardes sur les messages du chatteur » qui faisait vendre le chatteur depuis Suivi

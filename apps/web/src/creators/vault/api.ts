@@ -8,6 +8,7 @@ import {
   type VaultChoicesView,
   type VaultDescribeAnswer,
   type VaultDescribeAsk,
+  type VaultDescriptionReview,
   type VaultView,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -113,6 +114,34 @@ export async function askVaultDescribe(
     if (!response.ok) return null;
     const answer = VaultDescribeAnswerSchema.safeParse(await response.json().catch(() => null));
     return answer.success ? answer.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * « Valider la description » and « Corriger » on a media's sheet: the choices as they now stand; `stale` when the
+ * description shown was replaced meanwhile; `null` when the server refused or did not answer.
+ */
+export async function reviewVaultDescription(
+  creatorId: CreatorId,
+  platformMediaId: string,
+  review: VaultDescriptionReview,
+): Promise<VaultChoicesView | 'stale' | null> {
+  try {
+    const response = await fetch(
+      `/v1/creators/${encodeURIComponent(creatorId)}/vault/media/${encodeURIComponent(platformMediaId)}/description`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(review),
+      },
+    );
+    if (response.status === 409) return 'stale';
+    if (!response.ok) return null;
+    const view = VaultChoicesViewSchema.safeParse(await response.json().catch(() => null));
+    return view.success ? view.data : null;
   } catch {
     return null;
   }

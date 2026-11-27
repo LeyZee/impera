@@ -236,6 +236,8 @@ async function readSession(accountId: PlatformAccountId): Promise<void> {
   syncPending = null;
   // No answer here is the extension's own worker, never the CRM: reading the tab asks nothing of it.
   if (read === null) syncOutcome = { kind: 'failed', accountId, failure: 'extension' };
+  else if (read.state === 'other-account')
+    syncOutcome = { kind: 'failed', accountId, failure: 'other-account', other: read.accountId };
   else if (read.state !== 'held') syncOutcome = { kind: 'failed', accountId, failure: read.state };
   else {
     syncConfirm = { accountId, modelId: read.modelId, seen: read.seen };
@@ -375,11 +377,13 @@ const LINK_FAILURES: Readonly<Record<'page' | 'typed', Readonly<Record<LinkFailu
   page: {
     denied: 'Ton navigateur n’a pas autorisé ce site. Clique sur Relier et accepte sa question.',
     signed_out: 'Connecte-toi au CRM dans cet onglet, puis clique sur Relier.',
+    down: 'Le CRM ne répond pas : vérifie qu’il est lancé, puis réessaie.',
     not_crm: 'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
   },
   typed: {
     denied: 'Ton navigateur n’a pas autorisé ce site. Enregistre à nouveau et accepte sa question.',
     signed_out: 'Connecte-toi d’abord au CRM à cette adresse, puis enregistre-la.',
+    down: 'Le CRM ne répond pas : vérifie qu’il est lancé, puis réessaie.',
     not_crm: 'Cette adresse ne répond pas comme un CRM Impera.',
   },
 };

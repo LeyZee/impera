@@ -1,5 +1,5 @@
 # CR-07 Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence
-Statut : blocked (clé xAI) (ADR 0042 § 5, acceptée par Charles le 02/11/2026)
+Statut : todo (plus bloquée par une clé : les clés d'IA sont saisies dans le CRM ; à reprendre après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : blocked (clé xAI) (ADR 0042 § 5, acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0042)
 Dépend de : CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur
 Branche : task/cr-07-weekly-brief

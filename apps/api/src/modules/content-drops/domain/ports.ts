@@ -1,4 +1,5 @@
 import type {
+  ReadyVideoLine,
   ReplaceDropFileBody,
   ContentDrop,
   DropDescriptionsReview,
@@ -737,3 +738,9 @@ export interface ThumbnailQueue {
 export interface Thumbnailer {
   make(path: string, kind: 'image' | 'video', out: string): Promise<boolean>;
 }
+
+/**
+ * The owner's « Vidéos déjà tournées » for her (ADR 0163 § 7), read from his grid by the module that owns it: every
+ * line, offered or not, in his order; none when no grid is saved. Never shown to her with a price.
+ */
+export type ReadyVideoLines = (creatorId: string) => Promise<readonly ReadyVideoLine[]>;

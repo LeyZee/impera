@@ -183,9 +183,10 @@
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
+/* Neutral: a step to come is no warning, the amber is kept for « À traiter » (H-10). */
 .cl-card__setup-label {
   margin-inline-end: 2px;
-  color: var(--nv-warning);
+  color: var(--nv-ink-muted);
   font-weight: 600;
 }
 .cl-card__step {

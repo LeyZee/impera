@@ -25,7 +25,6 @@ import type { WeekAgendaStore } from '../../../creator-tasks';
 import { herDay } from '../../application/her-day';
 import { acceptWeek, creatorProgress, herWeek } from '../../application/her-week';
 import { validateWeek } from '../../application/validate';
-import { CreatorWeekNotFound } from '../../domain/errors';
 import { mondayOf } from '../../domain/plan';
 import type { AcceptSuggestion, DayTickStore, WeekDraftStore, WeekFactsReader } from '../../domain/ports';
 
@@ -80,16 +79,20 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
       '/creators/:creatorId/weeks/:week',
       {
         preValidation: deps.requireRole('owner', 'operator'),
-        schema: { params: CreatorWeekParamsSchema, response: { 200: AgencyCreatorWeekSchema } },
+        schema: {
+          params: CreatorWeekParamsSchema,
+          response: { 200: AgencyCreatorWeekSchema, 204: z.null() },
+        },
       },
-      async (request) => {
+      // 204 while the Sunday job has not computed it: an ordinary state, never a 404 the browser logs as an error
+      // (MAN-08, DS-14, recette 27/11).
+      async (request, reply) => {
         const week = await deps.drafts.read(
           request.params.creatorId,
           signedIn(request.user),
           mondayOf(request.params.week),
         );
-        if (week === null) throw new CreatorWeekNotFound();
-        return week;
+        return week === null ? reply.code(204).send(null) : reply.code(200).send(week);
       },
     );
 

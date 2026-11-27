@@ -64,6 +64,7 @@ import {
   ContentDropIdConflict,
   ContentDropNotFound,
   ContentDropRequestUnprocessable,
+  ContentDropReadyVideoUnprocessable,
   ContentDropScriptUnprocessable,
   ContentDropSettled,
   ContentRequestClosed,
@@ -84,12 +85,16 @@ import type {
   ScriptContentRequest,
   ReceiptStore,
   ScriptDropEntry,
+  ReadyVideoLines,
 } from '../../domain/ports';
 import { keptUntil } from '../../domain/retention';
 import { shotMoment } from '../../domain/shot-moment';
 
 import { enqueueDescription } from './description-queue';
 import { enqueueThumbnail } from './thumbnail-queue';
+
+/** No grid wired (tests, a module without custom orders): no type is offered, so no video to sell is dropped. */
+const NO_READY_VIDEOS: ReadyVideoLines = () => Promise.resolve([]);
 
 const { auditLog, contentDropFiles, contentDrops, contentRequests } = schema;
 
@@ -306,6 +311,27 @@ function sameDrop(stored: ContentDrop, body: CreateContentDropBody): boolean {
 }
 
 /**
+ * A video to sell carries a type the owner still offers, read from his grid; no other category carries one (ADR 0163
+ * § 7). The grid is read outside her RLS, by the module that owns it: she never reads a price.
+ */
+async function typeChecked(
+  body: CreateContentDropBody,
+  creatorId: string,
+  readyVideos: ReadyVideoLines,
+): Promise<void> {
+  if (body.category !== 'sale_video') {
+    if (body.readyVideoId !== null)
+      throw new ContentDropReadyVideoUnprocessable('Seule une vidéo à vendre porte un type');
+    return;
+  }
+  if (body.readyVideoId === null) throw new ContentDropReadyVideoUnprocessable();
+  const offered = (await readyVideos(creatorId)).some(
+    (line) => line.id === body.readyVideoId && line.offered,
+  );
+  if (!offered) throw new ContentDropReadyVideoUnprocessable('Ce type de vidéo n’est plus proposé');
+}
+
+/**
  * A drop and its declared files, by her or by the agency for her (ADR 0044 § 1): its format checked first, a script
  * only from her open request of that category, a request answered once. A replay of the same drop answers it.
  */
@@ -314,15 +340,18 @@ async function dropIn(
   creatorId: string,
   userId: string,
   body: CreateContentDropBody,
+  readyVideos: ReadyVideoLines,
 ): Promise<ContentDrop> {
   const known = await readDrop(tx, body.id);
   if (known !== undefined) {
     const stored = await viewOf(tx, known);
-    if (!sameDrop(stored, body)) throw new ContentDropIdConflict();
+    if (!sameDrop(stored, body) || known.readyVideoId !== body.readyVideoId)
+      throw new ContentDropIdConflict();
     return stored;
   }
   const refusals = dropRefusals(body);
   if (refusals.length > 0) throw new ContentDropFormatUnprocessable(refusals);
+  await typeChecked(body, creatorId, readyVideos);
   if (needsRequest(body.category) && body.requestId === null) throw new ContentDropScriptUnprocessable();
   if (body.requestId !== null) {
     const request = await readRequest(tx, body.requestId);
@@ -341,6 +370,7 @@ async function dropIn(
       category: body.category,
       sentence: body.sentence,
       requestId: body.requestId,
+      readyVideoId: body.readyVideoId,
       createdBy: userId,
     });
     await tx.insert(contentDropFiles).values(
@@ -600,7 +630,10 @@ async function replaceFileIn(
   return viewOf(tx, drop);
 }
 
-export function createDrizzleCreatorContentStore(db: Database): CreatorContentStore {
+export function createDrizzleCreatorContentStore(
+  db: Database,
+  readyVideos: ReadyVideoLines = NO_READY_VIDEOS,
+): CreatorContentStore {
   return {
     replaceFile: (userId, dropId, fileId, body, now) =>
       withCreatorAccount(db, userId, (tx, creatorId) =>
@@ -608,7 +641,7 @@ export function createDrizzleCreatorContentStore(db: Database): CreatorContentSt
       ),
     content: (userId) => withCreatorAccount(db, userId, (tx) => contentIn(tx, true)),
     drop: (userId, body) =>
-      withCreatorAccount(db, userId, (tx, creatorId) => dropIn(tx, creatorId, userId, body)),
+      withCreatorAccount(db, userId, (tx, creatorId) => dropIn(tx, creatorId, userId, body, readyVideos)),
     withdraw: (userId, dropId, now) =>
       withCreatorAccount(db, userId, (tx) => withdrawIn(tx, userId, dropId, 'creator', now)),
     refuse: (userId, requestId, reason, now) =>
@@ -856,7 +889,10 @@ async function markExportedIn(
 }
 
 /** `withTenantMember` for the owner and an active manager; a chatter is refused before any read. */
-export function createDrizzleAgencyContentStore(db: Database): AgencyContentStore {
+export function createDrizzleAgencyContentStore(
+  db: Database,
+  readyVideos: ReadyVideoLines = NO_READY_VIDEOS,
+): AgencyContentStore {
   const asTeam = <T>(creatorId: string, userId: string, run: (tx: Transaction) => Promise<T>): Promise<T> =>
     withTenantMember(db, creatorId, userId, async (tx, scope) => {
       if (!readsTeam(scope)) throw new ContentDropForbidden();
@@ -870,7 +906,8 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
 
   return {
     content: (creatorId, userId) => asTeam(creatorId, userId, (tx) => contentIn(tx, false)),
-    drop: (creatorId, userId, body) => asTeam(creatorId, userId, (tx) => dropIn(tx, creatorId, userId, body)),
+    drop: (creatorId, userId, body) =>
+      asTeam(creatorId, userId, (tx) => dropIn(tx, creatorId, userId, body, readyVideos)),
     withdraw: (creatorId, userId, dropId, now) =>
       asTeam(creatorId, userId, (tx) => withdrawIn(tx, userId, dropId, 'agency', now)),
 
@@ -890,6 +927,14 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (row.requestId !== null)
           throw new ContentDropRequestUnprocessable(
             'Ce dépôt répond à une demande : il en garde la catégorie',
+          );
+        // A video to sell carries its type (ADR 0163 § 7): withdrawn and dropped again, never moved to another use.
+        if (row.readyVideoId !== null)
+          throw new ContentDropReadyVideoUnprocessable('Une vidéo à vendre garde sa catégorie');
+        // Nor does a drop become one by a correction: it would have no type, so the AI could never sell it.
+        if (category === 'sale_video')
+          throw new ContentDropReadyVideoUnprocessable(
+            'Une vidéo à vendre se dépose avec son type : retire ce dépôt et dépose-la à nouveau',
           );
         // Her own choice is kept; a correction back to it clears the mark.
         const herChoice = row.correctedFrom ?? row.category;

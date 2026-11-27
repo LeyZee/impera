@@ -1,5 +1,6 @@
 import {
   collectiveGoalLastDay,
+  collectiveTiersRise,
   BonusTierSetIdSchema,
   CollectiveGoalIdSchema,
   newId,
@@ -164,8 +165,15 @@ export function GoalDialog({
   const tiers = goalTiersOf(rows);
   const typed = tiers.filter((tier) => tier !== null);
   const same = new Set(typed.map((tier) => tier.reachedBps)).size !== typed.length;
+  // A higher tier pays more: reaching more of the target never lowers a chatter's bonus (COUV-03).
+  const falling = !same && !collectiveTiersRise(typed);
   const ready =
-    targetMinor !== null && targetMinor > 0 && typed.length === rows.length && rows.length > 0 && !same;
+    targetMinor !== null &&
+    targetMinor > 0 &&
+    typed.length === rows.length &&
+    rows.length > 0 &&
+    !same &&
+    !falling;
 
   const confirm = useConfirmAgain();
 
@@ -346,10 +354,12 @@ export function GoalDialog({
                       }
                     : touched && same
                       ? { error: true, text: 'Deux paliers au même pourcentage.' }
-                      : {
-                          error: false,
-                          text: 'Au-delà de 100 % aussi : 120 % de la cible, une prime plus haute.',
-                        }
+                      : touched && falling
+                        ? { error: true, text: 'Un palier plus haut donne une prime plus haute.' }
+                        : {
+                            error: false,
+                            text: 'Au-delà de 100 % aussi : 120 % de la cible, une prime plus haute.',
+                          }
               }
             />
             <Refusal refusal={refusal} />

@@ -18,3 +18,7 @@ export const CAUSE_LABELS: Readonly<Record<HandoffCause, string>> = {
   custom_order: 'Demande sur mesure',
   sale_trouble: 'Vente qui coince',
 };
+
+/** The cause, with the word he wrote when a watched word set it off (IA-05): the human never guesses which. */
+export const handoffCauseLabel = (cause: HandoffCause, keyword?: string): string =>
+  keyword === undefined ? CAUSE_LABELS[cause] : `${CAUSE_LABELS[cause]} : « ${keyword} »`;

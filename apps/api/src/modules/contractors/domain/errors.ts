@@ -178,6 +178,13 @@ export class BillingRegimeIdConflict extends DomainError {
   }
 }
 
+/** Another regime has this name already (COUV-04): two regimes of one name could not be told apart. */
+export class BillingRegimeNameConflict extends DomainError {
+  constructor() {
+    super('billing_regime_name_conflict', 'Un régime porte déjà ce nom');
+  }
+}
+
 /** The accountant's validation is recorded already, on another day: it is recorded once, never moved. */
 export class BillingRegimeValidated extends DomainError {
   constructor(validatedOn: string) {

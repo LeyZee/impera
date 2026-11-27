@@ -47,7 +47,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/team': 1,
   'modules/telegram': 10,
   'modules/trends': 8,
-  root: 52,
+  // +2 for a live worker freeing its own locks on jobs whose completion was lost (recette COUV-14): Graphile's tables,
+  // closed to the app role, as the release of dead workers' locks.
+  root: 54,
   scripts: 1,
   wiring: 7,
 };
