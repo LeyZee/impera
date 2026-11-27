@@ -63,10 +63,11 @@ const accounts = (note: SetupNote | null): string | null =>
 function scriptsHint(day: number, night: number): string {
   const count = (n: number, when: string) => `${String(n)} ${n > 1 ? 'scripts' : 'script'} de ${when}`;
   if (day > 0 && night > 0) return `${count(day, 'jour')} et ${count(night, 'nuit')} prêts dans Reveal.`;
-  if (day === 0 && night === 0) return 'Aucun script prêt dans Reveal : l’agent n’a rien à proposer.';
+  if (day === 0 && night === 0)
+    return 'Aucun script prêt dans Reveal : l’agent discute, mais n’a rien à vendre.';
   return day === 0
-    ? 'Aucun script de jour prêt dans Reveal : l’agent n’a rien à proposer le jour.'
-    : 'Aucun script de nuit prêt dans Reveal : l’agent n’a rien à proposer la nuit.';
+    ? 'Aucun script de jour prêt dans Reveal : l’agent n’a rien à vendre le jour.'
+    : 'Aucun script de nuit prêt dans Reveal : l’agent n’a rien à vendre la nuit.';
 }
 
 export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupStep[]): SetupLine[] {

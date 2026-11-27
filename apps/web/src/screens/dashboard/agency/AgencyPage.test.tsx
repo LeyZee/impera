@@ -246,6 +246,17 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
   });
 
+  it('leaves the day’s ring empty without an objective, and says where to set it (audit 27/11)', async () => {
+    serve([CREATOR], {
+      steering: { status: 200, body: { ...STEERING, daily: { ...STEERING.daily, targetMinor: null } } },
+    });
+    show(agencyPage);
+    await screen.findByText(/Pas encore d’objectif ce mois-ci/u);
+    // A full ring would read « objectif atteint »: only the track is drawn.
+    expect(document.querySelector('.stg-gauge .nv-donut__track')).not.toBeNull();
+    expect(document.querySelectorAll('.stg-gauge .nv-donut__arc')).toHaveLength(0);
+  });
+
   it('never says a share above 100 % when the buyers outnumber the new subscribers read (recette 27/11, C1)', async () => {
     serve([CREATOR], {
       steering: {
