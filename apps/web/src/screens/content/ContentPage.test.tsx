@@ -114,6 +114,11 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     );
     expect(marks.slice(0, 4)).toEqual(['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm']);
     expect(marks.slice(4)).toEqual([null, null, null, null]);
+    // Theirs sits on the same plate as the drawn marks, in neutral (Design, 27/11).
+    const plates = [...document.querySelectorAll('.ct-tile .ct-kind')].map((mark) =>
+      mark.classList.contains('wk-kind'),
+    );
+    expect(plates).toEqual(Array.from({ length: 8 }, () => true));
     expect(document.querySelector('.ct-tile .ct-kind svg.wk-icon')).not.toBeNull();
     expect(
       document.querySelector<HTMLElement>('.ct-tile .ct-kind')?.style.getPropertyValue('--wk-feed_shoot'),

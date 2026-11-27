@@ -9,7 +9,7 @@ import '@/screens/agenda/week-card.css';
 
 /**
  * The Agenda's kind of each category: Instagram and Telegram take their network's colour and mark. A category the
- * Agenda has no colour for (a whale gift, a vocal, a sale video) keeps its emoji.
+ * Agenda has no colour for (a whale gift, a vocal, a sale video) keeps its emoji, on the same plate in neutral.
  */
 export const CATEGORY_KINDS: Readonly<Partial<Record<DropCategory, ColorKind>>> = {
   feed_shoot: 'feed_shoot',
@@ -38,7 +38,7 @@ export function CategoryIcon({
   const kind = CATEGORY_KINDS[category];
   if (kind === undefined)
     return (
-      <span className="ct-kind" data-size={size} aria-hidden="true">
+      <span className="wk-kind ct-kind ct-kind--emoji" data-size={size} aria-hidden="true">
         {CATEGORY_EMOJIS[category]}
       </span>
     );
