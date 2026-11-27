@@ -195,7 +195,12 @@ function DayRow({
         <summary className="wk-line__summary">
           <span className="wk-line__words">
             <span className="wk-line__label">{line.label}</span>
-            <span className="wk-line__peek dy-peek">{firstSentence(line.sheet)}</span>
+            <span className="wk-line__peek dy-peek">
+              {/* Done by her coffre: it says so under its words, its tick alone on the right (Design, 27/11). */}
+              {line.source === 'drop' && line.done >= line.target
+                ? 'Dans ton coffre'
+                : firstSentence(line.sheet)}
+            </span>
           </span>
           <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
             <path d="m6 3 5 5-5 5" />
@@ -239,19 +244,20 @@ function DayRow({
 }
 
 /**
- * A line her coffre does: done, its tick drawn and nothing to tap (« Dans ton coffre »); not yet, « Déposer », which
- * opens Contenu on its tile.
+ * A line her coffre does: done, its tick drawn and nothing to tap (« Dans ton coffre » under its words); not yet,
+ * « Déposer », which opens Contenu on its tile.
  */
 function DroppedMark({ line }: { line: DayLine }): JSX.Element | null {
   if (line.done >= line.target)
     return (
-      <span className="dy-dropped">
-        <span className="wk-tick dy-tick dy-tick--still" aria-hidden="true">
-          <svg viewBox="0 0 16 16">
-            <path d="m3.5 8.5 3 3 6-7" />
-          </svg>
-        </span>
-        <span className="dy-dropped__word">Dans ton coffre</span>
+      <span
+        className="wk-tick dy-tick dy-tick--still"
+        role="img"
+        aria-label={`${line.label} : dans ton coffre`}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m3.5 8.5 3 3 6-7" />
+        </svg>
       </span>
     );
   const category = DROP_FOR[line.item];

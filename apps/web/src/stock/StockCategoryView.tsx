@@ -101,25 +101,26 @@ export function StockCategoryView({
         </div>
       </header>
 
-      <div className="st-figures" role="list">
+      <ul className="st-figures">
+        {/* On a phone they are the filter (recette MOD-10): each presses on, and off at a second tap. */}
         {figures.map(([label, value, target]) => (
-          <button
-            key={label}
-            type="button"
-            role="listitem"
-            className="nv-tile st-figure"
-            data-on={target !== null && filter === target}
-            data-tone={label === 'À valider' && value > 0 && !her ? 'warn' : undefined}
-            disabled={target === null}
-            onClick={() => {
-              if (target !== null) setFilter(filter === target ? 'all' : target);
-            }}
-          >
-            <span className="nv-tile__label">{label}</span>
-            <span className="nv-tile__value nv-num">{value}</span>
-          </button>
+          <li key={label}>
+            <button
+              type="button"
+              className="nv-tile st-figure"
+              aria-pressed={target === null ? undefined : filter === target}
+              data-tone={label === 'À valider' && value > 0 && !her ? 'warn' : undefined}
+              disabled={target === null}
+              onClick={() => {
+                if (target !== null) setFilter(filter === target ? 'all' : target);
+              }}
+            >
+              <span className="nv-tile__label">{label}</span>
+              <span className="nv-tile__value nv-num">{value}</span>
+            </button>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <div className="st-toolbar">
         <FilterBar value={filter} onChange={setFilter} />

@@ -24,7 +24,8 @@ export const STOCK_NAMES: Readonly<Record<DropCategory, string>> = {
   script: 'Scripts',
   whale_gift: 'Cadeaux baleines',
   voice_beep: 'Vocal du bip',
-  voice_real: 'Vocal « bien réelle »',
+  // Non-breaking spaces inside the quotes: the closing one never falls alone on a line (Design, 27/11).
+  voice_real: 'Vocal «\u00a0bien réelle\u00a0»',
   sale_video: 'Vidéos à vendre',
   instagram_post: 'Photos Insta',
   instagram_reel: 'Reels Insta',
@@ -386,7 +387,9 @@ export function herFocusOf(stock: ContentStock, day: HerDay | null, scriptsAsked
       category: null,
       bonus: [],
     };
-  const count = first.mode === 'days' ? Math.min(first.lacking, Math.ceil((first.perWeek ?? 7) / 7)) : 1;
+  // A pace asks a day's worth; a minimum, all it lacks, so that the title and her ring say the same count (Design, 27/11).
+  const count =
+    first.mode === 'days' ? Math.min(first.lacking, Math.ceil((first.perWeek ?? 7) / 7)) : first.lacking;
   const target = first.target ?? 0;
   return {
     when: first.mode === 'days' ? 'week' : 'stock',

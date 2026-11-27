@@ -106,6 +106,7 @@ describe('her day', () => {
     const lead = await screen.findByRole('region', { name: 'L’essentiel du jour' });
     const video = within(lead).getAllByRole('listitem')[1];
     expect(video?.textContent).toContain('Dans ton coffre');
+    expect(within(video ?? lead).getByRole('img', { name: /dans ton coffre/u })).toBeTruthy();
     expect(within(video ?? lead).queryByRole('button', { name: /Cocher/u })).toBeNull();
   });
 
