@@ -77,6 +77,14 @@ custom_order_kept:
           extraMinutePercent: null,
         }
       - {
+          format: video_call_dressed,
+          offered: false,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
           format: video_call_sexual,
           offered: true,
           priceMinor: null,
