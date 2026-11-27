@@ -23,8 +23,8 @@ Le fichier a trois parties : `meta` (comme au format 1, `schema: 2`), `sheet` (l
 | `strategies` | comme `strategies` au format 1 (KYC et cases à apprendre, sexualisation, lancement des scripts, suivi d'offre) | la politique ; les consignes écrites vont aux modèles sans leurs chiffres |
 | `follow_ups` | comme au format 1 | la planification des relances |
 | `notifications` | comme au format 1, dont `alert_keywords` | les alertes |
-| `behavior` | `split_messages`, `pet_names` (les seuls surnoms qu'elle donne), `response_delay_minutes` | l'envoi et les gardes |
-| `rules` | `never_do`, `never_show`, `never_say`, `disgusts`, `emojis_forbidden` : les règles strictes, en listes de mots | les gardes (`guards.ts`) |
+| `behavior` | `split_messages`, `pet_names` (les seuls surnoms qu'elle donne), `response_delay_minutes`, `emoji_streak_max` (facultatif, 1 à 10 : ses N dernières réponses portaient toutes un emoji, la suivante n'en porte pas ; absent, 3, le défaut du code), et la forme de ses bulles, chacune facultative : `capitalization` (`capital`, `lowercase`, `free`), `strip_final_period` (booléen), `mark_spacing` (`space`, `none`, `free`) ; absente, le style de base de l'agence décide, puis le code (`free`, point retiré, `free`) | l'envoi et les gardes |
+| `rules` | `never_do`, `never_show`, `never_say`, `disgusts`, `emojis_forbidden` : les règles strictes, en listes de mots ; `close_only_words` (facultatif, 20 groupes au plus) : des mots qu'elle garde pour ses fans proches, chaque groupe `{ words, min_tier }` (au moins un mot, avec une lettre ou un chiffre ; palier de rencontre 1 à 5) ; écrit à un fan d'un palier plus bas, ou dont le palier ne se calcule pas faute de réglage, sa réponse est refusée (garde `close_only_word`, Charles 26/11) ; jamais montré au modèle | les gardes (`guards.ts`) |
 | `objection_replies` | facultatif, défaut `{}` : par type d'objection de prix (`too_expensive`, `real_is_cheaper`, `free_elsewhere`, `asks_discount`, `already_paid`), une liste de `{ id, text }` dans l'ordre de l'agence (ADR 0090 § B) | le choix d'une réplique jamais reçue par ce fan ; seule la réplique choisie va à la voix. Lu par le propriétaire seul ; les autres rôles reçoivent `{}`. Le dépôt ne porte que des répliques de test |
 
 Règles du format 2 :
@@ -45,7 +45,7 @@ Schéma Zod : `packages/contracts/src/persona.ts` (`PersonaSchema`, types `Perso
 
 La structure reprend la fiche créatrice d'OnlyChat, onglet par onglet (décision de Charles, 17/10/2026 : « OnlyChat sont les boss »), ajustée par la méthode de chatting de l'agence (`/mnt/project-files/chatting/methode-chatting.md`, §6, hors dépôt) : curseurs en heures, pas de réglage de négociation, surnoms en liste fermée. Le formulaire du dashboard et l'agent lisent le même schéma et les mêmes listes de valeurs, avec leurs libellés français : le dashboard n'a pas sa propre copie.
 
-Exemples : `personas/messalina/v0.0.0.yaml` (placeholders, la vraie persona est hors dépôt) et `personas/demo/v0.1.0.yaml` (créatrice fictive, pour les tests, les évals et la démonstration ; `v0.2.0.yaml` est la même rangée en blocs, P5-01 ; le playground et les évals lisent `v0.6.0.yaml`, au format 2, la même que `v0.4.0.yaml` avec une voix moins moulée et une vie plus variée).
+Exemples : `personas/messalina/v0.0.0.yaml` (placeholders, la vraie persona est hors dépôt) et `personas/demo/v0.1.0.yaml` (créatrice fictive, pour les tests, les évals et la démonstration ; `v0.2.0.yaml` est la même rangée en blocs, P5-01 ; le playground et les évals lisent `v0.6.0.yaml`, au format 2, la même que `v0.4.0.yaml` avec une voix moins moulée et une vie plus variée ; `v0.7.0.yaml` y ajoute un exemple inventé de `close_only_words` et `emoji_streak_max`).
 
 | Section | Onglet OnlyChat | Champs | Rôle |
 |---|---|---|---|

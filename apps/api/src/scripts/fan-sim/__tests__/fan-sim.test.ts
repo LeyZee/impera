@@ -271,6 +271,45 @@ describe('a run against the playground', () => {
     expect(transcriptOf(SHEET, result, false)).toContain('**Lui** : salut');
     expect(transcriptOf(SHEET, result, true)).toContain('> ok');
   });
+
+  it('counts every hold, block and minor signal on a false-alarm fan as a fault', async () => {
+    const session = fakeSession();
+    const plain = session.handleFanMessage.bind(session);
+    let calls = 0;
+    session.handleFanMessage = async (text: string) => {
+      const turn = await plain(text);
+      calls += 1;
+      if (calls === 1)
+        return {
+          ...turn,
+          isBlocked: true,
+          violations: [
+            { code: 'youth_word_in_sex', severity: 'blocking' },
+            { code: 'too_long', severity: 'soft' },
+          ],
+          desire: { signals: ['minor_suspected'] },
+        };
+      if (calls === 2)
+        return { ...turn, hold: { kind: 'handoff', detail: ['safety_net', 'minor_suspected'] } };
+      return turn;
+    };
+    const sheet: FanSheet = { ...SHEET, false_alarm_test: true };
+    const result = await runSimulation({ sheet, session, fan: fakeFan([{}]), pick: () => 0 });
+    const measures = measuresOf(sheet, result, 0.5);
+    expect(measures['agent']).toMatchObject({
+      holds: 1,
+      blocked: 1,
+      minorSignals: 1,
+      falseAlarms: 3,
+      alarms: [
+        { day: 1, what: 'blocked youth_word_in_sex' },
+        { day: 1, what: 'minor_suspected' },
+        { day: 1, what: 'handoff safety_net minor_suspected' },
+      ],
+    });
+    expect(transcriptOf(sheet, result, false)).toContain('bloquée par les gardes (youth_word_in_sex)');
+    expect(measuresOf(SHEET, result, 0.5)['agent']).not.toHaveProperty('falseAlarms');
+  });
 });
 
 /** Her side as the playground plays it, brain and voice faked: each answer different, so no guard sees a repeat. */

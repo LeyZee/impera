@@ -17,12 +17,15 @@ export interface AgentBubbleGuard {
   ): { readonly isBlocked: boolean; readonly codes: readonly GuardCode[] };
 }
 
+const CHATTER_CALLS: readonly GuardCode[] = ['repetition', 'close_only_word'];
+
 export function createBubbleGuard(settings: GuardSettings): AgentBubbleGuard {
   return {
     check(bubbles, context = {}, care = false) {
       const codes = [...checkVoiceOutput(bubbles, settings, context), ...(care ? checkCare(bubbles) : [])]
-        // A line she already sent him blocks the engine's draft only: sending it again is the chatter's call.
-        .filter((v) => v.severity === 'blocking' && v.code !== 'repetition')
+        // A line she already sent him, or a word she keeps for close fans (no tier read here), blocks the engine's
+        // draft only: the chatter who sees the fan decides.
+        .filter((v) => v.severity === 'blocking' && !CHATTER_CALLS.includes(v.code))
         .map((v) => v.code);
       return { isBlocked: codes.length > 0, codes: [...new Set(codes)] };
     },

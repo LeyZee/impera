@@ -14,10 +14,12 @@ import {
   type PersonaSheet,
   type PersonaStrategies,
   type StoredPersona,
+  type VoiceFormSettings,
 } from '@impera/contracts';
 import { parse, stringify } from 'yaml';
 
 import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain/desire';
+import { resolveForm } from '../domain/form';
 import { DEFAULT_GUARD_SETTINGS, type GuardSettings } from '../domain/guards';
 import { askableSlots } from '../domain/kyc';
 import { DEFAULT_AFTER_PURCHASE_HOURS } from '../domain/policy';
@@ -53,6 +55,13 @@ export interface PersonaForModels {
   readonly alertKeywords: readonly string[];
   /** Emojis she never uses (`agent.rules.emojis_forbidden`): a guard blocks them. */
   readonly forbiddenEmojis: readonly string[];
+  /** Her words kept for close fans (`agent.rules.close_only_words`, Charles 26/11): a guard refuses them below the tier. */
+  readonly closeOnlyWords?: GuardSettings['closeOnlyWords'];
+  /**
+   * The form of her bubbles and her emoji streak as her persona sets them (`agent.behavior`, Charles 26/11): each rule
+   * absent is her agency's base style's, then the code's (`resolveForm`).
+   */
+  readonly form?: VoiceFormSettings;
   /** The canvas lines she tries to learn of each fan, in her order (`strategies.kyc.collect`, P5-01). */
   readonly kycSlots: readonly KycSlot[];
   /**
@@ -209,6 +218,14 @@ export function personaForModels(
     petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,
+    ...(rules.close_only_words !== undefined &&
+      rules.close_only_words.length > 0 && {
+        closeOnlyWords: rules.close_only_words.map((group) => ({
+          words: group.words.filter((word) => !isPlaceholder(word)),
+          minTier: group.min_tier,
+        })),
+      }),
+    form: formOf(agent.behavior),
     kycSlots,
     objectionReplies: agent.objection_replies,
     spokenLanguages: spokenOf(sheet.identity.spoken_languages),
@@ -222,13 +239,31 @@ function spokenOf(languages: readonly Language[]): readonly [Language, ...Langua
   return first === undefined ? ['french'] : [first, ...rest];
 }
 
-/** The guards with her disgusts, her forbidden words and emojis, and her pet names. */
-export function guardSettingsOf(persona: PersonaForModels): GuardSettings {
+/** Her form settings as her persona sets them: only those she set, so a lower layer decides the rest. */
+function formOf(behavior: VoiceFormSettings): VoiceFormSettings {
+  const { capitalization, strip_final_period, mark_spacing, emoji_streak_max } = behavior;
+  return {
+    ...(capitalization !== undefined && { capitalization }),
+    ...(strip_final_period !== undefined && { strip_final_period }),
+    ...(mark_spacing !== undefined && { mark_spacing }),
+    ...(emoji_streak_max !== undefined && { emoji_streak_max }),
+  };
+}
+
+/**
+ * The guards with her disgusts, her forbidden words and emojis, her pet names, and her form: her persona's settings
+ * first, then her agency's base style's (ADR 0173), then the code's.
+ */
+export function guardSettingsOf(persona: PersonaForModels, baseStyle: VoiceFormSettings = {}): GuardSettings {
+  const { form, emojiStreakMax } = resolveForm([persona.form ?? {}, baseStyle]);
   return {
     ...DEFAULT_GUARD_SETTINGS,
     forbiddenTerms: persona.forbiddenTerms,
     forbiddenEmojis: persona.forbiddenEmojis,
     ...(persona.neverDo !== undefined && persona.neverDo.length > 0 && { neverDo: persona.neverDo }),
     ...(persona.petNames.length > 0 && { petNames: persona.petNames }),
+    ...(persona.closeOnlyWords !== undefined && { closeOnlyWords: persona.closeOnlyWords }),
+    form,
+    ...(emojiStreakMax !== undefined && { emojiStreakMax }),
   };
 }
