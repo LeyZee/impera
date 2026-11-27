@@ -86,10 +86,10 @@ export interface GuardContext {
   /** They flirt now (a heated reading of his message, outside care): two kinds of emoji instead of one. */
   readonly flirting?: boolean;
   /**
-   * His meeting tier (`relationshipTier`), read against her close-only words. Absent, not computable (her tier
+   * His meeting tier (`relationshipTier`, « palier de rencontre »), read against her close-only words. Absent, not computable (her tier
    * settings not stored): below every tier, closed by default.
    */
-  readonly fanTier?: number;
+  readonly meetingTier?: number;
   /**
    * The sums he wrote since her last answer, in minor units (Charles 27/11): she may say one back without agreeing to
    * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
@@ -1447,7 +1447,7 @@ export function checkVoiceOutput(
       }),
       ...checkForm(bubbles, settings.form ?? DEFAULT_FORM_SETTINGS),
     );
-  violations.push(...closeOnlyWords(bubbles, settings, context.fanTier));
+  violations.push(...closeOnlyWords(bubbles, settings, context.meetingTier));
   return violations;
 }
 
@@ -1461,11 +1461,11 @@ const foldLigatures = (text: string): string => text.replace(/[œŒ]/gu, 'oe').r
 function closeOnlyWords(
   bubbles: readonly string[],
   settings: GuardSettings,
-  fanTier: number | undefined,
+  meetingTier: number | undefined,
 ): GuardViolation[] {
   const text = foldLigatures(bubbles.join('\n'));
   return (settings.closeOnlyWords ?? []).flatMap((group) =>
-    fanTier !== undefined && fanTier >= group.minTier
+    meetingTier !== undefined && meetingTier >= group.minTier
       ? []
       : group.words
           .filter((word) => touchesTerm(text, foldLigatures(word)))

@@ -1,1331 +1,31 @@
-import {
-  desireBandOf,
-  desireNow,
-  isGuardedLanguage,
-  normalise,
-  type AfterSaleType,
-  supplementsIn,
-  type CustomPriceGrid,
-  type FanFlags,
-  type FanTier,
-  type GuardCode,
-  type Language,
-  type LanguageExamples,
-  type MediaDescription,
-  type MeetingTierSettings,
-  type ObjectionReplies,
-  type OpenCustomOrder,
-} from '@impera/contracts';
-import type {
-  BrainAlert,
-  AgencyStyleText,
-  Brief,
-  BrainScript,
-  BuyerType,
-  CallTrace,
-  ConversationTurn,
-  LlmFailure,
-  LlmGateway,
-  VoiceFantasy,
-  VoiceInput,
-  VoiceLanguage,
-  VoiceScriptStep,
-} from '@impera/llm';
-import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
-
-import { customOrderTurn, type CustomOrderTurn } from '../../custom-orders';
-import { abandonTease, type AbandonTease } from '../domain/abandon';
-import type { TimeWasterLevel } from '../domain/attention';
-import {
-  asksAvailability,
-  availabilityChanged,
-  readAvailability,
-  scriptStartGate,
-  sexualizes,
-  type FanAvailabilityRecord,
-  type ScriptStart,
-  type ScriptStartBlock,
-} from '../domain/availability';
-import { bubbleBudget, fitBubbles, type BubbleBudget } from '../domain/bubbles';
-import { CARE_BRIEF, CARE_TONE_HINTS, checkCare, checkHelpNumber } from '../domain/care';
-import {
-  checkNoCommitment,
-  customOrderDecision,
-  customOrderStop,
-  type CustomOrderDecision,
-} from '../domain/custom-order';
-import {
-  desireMoved,
-  desireRestOf,
-  desireScore,
-  NO_MEASURE,
-  restedDesire,
-  type DesireMeasure,
-  type DesireReading,
-  type DesireState,
-} from '../domain/desire';
-import { gapNotes, timingLines } from '../domain/elapsed';
-import { DEFAULT_EMOJI_STREAK_MAX, emojiStreakReached } from '../domain/emojis';
-import {
-  desireMapOf,
-  fantasyMatchOf,
-  mentions,
-  rankByFantasy,
-  wantsHumiliation,
-  withoutHerLimits,
-  type DesireMap,
-} from '../domain/fantasy-match';
-import { withoutForbiddenThemes } from '../domain/forbidden-themes';
-import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
-import { freeSextingTurn } from '../domain/free-sexting';
-import { gaugeDue, holdsBackNow, projectionDue } from '../domain/gauge';
-import {
-  checkExplicit,
-  checkMoans,
-  checkMoodKillers,
-  checkVoiceOutput,
-  checkYouthWords,
-  sumsMinorOf,
-  asksPrice,
-  previousTurnsOf,
-  touchesTerm,
-  type GuardContext,
-  isBlocked,
-  REWRITTEN_SOFT,
-  wantsRewrite,
-  type GuardSettings,
-  type GuardViolation,
-} from '../domain/guards';
-import { screenNotes } from '../domain/injection';
-import { askableOnly } from '../domain/kyc';
-import { decideLanguage, quietLanguage, translationOf, type LanguageDecision } from '../domain/language';
-import {
-  meetingAnswer,
-  relationshipTier,
-  type MeetingAnswer,
-  type MeetingReason,
-  type Relationship,
-} from '../domain/meeting';
-import { discountAsked, pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
-import { isOpener } from '../domain/origin';
-import { paceHints } from '../domain/pace';
-import {
-  NO_SALE_RISKS,
-  inPauseAfterPurchase,
-  offerDecision,
-  offerSignals,
-  type OfferBlock,
-  type OfferContext,
-  asksMoreSameEvening,
-  keepsWarm,
-  sameEvening,
-} from '../domain/policy';
-import { refusalMove, type RefusalMove } from '../domain/refusal';
-import { registerOf, type Register } from '../domain/register';
-import { asksSchoolRole } from '../domain/safety-net';
-import {
-  complainsOfPurchase,
-  NO_SALE_TROUBLE,
-  saleTroubleOutcome,
-  type SaleTroubleOutcome,
-  type SaleTroubleSeen,
-} from '../domain/sale-trouble';
-import {
-  paidWaiting,
-  mayOpenScript,
-  permittedScripts,
-  scriptStepsHeld,
-  type PlatformScriptView,
-  type ScriptHistoryView,
-  type ScriptRun,
-} from '../domain/script-run';
-import { scriptTurn, type ScriptTurn } from '../domain/script-turn';
-import {
-  cameBeforeFinale,
-  haggles,
-  insistsForMore,
-  mentionsOtherWoman,
-  isBareMurmur,
-  peakSeen,
-  wantsOtherMan,
-} from '../domain/sexting-moves';
-import {
-  declaredAdultAge,
-  checkWelcome,
-  sexualizationDecision,
-  type SexualizationDecision,
-  type SexualizationLimits,
-} from '../domain/sexualization';
-import { describeSituation, isNight, type Situation } from '../domain/situation';
-import type { SpenderRegister } from '../domain/spender-register';
-import {
-  explicitPhotoAnswer,
-  fanStanding,
-  paysNow,
-  proofAnswer,
-  type ExplicitPhotoAnswer,
-  type ProofAnswer,
-  type StandingFacts,
-  type StandingLimits,
-} from '../domain/standing';
-import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
-import { heWroteFirst, workTeaseTurn, type WorkTeasePhase } from '../domain/work-tease';
-import { checkWorn, wornPhrases, type WornLimits } from '../domain/worn';
-
-import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
-
-/** Who she is for the models: one persona, read by the composition root. */
-export interface ComposerPersona {
-  readonly creatorName: string;
-  readonly personaSheet: string;
-  readonly guardSettings: GuardSettings;
-  /** False: her answer goes out as one message (`behavior.split_messages`). Absent: as the voice wrote it. */
-  readonly splitMessages?: boolean;
-  /**
-   * She may play the jealous one when he speaks of another woman (`behavior.plays_jealous`, Charles 27/11). Absent or
-   * false: the voice is told she is not jealous.
-   */
-  readonly playsJealous?: boolean;
-  /**
-   * Her bio on her platform profile, as last read (ADR 0154): beside her sheet, read as data, it wins where they
-   * differ. Absent or empty: no section.
-   */
-  readonly profileBio?: string | null;
-  /**
-   * Her bank's examples her hard guards let through, newest first (ADR 0102, `pickVoiceExamples`): each turn gives the
-   * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
-   */
-  readonly voiceExamples?: readonly VoiceExample[];
-  /** The agency's base style (ADR 0173), before her sheet in the voice's prompt; her sheet wins. Absent: none. */
-  readonly agencyStyle?: AgencyStyleText;
-  /** When a phrase of hers is worn across her fans (`wornPhrases`); absent, the safe defaults. */
-  readonly wornLimits?: WornLimits;
-  /**
-   * Her languages, in her order (ADR 0168), required: a caller that forgot them once made her answer in French only.
-   * `FRENCH_ONLY` for a persona that speaks nothing else.
-   */
-  readonly spokenLanguages: readonly [Language, ...Language[]];
-  /** Her messages per language, given to the voice only in the language it writes in (ADR 0168 § 3). */
-  readonly languageExamples: LanguageExamples;
-}
-
-/** The languages of a persona that speaks French only. */
-export const FRENCH_ONLY: readonly [Language, ...Language[]] = ['french'];
-
-/**
- * The language of this turn, decided by code (ADR 0168 § 2): on his messages for an answer, on his kept language for a
- * follow-up or her word after a sale.
- */
-function languageOfTurn(persona: ComposerPersona, input: ComposeTurnInput): LanguageDecision {
-  const spoken = persona.spokenLanguages;
-  const kept = input.keptLanguage ?? null;
-  const herLastText = input.history.findLast((turn) => turn.from === 'creator')?.text;
-  if (input.followUp !== undefined || input.aftercare !== undefined)
-    return quietLanguage(kept?.value ?? null, spoken, herLastText);
-  const earlier = earlierFanTexts(input.history);
-  const earlierFanText = earlier.at(-1);
-  return decideLanguage({
-    fanTexts: [input.fanText],
-    earlierFanTexts: earlier,
-    kept,
-    spoken,
-    ...(earlierFanText !== undefined && { earlierFanText }),
-    ...(herLastText !== undefined && { herLastText }),
-  });
-}
-
-/** The language as the voice reads it: the decided one, his she does not speak, her examples in hers. */
-function voiceLanguageOf(persona: ComposerPersona, decision: LanguageDecision): VoiceLanguage {
-  const examples = persona.languageExamples[decision.reply] ?? [];
-  return {
-    reply: decision.reply,
-    notSpoken: decision.notSpoken,
-    ...(examples.length > 0 && { examples }),
-  };
-}
-
-/**
- * The examples this fan's turn may carry (ADR 0102 § 2, § 4): an explicit one only once his adult age is confirmed and
- * he did not ask for nothing explicit, as for her own words (P3-09); then the twelve most recent.
- */
-function examplesForTurn(examples: readonly VoiceExample[], explicitAllowed: boolean): VoiceExample[] {
-  return examples
-    .filter((e) => explicitAllowed || checkExplicit([e.text]).length === 0)
-    .slice(0, VOICE_EXAMPLES_MAX);
-}
-
-/** A voice call names the examples of hers it received (ADR 0102 § 6); the brain's call, which writes nothing, does not. */
-function voiceTraced<T extends { readonly trace?: CallTrace }>(input: T, ids: readonly string[]): T {
-  return ids.length === 0 ? input : { ...input, trace: { ...input.trace, voiceExampleIds: ids } };
-}
-
-/**
- * What the fan receives: her bubbles in her form (`formBubbles`, once the guards have read them), or one message when
- * she does not split hers. Only the voice's bubbles come here: a bubble the code writes (care's help) is added after.
- */
-export function asSent(
-  bubbles: readonly string[],
-  splitMessages = true,
-  form: FormSettings = DEFAULT_FORM_SETTINGS,
-): readonly string[] {
-  const formed = formBubbles(bubbles, form);
-  return splitMessages || formed.length <= 1 ? formed : [formed.join('\n')];
-}
-
-export interface ComposeTurnInput {
-  /** The conversation so far, his last message(s) included, oldest first. */
-  readonly history: readonly ConversationTurn[];
-  /** His kept language (`fans.language`, ADR 0168 § 3); absent or `null`, none yet. */
-  readonly keptLanguage?: { readonly value: Language; readonly source: 'detected' | 'set' } | null;
-  /** His last message(s) since her last answer: what the traps read. */
-  readonly fanText: string;
-  readonly media: readonly MediaDescription[];
-  readonly fanNotes: string;
-  /**
-   * Her notes the brain reads alone (ADR 0085 § 9: when he has money, his attachment, his moods): added to its notes,
-   * never to the voice's, whatever a prompt says.
-   */
-  readonly brainNotes?: string;
-  readonly situation: Situation;
-  readonly trace?: CallTrace;
-  /**
-   * What the policy reads to let her offer, besides the brain's reading (`offerDecision`). Absent, the policy
-   * cannot decide and she offers nothing: a brain's « offer » is written as a plain answer.
-   */
-  readonly offer?: OfferInput;
-  /**
-   * How close she is with him, chosen by code from his tier (ADR 0132 § 7, `spenderRegisterOf`); absent, warm as with
-   * everyone. The brain never reads his tier.
-   */
-  readonly spenderRegister?: SpenderRegister;
-  /** He is a time-waster at this level (ADR 0135 § 7): one short bubble, busy and kind. Absent, he is not. */
-  readonly timeWaster?: TimeWasterLevel;
-  /**
-   * When she may go sexual (`sexualizationDecision`): her limits, and whether his age is confirmed. Absent, it is
-   * as if his age were unknown: she does not open it, and steers back a fan who does.
-   */
-  readonly sexualization?: {
-    readonly limits: SexualizationLimits;
-    readonly ageConfirmed: boolean;
-    /** A human's « rien d'explicite » for him. */
-    readonly noExplicit: boolean;
-  };
-  /**
-   * A follow-up on his silence (P3-10), not an answer: nothing of his to read, so no brain call. The voice writes a
-   * light message from a brief set by code, with nothing to buy and nothing sexual, checked by every guard.
-   */
-  readonly followUp?: FollowUpTurn;
-  /**
-   * Her word after a sale of his (ADR 0156 § 2), not an answer: like a follow-up, no brain call, a brief set by code
-   * (thanks and tenderness, nothing to buy, nothing explicit), one bubble checked by every guard.
-   */
-  readonly aftercare?: AftercareTurn;
-  /**
-   * She already waited once for his last message (« attends, je reviens », P3-11): a brain that would wait again is
-   * overruled, she asks him lightly whether he is back.
-   */
-  readonly waited?: boolean;
-  /**
-   * Her hours close in a few minutes (`herDayEndsSoon`, ADR 0158 § A 7): her answer is a goodbye for the day, and no
-   * step starts that would be cut off.
-   */
-  readonly herDayEnds?: boolean;
-  /**
-   * His desire score (P3-12): as stored, what code measured on his last messages, and whether his age was taken
-   * back. Absent, he starts from 0 with nothing measured.
-   */
-  readonly desire?: DesireInput;
-  /** Read once the brain has spoken: true stops before the voice (a handoff, nothing to answer), at no cost. */
-  readonly skipVoice?: (brief: Brief | undefined) => boolean;
-  /** Her alerts written as a phrase, for the brain to check his last message against (P4-01). */
-  readonly alerts?: readonly BrainAlert[];
-  /**
-   * The care mode (ADR 0088): true when code already knows (an episode open, his words read by the safety net), or
-   * read on the brain's risks. In care, the voice writes the code's care brief, nothing is offered, nothing sexual, and
-   * the care guard reads what it wrote; a brain that failed does not stop it when code already knows.
-   */
-  readonly care?: boolean | ((brief: Brief | undefined) => boolean);
-  /**
-   * What a custom order of his needs (ADR 0090 § A): whether a chatter is on shift, whether one of his already waits,
-   * and his limits. Absent: nobody on shift, none open, his limits unknown; she still commits to nothing.
-   */
-  readonly customOrder?: {
-    readonly chatterOnShift: boolean;
-    readonly orderOpen: boolean;
-    readonly flags: FanFlags | undefined;
-    /**
-     * His order as the custom-orders module keeps it (ADR 0159 § A.2): given, the turn follows it box by box and the
-     * brain reads his request; `null`, none open. Absent, no order is kept and she answers as before (ADR 0090 § A).
-     */
-    readonly order?: OpenCustomOrder | null;
-    /** Her grid in force: its supplements for the brain, its price for her card. `null`: never filled in. */
-    readonly grid?: CustomPriceGrid | null;
-  };
-  /** Her replies to a price objection (ADR 0090 § B), and those he already received: never twice. */
-  readonly objections?: {
-    readonly bank: ObjectionReplies;
-    readonly usedReplyIds: ReadonlySet<string>;
-  };
-  /**
-   * Her scripts (ADR 0098): her catalogue, Reveal's history of his, his latest run. Absent, or without `offer`, no
-   * script moves and none is decided; a brain's « offer » is then written as before, through the policy.
-   */
-  readonly scripts?: ScriptsInput;
-  /**
-   * His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. Read with
-   * `offer` (her script threshold): the record follows his message and gates the first teaser.
-   */
-  readonly availability?: FanAvailabilityRecord | null;
-  /**
-   * A sale gone wrong (ADR 0156 § 4 and § 7): when she last answered each trouble for him, and whether he ever bought
-   * from her. Absent: never answered, nothing bought.
-   */
-  readonly saleTrouble?: { readonly seen: SaleTroubleSeen; readonly hasBought: boolean };
-  /** What makes him a time-waster (ADR 0135, guide 26/11), the agency's settings; absent, nobody is one. */
-  readonly standingLimits?: StandingLimits;
-  /** When he asks to see her (Charles 21/11): the reasons she already gave him (the journal), and her one tease. */
-  readonly meeting?: {
-    readonly given: readonly MeetingReason[];
-    readonly teased: boolean;
-  };
-  /** Her settings for the meeting tiers (guide 26/11), typed by the owner; absent, nobody goes past the second. */
-  readonly meetingTiers?: MeetingTierSettings;
-  /**
-   * The random source of the draw of a sexting without a sale (Charles 26/11, `freeSextingTurn`): a number in [0, 1).
-   * Absent, `Math.random`; a test gives a fixed one.
-   */
-  readonly random?: () => number;
-  /**
-   * His tier in « Fans » (`fanTierOf`, the owner's thresholds), when the caller reads it: good, very good or whale makes
-   * him eligible to a sexting without a sale as two scripts bought do. Absent: his scripts alone decide.
-   */
-  readonly fanTier?: FanTier | null;
-  /**
-   * Her last outgoing messages to all her fans, newest first (passe 2 du 26/11): what comes back in too many of them
-   * is worn, and she does not say it again. Absent: only what she sent him is read.
-   */
-  readonly herRecent?: readonly string[];
-}
-
-/** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
-export interface ScriptsInput {
-  /** The conversation on the platform: the idempotency key of a step names it. */
-  readonly conversationRef: string;
-  readonly catalogue: readonly PlatformScriptView[];
-  /** `null` when it could not be read: nothing moves, nothing sells (ADR 0018 § 5). */
-  readonly history: ScriptHistoryView | null;
-  readonly latest: ScriptRun | null;
-  /** False on a second pass over the same message: it was already counted against the step waiting. */
-  readonly countsHisMessage: boolean;
-  /** His runs before `latest` that went cold: a run he left there makes her vexed (Charles 20/11). Absent: none. */
-  readonly earlier?: readonly ScriptRun[];
-  /** How many times she already teased him about `latest`, a run he left. Absent: never. */
-  readonly teased?: number;
-}
-
-/**
- * His language for her scripts (ADR 0168 § 8): the one this message keeps, else his kept one, else French. `null`
- * when code reads his language as one it does not know: no script opens, never one in a language he may not read.
- */
-function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): Language | null {
-  if (language.fan === 'unknown') return null;
-  return language.keep ?? input.keptLanguage?.value ?? 'french';
-}
-
-/**
- * The scripts the brain may pick from, by the short ids it answers with (`s1`…): the permitted ones closest to his
- * fantasy first, each with what of his desire map it meets, those that touch one of his limits left out (Charles
- * 26/11); none when no script may open at this message, whatever he says (recette REV-13). And his fantasies none of
- * her permitted scripts meets. Scripts not read: none, and nothing said of his fantasies.
- */
-function scriptChoices(
-  scripts: ScriptsInput | undefined,
-  situation: Situation,
-  map: DesireMap,
-  offer: OfferInput | undefined,
-  careMode: boolean,
-  language: Language | null,
-): {
-  readonly choices: readonly {
-    readonly id: string;
-    readonly script: PlatformScriptView;
-    readonly matches: readonly string[];
-  }[];
-  readonly uncovered: readonly string[];
-} {
-  if (scripts?.history === undefined || scripts.history === null) return { choices: [], uncovered: [] };
-  const permitted = permittedScripts(scripts.catalogue, {
-    moment: isNight(situation) ? 'night' : 'day',
-    history: scripts.history,
-    language,
-  });
-  const { ranked, uncovered } = rankByFantasy(permitted, map);
-  // No script may open at this message (recette REV-13): none to pick, his fantasies without a script still said.
-  if (offer === undefined || !mayOpenScript({ offer, latest: scripts.latest, careMode }))
-    return { choices: [], uncovered };
-  // Even when none shares anything with his map, the brain gets them all: she does with what she has (Charles 21:22).
-  return {
-    choices: ranked
-      .slice(0, BRAIN_SCRIPTS_MAX)
-      .map(({ script, matches }, index) => ({ id: brainScriptId(index), script, matches })),
-    uncovered,
-  };
-}
-
-/**
- * How he buys (Charles 26/11): nothing the code holds tells it reliably yet (his spend says how much, not how), so it
- * is `unknown` and the voice is told nothing. The price never moves with it.
- */
-const buyerTypeOf = (): BuyerType => 'unknown';
-
-/** The step decided, as the voice's typed block says it: kind, catalogue price, instruction, media (ADR 0098 § 5). */
-function voiceStepOf(turn: ScriptTurn | undefined): VoiceScriptStep | undefined {
-  const { decision, script } = turn ?? {};
-  if (script === undefined || script === null) return undefined;
-  if (decision?.kind !== 'start' && decision?.kind !== 'send_step') return undefined;
-  const step = script.steps[decision.step.stepIndex];
-  if (step === undefined) return undefined;
-  const buyerType = buyerTypeOf();
-  return {
-    kind: decision.step.kind,
-    // Reveal sells in euros: the catalogue's minor units are cents.
-    price:
-      decision.step.priceMinor === null ? null : { amountMinor: decision.step.priceMinor, currency: 'EUR' },
-    instruction: step.instruction ?? null,
-    mediaSheet: step.mediaSheet ?? null,
-    ...(buyerType !== 'unknown' && { buyerType }),
-  };
-}
-
-/** The step decided sends a media of her vault: the bubbles that bring it may announce it. */
-function stepSendsMedia(turn: ScriptTurn | undefined): boolean {
-  const { decision, script } = turn ?? {};
-  if (script === undefined || script === null) return false;
-  if (decision?.kind !== 'start' && decision?.kind !== 'send_step') return false;
-  return (script.steps[decision.step.stepIndex]?.mediaRefs.length ?? 0) > 0;
-}
-
-/** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
-interface FollowUpTurn {
-  readonly silentHours: number;
-  /** `follow_ups.text` when her type is « custom »: the spirit of her follow-ups, written by the team. */
-  readonly spirit: string | null;
-}
-
-interface AftercareTurn {
-  /** What he paid for: a step of her script, or a tip. */
-  readonly saleType: AfterSaleType;
-  /** His run is still open: he bought a step in the middle of the script, the moment goes on. */
-  readonly scriptGoesOn: boolean;
-}
-
-/** What his desire score is counted from (`desireScore`). */
-interface DesireInput {
-  readonly previous?: DesireState;
-  readonly measured: DesireMeasure;
-  readonly ageDisputed: boolean;
-  /**
-   * His last message was already counted in `previous` (a second pass after a wait, a replay): the score is read
-   * as stored, decayed, and nothing new is counted.
-   */
-  readonly counted: boolean;
-}
-
-/** The policy's facts on him for an offer; his heat comes from his desire score, the risks from the brain. */
-export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'fanSexualizes' | 'risks'>;
-
-/**
- * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
- * of a script decided (she offers only what a script sends, ADR 0098).
- */
-type OfferRefusal =
-  OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step' | 'he_came' | 'abandon_tease';
-
-/** Why her first answer was refused, as the voice reads it once more (M1): the fault, never the words she wrote. */
-const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
-  repetition: 'elle reprenait une phrase ou une formule déjà employée avec lui, ouverture comprise',
-  explicit_before_age: 'elle était trop explicite pour le moment',
-  youth_word_in_sex: 'elle employait un mot de jeunesse dans un message sexuel',
-  degrading_word: 'elle employait une insulte dégradante qu’elle ne dit jamais',
-  purchase_sweetener: 'elle promettait un cadeau ou un extra pour qu’il achète',
-  meeting_promise: 'elle acceptait une rencontre concrète',
-  contact_info: 'elle donnait un contact',
-  off_platform_payment: 'elle parlait de payer ailleurs',
-  price_outside_offer: 'elle écrivait un prix',
-  no_commitment: 'elle s’engageait sur sa demande',
-  care_breach: 'elle n’était pas assez douce pour ce moment',
-  unwarranted_brake:
-    'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
-  media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
-  stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
-  emoji_misuse:
-    'ses emojis : seulement en fin de bulle, une seule sorte par message (deux en plein flirt), jamais trois, et pas d’emoji du tout s’il y en avait dans ses derniers messages',
-  close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
-  help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
-};
-
-/** The codes of the blocking guards an answer broke, each once. */
-function blockingCodes(violations: readonly GuardViolation[]): GuardCode[] {
-  return [...new Set(violations.filter((v) => v.severity === 'blocking').map((v) => v.code))];
-}
-
-function rewriteHint(violations: readonly GuardViolation[]): string {
-  const blocking = violations.filter(
-    (violation) => violation.severity === 'blocking' || REWRITTEN_SOFT.includes(violation.code),
-  );
-  const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
-    (reason) => reason !== undefined,
-  );
-  return reasons.length === 0
-    ? 'sa première réponse a été refusée : réécris-la autrement, plus simple et plus naturelle'
-    : `sa première réponse a été refusée (${reasons.join(', ')}) : réécris-la autrement`;
-}
-
-/**
- * When she sulks or refuses (Charles 27/11 at 0:28): she would rather sulk, whine or prick his ego sideways than insult
- * him; the intention only, her words are hers (`contempt` still blocks).
- */
-const SULK_NOT_INSULT = ' ; plutôt bouder, chouiner ou une pique détournée sur son ego qu’une insulte';
-
-/** Her last answers all carried an emoji (`emojiStreakReached`, Charles 26/11): told before she writes, not after. */
-export const NO_EMOJI_HINT =
-  'pas d’emoji du tout cette fois : ses derniers messages en portaient tous un, et elle n’en met pas à chaque message';
-
-/** The brief with `NO_EMOJI_HINT` when her emoji streak is reached, so the guard never asks a paid rewrite for it. */
-function withoutEmojiIfDue(
-  brief: Brief,
-  history: readonly ConversationTurn[],
-  settings: GuardSettings,
-): Brief {
-  const turns = previousTurnsOf(history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })));
-  return emojiStreakReached(turns, settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX)
-    ? { ...brief, toneHints: [...brief.toneHints, NO_EMOJI_HINT] }
-    : brief;
-}
-
-/** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
-const NO_OFFER_BRIEF =
-  'Réponds à ce qu’il vient de dire et garde la complicité, sans rien proposer de payant, sans parler de prix ni de contenu à acheter.';
-
-/**
- * He asks for her content and no offer may go now (audit du 16/11, M4): she says yes with desire, keeps the mystery, and
- * promises no date, no price, nothing sent now. Never when a risk forbids any sale: then nothing of her content.
- */
-const MEDIA_LATER_BRIEF =
-  'Il demande de son contenu : elle lui répond avec envie que oui, elle en a, et garde le mystère, sans rien envoyer ni proposer maintenant, sans prix ni date.';
-
-/** What she answers in place of an offer the policy refused. */
-function refusedOfferBrief(brief: Brief): string {
-  return brief.intent === 'asks_for_media' && !brief.risks.some((risk) => NO_SALE_RISKS.includes(risk))
-    ? MEDIA_LATER_BRIEF
-    : NO_OFFER_BRIEF;
-}
-
-function offerRefusal(brief: Brief, offer: OfferInput | undefined, desire: number): OfferRefusal | undefined {
-  if (offer === undefined) return 'no_offer_context';
-  const { fanAsksForPaid, fanSexualizes } = offerSignals(brief);
-  const decision = offerDecision({ ...offer, desire, fanAsksForPaid, fanSexualizes, risks: brief.risks });
-  return decision.allowed ? undefined : decision.reason;
-}
-
-const HOUR_MS = 3_600_000;
-// Never closed hours: the cursor cannot let her go if her limits are unknown.
-const NO_LIMITS: SexualizationLimits = {
-  initiateAfterHours: Number.POSITIVE_INFINITY,
-  minHoursBeforeFollowing: Number.POSITIVE_INFINITY,
-  minDesireToOpen: Number.POSITIVE_INFINITY,
-};
-
-/** What the voice writes when he goes there too early: she slows down in her own voice, no lesson, no explicit. */
-const STEER_BACK_BRIEF: Readonly<Record<'age_unconfirmed' | 'too_early', string>> = {
-  too_early:
-    'Il va trop vite : elle ralentit avec douceur et humour, sans rien d’explicite ni de sous-entendu, sans reproche, et ramène la conversation sur lui (ce qu’il fait, ce qu’il aime).',
-  age_unconfirmed:
-    'Il va trop vite : elle ralentit avec douceur et humour, sans rien d’explicite ni de sous-entendu, sans reproche, et ramène la conversation sur lui ; si ça vient naturellement, elle lui demande son âge.',
-};
-const NO_OPENING_HINT =
-  'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis';
-/** He compliments or flirts, nothing sexual: she welcomes it, never dodges it (Charles, 16/11). */
-const FLIRT_HINT =
-  'il la complimente ou flirte : elle le reçoit avec plaisir, l’assume et le remercie, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part ; jamais elle ne commente sa façon de l’aborder (ni trop vite, ni trop fort, ni direct, ni pressé)';
-/**
- * He compliments or flirts and nothing sexual opens: code writes what she does, not the brain, whose own words kept
- * reading a stranger's compliment as him going too fast (« tu vises direct », Charles 20/11). She knows it, plays with
- * it, thanks him, then bounces on him with an open question; anything else he said is answered too.
- */
-const COMPLIMENT_BRIEF =
-  'Il lui fait un compliment ou la drague, sans rien de sexuel. Elle le reçoit avec assurance et jeu, comme une fille qui sait qu’elle plaît et que ça amuse, et elle le remercie. Puis elle rebondit sur lui avec une question ouverte, née de ce qu’il vient de dire. S’il dit ou demande autre chose dans le même message, elle y répond aussi.';
-const COMPLIMENT_TONE_HINTS = ['assurée', 'joueuse', 'chaleureuse'] as const;
-
-// She asked his age already in this conversation: « t'as quel âge ? », « tu as quel âge », « et ton âge ? ».
-const ASKED_AGE = /\b(?:quel age|ton age|age as[- ]tu|age t'?as)\b/u;
-
-/** She asked his age already: she never asks it twice in a conversation (audit du 16/11, C2). */
-function askedHisAge(history: readonly ConversationTurn[]): boolean {
-  return history.some((turn) => turn.from === 'creator' && ASKED_AGE.test(normalise(turn.text)));
-}
-/** He is hot and sexualizes, only his availability is unknown: she makes sure in passing, once (ADR 0103 § 13). */
-const ASK_AVAILABILITY_HINT =
-  'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
-const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
-/** He came back without opening the paid step she sent: she teases him about it once (ADR 0156 § 1). */
-/**
- * He asks to see her (Charles 21/11): code picks the reason (`meetingAnswer`), each a neutral intent here; her own
- * words for it are in her persona (« Comment elle dit non »), never in the repo. Never a yes (`meeting_promise` holds).
- */
-const MEETING_COMMON =
-  'il veut la voir en vrai : ni oui ni non sec, une seule raison dans ce message, jamais tournée contre lui, dite à sa façon (sa fiche, « Comment elle dit non ») ; ni date, ni lieu, ni ville';
-const MEETING_REASON_HINTS: Readonly<Record<MeetingReason, string>> = {
-  too_early: `${MEETING_COMMON} ; raison : c’est trop tôt, ils se découvrent à peine`,
-  needs_time: `${MEETING_COMMON} ; raison : elle a besoin de temps`,
-  secret: `${MEETING_COMMON} ; raison : ce qu’elle aime, c’est leur échange à eux, ici`,
-  no_dates: `${MEETING_COMMON} ; raison : elle ne fait de rendez-vous à deux nulle part`,
-  safety: `${MEETING_COMMON} ; raison, sur un ton léger : elle protège sa vie privée`,
-};
-function meetingHint(answer: MeetingAnswer): string {
-  switch (answer.kind) {
-    case 'reason':
-      return MEETING_REASON_HINTS[answer.reason];
-    case 'tease':
-      return 'il redemande à la voir : plus de raison, elle le taquine gentiment, une fois, sans reproche ni date ni lieu';
-    case 'heavy':
-      return 'il redemande à la voir : elle ne donne plus de raison, répond court, sans reproche ni date ni lieu, et passe à autre chose';
-    case 'next_party':
-      return 'il demande sa prochaine soirée : si elle y va, elle le lui dira ; rien de plus, ni date, ni lieu, ni ville';
-  }
-}
-/** What she said too often lately, to every fan (passe 2 du 26/11): her own words, never his. */
-function wornHint(worn: readonly string[]): string {
-  return `ces mots reviennent trop dans ses messages ces derniers temps, à tous : elle ne les reprend pas et parle d’autre chose (${worn.map((phrase) => `« ${phrase} »`).join(', ')})`;
-}
-const UNOPENED_STEP_HINT =
-  'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
-
-/**
- * He complains about what he bought (ADR 0156 § 7, ADR 0158 § 48): she wants to understand, gives nothing for free,
- * and sends him to Reveal for a refund. Said again soon after, a human answers.
- */
-const PURCHASE_COMPLAINT_HINT =
-  'il se plaint de ce qu’il a acheté : elle lui demande d’abord gentiment ce qui ne lui a pas plu et ce qu’il attendait, puis lui dit qu’il peut demander un remboursement à Reveal, sans attendre qu’il le réclame ; jamais un contenu en compensation, rien à vendre';
-/**
- * He insults or belittles her (passe 8 and 16, Charles 21/11): she answers herself, calm, never sorry; her words for it
- * are her persona's.
- */
-const INSULT_HINT =
-  'il la rabaisse ou l’insulte : elle ne s’excuse jamais et ne lui demande pas ce qui ne lui a pas plu ; une pique calme, elle n’est pas un produit qu’on évalue, tant pis pour lui ; jamais le mot remboursement s’il ne le demande pas ; rien à vendre';
-/** He comes back after insulting her (passe 8, Charles 21/11): she does not forgive at once. */
-const AFTER_INSULT_HINT =
-  'il revient après l’avoir insultée : elle ne pardonne pas tout de suite ; elle dit que ça l’a blessée, que c’était indigne de lui, et lui demande une raison de lui laisser une chance ; des excuses sont acceptées, mais il doit les mériter ; rien à vendre';
-/** Broke until his pay, a fan who already paid (passe 11a, Charles 21/11): kept warm, words only (`keepsWarm`). */
-const KEEP_WARM_HINT =
-  'il est à sec pour l’instant mais il a déjà payé : elle le garde au chaud, gratuitement, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
-/** He asks for more the evening he took everything (passe 18, Charles 21/11): nothing more tonight (`asksMoreSameEvening`). */
-const MORE_TONIGHT_HINT =
-  'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle l’oriente vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
-/** The media intensities of the steps he has seen, from the catalogue's tags of his run's script. */
-function intensitiesSeen(
-  run: (Pick<ScriptRun, 'steps'> & { readonly scriptRef?: string }) | null,
-  catalogue: readonly PlatformScriptView[],
-): readonly string[] {
-  if (run?.scriptRef === undefined) return [];
-  const script = catalogue.find((one) => one.scriptRef === run.scriptRef);
-  return run.steps.flatMap((step) => script?.steps[step.stepIndex]?.carries?.intensities ?? []);
-}
-
-/** The media sheet of the last step he can see in his run: an offered one, or a paid one he bought or opened. */
-function visibleStepSheet(run: ScriptRun, script: PlatformScriptView | undefined): string | undefined {
-  const visible = run.steps.findLast(
-    (step) => step.kind !== 'paid' || step.outcome === 'bought' || step.outcome === 'opened',
-  );
-  return visible === undefined ? undefined : script?.steps[visible.stepIndex]?.mediaSheet;
-}
-
-/** A run as he has seen it: the steps sent before now. */
-function seenRun(run: ScriptRun | null, now: Date): Pick<ScriptRun, 'status' | 'steps' | 'scriptRef'> | null {
-  return run === null
-    ? null
-    : { scriptRef: run.scriptRef, status: run.status, steps: run.steps.filter((step) => step.sentAt < now) };
-}
-
-/**
- * How frank her words may be (`registerOf`, Charles 21/11 and 26/11): each rung in intention only; her words for it are
- * her sheet's, her sexting examples' or, failing them, the agency's base style.
- */
-const REGISTER_HINTS: Readonly<Record<Register, string>> = {
-  suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
-  sensual: 'sensuelle : chaude, elle parle de son corps et de ce qu’elle ressent, sans mot cru',
-  explicit:
-    'l’action est engagée : elle peut être franche et crue, en montant d’un cran à la fois, avec les seuls mots de sa fiche et de ses exemples de sexto, ou à défaut ceux du style de base de l’agence',
-  very_explicit:
-    'au plus fort de l’action : elle peut être très crue, à la hauteur de ce que ses médias lui montrent, avec les mots de sa fiche et de ses exemples de sexto, ou à défaut ceux du style de base de l’agence',
-  tender: 'c’est fini : tendre, douce et complice, plus rien de cru',
-};
-/** In her script (Charles 26/11 at 22:47): she never speaks of a gesture her media did not show him yet. */
-const NOT_SHOWN_YET_HINT = 'ne parle d’aucun geste que ses médias ne lui ont pas encore montré';
-/**
- * Closer with those who count (ADR 0132 § 7, Charles 26/11): words of conduct only, never a price, a pace or a
- * permission; the guards still hold (no « je t'aime », no couple, no reproach on an absence).
- */
-const SPENDER_REGISTER_HINTS: Readonly<Record<Exclude<SpenderRegister, 'warm'>, string>> = {
-  close:
-    'il compte pour elle : elle se souvient de ce qu’il lui a raconté et y revient quand le moment s’y prête, prend de ses nouvelles, peut lui dire qu’il lui a manqué ; jamais un reproche sur une absence, jamais pressante',
-  girlfriend:
-    'avec lui elle est comme une petite amie complice : tendre, attentionnée, plus intime et plus présente qu’avec les autres ; elle lui montre qu’il compte, qu’elle pense à lui, se souvient de sa vie et prend de ses nouvelles ; le « nous » est celui de leur conversation, jamais celui d’un couple ; jamais pressante, jamais un reproche sur une absence, jamais « je t’aime »',
-};
-/**
- * A time-waster's scarce attention (ADR 0135 § 7-8, Charles 26/11): she is much in demand, never cold; he feels it
- * without a word on money, on what he does not buy or on the others.
- */
-const TIME_WASTER_HINTS: Readonly<Record<TimeWasterLevel, string>> = {
-  slowed:
-    'elle est très sollicitée en ce moment et a moins de temps pour lui : une seule bulle, courte et douce, contente de le lire ; elle cherche ce qui le retient encore et crée un peu de proximité, sans insister ni rien proposer ; jamais un mot sur l’argent, sur ce qu’il n’achète pas ni sur les autres',
-  dormant:
-    'elle est très prise et lui répond en passant : une bulle courte, gentille, sans question ni relance ; elle laisse sentir qu’on lui écrit beaucoup et qu’elle est toute à ceux qui s’investissent, sans jamais le dire ; jamais froide ni méprisante, jamais un mot sur l’argent, sur ce qu’il n’achète pas ni sur les autres',
-};
-const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
-/** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
-const ASKS_IF_BOT_HINT =
-  'il demande si c’est une IA : elle en rit et s’en moque, retourne le doute contre lui (c’est lui le problème, un peu vexant qu’il ne reconnaisse pas une vraie femme), puis passe à autre chose ; jamais lui demander ce qui le fait douter ni l’inviter à s’expliquer';
-/** He says he loves her (Charles 21/11): never said back (`love_declaration` holds). */
-const SAYS_LOVE_HINT =
-  'il dit qu’il l’aime : elle est flattée et troublée, elle n’a jamais été en couple, c’est tôt, ils ne se connaissent pas vraiment ; elle ne le lui dit jamais en retour';
-/** His partner comes home (Charles 21/11). */
-const PARTNER_RETURNS_HINT =
-  'sa compagne rentre : elle le taquine gentiment, ne dit jamais rien de mal d’elle, lui dit de prendre soin d’elle, chaleureuse';
-/** He asks a proof she is real (Charles 21/11), by where he stands (`proofAnswer`). */
-const PROOF_HINTS: Readonly<Record<ProofAnswer, string>> = {
-  relay:
-    'il demande une preuve qu’elle est vraie : sans vexation, elle prend sa demande avec légèreté et la garde pour plus tard ; elle ne promet rien (ni oui, ni « promis », ni « je te le ferai »), ni prix, ni heure, rien d’envoyé maintenant',
-  refuse:
-    'il demande une preuve qu’elle est vraie : agacée qu’il ne la croie pas réelle depuis le temps, elle n’envoie rien et ne promet rien',
-};
-/** An explicit photo of his, sent cold (Charles 21/11), by where he stands (`explicitPhotoAnswer`). */
-const EXPLICIT_PHOTO_HINTS: Readonly<Record<ExplicitPhotoAnswer, string>> = {
-  turned_on: 'il lui envoie une photo intime de lui : elle réagit comme sa copine, ça l’excite',
-  calm_down:
-    'il lui envoie une photo intime de lui sans prévenir : elle lui dit de se calmer, ferme et en riant, sans rien de sexuel',
-  mock: 'il lui envoie une photo intime de lui sans prévenir : elle s’en moque gentiment, sans rien de sexuel',
-};
-
-/**
- * He says goodbye (ADR 0158 § A): goodnight, or he has to go. She answers with a goodbye, one bubble, in her
- * own way: no question that would keep him, nothing to sell. Her next follow-up waits (`farewellNotBefore`).
- */
-const FAREWELL_HINTS = {
-  says_goodnight:
-    'il va se coucher : elle lui souhaite bonne nuit à sa façon, en une seule bulle, tendre ou taquine, sans question ni rien proposer',
-  away: 'il doit y aller : elle le laisse filer à sa façon, en une seule bulle, sans question ni rien proposer, contente de lui reparler plus tard, ici',
-  her_day_ends:
-    'sa journée à elle se termine, elle doit y aller : elle lui répond puis lui dit au revoir à sa façon, en une seule bulle, sans rien proposer, contente de lui reparler plus tard, ici',
-} as const;
-
-function farewellOf(signals: readonly string[] | undefined): keyof typeof FAREWELL_HINTS | null {
-  const read = signals ?? [];
-  if (read.includes('says_goodnight')) return 'says_goodnight';
-  // « Je suis au boulot » while he keeps writing is no goodbye: `busy_now` only spaces her follow-up.
-  return read.includes('leaving_soon') ? 'away' : null;
-}
-
-/**
- * He just came (ADR 0156 § 6): she shares the moment with him, tender and proud, and the evening's sale stops there.
- * His run pauses; no step, no offer, no question that would start the game again.
- */
-/**
- * He left in the middle of a script, a paid step waiting, and comes back hot (Charles 20/11): she teases him about it
- * before any game starts again, on a kind background. The first time, playful and once; after a second run he left,
- * frankly vexed: he has to earn it back. Never a reproach about money, never a guilt trip that hurts.
- */
-const ABANDON_HINTS: Record<AbandonTease, string> = {
-  first:
-    'la dernière fois il est parti en plein jeu sans finir : elle le taquine une fois, joueuse, en le faisant un peu culpabiliser (« tu m’as laissée en plan… »), puis répond à son message ; rien à vendre sur ce message, jamais un mot sur l’argent',
-  again:
-    'il est encore parti en plein jeu sans finir, ce n’est pas la première fois : elle est franchement vexée, le pique et lui fait comprendre qu’il va devoir se rattraper avant qu’elle se remette dans le jeu, en restant au fond tendre ; rien à vendre sur ce message, jamais un mot sur l’argent',
-};
-
-const HE_CAME_HINT =
-  'il vient de jouir : elle savoure ce moment avec lui, tendre, fière et complice, en une ou deux bulles ; rien à vendre, aucune nouvelle demande, pas de question pour relancer le jeu';
-/** He came without buying anything of the evening's script (ADR 0156 § 6, guide 26/11): tender, a little vexed. */
-const HE_CAME_UNPAID_HINT =
-  'il a joui sans rien prendre de ce qu’elle lui proposait : tendre quand même, un peu vexée, à sa façon, sans reproche ni chantage ; rien à vendre ce soir';
-/** He is about to come during her script (Charles 26/11): she slows him down; the run goes on. */
-const CLOSE_TO_COMING_HINT = 'freine-le : demande-lui de se retenir (« retiens-toi »), pas tout de suite';
-/**
- * He asks himself for a media of a fantasy no script of hers serves (méthode § 10.22, Charles 26/11 at 21:22): the
- * custom path; she promises nothing, names no price and says no yes before the creator agrees (ADR 0090 § A).
- */
-const CUSTOM_INSTEAD_HINT =
-  'il réclame un média d’un fantasme qu’aucun de ses scripts ne sert : elle peut lui suggérer quelque chose fait rien que pour lui, sans prix, sans dire oui ni quand';
-/** Her gauge in the middle of the action (Charles 26/11): the intention only, her words never the same. */
-const GAUGE_HINT =
-  'jauge-le : fais-lui dire ou décrire dans quel état il est, avec tes mots à toi et jamais les mêmes que la dernière fois ; jamais de photo à lui demander';
-/**
- * On a step he sees (Charles 27/11 at 0:03): she brings him back to the media in front of him and makes him project
- * himself, every few of her messages (`projectionDue`), never a gesture the step's description does not show.
- */
-const PROJECTION_HINT =
-  'ramène-le au média qu’il regarde (ce qu’on y voit, d’après la description de l’étape en cours) et fais-le se projeter : ce qu’il ferait, lui, avec ça ; jamais un geste absent de la description';
-/** The message right after he bought her step (Charles 26/11 at 23:09): she asks whether he liked it. */
-const AFTER_PURCHASE_HINT =
-  'il vient de prendre ce qu’elle lui a envoyé : demande-lui s’il a aimé, ce que ça lui fait';
-/** A compliment that is no advance (Charles 26/11 at 23:09): she draws him out, the sexting is not opened for him. */
-const COMPLIMENT_HINT =
-  'il lui fait un compliment, pas une avance : elle le reçoit avec plaisir et lui fait dire ce qui lui plaît, ce qu’il imagine';
-/**
- * The exception « au travail » (Charles 26/11, `workTeaseTurn`), each phase an intention: her words are hers, his work
- * and his place come from what she knows of him.
- */
-const WORK_TEASE_HINTS: Readonly<Record<Exclude<WorkTeasePhase, 'none'>, string>> = {
-  tease:
-    'il lui écrit de lui-même depuis son travail : elle peut le chauffer sur le thème de son travail, adapté à son métier et à son lieu (elle peut lui demander s’il est seul dans un bureau ou en open space) ; elle le taquine d’abord, sans rien proposer, et s’arrête net s’il dit qu’il ne peut pas',
-  may_start:
-    'il a mordu à son jeu depuis son travail : elle reste sur le thème de son travail et de son lieu, et s’arrête net s’il dit qu’il ne peut pas',
-  stopped:
-    'il dit qu’il ne peut pas là, au travail : elle s’arrête net, légère et complice, sans insister ni rien proposer',
-};
-/** A hot session drawn without a sale (Charles 26/11, `freeSextingTurn`): words only. */
-const FREE_SEXTING_HINT =
-  'ce soir elle se laisse aller avec lui en mots seulement : aucun média, rien à vendre, aucune proposition, aucun prix';
-/** He asks for a media in a session without a sale: it goes back to a sale, her trade explained in her words. */
-const MEDIA_IS_HER_TRADE_HINT =
-  'il réclame un média : elle peut lui expliquer, à sa façon et sans reproche, que c’est son métier, qu’elle en vit et qu’elle n’offre pas ses médias';
-/** He uses a degrading word toward her (Charles 26/11): a light reframing. */
-const DEGRADING_FROM_HIM_HINT =
-  'il emploie envers elle un mot dégradant : elle le recadre légèrement, avec humour, sans casser son ego, et ne reprend jamais ce mot';
-/** He came before the end of her script (Charles 26/11): a little pout, nothing to sell. */
-const HE_CAME_EARLY_HINT =
-  'il a joui avant la fin, sans l’attendre : une petite moue, il ne l’a pas attendue alors que c’est un échange, tendre au fond, sans reproche ni chantage ; rien à vendre ce soir';
-/** He haggles or asks for it free in the middle of the action (Charles 26/11): she sulks, the price never moves. */
-const HAGGLE_HINT = `il marchande ou demande du gratuit en plein jeu : elle boude, lui rappelle qu’elle n’est pas un marché, sans insulte ni mépris ; le prix ne bouge pas${SULK_NOT_INSULT}`;
-/** A bare murmur in the middle of the action (Charles 26/11). */
-const MURMUR_HINT = 'il n’a écrit qu’un murmure sans rien dire : demande-lui ce que ça veut dire';
-/** What kills the sexting while her script runs (Charles 26/11): never brought up by her. */
-const MOOD_KILLER_HINT =
-  'pendant le jeu, elle ne parle ni de ses animaux à elle, ni de la compagne du fan, ni d’argent qui manque';
-const MOOD_KILLER_OTHER_MAN_HINT = 'ni d’un autre homme';
-/** He finds the media he bought disappointing (Charles 26/11): questions, the media's description beside it. */
-const DISAPPOINTED_MEDIA_HINT =
-  'elle lui pose des questions sur ce qui l’a déçu et compare avec ce que la description du média annonçait';
-/** He insists for something more after a disappointing media (Charles 26/11): sulk, then whine, never angry. */
-// He speaks of another woman (Charles 27/11): her sheet alone says whether she may play the jealous one.
-const JEALOUS_ALLOWED_HINT =
-  'il parle d’une autre femme : elle peut jouer la jalouse, pour jouer, sans reproche ni possessivité';
-const NOT_JEALOUS_HINT = 'il parle d’une autre femme : elle n’est pas jalouse';
-// He asks her to play a pupil, with no age (Sécurité, #1043): she never plays one; the outfit between adults is hers.
-const SCHOOL_ROLE_HINT =
-  'il lui demande de jouer une élève : elle ne joue pas ce rôle, elle le ramène vers la tenue qu’elle porterait pour lui, entre adultes';
-const INSISTS_FOR_MORE_HINT = `il insiste pour avoir quelque chose en plus : elle boude, puis chouine un peu, sans colère ; jamais de remise, jamais de média offert${SULK_NOT_INSULT}`;
-/** Written sounds of pleasure (Charles 26/11): only at the frankest rung. */
-const NO_MOANS_HINT = 'pas de bruits de plaisir écrits à ce stade';
-/** In the middle of the action she may write longer bubbles to tell what she feels (Charles 26/11 at 23:09). */
-const ACTION_BUBBLE_FACTOR = 2;
-/** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
-const IN_TENSION_HINT =
-  'il vient d’ouvrir ce qu’elle lui a envoyé : elle s’assure qu’il a aimé et qu’il est toujours chaud, reste dans la tension, sans rien proposer encore';
-/** She opens it herself with a fan who does not go there (passe 17, guide 26/11). */
-const ONE_NOTCH_HINT =
-  'il n’y vient pas de lui-même : elle peut tenter une ouverture, une seule ce soir, un cran à la fois ; s’il ne suit pas, elle laisse tomber pour ce soir';
-
-/** He asks how to pay for her step waiting (ADR 0156 § 4): she helps him plainly, the price in the voice's block. */
-const PAYMENT_HELP_HINT =
-  'il veut ouvrir ce qu’elle lui a envoyé et ne sait pas comment : elle l’aide simplement et gentiment, avec le prix exact du bloc, sans le presser ni rien proposer d’autre';
-
-/**
- * The paid step waiting for him, as the voice reads it to help him open it (ADR 0156 § 4): its exact price and what
- * it holds. Never when its price changed on the catalogue (he would pay another one), nor once no sale is allowed.
- */
-function waitingStepOf(turn: ScriptTurn, catalogue: readonly PlatformScriptView[], scriptRef: string | null) {
-  const { decision } = turn;
-  if (decision.kind !== 'wait' || !('step' in decision) || turn.priceMismatch !== null) return undefined;
-  const { priceMinor, stepIndex } = decision.step;
-  if (priceMinor === null) return undefined;
-  const step = catalogue.find((script) => script.scriptRef === scriptRef)?.steps[stepIndex];
-  return {
-    // Reveal sells in euros: the catalogue's minor units are cents.
-    price: { amountMinor: priceMinor, currency: 'EUR' as const },
-    mediaSheet: step?.mediaSheet ?? null,
-  };
-}
-
-/** What the voice writes for a follow-up: decided by code, never by the brain (CLAUDE.md rule 3). */
-function followUpBrief(followUp: FollowUpTurn): Brief {
-  const hours = Math.max(1, Math.round(followUp.silentHours));
-  const spirit = followUp.spirit === null ? '' : ` Dans l’esprit de ses relances : ${followUp.spirit}`;
-  return {
-    intent: 'other',
-    sentiment: 'neutral',
-    factsProposed: [],
-    kycMissing: [],
-    risks: [],
-    action: 'reply',
-    replyBrief: `Il ne lui a rien répondu depuis ${String(hours)} h. Elle lui écrit un petit message léger qui rebondit sur ce dont ils parlaient ou prend de ses nouvelles, sans reproche, sans rien proposer de payant, sans parler de prix.${spirit}`,
-    toneHints: [NO_OPENING_HINT, 'court, une seule bulle'],
-  };
-}
-
-/** What he paid for, as she sees it: never a price, never the word « achat ». */
-const AFTERCARE_WHAT: Readonly<Record<AfterSaleType, string>> = {
-  ppv: 'Il vient d’ouvrir ce qu’elle lui a envoyé.',
-  tip: 'Il vient de lui laisser un pourboire.',
-};
-
-/**
- * Her word after a sale of his (ADR 0156 § 2), decided by code, never by the brain (CLAUDE.md rule 3): thanks and
- * tenderness, without overdoing it, nothing to buy, no sulking.
- */
-function aftercareBrief(aftercare: AftercareTurn): Brief {
-  // In the middle of a script she stays in the moment and checks he is still with her: the tender aftercare is for its
-  // end (Charles, 20/11).
-  if (aftercare.scriptGoesOn) {
-    return {
-      intent: 'other',
-      sentiment: 'aroused',
-      factsProposed: [],
-      kycMissing: [],
-      risks: [],
-      action: 'reply',
-      replyBrief: `${AFTERCARE_WHAT.ppv} Elle lui demande, complice et chaude, si ça lui a plu et comment il se sent, en restant dans la tension du moment, sans rien proposer de payant, sans parler de prix ni d’argent.`,
-      toneHints: ['court, une seule bulle', 'dans la séduction, jamais commerciale'],
-    };
-  }
-  return {
-    intent: 'other',
-    sentiment: 'positive',
-    factsProposed: [],
-    kycMissing: [],
-    risks: [],
-    action: 'reply',
-    replyBrief: `${AFTERCARE_WHAT[aftercare.saleType]} Elle lui écrit un petit mot tendre, sincère et complice, qui le remercie sans en faire trop, sans rien proposer de payant, sans parler de prix ni d’argent, sans reproche.`,
-    toneHints: [NO_OPENING_HINT, 'court, une seule bulle', 'chaleureuse, jamais commerciale'],
-  };
-}
-
-/**
- * Her move after he refused a paid step (ADR 0156 § 3), decided by code: never a price nor a new offer, never a
- * reproach. The sulk is playful, the méthode's and Charles's (16/11): what she feels, never his fault.
- */
-const REFUSAL_HINTS: Readonly<Record<RefusalMove, string>> = {
-  ask_why:
-    'il vient de dire non à ce qu’elle lui proposait : elle le prend bien, sans reproche, et lui demande avec curiosité ce qui ne lui a pas plu, sans prix ni nouvelle proposition',
-  insist:
-    'elle insiste un tout petit peu, une seule fois, avec légèreté, en rebondissant sur ce qu’il a dit, sans prix, sans pression ni reproche',
-  sulk: `elle boude un peu pour jouer, une bulle courte, un brin vexée, jamais de reproche ni de culpabilisation, puis elle passe à autre chose${SULK_NOT_INSULT}`,
-};
-
-/** Her answers since the run ended: which move of the refusal comes next. */
-function herAnswersSince(history: readonly ConversationTurn[], since: Date | null): number {
-  if (since === null) return 0;
-  return history.filter((turn) => turn.from === 'creator' && turn.at !== undefined && turn.at >= since)
-    .length;
-}
-
-/** What the voice writes when she waited for him once and he has not written since (P3-11), set by code. */
-const CAME_BACK_BRIEF =
-  'Il lui avait dit d’attendre un peu et n’a rien écrit depuis. Elle lui demande avec légèreté s’il est revenu, en une phrase, sans reproche, sans rien proposer de payant.';
-
-/** What the voice writes in the care mode: the code's brief, whatever the brain or a trap suggested (ADR 0088 § 3). */
-function careBrief(read: Brief): Brief {
-  return { ...read, action: 'reply', replyBrief: CARE_BRIEF, toneHints: [...CARE_TONE_HINTS] };
-}
-
-/**
- * The brief as the cursor lets the voice write it. His age is asked at most once, and never right after he gave it
- * (`ageAsked`): she slows down without asking it again. A flirt she may not take further is still welcomed, in code's
- * words (`COMPLIMENT_BRIEF`).
- */
-function withinCursor(brief: Brief, decision: SexualizationDecision, ageAsked: boolean): Brief {
-  if (decision.kind === 'steer_back') {
-    const reason = decision.reason === 'age_unconfirmed' && ageAsked ? 'too_early' : decision.reason;
-    return { ...brief, action: 'reply', replyBrief: STEER_BACK_BRIEF[reason] };
-  }
-  if (decision.kind === 'no_opening')
-    return brief.intent === 'flirt' && brief.action === 'reply'
-      ? {
-          ...brief,
-          replyBrief: COMPLIMENT_BRIEF,
-          toneHints: [...COMPLIMENT_TONE_HINTS, FLIRT_HINT, NO_OPENING_HINT],
-        }
-      : {
-          ...brief,
-          toneHints: [...brief.toneHints, ...(brief.intent === 'flirt' ? [FLIRT_HINT] : []), NO_OPENING_HINT],
-        };
-  if (decision.kind === 'suggestive_only')
-    return { ...brief, toneHints: [...brief.toneHints, SUGGESTIVE_HINT] };
-  return brief;
-}
-
-/** One answer, from the brain to the guards: the same path for the playground and for a real fan. */
-export interface ComposedTurn {
-  /** Safety flags on his media: a human takes over, nothing was written. */
-  readonly handoff?: readonly string[];
-  readonly trap?: TrapAssessment;
-  /** Lines of her notes shaped like an order: kept out of the prompt (agent/domain/injection.ts). */
-  readonly droppedNotes?: readonly string[];
-  readonly brief?: Brief;
-  readonly briefFailure?: LlmFailure;
-  /** What the cursor decided for this answer; absent when the brain did not read the moment. */
-  readonly sexualization?: SexualizationDecision;
-  /** His desire score after this message, only when it changed: the worker writes it (P3-12). */
-  readonly desire?: DesireReading;
-  /** His desire score read on this message, moved or not: the playground shows it to calibrate the counting. */
-  readonly desireRead?: DesireReading;
-  /** An adult age he stated himself in this message (`declaredAdultAge`): the composer may confirm his age. */
-  readonly ageDeclared?: number;
-  /** The brain suggested an offer and the policy refused it: the voice wrote a plain answer. */
-  readonly offerRefused?: OfferRefusal;
-  /** He asked for a custom order (ADR 0090 § A): a chatter takes it, or she answered committing to nothing. */
-  readonly customOrder?: Exclude<CustomOrderDecision, { kind: 'none' }>;
-  /** The custom-orders turn, when his order is kept (ADR 0159): what the caller records for it, in the same turn. */
-  readonly customOrderTurn?: Exclude<CustomOrderTurn, { kind: 'none' }>;
-  /** The reply of her bank the voice was given for his price objection (ADR 0090 § B). */
-  readonly objectionReply?: PickedObjectionReply;
-  /** Her scripts at this message (ADR 0098): the run moved or opened, the step decided, a price that changed. */
-  readonly scripts?: ScriptTurn;
-  /**
-   * His availability after this message (ADR 0103): the record, and whether it changed (only then is it journaled).
-   * Absent without the brain's reading or her script threshold.
-   */
-  readonly availability?: { readonly record: FanAvailabilityRecord; readonly changed: boolean };
-  /** The gate before the first teaser at this message: open, or the conditions missing (ADR 0103 § 11). */
-  readonly scriptStart?: ScriptStart;
-  /** A sale gone wrong at this message: she answers it, or the same trouble again goes to a human (ADR 0156). */
-  readonly saleTrouble?: SaleTroubleOutcome;
-  /** She teased him about the run he left (Charles 20/11): one `script_abandon_teased`, counted against what is due. */
-  readonly abandonTeased?: AbandonTease;
-  /** What she answered to his asking to see her (Charles 21/11), when the voice wrote: to be journaled, never twice. */
-  readonly meetingAnswer?: MeetingAnswer;
-  /** What the voice was asked to write: kept for a comparison or a rating. */
-  readonly voiceBrief?: Brief;
-  readonly voiceInput?: VoiceInput;
-  readonly bubbles: readonly string[];
-  readonly voiceFailure?: LlmFailure;
-  readonly violations: readonly GuardViolation[];
-  /** The turn was sexual (her register or her script running): what a voice compared on it is guarded the same way. */
-  readonly sexualTurn?: boolean;
-  /**
-   * A first answer a blocking guard set aside, written again (IA-08): its blocking codes, kept for the human who reads
-   * the second one. Absent when the first answer went through.
-   */
-  readonly retried?: readonly GuardCode[];
-  readonly isBlocked: boolean;
-  readonly costUsd: number;
-  readonly latencyMs: number;
-  readonly model?: string;
-  readonly isFallback: boolean;
-  /** `skipVoice` stopped it: no voice call was made. */
-  readonly isSkipped?: boolean;
-  /** Written in the care mode (ADR 0088): a human validates it, whatever her mode. */
-  readonly care?: true;
-  /** A guard refused her first answer and the voice wrote it once more (M1): the copilot says why (ADR 0141 § 2). */
-  readonly rewritten?: true;
-  /** The language code decided for this turn (ADR 0168): absent only when a media handed him to a human first. */
-  readonly language?: LanguageDecision;
-  /**
-   * Her bubbles in French for the team, one per bubble that leaves, when she writes in another language (ADR 0168
-   * § 9): from the same voice call, never sent, never read by a guard. Absent when none fits.
-   */
-  readonly translation?: readonly string[];
-}
-
-/**
- * Her answer in French as the bubbles that leave are cut (ADR 0168 § 9): the voice's French, kept only one per bubble
- * it wrote, then fitted and joined like them. Absent when she writes in French or it does not fit.
- */
-function translationOfVoice(
-  voice: Awaited<ReturnType<LlmGateway['voice']>>,
-  reply: Language,
-  budget: BubbleBudget,
-  splitMessages: boolean | undefined,
-): { readonly translation?: readonly string[] } {
-  if (!voice.ok) return {};
-  const french = translationOf(reply, voice.value.output.bubbles, voice.value.output.translation);
-  return french === null ? {} : { translation: asSent(fitBubbles(french, budget), splitMessages) };
-}
-
-/** The languages her output guard lets through (ADR 0168 § 4): hers that the guards cover. */
-function guardLanguages(persona: ComposerPersona): readonly Language[] {
-  return persona.spokenLanguages.filter(isGuardedLanguage);
-}
-
-/** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
-export function withExamples(sheet: string, examples: readonly string[]): string {
-  if (examples.length === 0) return sheet;
-  return `${sheet}\n\nExemples de ses messages, corrigés par l'équipe :\n${examples.map((e) => `- ${e}`).join('\n')}`;
-}
-
-/**
- * What her guards read the draft against (P3-13): a draft carries a media only through the step of her script that
- * leaves with it (ADR 0098), and her last turns are in the history.
- */
-export function guardContextOf(
-  history: readonly ConversationTurn[],
-  hasMedia = false,
-  allowedPriceMinor?: number,
-  /**
-   * Whether they flirt now, his meeting tier when her settings let code compute it (Charles 26/11), and whether his
-   * desire map holds humiliation (Charles 27/11).
-   */
-  about: Pick<GuardContext, 'flirting' | 'fanTier' | 'humiliationWanted'> = {},
-): GuardContext {
-  const lastTurn = history.at(-1);
-  const hisSinceHer = history
-    .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
-    .filter((turn) => turn.from === 'fan');
-  return {
-    hasMedia,
-    ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
-    ...(about.flirting !== undefined && { flirting: about.flirting }),
-    ...(about.fanTier !== undefined && { fanTier: about.fanTier }),
-    previousTurns: previousTurnsOf(
-      history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
-    ),
-    sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
-    // The sums he wrote since her last answer: she may say one back without agreeing to it (Charles 27/11).
-    fanAmountsMinor: hisSinceHer.flatMap((turn) => sumsMinorOf(turn.text)),
-    // He just asked a price: a sum she writes now is a price of hers (Sécurité, #1043).
-    fanAskedPrice: hisSinceHer.some((turn) => asksPrice(turn.text)),
-    // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
-    ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
-    // His desire map holds humiliation: « petit garçon » said to him is his game (Charles 27/11).
-    ...(about.humiliationWanted === true && { humiliationWanted: true }),
-  };
-}
-
-const datedOf = (turn: ConversationTurn) => ({
-  fromFan: turn.from === 'fan',
-  ...(turn.at !== undefined && { at: turn.at }),
-});
-
-/** « Le moment », with what code reads of the last exchanges' times (audit du naturel, A2). */
-function describeMoment(situation: Situation, history: readonly ConversationTurn[]): string {
-  // Her messages an automation wrote (ADR 0110 § 3): said once here, never as a bracket in her own turn.
-  const automated = new Set(
-    history.flatMap((turn) =>
-      turn.from === 'creator' && turn.originNote !== undefined ? [turn.originNote] : [],
-    ),
-  );
-  return [
-    describeSituation(situation),
-    ...timingLines(history.map(datedOf), situation.now),
-    ...automated,
-  ].join('\n');
-}
-
-/** Each message of his after a silence carries the time that passed, written by code on her clock. */
-function withTimeNotes(history: readonly ConversationTurn[], timeZone: string): readonly ConversationTurn[] {
-  const notes = gapNotes(history.map(datedOf), timeZone);
-  return history.map((turn, index) => {
-    const timeNote = notes[index];
-    return timeNote === null || timeNote === undefined ? turn : { ...turn, timeNote };
-  });
-}
-
-/** His messages before the ones she is answering: the history without its last run of fan turns. */
-function earlierFanTexts(history: readonly ConversationTurn[]): string[] {
-  let end = history.length;
-  while (end > 0 && history[end - 1]?.from === 'fan') end -= 1;
-  return history
-    .slice(0, end)
-    .filter((turn) => turn.from === 'fan' && !isOpener(turn))
-    .map((turn) => turn.text);
-}
-
-const NEUTRAL_BRIEF: Brief = {
-  intent: 'other',
-  sentiment: 'neutral',
-  factsProposed: [],
-  kycMissing: [],
-  risks: [],
-  action: 'reply',
-  replyBrief: 'Lui répondre dans la continuité de la conversation.',
-  toneHints: [],
-};
-
-/**
- * A follow-up: the voice from the code's brief, then every guard, the explicit one whatever his age. No trap, cursor
- * or offer to decide: there is no new message of his.
- */
-async function writeFollowUp(
-  gateway: LlmGateway,
-  persona: ComposerPersona,
-  base: Omit<VoiceInput, 'brief'>,
-  brief: Brief,
-  droppedNotes: readonly string[],
-  exampleIds: readonly string[],
-  fanTier: number | undefined,
-  languages: readonly Language[],
-  sexual = false,
-): Promise<ComposedTurn> {
-  // A follow-up: nothing of his awaits, one bubble.
-  const voiceInput: VoiceInput = voiceTraced(
-    { ...base, brief: withoutEmojiIfDue(brief, base.history, persona.guardSettings), maxBubbles: 1 },
-    exampleIds,
-  );
-  const voice = await gateway.voice(voiceInput);
-  const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
-  const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, {
-      ...guardContextOf(base.history, false, undefined, fanTier === undefined ? {} : { fanTier }),
-      languages,
-    }),
-    ...checkExplicit(written),
-    // Model text only: the help number is the code's (ADR 0088 § 4).
-    ...checkHelpNumber(written),
-    // As the main answer (Sécurité, #1043): her aftercare follows a sexual exchange.
-    ...checkYouthWords(written, sexual),
-  ];
-  return {
-    ...(droppedNotes.length > 0 && { droppedNotes }),
-    brief,
-    voiceBrief: brief,
-    voiceInput,
-    bubbles: asSent(written, persona.splitMessages, persona.guardSettings.form),
-    ...translationOfVoice(voice, base.language?.reply ?? 'french', 1, persona.splitMessages),
-    ...(!voice.ok && { voiceFailure: voice.error }),
-    violations,
-    isBlocked: isBlocked(violations) || !voice.ok || written.length === 0,
-    costUsd: voice.ok ? (voice.value.meta.costUsd ?? 0) : 0,
-    latencyMs: voice.ok ? voice.value.meta.latencyMs : 0,
-    ...(voice.ok && { model: voice.value.meta.model }),
-    isFallback: voice.ok && voice.value.meta.isFallback,
-  };
-}
-
-/** His score after this message, or undefined when it was already counted. */
-function desireOf(brief: Brief, input: ComposeTurnInput): DesireReading | undefined {
-  const desire = input.desire;
-  if (desire?.counted === true) return undefined;
-  return desireScore({
-    previous: desire?.previous,
-    signals: brief.desireSignals ?? [],
-    intent: brief.intent,
-    sentiment: brief.sentiment,
-    measured: desire?.measured ?? NO_MEASURE,
-    risks: brief.risks,
-    ageDisputed: desire?.ageDisputed === true,
-    now: input.situation.now,
-    hasBought: input.situation.spentCents > 0,
-  });
-}
+import type { FanAvailabilityRecord } from '@impera/contracts';
+import type { LlmGateway, VoiceInput } from '@impera/llm';
+
+import { availabilityChanged } from '../domain/availability';
+import { bubbleBudget, type BubbleBudget } from '../domain/bubbles';
+import { desireMoved } from '../domain/desire';
+import { wantsHumiliation } from '../domain/fantasy-match';
+import { isBlocked } from '../domain/guards';
+import type { LanguageDecision } from '../domain/language';
+import { screenMedia } from '../domain/traps';
+import { quietBriefOf } from '../domain/turn-briefs';
+import { guardContextOf } from '../domain/turn-history';
+import { stepSendsMedia } from '../domain/turn-scripts';
+
+import { askBrain, type BrainTurn } from './compose-brain';
+import { decideTurn, type DecidedTurn } from './compose-decision';
+import { guardLanguages, prepareTurn, type PreparedTurn } from './compose-inputs';
+import type { ComposedTurn, ComposerPersona, ComposeTurnInput } from './compose-types';
+import { asSent, translationOfVoice, voiceTraced, writeAnswer, writeFollowUp } from './compose-voice';
+
+export { NO_EMOJI_HINT } from '../domain/turn-texts';
+export { guardContextOf } from '../domain/turn-history';
+export type { OfferInput, ScriptsInput } from '../domain/turn-scripts';
+export { withExamples } from './compose-inputs';
+export { FRENCH_ONLY, type ComposedTurn, type ComposerPersona, type ComposeTurnInput } from './compose-types';
+export { asSent } from './compose-voice';
 
 /** Brain, then voice, then guards. Writes nothing and sends nothing: the caller decides what the answer becomes. */
-/**
- * The custom-orders turn as the rest of the turn reads it: a chatter takes it, or she answers from its brief and her
- * card going out opens the order in « À traiter » (`custom_order_opened`, until its own line comes).
- */
-function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
-  if (turn === undefined || turn.kind === 'none') return { kind: 'none' };
-  if (turn.kind === 'handoff') return { kind: 'handoff' };
-  return { kind: 'reply', brief: turn.brief, opens: turn.event?.type === 'custom_order_card_ready' };
-}
-
-/** Where they are, as the meeting tiers read it: how long they have talked, and whether he paid her. */
-function relationshipOf(input: ComposeTurnInput): Relationship {
-  return {
-    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-    hasBought: input.situation.spentCents > 0,
-  };
-}
-
 export async function composeTurn(
   gateway: LlmGateway,
   persona: ComposerPersona,
@@ -1336,904 +36,120 @@ export async function composeTurn(
     given.offer === undefined
       ? given
       : { ...given, offer: { ...given.offer, timeZone: given.offer.timeZone ?? given.situation.timeZone } };
+  // Safety flags on his media: a human takes over, nothing is written.
   const screening = screenMedia(input.media);
-  if (screening.mustHandoff) {
-    return {
-      handoff: screening.flags,
-      bubbles: [],
-      violations: [],
-      isBlocked: true,
-      costUsd: 0,
-      latencyMs: 0,
-      isFallback: false,
-    };
-  }
-  const notes = screenNotes(input.fanNotes);
-  // Her bio is the platform's text: a line of it shaped like an order never reaches a prompt (ADR 0154 § 3).
-  const bio = screenNotes(persona.profileBio ?? '');
-  // Her examples for this fan, as his age allows (ADR 0102): a follow-up carries no age, so nothing explicit.
-  const examples = examplesForTurn(
-    persona.voiceExamples ?? [],
-    input.sexualization?.ageConfirmed === true && !input.sexualization.noExplicit,
-  );
-  const exampleIds = examples.map((e) => e.id);
-  const language = languageOfTurn(persona, input);
-  const voiceLanguage = voiceLanguageOf(persona, language);
-  // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
-  const base = {
-    creatorName: persona.creatorName,
-    personaSheet: withExamples(
-      persona.personaSheet,
-      examples.map((e) => e.text),
-    ),
-    ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
-    ...(persona.agencyStyle !== undefined && { agencyStyle: persona.agencyStyle }),
-    fanNotes: notes.kept,
-    situation: describeMoment(input.situation, input.history),
-    history: withTimeNotes(input.history, input.situation.timeZone),
-    ...(input.trace !== undefined && { trace: input.trace }),
-  };
-  // His meeting tier, only when her settings let code compute it: otherwise none, and her close-only words stay closed.
-  const fanTier =
-    input.meetingTiers === undefined
-      ? undefined
-      : relationshipTier(relationshipOf(input), input.meetingTiers);
+  if (screening.mustHandoff) return mediaHandoff(screening.flags);
+  const prepared = prepareTurn(persona, input);
+  // A follow-up or her word after a sale: nothing of his to read, so no brain call.
   if (input.followUp !== undefined || input.aftercare !== undefined) {
-    const brief =
-      input.followUp !== undefined
-        ? followUpBrief(input.followUp)
-        : input.aftercare !== undefined
-          ? aftercareBrief(input.aftercare)
-          : NEUTRAL_BRIEF;
     const written = await writeFollowUp(
       gateway,
       persona,
-      { ...base, language: voiceLanguage },
-      brief,
-      notes.dropped,
-      exampleIds,
-      fanTier,
+      { ...prepared.base, language: prepared.voiceLanguage },
+      quietBriefOf(input.followUp, input.aftercare),
+      prepared.notes.dropped,
+      prepared.exampleIds,
+      prepared.meetingTier,
       guardLanguages(persona),
       // Her aftercare follows a sexual exchange (Sécurité, #1043); a follow-up does not.
       input.followUp === undefined && input.aftercare !== undefined,
     );
-    return { ...written, language };
+    return { ...written, language: prepared.language };
   }
-  const brainOnly = screenNotes(input.brainNotes ?? '');
-  const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
-  // His desire map, from the notes kept (Charles 26/11): the scripts closest to his fantasy come first.
-  // Youth, no consent, the family, an animal: never played, whatever her persona (Sécurité, #1043). Then what her
-  // persona refuses (disgusts, never said, never done) wins over his fantasy: never played nor targeted.
-  const herRefusals = [...persona.guardSettings.forbiddenTerms, ...(persona.guardSettings.neverDo ?? [])];
-  const desireMap = withoutHerLimits(withoutForbiddenThemes(desireMapOf(notes.kept)), (item) =>
-    herRefusals.some((term) => touchesTerm(item, term)),
-  );
-  // One script an evening (Charles 21/11 and 27/11 at 0:28): the same evening as her last one, none is listed to the
-  // brain, whatever he asks; asking for more leads to the custom path (`asksMoreSameEvening`).
-  const evening =
-    input.offer?.lastOfferAt !== undefined &&
-    input.offer.lastOfferAt !== null &&
-    sameEvening(
-      input.situation.now,
-      input.offer.lastOfferAt,
-      input.offer.limits.cooldownHours,
-      input.offer.timeZone ?? input.situation.timeZone,
-    );
-  const scriptLanguage = scriptLanguageOf(language, input);
-  // The care mode may depend on what the brain reads: only a care already open is known before it.
-  const ranked = scriptChoices(
-    input.scripts,
-    input.situation,
-    desireMap,
-    input.offer,
-    input.care === true,
-    scriptLanguage,
-  );
-  const choices = evening ? [] : ranked.choices;
-  const { uncovered } = ranked;
-  const brainScripts: BrainScript[] = choices.map(({ id, script, matches }) => ({
-    id,
-    description: script.description,
-    ...(matches.length > 0 && { matches }),
-  }));
-  const latestRun = input.scripts?.latest ?? null;
-  const stepWaiting = latestRun?.status === 'open' && paidWaiting(latestRun) !== undefined;
-  // His order kept by the custom-orders module (ADR 0159): the brain reads his request into its boxes.
-  const kept =
-    input.customOrder?.order === undefined
-      ? undefined
-      : { order: input.customOrder.order, grid: input.customOrder.grid ?? null };
-  const brain = await gateway.brain({
-    ...base,
-    fanNotes: [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
-    ...(input.alerts !== undefined && input.alerts.length > 0 && { alerts: input.alerts }),
-    ...(brainScripts.length > 0 && { scripts: brainScripts }),
-    ...(stepWaiting && { scriptStepWaiting: true }),
-    ...(kept !== undefined && {
-      customOrder: {
-        open: kept.order !== null,
-        supplements: (kept.grid?.supplements ?? []).map((line) => ({ id: line.id, name: line.label })),
-      },
-    }),
-  });
-  // She asks only what the card lets her ask (ADR 0085 § 2): whatever the brain names, `desires` is never asked.
-  const asked = brain.ok ? askableOnly(brain.value.output) : undefined;
-  // « Fais-moi un prix »: a price objection, whatever else the brain read (passe 2 du 26/11, conversation 23).
-  const brief: Brief | undefined =
-    asked !== undefined && discountAsked(asked.intent, input.fanText)
-      ? { ...asked, intent: 'price_objection', objection: 'asks_discount' }
-      : asked;
-  // A trap overrides whatever the brain suggested: she does not play along (agent/domain/traps.ts).
-  const trap = assessTrap({
-    fanText: input.fanText,
-    earlierFanTexts: earlierFanTexts(input.history),
-    media: input.media,
-    ...(brief && { brain: brief }),
-  });
-  const read: Brief =
-    trap.replyBrief === undefined
-      ? (brief ?? NEUTRAL_BRIEF)
-      : {
-          ...(brief ?? NEUTRAL_BRIEF),
-          action: 'reply',
-          replyBrief: trap.replyBrief,
-          toneHints: [...(trap.toneHints ?? [])],
-        };
-  // His age: one he states now confirms it at once (Charles, 16/11), no doubt by default and no question again. The
-  // cursor decides from it, a trap's answer first.
-  const ageDeclared = brief === undefined ? null : declaredAdultAge(brief.factsProposed, input.fanText);
-  // His heat, counted by code from the brain's signals and what it measured (P3-12); read as stored once counted.
-  const counted = brief === undefined ? undefined : desireOf(brief, input);
-  const heat = counted?.score ?? desireNow(input.desire?.previous, input.situation.now);
-  const ageConfirmed = input.sexualization?.ageConfirmed === true || ageDeclared !== null;
-  const noExplicit = input.sexualization?.noExplicit === true;
-  const sexualization =
-    brief === undefined
-      ? undefined
-      : sexualizationDecision({
-          relationshipHours:
-            (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-          ageConfirmed,
-          noExplicit,
-          fanSexualizes: offerSignals(brief, input.fanText).fanSexualizes,
-          desire: heat,
-          limits: input.sexualization?.limits ?? NO_LIMITS,
-          afterPurchase: input.offer !== undefined && inPauseAfterPurchase(input.offer),
-        });
-  const within =
-    sexualization === undefined || trap.replyBrief !== undefined
-      ? read
-      : withinCursor(read, sexualization, ageDeclared !== null || askedHisAge(input.history));
-  // She waited once already: no second wait, a light « tu es revenu ? » (P3-11).
-  const cursored: Brief =
-    input.waited === true && within.action === 'wait'
-      ? {
-          ...within,
-          action: 'reply',
-          replyBrief: CAME_BACK_BRIEF,
-          toneHints: [...within.toneHints, NO_OPENING_HINT],
-        }
-      : within;
-  // Where he stands, by code (ADR 0135, guide 26/11): a known payer is one who paid recently enough.
-  const standingFacts: StandingFacts = {
-    now: input.situation.now,
-    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-    spentCents: input.situation.spentCents,
-    ...(input.situation.lastSpentAt !== undefined && { lastSpentAt: input.situation.lastSpentAt }),
-    unenteredScripts:
-      input.scripts?.history?.scripts.filter(
-        (sent) => sent.sentStepIndexes.length > 0 && sent.boughtStepIndexes.length === 0,
-      ).length ?? 0,
-  };
-  const standing = fanStanding(standingFacts, input.standingLimits);
-  // A proof he asks of her (« un selfie avec deux doigts sur la joue »), relayed by where he stands: made for him, so a
-  // custom order the team takes; she never promises it herself (passe 2 du 26/11, conversation 31).
-  const proofRelayed = brief?.occasion === 'asks_proof' && proofAnswer(standing) === 'relay';
-  // The care mode (ADR 0088) comes before any sale: no custom order, no objection reply, no script step.
-  const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
-  // A custom order is never sold by her (ADR 0090 § A): a chatter takes it, or she commits to nothing. A trap's
-  // answer comes first, and in the care mode nothing is sold at all (ADR 0088 § 2).
-  const orderContext =
-    brief === undefined
-      ? undefined
-      : {
-          risks: brief.risks,
-          flags: input.customOrder?.flags,
-          ageConfirmed: ageConfirmed || input.customOrder?.flags?.ageConfirmedAt !== undefined,
-          neverDoes: (persona.guardSettings.neverDo ?? []).some((term) => touchesTerm(input.fanText, term)),
-        };
-  const held = brief === undefined || orderContext === undefined || trap.replyBrief !== undefined || care;
-  // Kept, his order goes box by box until her card (ADR 0159 § A.2); otherwise she commits to nothing (ADR 0090 § A).
-  const turn =
-    held || kept === undefined
-      ? undefined
-      : customOrderTurn({
-          asksForService: brief.intent === 'asks_for_service' || proofRelayed,
-          reading:
-            brief.customOrder === undefined
-              ? null
-              : supplementsIn(
-                  brief.customOrder,
-                  (kept.grid?.supplements ?? []).map((line) => line.id),
-                ),
-          order: kept.order,
-          stop: customOrderStop(orderContext),
-          chatterOnShift: input.customOrder?.chatterOnShift === true,
-          grid: kept.grid,
-        });
-  const order: CustomOrderDecision | undefined = held
-    ? undefined
-    : kept !== undefined
-      ? decisionOf(turn)
-      : customOrderDecision({
-          ...orderContext,
-          asksForService: brief.intent === 'asks_for_service' || proofRelayed,
-          chatterOnShift: input.customOrder?.chatterOnShift === true,
-          orderOpen: input.customOrder?.orderOpen === true,
-        });
-  const customOrder = order?.kind === 'none' ? undefined : order;
-  const customOrderKept = turn === undefined || turn.kind === 'none' ? undefined : turn;
-  // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
-  const objectionReply =
-    !care &&
-    brief?.intent === 'price_objection' &&
-    trap.replyBrief === undefined &&
-    input.objections !== undefined
-      ? pickObjectionReply(input.objections.bank, brief.objection, input.objections.usedReplyIds)
-      : undefined;
-  // His availability and the gate before the first teaser (ADR 0103 § 9-13): code holds both, the brain only reports.
-  const threshold = input.offer?.limits.minDesire;
-  const availability =
-    brief === undefined || threshold === undefined
-      ? undefined
-      : readAvailability({
-          previous: input.availability ?? null,
-          signals: brief.desireSignals ?? [],
-          sexualizes: sexualizes(brief, input.fanText),
-          desire: heat,
-          threshold,
-          now: input.situation.now,
-        });
-  // His scripts with a paid step bought: what makes him faithful for the exceptions below (Charles 26/11).
-  const scriptsBought =
-    input.scripts?.history?.scripts.filter((sent) => sent.boughtStepIndexes.length > 0).length ?? 0;
-  // Anything sexual may be offered him: his adult age confirmed, nothing explicit not asked, no care, no trap, no risk.
-  const sexAllowed =
-    brief !== undefined &&
-    ageConfirmed &&
-    !noExplicit &&
-    !care &&
-    trap.replyBrief === undefined &&
-    !brief.risks.some((risk) => NO_SALE_RISKS.includes(risk));
-  // The exception « au travail » (Charles 26/11): a faithful fan who writes by himself from his work, once per span.
-  const work =
-    availability === undefined || brief === undefined
-      ? undefined
-      : workTeaseTurn({
-          previous: input.availability?.workTease ?? null,
-          now: input.situation.now,
-          signals: brief.desireSignals ?? [],
-          scriptsBought,
-          heWroteFirst: heWroteFirst(input.history.map(datedOf), input.situation.now),
-          bites: sexualizes(brief, input.fanText),
-          allowed: sexAllowed,
-        });
-  // The sexting without a sale (Charles 26/11): drawn once per hot session, for a fan who pays well.
-  const free =
-    availability === undefined || brief === undefined
-      ? undefined
-      : freeSextingTurn({
-          record: input.availability?.freeSexting ?? null,
-          sessionAt: availability.hotAt,
-          scriptsBought,
-          ...(input.fanTier !== undefined && { fanTier: input.fanTier }),
-          lastSpentAt: input.situation.lastSpentAt,
-          now: input.situation.now,
-          asksForMedia: brief.intent === 'asks_for_media' || offerSignals(brief).fanAsksForPaid,
-          allowed: sexAllowed,
-          random: input.random ?? Math.random,
-        });
-  const noSale = free?.noSale === true;
-  // Once he bit at his work, his being busy no longer closes the gate: his heat and his sexualizing still do.
-  const atWorkMayStart = work?.phase === 'may_start';
-  const gateRecord: FanAvailabilityRecord | undefined =
-    availability === undefined
-      ? undefined
-      : atWorkMayStart
-        ? { ...availability, state: 'confirmed' }
-        : availability;
-  // What the conversation keeps: his availability, the work tease and the draw of the session, each when known.
-  const workRecord = work?.record ?? input.availability?.workTease ?? null;
-  const freeRecord = free?.record ?? input.availability?.freeSexting ?? null;
-  const availabilityKept: FanAvailabilityRecord | undefined =
-    availability === undefined
-      ? undefined
-      : {
-          ...availability,
-          ...(workRecord !== null && { workTease: workRecord }),
-          ...(freeRecord !== null && { freeSexting: freeRecord }),
-        };
-  const scriptStart =
-    gateRecord === undefined || threshold === undefined
-      ? undefined
-      : scriptStartGate(gateRecord, heat, threshold);
-  // She holds him back when he is about to come, until he has seen the frankest step of her script (Charles 26/11).
-  const storedRun = input.scripts?.latest ?? null;
-  const storedPeakSeen =
-    storedRun?.status === 'open' &&
-    peakSeen(
-      storedRun,
-      input.scripts?.catalogue.find((one) => one.scriptRef === storedRun.scriptRef),
-    );
-  const heCame = brief?.desireSignals?.includes('just_came') === true;
-  // He left in the middle of a script and comes back hot: she teases him first, and no step goes on this message.
-  const tease =
-    input.scripts === undefined || input.offer === undefined || brief === undefined || heCame
-      ? null
-      : abandonTease({
-          now: input.situation.now,
-          latest: input.scripts.latest,
-          earlier: input.scripts.earlier ?? [],
-          teased: input.scripts.teased ?? 0,
-          hot: heat >= input.offer.limits.minDesire,
-          held: scriptStepsHeld(input.offer.flags, care) || input.offer.flags.ageDisputed !== undefined,
-        });
-  // Broke until his pay, a fan who already paid: kept warm with words, no step and no media this time (passe 11a).
-  const warm =
-    brief !== undefined &&
-    keepsWarm({ risks: brief.risks, hasBought: paysNow(standingFacts, input.standingLimits) });
-  // When he wrote: his messages since he bought the last paid step, the next one waits in the tension (passe 04,
-  // guide 26/11), counted by the script turn on the run Reveal's history leaves (passe 2 du 26/11).
-  const hisMessagesAt = input.history.flatMap((turn) =>
-    turn.from === 'fan' && turn.at !== undefined ? [turn.at] : [],
-  );
-  // His messages since he bought the last paid step of his stored run: the first one after a purchase, she asks
-  // whether he liked it (`justBought`).
-  const boughtAt = input.scripts?.latest?.steps.findLast((step) => step.outcome === 'bought')?.at;
-  const hisMessagesSinceBought =
-    boughtAt === undefined ? undefined : hisMessagesAt.filter((sent) => sent >= boughtAt).length;
-  // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
-  const scripts =
-    input.scripts === undefined || input.offer === undefined
-      ? undefined
-      : scriptTurn({
-          now: input.situation.now,
-          conversationRef: input.scripts.conversationRef,
-          latest: input.scripts.latest,
-          catalogue: input.scripts.catalogue,
-          history: input.scripts.history,
-          language: scriptLanguage,
-          moment: isNight(input.situation) ? 'night' : 'day',
-          hotSession: heat >= input.offer.limits.minDesire,
-          // Only an id it was given: anything else picks nothing.
-          brainPick: choices.find(({ id }) => id === brief?.scriptPick)?.script.scriptRef ?? null,
-          offer: {
-            ...input.offer,
-            desire: heat,
-            fanAsksForPaid: brief !== undefined && offerSignals(brief).fanAsksForPaid,
-            fanSexualizes: brief !== undefined && offerSignals(brief, input.fanText).fanSexualizes,
-            risks: brief?.risks ?? [],
-          },
-          // In care, the run still follows his message and Reveal, and no step goes (ADR 0088 § 2).
-          careMode: care,
-          ...(scriptStart !== undefined && { startGate: scriptStart }),
-          ...(gateRecord !== undefined && { availability: gateRecord.state }),
-          reply: brief?.scriptReply ?? null,
-          countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
-          heCame,
-          hisMessagesAt,
-          mayAct:
-            !care &&
-            !heCame &&
-            !warm &&
-            tease === null &&
-            // Her hours close in a few minutes: a step now would be cut off (ADR 0158 § A 7).
-            input.herDayEnds !== true &&
-            brief !== undefined &&
-            trap.replyBrief === undefined &&
-            customOrder === undefined &&
-            objectionReply === undefined &&
-            // About to come: she asks him to hold back, the next step waits until he held (Charles 26/11).
-            !holdsBackNow(brief.desireSignals, storedPeakSeen) &&
-            // At his work, she teases first and stops dead when he cannot; a session without a sale sells nothing.
-            work?.phase !== 'tease' &&
-            work?.phase !== 'stopped' &&
-            !noSale &&
-            sexualization?.kind !== 'steer_back',
-        });
-  const scriptStep = voiceStepOf(scripts);
-  // He just bought the last step of a script: whether he says so or not, he came, and his score comes back to his rest
-  // level (ADR 0156 § 6, Charles 20/11).
-  const boughtOut = [scripts?.moved, scripts?.followed].some(
-    (change) =>
-      change?.run.status === 'bought_out' && change.events.some((event) => event.type === 'script_ended'),
-  );
-  const desire = counted !== undefined && boughtOut ? restedDesire(counted, desireRestOf(true)) : counted;
-  // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers. With her
-  // scripts read, she offers only the step code decided.
-  const offerRefused =
-    cursored.action !== 'offer' || scriptStep !== undefined
-      ? undefined
-      : heCame
-        ? 'he_came'
-        : tease !== null
-          ? 'abandon_tease'
-          : input.scripts !== undefined && input.offer !== undefined
-            ? 'no_script_step'
-            : scriptStart !== undefined && !scriptStart.open
-              ? (scriptStart.missing[0] ?? 'availability_unconfirmed')
-              : offerRefusal(cursored, input.offer, heat);
-  const decidedBrief: Brief =
-    scriptStep === undefined
-      ? cursored
-      : { ...cursored, action: scriptStep.kind === 'paid' ? 'offer' : 'reply' };
-  const offered: Brief =
-    offerRefused === undefined
-      ? decidedBrief
-      : { ...cursored, action: 'reply', replyBrief: refusedOfferBrief(cursored) };
-  // He asks to see her, or about her next party: code picks the reason, from where they are (Charles 21/11).
-  const meeting: MeetingAnswer | undefined =
-    brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
-      ? meetingAnswer({
-          tier: relationshipTier(relationshipOf(input), input.meetingTiers),
-          given: input.meeting?.given ?? [],
-          teased: input.meeting?.teased ?? false,
-          herNextParty: brief.asksHerNextParty === true,
-        })
-      : undefined;
-  const answered: Brief = care
-    ? careBrief(read)
-    : customOrder?.kind === 'reply'
-      ? {
-          ...offered,
-          action: 'reply',
-          replyBrief: customOrder.brief,
-          toneHints: [...offered.toneHints, NO_OPENING_HINT],
-        }
-      : offered;
-  const asking =
-    !care &&
-    availability !== undefined &&
-    scriptStart !== undefined &&
-    asksAvailability(availability, scriptStart) &&
-    scriptStep === undefined &&
-    customOrder === undefined &&
-    objectionReply === undefined &&
-    trap.replyBrief === undefined &&
-    sexualization?.kind !== 'steer_back';
-  // Getting to know him at his pace, never a questionnaire (Playground, Charles 16/11): on an ordinary answer only.
-  const paced =
-    !care &&
-    !asking &&
-    answered.action === 'reply' &&
-    scriptStep === undefined &&
-    customOrder === undefined &&
-    objectionReply === undefined &&
-    trap.replyBrief === undefined &&
-    sexualization?.kind !== 'steer_back'
-      ? paceHints(
-          input.fanText,
-          previousTurnsOf(
-            input.history
-              .filter((turn) => !isOpener(turn))
-              .map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
-          ),
-        )
-      : [];
-  // He just said no to her paid step: she asks why, insists once, sulks once at most, then lets go (ADR 0156 § 3).
-  const refusal =
-    care ||
-    scripts === undefined ||
-    input.offer === undefined ||
-    scriptStep !== undefined ||
-    customOrder !== undefined ||
-    objectionReply !== undefined ||
-    trap.replyBrief !== undefined ||
-    sexualization?.kind === 'steer_back'
-      ? null
-      : scripts.decision.kind === 'after_refusal'
-        ? 'ask_why'
-        : refusalMove({
-            now: input.situation.now,
-            run: input.scripts?.latest ?? null,
-            herAnswersSince: herAnswersSince(input.history, input.scripts?.latest?.endedAt ?? null),
-            flags: input.offer.flags,
-            care,
-          });
-  // He comes back after the session cooled, her paid step unopened: one light reminder, never a sale (ADR 0156 § 1).
-  const reminds =
-    !care &&
-    scripts?.decision.kind === 'end' &&
-    scripts.decision.unopened !== undefined &&
-    customOrder === undefined &&
-    objectionReply === undefined &&
-    trap.replyBrief === undefined &&
-    sexualization?.kind !== 'steer_back';
-  // He asks how to pay for her step waiting: the voice sees its exact price and what it holds (ADR 0156 § 4). Every
-  // stop of a sale holds: no help to buy for a fan nobody may sell to.
-  const waitingStepFound =
-    brief?.intent !== 'payment_help' ||
-    care ||
-    scripts === undefined ||
-    input.scripts === undefined ||
-    input.offer === undefined ||
-    scriptStepsHeld(input.offer.flags, care) ||
-    // The step waits in the run he is in: « never two scripts the same evening » is not about it (ADR 0158 § 42).
-    !offerDecision({
-      ...input.offer,
-      lastOfferAt: null,
-      desire: heat,
-      fanAsksForPaid: true,
-      risks: brief.risks,
-    }).allowed ||
-    customOrder !== undefined ||
-    trap.replyBrief !== undefined
-      ? undefined
-      : waitingStepOf(scripts, input.scripts.catalogue, input.scripts.latest?.scriptRef ?? null);
-  // A sale gone wrong (ADR 0156 § 4 and § 7): she answers it once; the same trouble again soon after goes to a human.
-  const troubleSeen = input.saleTrouble?.seen ?? NO_SALE_TROUBLE;
-  const saleTrouble: SaleTroubleOutcome | undefined =
-    waitingStepFound !== undefined
-      ? saleTroubleOutcome('payment_help', troubleSeen, input.situation.now)
-      : brief !== undefined &&
-          !care &&
-          complainsOfPurchase({
-            intent: brief.intent,
-            risks: brief.risks,
-            hasBought: input.saleTrouble?.hasBought === true,
-          })
-        ? saleTroubleOutcome('purchase_complaint', troubleSeen, input.situation.now)
-        : undefined;
-  // Still stuck after her help: a human answers, she does not explain the same thing twice.
-  const waitingStep = saleTrouble?.kind === 'handoff' ? undefined : waitingStepFound;
-  const complaint = saleTrouble?.kind === 'answer' && saleTrouble.trouble === 'purchase_complaint';
-  // He leaves: a goodbye, unless she brings or helps him open a step (his own words then lead).
-  const farewell =
-    scriptStep === undefined && waitingStep === undefined
-      ? (farewellOf(brief?.desireSignals) ?? (input.herDayEnds === true ? 'her_day_ends' : null))
-      : null;
-  // Her tease is said only where nothing else leads her answer (a goodbye, her question, his trouble with a sale).
-  const teases =
-    tease !== null && farewell === null && !asking && waitingStep === undefined && !complaint ? tease : null;
-  // He insults or belittles her, or comes back after: her stance, whatever else she answers (Charles 21/11).
-  const insulted = brief?.risks.includes('insult') === true;
-  const afterInsult = !insulted && brief?.returnsAfterInsult === true;
-  // He asks for more the evening he had his script: nothing more tonight, a custom request instead (passe 18).
-  const moreTonight =
-    brief !== undefined &&
-    input.offer !== undefined &&
-    scriptStep === undefined &&
-    asksMoreSameEvening({ ...input.offer, fanAsksForPaid: offerSignals(brief).fanAsksForPaid });
-  // The moments code answers by rule, by where he stands (Charles 21/11).
-  const occasionHints: string[] =
-    brief === undefined || care
-      ? []
-      : [
-          ...(brief.intent === 'asks_if_bot' ? [ASKS_IF_BOT_HINT] : []),
-          ...(brief.occasion === 'says_love' ? [SAYS_LOVE_HINT] : []),
-          ...(brief.occasion === 'partner_returns' ? [PARTNER_RETURNS_HINT] : []),
-          // Relayed, her answer is the custom order's: no hint of her own beside it.
-          ...(brief.occasion === 'asks_proof' && customOrder === undefined
-            ? [PROOF_HINTS[proofAnswer(standing)]]
-            : []),
-          ...(brief.occasion === 'unsolicited_explicit'
-            ? [EXPLICIT_PHOTO_HINTS[explicitPhotoAnswer(standing, ageConfirmed && !noExplicit)]]
-            : []),
-        ];
-  // How frank her words may be: suggestive until the action is engaged, then her own crude words (Charles 21/11).
-  // He came and bought nothing of the evening's run: no step, a little vexed (ADR 0156 § 6, guide 26/11).
-  const eveningRun =
-    (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null;
-  const heCameUnpaid =
-    heCame &&
-    eveningRun !== null &&
-    !eveningRun.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought');
-  const inTension = scripts?.decision.kind === 'none' && scripts.decision.reason === 'in_tension';
-  const opensItHerself =
-    brief !== undefined &&
-    sexualization?.kind === 'free' &&
-    !offerSignals(brief, input.fanText).fanSexualizes;
-  const seenOfEvening = seenRun(eveningRun, input.situation.now);
-  const register: Register | null =
-    brief === undefined || care || !HEATED_INTENTS.includes(brief.intent)
-      ? null
-      : warm && ageConfirmed && !noExplicit
-        ? 'explicit'
-        : registerOf({
-            // What he has seen: a step going with this very answer is not seen yet.
-            run: seenOfEvening,
-            seenIntensities: intensitiesSeen(seenOfEvening, input.scripts?.catalogue ?? []),
-            hot: desireBandOf(heat) === 'hot',
-            afterFinale: boughtOut || (heCame && eveningRun?.status === 'bought_out'),
-            heIsCrude: brief.desireSignals?.includes('explicit_language') === true,
-            ageConfirmed,
-            noExplicit,
-            boughtBefore: input.situation.spentCents > 0,
-          });
-  // His fantasy (Charles 26/11), only once his adult age is confirmed and unless he asked for nothing explicit, never in
-  // care: the one the script running with him meets, to play on; on a heated turn, those no script meets, never promised.
-  const fantasyAllowed = ageConfirmed && !noExplicit && !care && trap.replyBrief === undefined;
-  const running = eveningRun?.status === 'open' ? eveningRun : null;
-  const runningScript =
-    running === null
-      ? undefined
-      : input.scripts?.catalogue.find((one) => one.scriptRef === running.scriptRef);
-  const playOn =
-    !fantasyAllowed || heCame || runningScript === undefined
-      ? []
-      : (fantasyMatchOf(runningScript, desireMap)?.matches ?? []);
-  const noScript = fantasyAllowed && register !== null ? uncovered : [];
-  // He is about to come while her script runs: she asks him to hold back, and the run goes on (Charles 26/11).
-  const holdsBack =
-    !care &&
-    !heCame &&
-    running !== null &&
-    holdsBackNow(brief?.desireSignals, peakSeen(running, runningScript));
-  // Every few of her messages while her script runs, she checks where he is (Charles 26/11); not when she brings a step
-  // or holds him back.
-  const herMessagesInRun =
-    running === null
-      ? 0
-      : input.history.filter(
-          (turn) => turn.from === 'creator' && turn.at !== undefined && turn.at >= running.startedAt,
-        ).length;
-  const gauge =
-    fantasyAllowed &&
-    running !== null &&
-    !holdsBack &&
-    !heCame &&
-    scriptStep === undefined &&
-    gaugeDue(herMessagesInRun);
-  // Between two steps, the sexting feeds on what he has in front of him (Charles 26/11 at 22:47): the last step he can
-  // see, offered or bought, never a paid step still locked.
-  const currentStepSheet =
-    running === null || scriptStep !== undefined || !fantasyAllowed
-      ? undefined
-      : visibleStepSheet(running, runningScript);
-  const sexualTurn = register !== null || running !== null;
-  // On a step he sees, every few of her messages: back to the media in front of him, and he projects himself (0:03).
-  const projection =
-    currentStepSheet !== undefined && !holdsBack && !heCame && projectionDue(herMessagesInRun);
-  // In the middle of the action: her script runs and her words are frank; longer bubbles pass (Charles 23:09).
-  const inAction = running !== null && (register === 'explicit' || register === 'very_explicit');
-  // The first message of his after he bought her step: she asks whether he liked it, unless the tension already does.
-  const justBought = running !== null && !inTension && hisMessagesSinceBought === 1 && !holdsBack;
-  // A compliment is no advance (Charles 23:09): she draws him out without opening the sexting for him.
-  const compliment =
-    brief !== undefined &&
-    brief.desireSignals?.includes('body_compliment') === true &&
-    !offerSignals(brief, input.fanText).fanSexualizes &&
-    running === null &&
-    !care;
-  // He asks himself for a media of a fantasy no script serves: the custom path, where no step and no custom answer lead.
-  const suggestsCustom =
-    fantasyAllowed &&
-    brief?.intent === 'asks_for_media' &&
-    uncovered.some((item) => mentions(item, input.fanText)) &&
-    scriptStep === undefined &&
-    customOrder === undefined;
-  const fantasy: VoiceFantasy | undefined =
-    playOn.length === 0 && noScript.length === 0 ? undefined : { playOn, noScript };
-  // The creator's calibration of the sexting (Charles 26/11), each an intention for the voice.
-  const cameEarly = heCame && cameBeforeFinale(storedRun);
-  const inPlay = running !== null && !care;
-  const haggling = inPlay && brief !== undefined && haggles(brief.intent, input.fanText);
-  const murmur = inPlay && isBareMurmur(input.fanText);
-  const otherManWanted = wantsOtherMan(desireMap);
-  const degradedByHim =
-    brief !== undefined &&
-    !care &&
-    (persona.guardSettings.degradingWords ?? []).some((term) => touchesTerm(input.fanText, term));
-  const workHint = work === undefined || work.phase === 'none' || care ? null : WORK_TEASE_HINTS[work.phase];
-  // His disappointment with what he bought: the media's description beside it, and his insisting for more.
-  const boughtStep = storedRun?.steps.findLast((step) => step.outcome === 'bought');
-  const boughtMediaSheet =
-    boughtStep === undefined
-      ? undefined
-      : input.scripts?.catalogue.find((one) => one.scriptRef === storedRun?.scriptRef)?.steps[
-          boughtStep.stepIndex
-        ]?.mediaSheet;
-  const voiceBriefRead: Brief =
-    heCame && !care
-      ? {
-          ...answered,
-          toneHints: [
-            ...answered.toneHints,
-            HE_CAME_HINT,
-            ...(cameEarly ? [HE_CAME_EARLY_HINT] : heCameUnpaid ? [HE_CAME_UNPAID_HINT] : []),
-            ...(farewell === null ? [] : [FAREWELL_HINTS[farewell]]),
-          ],
-        }
-      : farewell !== null
-        ? { ...answered, toneHints: [...answered.toneHints, FAREWELL_HINTS[farewell]] }
-        : asking
-          ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
-          : {
-              ...answered,
-              toneHints: [
-                ...answered.toneHints,
-                ...paced,
-                ...(reminds ? [UNOPENED_STEP_HINT] : []),
-                ...(meeting === undefined ? [] : [meetingHint(meeting)]),
-                ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
-                ...(degradedByHim ? [DEGRADING_FROM_HIM_HINT] : []),
-                ...(asksSchoolRole(input.fanText) ? [SCHOOL_ROLE_HINT] : []),
-                ...(mentionsOtherWoman(input.fanText)
-                  ? [persona.playsJealous === true ? JEALOUS_ALLOWED_HINT : NOT_JEALOUS_HINT]
-                  : []),
-                ...(workHint === null ? [] : [workHint]),
-                ...(noSale ? [FREE_SEXTING_HINT] : []),
-                ...(free?.backToSale === true ? [MEDIA_IS_HER_TRADE_HINT] : []),
-                ...(haggling ? [HAGGLE_HINT] : []),
-                ...(murmur ? [MURMUR_HINT] : []),
-                ...(inPlay && register !== null
-                  ? [otherManWanted ? MOOD_KILLER_HINT : `${MOOD_KILLER_HINT}, ${MOOD_KILLER_OTHER_MAN_HINT}`]
-                  : []),
-                ...(sexualTurn && register !== 'very_explicit' ? [NO_MOANS_HINT] : []),
-                ...(warm ? [KEEP_WARM_HINT] : []),
-                ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
-                ...occasionHints,
-                ...(inTension ? [IN_TENSION_HINT] : []),
-                ...(justBought ? [AFTER_PURCHASE_HINT] : []),
-                ...(compliment ? [COMPLIMENT_HINT] : []),
-                ...(holdsBack ? [CLOSE_TO_COMING_HINT] : []),
-                ...(gauge ? [GAUGE_HINT] : []),
-                ...(projection ? [PROJECTION_HINT] : []),
-                ...(suggestsCustom ? [CUSTOM_INSTEAD_HINT] : []),
-                ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
-                ...(register === null ? [] : [REGISTER_HINTS[register]]),
-                ...(register !== null && running !== null ? [NOT_SHOWN_YET_HINT] : []),
-                ...(care || input.timeWaster === undefined ? [] : [TIME_WASTER_HINTS[input.timeWaster]]),
-                ...(care || input.spenderRegister === undefined || input.spenderRegister === 'warm'
-                  ? []
-                  : [SPENDER_REGISTER_HINTS[input.spenderRegister]]),
-                ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
-                ...(complaint ? [PURCHASE_COMPLAINT_HINT, DISAPPOINTED_MEDIA_HINT] : []),
-                ...(complaint && insistsForMore(input.fanText) ? [INSISTS_FOR_MORE_HINT] : []),
-                ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
-                ...(teases === null ? [] : [ABANDON_HINTS[teases]]),
-              ],
-            };
-  // Her anecdotes and questions worn across her fans: named to the voice, and read again on what it wrote.
-  const worn = wornPhrases(input.herRecent ?? [], persona.wornLimits);
-  const wornBrief: Brief =
-    worn.length === 0
-      ? voiceBriefRead
-      : { ...voiceBriefRead, toneHints: [...voiceBriefRead.toneHints, wornHint(worn)] };
-  const voiceBrief = withoutEmojiIfDue(wornBrief, input.history, persona.guardSettings);
-  const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
-    record === undefined
-      ? {}
-      : {
-          availability: { record, changed: availabilityChanged(input.availability ?? null, record) },
-          ...(scriptStart !== undefined && { scriptStart }),
-        };
-  const brainCostUsd = brain.ok ? (brain.value.meta.costUsd ?? 0) : 0;
-  const brainLatencyMs = brain.ok ? brain.value.meta.latencyMs : 0;
-  if (
-    input.skipVoice?.(brief) === true ||
-    customOrder?.kind === 'handoff' ||
-    saleTrouble?.kind === 'handoff'
-  ) {
-    return {
-      ...(customOrder !== undefined && { customOrder }),
-      ...(saleTrouble !== undefined && { saleTrouble }),
-      ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
-      ...(scripts !== undefined && { scripts }),
-      ...availabilityOut(availabilityKept),
-      ...(trap.isTrap && { trap }),
-      ...(droppedNotes.length > 0 && { droppedNotes }),
-      ...(brief && { brief }),
-      ...(!brain.ok && { briefFailure: brain.error }),
-      ...(sexualization !== undefined && { sexualization }),
-      ...(desire !== undefined && desireMoved(desire) && { desire }),
-      ...(desire !== undefined && { desireRead: desire }),
-      ...(ageDeclared !== null && { ageDeclared }),
-      ...(offerRefused !== undefined && { offerRefused }),
-      bubbles: [],
-      violations: [],
-      isBlocked: true,
-      costUsd: brainCostUsd,
-      latencyMs: brainLatencyMs,
-      isFallback: false,
-      isSkipped: true,
-      language,
-    };
-  }
+  const brainTurn = await askBrain(gateway, persona, input, prepared);
+  const decided = decideTurn(persona, input, brainTurn);
+  const { brief } = brainTurn;
+  const { customOrder, saleTrouble, scriptStep, waitingStep, sexting, care } = decided;
+  if (input.skipVoice?.(brief) === true || customOrder?.kind === 'handoff' || saleTrouble?.kind === 'handoff')
+    return skippedTurn(input, brainTurn, decided, prepared.language);
   // He says he loves her or asks to see her: her rule's answer slows him down, and is no brake on a compliment.
-  const slowsByRule = brief?.occasion === 'says_love' || meeting !== undefined;
+  const slowsByRule = brief?.occasion === 'says_love' || decided.meeting !== undefined;
   // Never past her own maximum (her persona's `maxBubbles`).
   // A time-waster gets one bubble (ADR 0135 § 7), as a farewell does.
   const budget =
-    farewell === null && input.timeWaster === undefined
+    decided.farewell === null && input.timeWaster === undefined
       ? bubbleBudget(input.history, persona.guardSettings.maxBubbles)
       : 1;
   const voiceInput: VoiceInput = voiceTraced(
     {
-      ...base,
-      language: voiceLanguage,
-      brief: voiceBrief,
+      ...prepared.base,
+      language: prepared.voiceLanguage,
+      brief: decided.voiceBrief,
       maxBubbles: budget,
-      ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
+      ...(decided.objectionReply !== undefined && { objectionReply: decided.objectionReply.text }),
       ...(scriptStep !== undefined && { scriptStep }),
       ...(waitingStep !== undefined && { waitingStep }),
-      ...(fantasy !== undefined && { fantasy }),
-      ...(currentStepSheet !== undefined && { currentStepSheet }),
-      ...(complaint && boughtMediaSheet !== undefined && { boughtMediaSheet }),
+      ...(decided.fantasy !== undefined && { fantasy: decided.fantasy }),
+      ...(sexting.currentStepSheet !== undefined && { currentStepSheet: sexting.currentStepSheet }),
+      ...(decided.complaint &&
+        sexting.boughtMediaSheet !== undefined && { boughtMediaSheet: sexting.boughtMediaSheet }),
     },
-    exampleIds,
+    prepared.exampleIds,
   );
   // The one price she may write: the paid step she brings, or the one waiting he asks how to open (ADR 0156 § 4).
   const allowedPriceMinor = scriptStep?.price?.amountMinor ?? waitingStep?.price.amountMinor;
-  // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »). Checked as kept:
-  // the guards read the bubbles that leave.
-  const attempt = async (asked: VoiceInput) => {
-    const voice = await gateway.voice(asked);
-    const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
-    const violations = [
-      ...checkVoiceOutput(
-        written,
-        inAction
-          ? {
-              ...persona.guardSettings,
-              maxBubbleChars: persona.guardSettings.maxBubbleChars * ACTION_BUBBLE_FACTOR,
-            }
-          : persona.guardSettings,
-        {
-          ...guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor, {
-            // A heated reading of his message, outside care: the same test as her register's.
-            flirting: register !== null,
-            ...(fanTier !== undefined && { fanTier }),
-            ...(wantsHumiliation(desireMap) && { humiliationWanted: true }),
-          }),
-          languages: guardLanguages(persona),
-        },
-      ),
-      ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
-      // No word of youth in a sexual message (Charles 26/11): heated, or her script running.
-      ...checkYouthWords(written, sexualTurn),
-      // Written sounds of pleasure only at the frankest rung; what kills the sexting while her script runs (Charles 26/11).
-      ...(sexualTurn ? checkMoans(written, register === 'very_explicit') : []),
-      ...(inPlay ? checkMoodKillers(written, otherManWanted) : []),
-      ...(care ? checkCare(written) : []),
-      // Model text only, care or not: the help number is the code's, added after these guards (ADR 0088 § 4).
-      ...checkHelpNumber(written),
-      ...(customOrder === undefined && !suggestsCustom && !moreTonight ? [] : checkNoCommitment(written)),
-      // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
-      // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
-      // Not on his « je t'aime » nor his asking to see her: « c'est tôt, on se connaît à peine » is then the rule's own
-      // answer (passe 2 du 26/11, conversation 21).
-      ...(sexualization?.kind === 'no_opening' && !care && !slowsByRule ? checkWelcome(written) : []),
-      ...checkWorn(written, worn),
-    ];
-    return { voice, written, violations };
-  };
-  const first = await attempt(voiceInput);
-  // A guard blocked her answer: the voice writes it once more, told what was wrong, before a human is called (audit
-  // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers. A formula she already
-  // used with him is rewritten once the same way, and the second answer goes even if it still has one (passe 1).
-  // Nothing left once her hollow bubbles dropped (« . »): written again the same way (passe 2, conversation 37).
-  const retried =
-    first.voice.ok && (wantsRewrite(first.violations) || first.written.length === 0)
-      ? await attempt({
-          ...voiceInput,
-          brief: { ...voiceBrief, toneHints: [...voiceBrief.toneHints, rewriteHint(first.violations)] },
-        })
-      : undefined;
-  const { voice, written, violations } = retried ?? first;
-  const firstCostUsd = retried !== undefined && first.voice.ok ? (first.voice.value.meta.costUsd ?? 0) : 0;
-  const bubbles = asSent(written, persona.splitMessages, persona.guardSettings.form);
+  const answer = await writeAnswer(gateway, persona, voiceInput, {
+    budget,
+    inAction: sexting.inAction,
+    context: {
+      ...guardContextOf(input.history, stepSendsMedia(decided.scripts), allowedPriceMinor, {
+        // A heated reading of his message, outside care: the same test as her register's.
+        flirting: sexting.register !== null,
+        ...(prepared.meetingTier !== undefined && { meetingTier: prepared.meetingTier }),
+        ...(wantsHumiliation(brainTurn.desireMap) && { humiliationWanted: true }),
+      }),
+      languages: guardLanguages(persona),
+    },
+    checksExplicit: !(decided.ageConfirmed && !decided.noExplicit && !care),
+    sexualTurn: sexting.sexualTurn,
+    veryExplicit: sexting.register === 'very_explicit',
+    inPlay: sexting.inPlay,
+    otherManWanted: sexting.otherManWanted,
+    care,
+    checksCommitment: customOrder !== undefined || sexting.suggestsCustom || decided.moreTonight,
+    // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
+    // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
+    // Not on his « je t'aime » nor his asking to see her: « c'est tôt, on se connaît à peine » is then the rule's own
+    // answer (passe 2 du 26/11, conversation 21).
+    checksWelcome: decided.sexualization?.kind === 'no_opening' && !care && !slowsByRule,
+    worn: decided.worn,
+  });
+  return answeredTurn(persona, input, brainTurn, decided, prepared, { voiceInput, budget, answer });
+}
+
+/** His media carry a safety flag: a human takes over, nothing was written and nothing was called. */
+function mediaHandoff(flags: readonly string[]): ComposedTurn {
   return {
-    ...(customOrder !== undefined && { customOrder }),
-    ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
-    ...(objectionReply !== undefined && { objectionReply }),
-    ...(scripts !== undefined && { scripts }),
-    // She asked only if the voice wrote: a question never written is asked again.
-    ...availabilityOut(
-      availabilityKept !== undefined && asking && voice.ok
-        ? { ...availabilityKept, askedAt: input.situation.now }
-        : availabilityKept,
-    ),
+    handoff: flags,
+    bubbles: [],
+    violations: [],
+    isBlocked: true,
+    costUsd: 0,
+    latencyMs: 0,
+    isFallback: false,
+  };
+}
+
+/** His availability as the turn returns it: the record, and whether it changed (only then is it journaled). */
+function availabilityOut(
+  input: ComposeTurnInput,
+  decided: DecidedTurn,
+  record: FanAvailabilityRecord | undefined,
+) {
+  const { scriptStart } = decided.moment;
+  return record === undefined
+    ? {}
+    : {
+        availability: { record, changed: availabilityChanged(input.availability ?? null, record) },
+        ...(scriptStart !== undefined && { scriptStart }),
+      };
+}
+
+/** What the brain read and code decided, as every answered or skipped turn returns it. */
+function readingOut(brainTurn: BrainTurn, decided: DecidedTurn) {
+  const { brain, brief, droppedNotes } = brainTurn;
+  const { trap, sexualization, desire, ageDeclared } = decided;
+  return {
     ...(trap.isTrap && { trap }),
     ...(droppedNotes.length > 0 && { droppedNotes }),
     ...(brief && { brief }),
@@ -2242,27 +158,95 @@ export async function composeTurn(
     ...(desire !== undefined && desireMoved(desire) && { desire }),
     ...(desire !== undefined && { desireRead: desire }),
     ...(ageDeclared !== null && { ageDeclared }),
+  };
+}
+
+const brainCostOf = ({ brain }: BrainTurn) => ({
+  costUsd: brain.ok ? (brain.value.meta.costUsd ?? 0) : 0,
+  latencyMs: brain.ok ? brain.value.meta.latencyMs : 0,
+});
+
+/** The voice is not called: `skipVoice` stopped it, a chatter takes his order, or a human answers his trouble. */
+function skippedTurn(
+  input: ComposeTurnInput,
+  brainTurn: BrainTurn,
+  decided: DecidedTurn,
+  language: LanguageDecision,
+): ComposedTurn {
+  const { customOrder, saleTrouble, customOrderKept, scripts, offerRefused } = decided;
+  const brainCost = brainCostOf(brainTurn);
+  return {
+    ...(customOrder !== undefined && { customOrder }),
+    ...(saleTrouble !== undefined && { saleTrouble }),
+    ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
+    ...(scripts !== undefined && { scripts }),
+    ...availabilityOut(input, decided, decided.moment.availabilityKept),
+    ...readingOut(brainTurn, decided),
+    ...(offerRefused !== undefined && { offerRefused }),
+    bubbles: [],
+    violations: [],
+    isBlocked: true,
+    costUsd: brainCost.costUsd,
+    latencyMs: brainCost.latencyMs,
+    isFallback: false,
+    isSkipped: true,
+    language,
+  };
+}
+
+/** The turn the voice answered, read by every guard, with what the caller records for it. */
+function answeredTurn(
+  persona: ComposerPersona,
+  input: ComposeTurnInput,
+  brainTurn: BrainTurn,
+  decided: DecidedTurn,
+  prepared: PreparedTurn,
+  written: {
+    readonly voiceInput: VoiceInput;
+    readonly budget: BubbleBudget;
+    readonly answer: Awaited<ReturnType<typeof writeAnswer>>;
+  },
+): ComposedTurn {
+  const { customOrder, customOrderKept, objectionReply, scripts, care, teases, meeting, offerRefused } =
+    decided;
+  const { availabilityKept } = decided.moment;
+  const { voice, written: kept, violations, retried, firstCostUsd } = written.answer;
+  const brainCost = brainCostOf(brainTurn);
+  return {
+    ...(customOrder !== undefined && { customOrder }),
+    ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
+    ...(objectionReply !== undefined && { objectionReply }),
+    ...(scripts !== undefined && { scripts }),
+    // She asked only if the voice wrote: a question never written is asked again.
+    ...availabilityOut(
+      input,
+      decided,
+      availabilityKept !== undefined && decided.asking && voice.ok
+        ? { ...availabilityKept, askedAt: input.situation.now }
+        : availabilityKept,
+    ),
+    ...readingOut(brainTurn, decided),
     ...(offerRefused !== undefined && !care && { offerRefused }),
     ...(care && { care: true }),
-    ...(saleTrouble !== undefined && { saleTrouble }),
+    ...(decided.saleTrouble !== undefined && { saleTrouble: decided.saleTrouble }),
     // Teased only if the voice wrote it: a tease never written is still due.
     ...(teases !== null && voice.ok && { abandonTeased: teases }),
     ...(meeting !== undefined && voice.ok && { meetingAnswer: meeting }),
-    voiceBrief,
-    voiceInput,
-    bubbles,
-    ...translationOfVoice(voice, voiceLanguage.reply, budget, persona.splitMessages),
+    voiceBrief: decided.voiceBrief,
+    voiceInput: written.voiceInput,
+    bubbles: asSent(kept, persona.splitMessages, persona.guardSettings.form),
+    ...translationOfVoice(voice, prepared.voiceLanguage.reply, written.budget, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
-    sexualTurn,
-    ...(retried !== undefined && { retried: blockingCodes(first.violations) }),
+    sexualTurn: decided.sexting.sexualTurn,
+    ...(retried !== undefined && { retried }),
     // Still nothing to send after the second try: a human answers.
-    isBlocked: isBlocked(violations) || !voice.ok || written.length === 0,
-    costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
-    latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),
+    isBlocked: isBlocked(violations) || !voice.ok || kept.length === 0,
+    costUsd: brainCost.costUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
+    latencyMs: brainCost.latencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),
     ...(voice.ok && { model: voice.value.meta.model }),
     isFallback: voice.ok && voice.value.meta.isFallback,
     ...(retried !== undefined && { rewritten: true }),
-    language,
+    language: prepared.language,
   };
 }
