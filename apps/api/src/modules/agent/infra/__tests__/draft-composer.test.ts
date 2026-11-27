@@ -2876,7 +2876,12 @@ describe('createDraftComposer, his custom order kept box by box (ADR 0159 § A.2
   });
 
   it('without a kept order, reads nothing into boxes and answers as before', async () => {
-    const { draftComposer, seen } = asking({ format: 'video', supplements: [], minutes: null, details: {} });
+    const { draftComposer, seen } = asking({
+      format: 'video',
+      supplements: [],
+      minutes: null,
+      details: { name_to_say: 'Léo' },
+    });
     const result = await draftComposer.compose(INPUT);
     expect(seen.brainInputs?.[0]?.customOrder).toBeUndefined();
     expect(result).not.toHaveProperty('customOrderTurn');
@@ -2885,7 +2890,13 @@ describe('createDraftComposer, his custom order kept box by box (ADR 0159 § A.2
 });
 
 describe('createDraftComposer, a custom order and a price objection (ADR 0090)', () => {
-  const ORDER: Brief = { ...BRIEF, intent: 'asks_for_service', replyBrief: 'Lui dire oui.' };
+  // He says what he wants: a video with his name said (Charles 27/11, modalities first otherwise).
+  const ORDER: Brief = {
+    ...BRIEF,
+    intent: 'asks_for_service',
+    replyBrief: 'Lui dire oui.',
+    customOrder: { format: 'video', supplements: [], minutes: null, details: { name_to_say: 'Léo' } },
+  };
   const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
   const ordering = (
     options: {
@@ -2930,6 +2941,17 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       customOrderOpened: true,
     });
     expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('with nobody on shift, asks what he imagines before noting a vague request (Charles 27/11)', async () => {
+    const { draftComposer, seen } = ordering({
+      voice: { bubbles: ['oh j’adore… tu l’imagines comment ? 😏'] },
+      brief: { ...ORDER, customOrder: { format: null, supplements: [], minutes: null, details: {} } },
+    });
+    const result = await draftComposer.compose(INPUT);
+    expect(result).toMatchObject({ kind: 'draft' });
+    expect(result).not.toMatchObject({ customOrderOpened: true });
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('ce qu’il imagine');
   });
 
   it('with nobody on shift, answers from the code’s brief and opens the order', async () => {
@@ -2995,6 +3017,47 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
     expect(result).toMatchObject({ kind: 'draft' });
     expect(result).not.toHaveProperty('customOrderOpened');
     expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('n’entre pas dans cette demande');
+  });
+
+  it('after asking what he imagines, declines a theme she never does, noting nothing (Charles 27/11)', async () => {
+    // Her invented limit: never dressed as a clown.
+    const neverDo = ['déguisée en clown'];
+    const asked = ordering({
+      neverDo,
+      voice: { bubbles: ['mmh tu l’imagines comment ? 😏'] },
+      brief: { ...ORDER, customOrder: { format: null, supplements: [], minutes: null, details: {} } },
+    });
+    const first = await asked.draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais des vidéos perso ?', at: INPUT.now }],
+    });
+    expect(first).not.toHaveProperty('customOrderOpened');
+    expect(asked.seen.voiceInputs?.[0]?.brief.replyBrief).toContain('ce qu’il imagine');
+
+    const answered = ordering({
+      neverDo,
+      voice: { bubbles: ['ça c’est pas mon truc 🙈'] },
+      brief: {
+        ...ORDER,
+        customOrder: {
+          format: 'video',
+          supplements: [],
+          minutes: null,
+          details: { what: 'déguisée en clown' },
+        },
+      },
+    });
+    const second = await answered.draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'Tu fais des vidéos perso ?', at: INPUT.now },
+        { direction: 'outbound', text: 'mmh tu l’imagines comment ? 😏', at: INPUT.now },
+        { direction: 'inbound', text: 'Une vidéo de toi déguisée en clown', at: INPUT.now },
+      ],
+    });
+    expect(second).toMatchObject({ kind: 'draft' });
+    expect(second).not.toHaveProperty('customOrderOpened');
+    expect(answered.seen.voiceInputs?.[0]?.brief.replyBrief).toContain('n’entre pas dans cette demande');
   });
 
   it('opens no second order while one waits', async () => {

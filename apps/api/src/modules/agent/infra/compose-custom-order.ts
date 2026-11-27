@@ -2,7 +2,12 @@ import { supplementsIn } from '@impera/contracts';
 import type { Brief } from '@impera/llm';
 
 import { customOrderTurn, type CustomOrderTurn } from '../../custom-orders';
-import { customOrderDecision, customOrderStop, type CustomOrderDecision } from '../domain/custom-order';
+import {
+  customOrderDecision,
+  customOrderStop,
+  saysWhatHeWants,
+  type CustomOrderDecision,
+} from '../domain/custom-order';
 import { touchesTerm } from '../domain/guards';
 
 import type { BrainTurn } from './compose-brain';
@@ -75,6 +80,8 @@ export function customOrderOf(facts: {
           asksForService: brief.intent === 'asks_for_service' || facts.proofRelayed,
           chatterOnShift: input.customOrder?.chatterOnShift === true,
           orderOpen: input.customOrder?.orderOpen === true,
+          // A proof relayed says what he wants by itself; otherwise the brain's reading of his request.
+          saysWhatHeWants: facts.proofRelayed || saysWhatHeWants(brief.customOrder),
         });
   const customOrder = order?.kind === 'none' ? undefined : order;
   const customOrderKept = turn === undefined || turn.kind === 'none' ? undefined : turn;

@@ -277,6 +277,30 @@ describe('Rapports de fin de shift comparés à Reveal (ADR 0073)', () => {
     expect(back.statusCode).toBe(200);
   });
 
+  it('gives the agency the « chatteur pas là » delay, none until set, and only the owner sets it (ADR 0094 § 1)', async () => {
+    const path = '/scheduling/not-taken-delay';
+    expect((await call('GET', path, noraCookie)).json()).toEqual({ minutes: null });
+    expect(codeOf(await call('GET', path, theoCookie))).toBe('shift_report_forbidden');
+    expect((await call('PUT', path, noraCookie, { minutes: 15 })).statusCode).toBe(403);
+    expect((await call('PUT', path, owner, { minutes: 2 })).statusCode).toBe(400);
+    const saved = await call('PUT', path, owner, { minutes: 15 });
+    expect(saved.statusCode, saved.body).toBe(200);
+    expect((await call('GET', path, noraCookie)).json()).toEqual({ minutes: 15 });
+    // The report threshold set before stays as it was: one setting changes at a time.
+    expect(
+      ReportGapThresholdSchema.parse((await call('GET', '/scheduling/report-gap', owner)).json()),
+    ).toEqual({
+      bps: 100,
+      minor: 500,
+    });
+    const [audit] = await test.admin.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'scheduling_settings.not_taken_delay'));
+    expect(audit).toMatchObject({ details: { minutes: 15 } });
+    expect((await call('PUT', path, owner, { minutes: null })).json()).toEqual({ minutes: null });
+  });
+
   it('validates by itself a report within the threshold and not above Reveal, once, in no one’s name (§ 4)', async () => {
     const shift = await shiftOf(-1);
     // 120,00 € sold, 20,00 € of it refunded since: Reveal read 100,00 €. A sale outside the window is not the shift's,

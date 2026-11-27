@@ -552,6 +552,17 @@ describe('loadConfig', () => {
       expect(testConfig({ ...PRODUCTION, SENTRY_DSN: DSN }).SENTRY_DSN).toBe(DSN);
     });
 
+    it("lets the worker's pulse go to an https watcher only, in production (OPS-22)", () => {
+      const live = { ...PRODUCTION, SENTRY_DSN: DSN };
+      expect(() => testConfig({ ...live, WORKER_HEARTBEAT_URL: 'http://watcher.example.test/ping' })).toThrow(
+        /WORKER_HEARTBEAT_URL must be a URL, https in production/u,
+      );
+      expect(
+        testConfig({ ...live, WORKER_HEARTBEAT_URL: 'https://watcher.example.test/ping' })
+          .WORKER_HEARTBEAT_URL,
+      ).toBe('https://watcher.example.test/ping');
+    });
+
     it.each([
       ['http, not https', 'http://publickey@errors.example.test/42'],
       ['no key', 'https://errors.example.test/42'],
@@ -561,6 +572,29 @@ describe('loadConfig', () => {
       ['not a URL', 'publickey@errors.example.test/42'],
     ])('refuses a DSN with %s', (_why, value) => {
       expect(() => testConfig({ SENTRY_DSN: value })).toThrow(/SENTRY_DSN must be an https Sentry DSN/u);
+    });
+  });
+
+  describe("the worker's pulse for an outside watcher (OPS-22)", () => {
+    it('is optional, empty counting as unset', () => {
+      expect(testConfig().WORKER_HEARTBEAT_URL).toBeUndefined();
+      expect(testConfig({ WORKER_HEARTBEAT_URL: '' }).WORKER_HEARTBEAT_URL).toBeUndefined();
+      expect(
+        testConfig({ WORKER_HEARTBEAT_URL: 'https://watcher.example.test/ping/x' }).WORKER_HEARTBEAT_URL,
+      ).toBe('https://watcher.example.test/ping/x');
+      expect(testConfig({ WORKER_HEARTBEAT_URL: 'http://localhost:8000/ping' }).WORKER_HEARTBEAT_URL).toBe(
+        'http://localhost:8000/ping',
+      );
+    });
+
+    it.each([
+      ['not a URL', 'watcher.example.test/ping'],
+      ['credentials', 'https://user:secret@watcher.example.test/ping'],
+      ['another scheme', 'ftp://watcher.example.test/ping'],
+    ])('refuses an address with %s', (_why, value) => {
+      expect(() => testConfig({ WORKER_HEARTBEAT_URL: value })).toThrow(
+        /WORKER_HEARTBEAT_URL must be a URL/u,
+      );
     });
   });
 

@@ -178,6 +178,7 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |
 | `S3_*` | § 4.4 ; sans elles, la créatrice ne peut pas envoyer de fichier (l'envoi répond « réessaie dans un moment ») |
 | `SENTRY_DSN` | **obligatoire** : le DSN du projet Sentry de la région UE (`https://<clé>@<hôte>.de.sentry.io/<projet>`), créé par Charles ; sans lui l'API et le worker refusent de démarrer. Ce qui part et ce qui ne part jamais : `operations.md` § Observabilité |
+| `WORKER_HEARTBEAT_URL` | sur `worker` seulement, l'adresse de ping du contrôle créé au § 1.6, étape 2, saisie par Charles dans Coolify et jamais écrite dans le dépôt. Vide : rien ne sort, mais un worker arrêté ne prévient personne. En `https` en production, sans identifiants dans l'adresse, sinon le worker refuse de démarrer |
 | `LINK_SERVICE_ORIGIN` | facultatif : l'origine du service de redirection lu par le connecteur de liens, `https://<domaine>` et rien après, saisie par Charles dans Coolify et jamais écrite dans le dépôt. Vide : le connecteur de liens est éteint, rien d'autre ne casse. Présente mais invalide (port, chemin, adresse IP, `localhost`, identifiants) : l'API et le worker refusent de démarrer (ADR 0120 § 3) |
 | `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
 
@@ -217,9 +218,10 @@ node dist/scripts/persona-load.js /data/persona/persona.yaml --activate
 Hors du serveur, pour qu'une panne du VPS se voie (ADR 0152 § 7) :
 
 1. **Disponibilité** : un service de surveillance extérieur, gratuit au départ (UptimeRobot, ou un équivalent que Charles préfère), interroge toutes les 5 minutes `https://app.<domaine>/healthz` (le nginx de `web`, mot-clé `ok`) et prévient Charles par e-mail ou Telegram. Le compte du service a la double authentification ; il ne connaît que l'adresse publique. `/health` et `/ready` de l'API ne sont pas exposés par nginx : tant qu'ils ne le sont pas, une API arrêtée derrière un `web` vivant se voit dans Coolify (statut du service, redémarrages) et par les alertes de l'application, pas par ce service.
-2. **Disque** : Coolify → Notifications (e-mail ou Telegram), puis Servers → le serveur → seuil d'alerte du disque à 80 %. Les vidéos du worker demandent 30 Go libres (§ 4.4).
-3. **Connexions SSH refusées** : `sudo fail2ban-client status sshd` à chaque revue hebdomadaire ; un nombre d'adresses bloquées qui s'envole, ou une connexion réussie inconnue dans `last -a`, se traite comme un incident (`incident.md`).
-4. Charles met Coolify à jour lui-même (rappel mensuel), après avoir lu ses notes de version.
+2. **Battement du worker** (OPS-22) : le seul signal qui voit un worker arrêté, figé ou coupé de la base, les trois cas où plus aucune alerte de l'application ne peut sonner. Chez un service de type « dead man's switch » (Healthchecks.io, gratuit, ou un équivalent que Charles préfère ; double authentification sur le compte), Charles crée un contrôle : période 5 minutes, délai de grâce 5 minutes, alerte par e-mail à lui et à Luca. Le service donne une adresse de ping, que Charles colle dans Coolify sur `worker` seulement, en `WORKER_HEARTBEAT_URL`, jamais ailleurs (qui la connaît peut battre à la place du worker). Le worker y envoie un `GET` au plus une fois par minute, juste après avoir écrit son battement en base. Vérifier après le déploiement : le contrôle passe au vert dans les deux minutes ; arrêter `worker` dans Coolify fait partir l'e-mail une dizaine de minutes plus tard (le redémarrer ensuite). Réseau sortant : l'hôte du service doit être joignable depuis le conteneur `worker`.
+3. **Disque** : Coolify → Notifications (e-mail ou Telegram), puis Servers → le serveur → seuil d'alerte du disque à 80 %. Les vidéos du worker demandent 30 Go libres (§ 4.4).
+4. **Connexions SSH refusées** : `sudo fail2ban-client status sshd` à chaque revue hebdomadaire ; un nombre d'adresses bloquées qui s'envole, ou une connexion réussie inconnue dans `last -a`, se traite comme un incident (`incident.md`).
+5. Charles met Coolify à jour lui-même (rappel mensuel), après avoir lu ses notes de version.
 
 ## 2. Mettre à jour
 
