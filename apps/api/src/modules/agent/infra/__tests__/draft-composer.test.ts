@@ -439,18 +439,17 @@ describe('createDraftComposer', () => {
     expect(still.seen.voiceCalls).toBe(2);
   });
 
-  it('lets her say « on se connaît à peine » to his love, never to a compliment (passe 2, conversation 21)', async () => {
+  it('lets her say « on se connaît à peine » to his love, and marks it on a compliment (passe 2, conversation 21)', async () => {
     const slow = { bubbles: ['Ça me touche 🙈', 'mais on se connaît à peine toi'] };
     const love = composer({ brief: { ...BRIEF, intent: 'flirt', occasion: 'says_love' }, voice: slow });
     expect(await love.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
     expect(love.seen.voiceCalls).toBe(1);
 
+    // On a compliment, a brake is a soft fault since 27/11 (Sécurité, #1054): read by the calibration, never blocked.
     const compliment = composer({ brief: { ...BRIEF, intent: 'flirt' }, voice: slow });
-    expect(await compliment.draftComposer.compose(INPUT)).toMatchObject({
-      kind: 'held',
-      reason: 'guard_blocked',
-      detail: ['unwarranted_brake'],
-    });
+    const draft = await compliment.draftComposer.compose(INPUT);
+    expect(draft).toMatchObject({ kind: 'draft' });
+    expect(draft.kind === 'draft' ? draft.softViolations : []).toContain('unwarranted_brake');
   });
 
   it('names her phrases worn across her fans to the voice, and writes once more an answer that says one (passe 2)', async () => {
@@ -1442,7 +1441,11 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     const held = await draftComposer.compose({
       ...INPUT,
       history: [
-        { direction: 'inbound', text: 'je fantasme sur une écolière', at: new Date('2026-10-17T09:59:00Z') },
+        {
+          direction: 'inbound',
+          text: 'je fantasme sur une vraie écolière',
+          at: new Date('2026-10-17T09:59:00Z'),
+        },
       ],
     });
     expect(held).toEqual({
@@ -1458,6 +1461,26 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     expect(minor.protections.map((p) => p.protection)).toEqual([
       { unconfirmAge: true, stopContact: false, care: false, freezeSales: false, because: ['minor_fantasy'] },
     ]);
+  });
+
+  it('hands a request to be like his own child to a human, without touching his age (Sécurité, #1054)', async () => {
+    const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
+    const { draftComposer, seen } = composer({}, undefined, minor.limits);
+    const held = await draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'habille-toi comme ma fille', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    expect(held).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'other',
+      detail: ['safety_net', 'his_child_role'],
+      costUsd: 0,
+    });
+    expect(seen.traces).toHaveLength(0);
+    expect(minor.protections).toEqual([]);
   });
 
   it('keeps the net when no model has a key: the minor is still a minor', async () => {
@@ -2066,7 +2089,7 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(limits.confirmed).toEqual([]);
   });
 
-  it('takes an insistent compliment as one, and writes a brake on it again (Charles, 20/11)', async () => {
+  it('takes an insistent compliment as one, and lets a brake on it through as a soft fault (Sécurité, #1043)', async () => {
     // « tu es trop belle !!! » read as a flirt in a good mood (her « Pourquoi », 20/11): welcomed.
     const INSISTENT: Brief = {
       ...BRIEF,
@@ -2084,12 +2107,13 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       limitsOf({}).limits,
       cursor,
     );
+    // A brake on a compliment is a style fault since 27/11 (Sécurité, #1043): soft, read by the calibration, not rewritten.
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'draft',
-      bubbles: ['Je sais 😏 merci, c’est mignon'],
+      bubbles: ['Coucou toi ! Tu y vas un peu fort, non 😏'],
     });
     expect(written(seen)?.replyBrief).not.toContain('ralentit');
-    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
+    expect(seen.voiceInputs).toHaveLength(1);
   });
 
   it('writes what she does on a compliment itself, never in the brain’s words (Charles, 20/11)', async () => {
@@ -2112,6 +2136,7 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
       limitsOf({}).limits,
       cursor,
     );
+    // The brake is soft (Sécurité, #1054); her emoji streak (`emoji_misuse`) still asks one more writing.
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'draft',
       bubbles: ['Merci 😏 ça me fait plaisir, tu fais quoi de beau ?'],
@@ -2121,7 +2146,8 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(brief?.replyBrief).toContain('question ouverte');
     expect(brief?.replyBrief).not.toMatch(/réserve|direct/u);
     expect(brief?.toneHints).not.toContain('réservée');
-    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
+    expect(seen.voiceInputs).toHaveLength(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.join(' ')).not.toContain('freinait');
   });
 
   it('welcomes a compliment the brain adds a desire to, never slowed down nor asked his age (Charles, 20/11)', async () => {

@@ -47,6 +47,9 @@ describe('permitted phrases that must always pass, output guards', () => {
     't’étais comment enfant ?',
     'mon enfance à la campagne',
     'have you got kids?',
+    'j’ai 15 ans d’expérience',
+    'à 16 ans j’étais timide',
+    'quand j’avais 16 ans, je dansais',
     'hai figli?',
     '¿tienes hijos?',
   ])('minor_reference lets « %s » through', (bubble) => {
@@ -79,6 +82,12 @@ describe('permitted phrases that must always pass, output guards', () => {
     ['you’ll give me a baby', true],
     ['mi farai un bambino', true],
     ['me harás un hijo', true],
+    ['tes petites fesses', true],
+    ['ton petit sexe 😏', true],
+    ['je mets ma jupe d’écolière pour toi', true],
+    ['mon uniforme scolaire te plaît ?', true],
+    ['ma tenue de lycéenne, rien que pour toi', true],
+    ['my school uniform is on', true],
   ] as const)('youth_word_in_sex lets « %s » through (sexual turn: %s)', (bubble, sexual) => {
     expect(checkYouthWords([bubble], sexual)).toEqual([]);
   });
@@ -269,6 +278,60 @@ describe('permitted phrases that must always pass, output guards', () => {
   });
 
   it.each([
+    'j’ai 2 cours demain matin',
+    'garde moi 1 place à côté de toi',
+    'il me reste 3 route à faire',
+    '2 avenue c’est trop loin',
+    'j’ai fait 10 allée retour',
+    '5 chemin différents',
+  ])('contact_info lets the number of life « %s » through', (bubble) => {
+    expect(raised(bubble)).not.toContain('contact_info');
+  });
+
+  it.each(['busco trabajo en madrid', 'cerco casa a roma', 'find me a good song for tonight'])(
+    'contact_info lets a search without a network « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('contact_info');
+    },
+  );
+
+  it.each([
+    'après tout ce que je t’ai montré, tu me fais rire',
+    'tu me déçois, t’as oublié mon prénom 😏',
+    'je suis déçue, il pleut',
+  ])('guilt_trip never blocks « %s »', (bubble) => {
+    expect(
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter(
+        (v) => v.code === 'guilt_trip' && v.severity === 'blocking',
+      ),
+    ).toEqual([]);
+  });
+
+  it.each([
+    'vilain garçon va 😏',
+    't’es qu’un petit garçon',
+    'mon petit garçon, viens là',
+    'ton corps me plaît, vilain garçon',
+  ])('belittling_name never blocks « %s »', (bubble) => {
+    expect(raised(bubble)).not.toContain('minor_reference');
+    expect(
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter((v) => v.severity === 'blocking'),
+    ).toEqual([]);
+  });
+
+  it.each([
+    '*rougit*',
+    '(rires) t’es bête',
+    'mon adresse ? ici c’est très bien',
+    'ton adresse mail tu la gardes 😌',
+    'tu y vas un peu fort toi 😏',
+  ])('a style fault never blocks « %s »', (bubble) => {
+    expect(
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).filter((v) => v.severity === 'blocking'),
+    ).toEqual([]);
+  });
+
+  it.each([
     'je suis modèle photo',
     'je suis assistante dentaire le jour',
     'moi un bot ? tu me vexes',
@@ -306,6 +369,12 @@ describe('permitted phrases that must always pass, input nets', () => {
     'en seconde main',
     'première fois que je fais ça',
     'je passe le bac',
+    'je passe en seconde équipe',
+    'je suis en seconde équipe au foot',
+    'sono al liceo, sono un insegnante',
+    'I’m at high school, I’m a teacher',
+    'mets ta jupe d’écolière ce soir, j’ai envie de toi',
+    'joue une lycéenne pour moi',
   ])('safetySigns finds no minor in « %s »', (text) => {
     expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).not.toContain('minor_suspected');
   });
@@ -348,6 +417,10 @@ describe('permitted phrases that must always pass, input nets', () => {
     'sei sexy, piccola mia',
     'quiero hacerte un bebé en la cama',
     'estás sexy, cariño',
+    'mets ta jupe d’écolière ce soir, j’ai envie de toi',
+    'je fantasme sur toi en écolière',
+    'joue une lycéenne pour moi',
+    'you as a schoolgirl turns me on',
   ])('minor_fantasy leaves « %s »', (text) => {
     expect(safetySigns(text)).not.toContain('minor_fantasy');
   });

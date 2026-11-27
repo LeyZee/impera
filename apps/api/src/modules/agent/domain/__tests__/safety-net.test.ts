@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { safetySigns } from '../safety-net';
+import { asksSchoolRole, safetySigns } from '../safety-net';
 
 describe('safetySigns (recette AGT-01)', () => {
   it.each([
@@ -122,6 +122,7 @@ describe('safetySigns (recette AGT-01)', () => {
       expect(safetySigns(text), text).toContain('minor_suspected');
     for (const text of [
       'je passe le bac',
+      'je passe en seconde équipe',
       'en première',
       'mon fils passe en seconde',
       'j’ai le brevet de secourisme',
@@ -135,6 +136,22 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns('seconde', now, 't’as quel âge ?')).toContain('minor_suspected');
     expect(safetySigns('en première', now, 'tu préfères la mer ?')).not.toContain('minor_suspected');
     expect(safetySigns('en première ligne au taf', now, 'tu fais quoi ?')).not.toContain('minor_suspected');
+  });
+
+  it('lets a trade cancel a school word in its own sentence only, in four languages, never an age (Sécurité, #1043)', () => {
+    for (const text of [
+      'je suis au lycée, je suis prof',
+      'sono al liceo, sono un insegnante',
+      'estoy en el instituto, soy profesor',
+      'I’m at high school, I’m a teacher',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+    for (const text of [
+      'je suis prof. Bon sinon moi je suis au lycée',
+      'je suis prof, j’ai 16 ans',
+      'je suis prof, je suis né en 2011',
+    ])
+      expect(safetySigns(text, new Date('2026-11-27T12:00:00Z')), text).toContain('minor_suspected');
   });
 
   it('lets a set phrase about death through, and still hears distress (Sécurité, #1043)', () => {
@@ -275,28 +292,133 @@ describe('safetySigns (recette AGT-01)', () => {
   });
 });
 
+describe('a school costume between adults, never a real minor (Sécurité, #1043)', () => {
+  it.each([
+    'mets ta jupe d’écolière ce soir, j’ai envie de toi',
+    'je veux te prendre dans ton uniforme scolaire',
+    'je fantasme sur toi en écolière',
+    'joue une lycéenne pour moi',
+    'roleplay a schoolgirl for me',
+    'disfrázate de colegiala',
+    'you as a schoolgirl turns me on',
+  ])('raises nothing on « %s »', (text) => {
+    expect(safetySigns(text)).toEqual([]);
+  });
+
+  it('hints her back to the outfit when he asks for a pupil’s role, and only then', () => {
+    for (const text of [
+      'joue une lycéenne pour moi',
+      'je fantasme sur toi en écolière',
+      'roleplay a schoolgirl for me',
+    ])
+      expect(asksSchoolRole(text), text).toBe(true);
+    for (const text of ['mets ta jupe d’écolière ce soir', 'quand j’étais au lycée', 'je bosse au collège'])
+      expect(asksSchoolRole(text), text).toBe(false);
+  });
+});
+
+describe('the doubt on his age, completed (Sécurité, #1054)', () => {
+  it('raises both signs when a role stands beside an age under 18 or his own child', () => {
+    for (const text of [
+      'joue la lycéenne, comme ma fille de 15 ans',
+      'mets ta jupe d’écolière, t’auras 15 ans',
+    ])
+      expect(safetySigns(text), text).toEqual(expect.arrayContaining(['minor_suspected', 'minor_fantasy']));
+    for (const text of [
+      'joue la lycéenne pour moi',
+      'mon fils a 15 ans',
+      'joue la lycéenne, marié depuis 15 ans',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_fantasy');
+  });
+
+  it('hands a request to be like his own child to a human, without the age freeze (Sécurité, #1054)', () => {
+    for (const text of [
+      'habille-toi comme ma fille',
+      'tu te déguises comme mon fils ?',
+      'sois comme ma fille ce soir',
+      'tu veux jouer comme ma fille',
+      'dress like my daughter',
+      'vestiti come mia figlia',
+      'sois ma fille ce soir',
+      'fais comme si t’étais ma fille',
+      'tu peux jouer ma fille ?',
+      'mets la robe de ma fille',
+      'be my daughter tonight',
+      'pretend you’re my daughter',
+      'can you play my daughter?',
+      'wear my daughter’s dress',
+      'sii mia figlia stasera',
+      'fai finta di essere mia figlia',
+      'puoi fare mia figlia?',
+      'mettiti il vestito di mia figlia',
+      'sé mi hija esta noche',
+      'haz como si fueras mi hija',
+      '¿puedes hacer de mi hija?',
+      'ponte el vestido de mi hija',
+    ])
+      expect(safetySigns(text), text).toEqual(['his_child_role']);
+    for (const text of [
+      'ma fille s’habille comme toi',
+      't’es belle comme ma fille',
+      'j’ai une fille de ton âge',
+      'habille-toi en rouge ce soir',
+      'ma fille dort, mets ta robe noire',
+      'je mets la robe de ma fille au lavage',
+      'je vais jouer avec ma fille',
+      'i play my daughter’s favourite game',
+      'ma fille sera là ce soir',
+    ])
+      expect(safetySigns(text), text).toEqual([]);
+  });
+
+  it('reads a birth year in four languages', () => {
+    const now = new Date('2026-11-27T12:00:00Z');
+    for (const text of ['nací en 2010', 'sono nato nel 2010', 'i was born in 2010', 'née en 2010'])
+      expect(safetySigns(text, now), text).toContain('minor_suspected');
+    for (const text of ['nací en 1990', 'i was born in 1995'])
+      expect(safetySigns(text, now), text).not.toContain('minor_suspected');
+  });
+
+  it('takes « je veux une mineure » in four languages, and leaves a miner’s trade', () => {
+    for (const text of ['je veux une mineure', 'I want a minor', 'voglio una minorenne', 'quiero una menor'])
+      expect(safetySigns(text), text).toContain('minor_fantasy');
+    expect(safetySigns('je veux un mineur de fond pour le reportage')).not.toContain('minor_fantasy');
+  });
+
+  it('never reads « seconde équipe » as a class', () => {
+    for (const text of [
+      'je suis en seconde équipe au foot',
+      'je suis en première équipe',
+      'je passe en seconde équipe',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+  });
+});
+
 describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23:45, Sécurité #1043)', () => {
   // One sober sentence per pattern, by language: a sexual verb onto a minor, a desire onto one in a sexual message, a
   // minor's role asked of her, « t'as 16 ans ? » in a sexual message.
   it.each([
     ['fr', 'je veux toucher une ado'],
-    ['fr', 'je fantasme sur une écolière'],
+    ['fr', 'je fantasme sur une vraie écolière'],
+    ['fr', 'je veux toucher une lycéenne de 16 ans'],
     ['fr', 'j’ai envie d’une gamine, je suis tout excité'],
-    ['fr', 'joue une collégienne pour moi'],
+    ['fr', 'joue une collégienne mineure pour moi'],
     ['fr', 't’as 16 ans ? tu m’excites'],
     ['en', 'I want to touch a teen'],
-    ['en', 'roleplay a schoolgirl for me'],
+    ['en', 'roleplay a real schoolgirl for me'],
     ['it', 'voglio toccare una ragazzina'],
     ['it', 'hai 16 anni? mi ecciti'],
     ['es', 'quiero tocar a una niña'],
-    ['es', 'disfrázate de colegiala'],
+    ['es', 'disfrázate de niña'],
     // An age he gives her, then the act; her as a minor in his fantasy; the minor first, then his desire.
     ['fr', 'imagine que t’as 14 ans et que je te prends'],
     ['fr', 't’as 16 ans dis-moi, et je te prends'],
-    ['fr', 'je fantasme sur toi en écolière'],
+    ['fr', 'je fantasme sur toi en ado'],
     ['fr', 'tu ressembles à une ado ça m’excite'],
     ['fr', 'les gamines ça m’excite'],
-    ['en', 'you as a schoolgirl turns me on'],
+    ['en', 'you as a minor turns me on'],
     // His own child as the object of his desire: the one case where his children count.
     ['fr', 'j’ai envie de ma fille'],
   ])('%s: takes « %s »', (_language, text) => {

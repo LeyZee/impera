@@ -9,6 +9,7 @@ import {
 
 import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
 import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
+import { INTIMATE_PARTS } from './intimate-words';
 import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
 
 /**
@@ -39,6 +40,11 @@ export interface GuardSettings {
    * 16/11, M3). Carried here as her other limits are, to every composer.
    */
   readonly neverDo?: readonly string[];
+  /**
+   * She may write stage directions (« *rougit* », « (rires) »), a style of hers (`behavior.stage_directions`, Charles
+   * 27/11). Absent or false: one is a soft `stage_direction`, read by the calibration.
+   */
+  readonly stageDirections?: boolean;
   /**
    * The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): read from her persona, never
    * listed in the repository. One in her answer is a `degrading_word`, blocking. Absent: not checked.
@@ -96,6 +102,11 @@ export interface GuardContext {
   readonly fanLastMessage?: string;
   /** He asked a price since her last answer (Sécurité, #1043): a sum she writes now is a price of hers. */
   readonly fanAskedPrice?: boolean;
+  /**
+   * His desire map holds a fantasy of humiliation (Charles 27/11): « petit garçon », « vilain garçon » said to him are
+   * then his game, not a `belittling_name`.
+   */
+  readonly humiliationWanted?: boolean;
   /**
    * The languages she may write in to him (ADR 0168 § 4): her persona's, among those the guards cover. Absent, any
    * covered language passes; a language outside the coverage never does.
@@ -199,9 +210,81 @@ export function withoutProcreation(words: string): string {
   return words.replace(PROCREATION, ' ');
 }
 
-/** A child or a minor named in a text, procreation between adults left out: the word, or `undefined`. */
+// A piece of clothing between adults (Charles 27/11): « ma jupe d'écolière », « un uniforme scolaire », « a school
+// uniform ». The outfit passes, in her answer and on his desire map; her or him as a minor never does (« je suis une
+// écolière », « je joue la lycéenne », an age under 18, « j'ai l'air d'avoir 15 ans », a pupil's setting). Read on the
+// normalised text, apostrophes as written or as spaces.
+const SCHOOL_OUTFIT =
+  /\b(jupes?|jupettes?|uniformes?|tenues?|chemisiers?|chaussettes?|socquettes?|cravates?|blazers?|kilts?|robes?|ensembles?|costumes?)( plissees?)? (?:d'? ?|de |style |facon |type )(ecolieres?|ecoliers?|collegiennes?|lyceennes?)\b|\buniformes? (scolaires?|d'? ?ecole)\b|\b(school ?girl |school )(uniforms?|outfits?|skirts?)\b|\b(divisa|uniforme) (scolastica|escolar|de colegiala)\b|\bfalda (de colegiala|escolar)\b/g;
+
+// « Petit garçon », « vilain garçon » said to him (Charles 27/11): a style fault, soft (`belittling_name`), and his
+// game when his desire map holds humiliation. Never a body compared to a child's (« on dirait celle d'un petit
+// garçon », « comme un petit garçon »), never a role where he is a child: both stay `minor_reference`.
+const BOY_NAME =
+  /(?<!\b(celle|celui|ceux|celles|taille|l'?air|digne) d'? ?(une? )?|\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix) (de|d'?) ?(une? )?|\bon dirait (une? )?|\bcomme (une? )?)\b(petit|vilain) garcon\b/g;
+// A street that is also a common word (« 2 avenue c'est trop loin », « 10 allée retour », « 5 chemin différents »)
+// is an address only with « de / du / des / d' » or a capital after it (Sécurité, #1054): « 8 avenue Foch », « 3 allée
+// des Tilleuls ». Read on the bubble as written, where the capital still is.
+const STREET_WORD =
+  /\b\d{1,4}(?: ?(?:bis|ter))?,? (?:avenue|allée|allee|chemin|place|cours|route|square|quai|street|avenida) (\S+)/giu;
+
+/** A street address with a street that is also a common word: the words, or `undefined`. */
+function streetAddressOf(bubble: string): string | undefined {
+  for (const match of bubble.matchAll(STREET_WORD)) {
+    const next = match[1] ?? '';
+    if (/^(?:(?:de|du|des)$|d['’])/iu.test(next) || (next !== next.toLowerCase() && /^\p{Lu}/u.test(next)))
+      return match[0];
+  }
+  return undefined;
+}
+
+// She says she is under 18, in any message (Sécurité, #1054): « j'ai 14 ans », « en tenue de collégienne j'ai 14
+// ans », « I'm 16 », « ho 16 anni », « tengo 16 años ». Not a length of time (« j'ai 15 ans d'expérience »), not her
+// past (« à 16 ans j'étais… », « quand j'avais 16 ans »).
+const HER_MINOR_AGE = new RegExp(
+  [
+    "\\b(j'?ai|j ai|moi,?|ho|tengo) (1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix[ -]?sept|diciassette|sedici|quindici|quattordici|tredici|dodici|undici|diecisiete|dieciseis|quince|catorce|trece|doce|once) ?(ans?|piges?|balais|berges|anni|anos)\\b(?! ?(d'|de |d |que |qu'|di |fa\\b|en |depuis|ensemble|avec))",
+    "\\b(i'?m|i am) (1[0-7]|[1-9]|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)( years? old| yo)?(?= ?($|[,.!?;]|and\\b|et\\b|btw\\b))",
+  ].join('|'),
+);
+
+// His body, or a part of it, compared to a child's (Sécurité, #1054): « t'as un corps de petit garçon », « des mains
+// d'enfant ». Blocking, a `minor_reference`, whatever his desire map.
+// The intimate parts count too, his or hers, sexual message or not (Sécurité, #1054): the shared lexicon, never a list
+// of its own. « Ta petite queue » or « tes petites fesses » name no child and pass.
+const CHILD_BODY = new RegExp(
+  `\\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix|${INTIMATE_PARTS}) (de|d'?) ?(une? |petit |petite )?(petit garcon|petite fille|enfants?|gamine?s?|gosses?|fillettes?|ados?|adolescente?s?)\\b`,
+);
+// In English the child comes first (Sécurité, #1054): « your little boy body », « a kid's body », « little girl » before
+// an intimate part. The shared lexicon again, with plain body words.
+const CHILD_BODY_EN = new RegExp(
+  `\\b(little (boy|girl)|kid|child|children|teen(ager)?|young (boy|girl))('?s)? (body|hands?|face|skin|legs?|feet|voice|chest|figure|privates|private parts|${INTIMATE_PARTS})\\b`,
+);
+const CHILD_ROLE_FOR_HIM =
+  /\b(joue|jouer|joues|jouons|sois|seras|serais|deviens|devenir|redeviens|comme si t'? ?etais|fais|faire) (le |mon |un |ton |notre )?(petit|vilain) garcon\b|\b(maman|mommy|mummy|mama|mami)\b[^.!?]{0,40}\b(petit|vilain) garcon\b|\b(petit|vilain) garcon\b[^.!?]{0,40}\b(maman|mommy|mummy|mama|mami)\b/;
+
+const BOY_NAME_ALONE = new RegExp(BOY_NAME.source);
+
+/** A role where he is a child, in a normalised text: the words, or `undefined`. */
+function childRoleOf(text: string): string | undefined {
+  return CHILD_ROLE_FOR_HIM.exec(text)?.[0];
+}
+
+/** The text without « petit garçon » or « vilain garçon » said to him; untouched when he is given a child's role. */
+function withoutBoyName(text: string): string {
+  return childRoleOf(text) === undefined ? text.replace(BOY_NAME, ' ') : text;
+}
+
+/** A text without the school outfits it names: the clothing passes, the rest of the text is read as before. */
+export function withoutSchoolOutfit(text: string): string {
+  return text.replace(SCHOOL_OUTFIT, ' ');
+}
+
+/** A child or a minor named in a text, procreation between adults and a school outfit left out: the word, or `undefined`. */
 function minorNamed(bubble: string): string | undefined {
-  return MINOR_REFERENCE.exec(withoutProcreation(normaliseWords(bubble)))?.[0];
+  return MINOR_REFERENCE.exec(
+    withoutBoyName(withoutSchoolOutfit(withoutProcreation(normaliseWords(bubble)))),
+  )?.[0];
 }
 
 // A means of paying outside Reveal (recette MOT-04). « Wise » counts only as a means: « that's wise » is innocent.
@@ -310,7 +393,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'meeting_promise',
     pattern:
-      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|mon adresse|(?<!(j'?ai|j'avais|j'aurai|t'?as|tu as|il a|elle a|un|mon|ton) )rendez-vous (a |au |chez ))/,
+      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|(?<!(j'?ai|j'avais|j'aurai|t'?as|tu as|il a|elle a|un|mon|ton) )rendez-vous (a |au |chez ))/,
   },
   {
     code: 'meeting_promise',
@@ -348,16 +431,25 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   { code: 'contact_info', pattern: /\b(https?:\/\/|www\.)\S+/ },
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
+  // A street address, in numbers and a street (Charles 27/11): « 12 rue des Lilas », « 4 bis avenue Foch ». « Mon
+  // adresse » in words alone is a soft `address_word`.
+  {
+    code: 'contact_info',
+    pattern:
+      /\b\d{1,4}( ?(bis|ter))?,? (rue|bd|boulevard|impasse|calle) (de la |de l'|des |du |de |d')?[a-z]/,
+  },
   // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
   // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there
   // never does (« ajoute-moi sur snap », « viens sur telegram », « mon insta c'est… », « rejoins-moi sur discord »). The
   // invitation verbs in Italian and Spanish too (ADR 0168 § 4): « scrivimi su whatsapp », « escríbeme por telegram ».
+  // The search verbs count in Spanish, Italian and English too (« búscame en insta », « cercami su tiktok », « find me on
+  // snap », « look me up on insta »), only beside a network's name.
   {
     code: 'contact_info',
     pattern: new RegExp(
       [
-        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?|scrivi|scrivimi|scrivetemi|aggiungi|aggiungimi|seguimi|vieni|contattami|escribe|escribeme|escribime|agrega|agregame|anademe|sigueme|ven|contactame|hablame)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
-        `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
+        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?|busca|cerca|scrivi|scrivimi|scrivetemi|aggiungi|aggiungimi|seguimi|vieni|contattami|escribe|escribeme|escribime|agrega|agregame|anademe|sigueme|ven|contactame|hablame)([ -]?(moi|me|toi|nous|mi))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
+        `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|look me up|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
         `\\b(mon|ma|mes|my|mi|il mio|la mia) (compte |account |cuenta )?${NETWORK}\\b`,
         // « discord c'est pour les gamers » is a topic: after « c'est », only a handle (Sécurité, #1043).
         `\\b${NETWORK} ?(:|=) ?@?[a-z0-9_.]{3,}`,
@@ -530,6 +622,22 @@ const COMMON_PET_NAMES = [
   'mon bel inconnu',
 ];
 
+// Guilt to get a purchase (Sécurité, #1043): « après tout ce que je t'ai montré tu prends même pas ça », « si tu tenais à
+// moi tu la prendrais », « tu me déçois, tu l'ouvres même pas ». Blocking; the rest of `guilt_trip` stays soft.
+const GUILT_BUYS =
+  "\\b((l'|la |le |les )(prends|prennes|prendrais|prendre|achetes|acheter|ouvres|ouvrir|debloques|debloquer|payes|paies)|(prends|prennes|achetes|ouvres|debloques|payes)( meme)? (pas |jamais )?(ca|celle|celui|ma (video|photo|vid|story)|mon (pack|media|contenu)|mes (photos|videos)|le pack|la video|la photo)|acheter|achat|achetes|debloquer)\\b";
+const GUILT_FOR_SALE = new RegExp(
+  [
+    `\\bapres (tout )?(ce que|tout ce que|ce qu') ?je t'?ai (montre|donne|envoye|fait|offert)\\b[^.!?]*${GUILT_BUYS}`,
+    "\\bsi tu (m'?aimais|tenais a moi|me kiffais|m'?appreciais|etais (vraiment )?(fan|gentil|genereux))\\b[^.!?]{0,30}\\b(prendrais|acheterais|ouvrirais|debloquerais|craquerais|payerais|paierais)\\b",
+    `\\b(tu me decois|ca m'a refroidie?|ca me rend (triste|malheureuse)|tu me fais de la peine|je suis (vexee|decue))\\b[^.!?]*${GUILT_BUYS}`,
+    `${GUILT_BUYS}[^.!?]*\\b(tu me decois|ca me rend (triste|malheureuse)|tu me fais de la peine|je suis (vexee|decue))\\b`,
+  ].join('|'),
+);
+// « Mon adresse », « ton adresse mail » in words (Charles 27/11): soft, with a line to the voice. The address itself,
+// an e-mail or a number stays `contact_info`.
+const ADDRESS_WORD =
+  /\b(mon|mes|ton|ta|tes|son|my|your|mi|tu|il mio|il tuo|la mia|la tua) (adresses?|address|indirizzo|direccion)\b/;
 const GUILT_TRIP =
   /\b(tu me decois|ca m'a refroidie?|ca me rend (triste|malheureuse)|tu me fais de la peine|je suis (vexee|decue)|arrete de faire (le|ton) radin)\b(?! pas)/;
 
@@ -1220,12 +1328,28 @@ export function checkVoiceOutput(
       : meetingCommitment(bubble, context.fanLastMessage, message);
     if (committed !== undefined)
       violations.push({ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match: committed });
-    const compared = MINOR_COMPARISON.exec(text)?.[0];
+    const compared =
+      MINOR_COMPARISON.exec(withoutBoyName(text))?.[0] ??
+      CHILD_BODY.exec(text)?.[0] ??
+      CHILD_BODY_EN.exec(text)?.[0] ??
+      HER_MINOR_AGE.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
-    const stage = STAGE_DIRECTION.map((pattern) => pattern.exec(bubble)?.[0]).find((m) => m !== undefined);
+    // « Petit garçon » said to him: soft, his game when his map holds humiliation; blocking once he is a child in a
+    // role (Sécurité, #1043).
+    const childRole = childRoleOf(text);
+    const boyName = BOY_NAME_ALONE.exec(withoutSchoolOutfit(text))?.[0];
+    if (childRole !== undefined)
+      violations.push({ code: 'belittling_name', severity: 'blocking', bubbleIndex, match: childRole });
+    else if (compared === undefined && boyName !== undefined && context.humiliationWanted !== true)
+      violations.push({ code: 'belittling_name', severity: 'soft', bubbleIndex, match: boyName });
+    // A style, never a hard line (Sécurité, #1043): soft, and nothing at all when her sheet allows them.
+    const stage =
+      settings.stageDirections === true
+        ? undefined
+        : STAGE_DIRECTION.map((pattern) => pattern.exec(bubble)?.[0]).find((m) => m !== undefined);
     if (stage !== undefined) {
-      violations.push({ code: 'stage_direction', severity: 'blocking', bubbleIndex, match: stage });
+      violations.push({ code: 'stage_direction', severity: 'soft', bubbleIndex, match: stage });
     }
     const emergency = emergencyMatch(text);
     if (emergency !== undefined) {
@@ -1272,7 +1396,22 @@ export function checkVoiceOutput(
         violations.push({ code: 'pet_name', severity: 'soft', bubbleIndex, match: slip });
     }
     const guilt = GUILT_TRIP.exec(text);
-    if (guilt) violations.push({ code: 'guilt_trip', severity: 'soft', bubbleIndex, match: guilt[0] });
+    const street = streetAddressOf(bubble);
+    if (
+      street !== undefined &&
+      !violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'contact_info')
+    )
+      violations.push({ code: 'contact_info', severity: 'blocking', bubbleIndex, match: street });
+    const address = ADDRESS_WORD.exec(text)?.[0];
+    if (
+      address !== undefined &&
+      !violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'contact_info')
+    )
+      violations.push({ code: 'address_word', severity: 'soft', bubbleIndex, match: address });
+    const guiltForSale = GUILT_FOR_SALE.exec(text)?.[0];
+    if (guiltForSale !== undefined)
+      violations.push({ code: 'guilt_trip', severity: 'blocking', bubbleIndex, match: guiltForSale });
+    else if (guilt) violations.push({ code: 'guilt_trip', severity: 'soft', bubbleIndex, match: guilt[0] });
     const tic = AI_TICS.map((pattern) => pattern.exec(text)).find((m) => m !== null);
     if (tic) violations.push({ code: 'ai_tic', severity: 'soft', bubbleIndex, match: tic[0] });
     if (bubble.length > settings.maxBubbleChars) {
@@ -1436,7 +1575,7 @@ export function checkYouthWords(bubbles: readonly string[], sexual: boolean): Gu
   const ownWords = checkExplicit(bubbles).length > 0;
   if (!sexual && !ownWords) return [];
   return bubbles.flatMap((bubble, bubbleIndex) => {
-    const text = normalise(bubble);
+    const text = withoutBoyName(withoutSchoolOutfit(normalise(bubble)));
     const match =
       YOUTH_WORDS.exec(text)?.[0] ?? YOUTH_AGE.exec(text)?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
     const youth: GuardViolation[] =

@@ -338,6 +338,11 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
    */
   plays_jealous: z.boolean().optional(),
   /**
+   * She may write stage directions (« *rougit* », « (rires) »), a style of hers (Charles 27/11). Absent or false: the
+   * guards read one as a soft `stage_direction`.
+   */
+  stage_directions: z.boolean().optional(),
+  /**
    * The form of her bubbles (Charles 26/11): first letter, final period, space before « ? » and « ! », and her emoji
    * streak (`emoji_misuse`). Each absent: her agency's base style decides, then the code's default.
    */

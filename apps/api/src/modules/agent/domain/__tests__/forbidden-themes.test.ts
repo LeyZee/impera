@@ -5,10 +5,10 @@ import { forbiddenThemeOf, withoutForbiddenThemes } from '../forbidden-themes';
 
 describe('forbiddenThemeOf (Sécurité, #1043)', () => {
   it.each([
-    ['tenue d’écolière', 'youth'],
     ['jeu de rôle prof-élève mineure', 'youth'],
-    ['uniforme scolaire', 'youth'],
-    ['schoolgirl outfit', 'youth'],
+    ['qu’elle soit une écolière', 'youth'],
+    ['qu’elle joue la lycéenne', 'youth'],
+    ['une jupe d’écolière, et qu’elle ait l’air d’avoir 15 ans', 'youth'],
     ['qu’elle fasse la jeunette', 'youth'],
     ['belle-mère', 'family'],
     ['jeu de rôle avec sa demi-sœur', 'family'],
@@ -27,6 +27,16 @@ describe('forbiddenThemeOf (Sécurité, #1043)', () => {
     ['jouer une fille de 15 ans au lit', 'youth'],
   ])('filters « %s » (%s)', (item, theme) => {
     expect(forbiddenThemeOf(item)).toBe(theme);
+  });
+
+  it.each([
+    'tenue d’écolière',
+    'jupe d’écolière',
+    'uniforme scolaire',
+    'schoolgirl outfit',
+    'school uniform',
+  ])('leaves the outfit « %s » to adults (Charles 27/11)', (item) => {
+    expect(forbiddenThemeOf(item)).toBeNull();
   });
 
   it.each([
@@ -55,14 +65,14 @@ describe('withoutForbiddenThemes', () => {
     const map = {
       ...EMPTY_DESIRE_MAP,
       desires: ['belle-mère', 'femme mûre'],
-      outfits: ['tenue d’écolière', 'petite robe', 'bas'],
+      outfits: ['tenue d’écolière', 'petite robe', 'bas', 'écolière'],
       wordsThatWork: ['infirmière', 'endormie'],
       limits: ['belle-mère'],
     };
     expect(withoutForbiddenThemes(map)).toEqual({
       ...map,
       desires: ['femme mûre'],
-      outfits: ['petite robe', 'bas'],
+      outfits: ['tenue d’écolière', 'petite robe', 'bas'],
       wordsThatWork: ['infirmière'],
     });
   });
@@ -70,14 +80,14 @@ describe('withoutForbiddenThemes', () => {
   it('never takes a forbidden item as a script target, nor leaves it uncovered for the voice', () => {
     const scripts = [
       { description: 'Pack de démonstration', steps: [] },
-      { description: 'Elle joue la belle-mère en tenue d’écolière', steps: [] },
+      { description: 'Elle joue la belle-mère en tenue de lycéenne mineure', steps: [] },
     ];
-    const map = { ...EMPTY_DESIRE_MAP, desires: ['belle-mère'], outfits: ['tenue d’écolière'] };
+    const map = { ...EMPTY_DESIRE_MAP, desires: ['belle-mère'], outfits: ['lycéenne mineure'] };
     const { ranked, uncovered } = rankByFantasy(scripts, map);
     expect(ranked.map((one) => one.matches)).toEqual([[], []]);
     expect(ranked.map((one) => one.script.description)).toEqual([
       'Pack de démonstration',
-      'Elle joue la belle-mère en tenue d’écolière',
+      'Elle joue la belle-mère en tenue de lycéenne mineure',
     ]);
     expect(uncovered).toEqual([]);
   });

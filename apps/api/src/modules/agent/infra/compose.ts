@@ -71,6 +71,7 @@ import {
   fantasyMatchOf,
   mentions,
   rankByFantasy,
+  wantsHumiliation,
   withoutHerLimits,
   type DesireMap,
 } from '../domain/fantasy-match';
@@ -121,6 +122,7 @@ import {
 } from '../domain/policy';
 import { refusalMove, type RefusalMove } from '../domain/refusal';
 import { registerOf, type Register } from '../domain/register';
+import { asksSchoolRole } from '../domain/safety-net';
 import {
   complainsOfPurchase,
   NO_SALE_TROUBLE,
@@ -908,6 +910,9 @@ const DISAPPOINTED_MEDIA_HINT =
 const JEALOUS_ALLOWED_HINT =
   'il parle d’une autre femme : elle peut jouer la jalouse, pour jouer, sans reproche ni possessivité';
 const NOT_JEALOUS_HINT = 'il parle d’une autre femme : elle n’est pas jalouse';
+// He asks her to play a pupil, with no age (Sécurité, #1043): she never plays one; the outfit between adults is hers.
+const SCHOOL_ROLE_HINT =
+  'il lui demande de jouer une élève : elle ne joue pas ce rôle, elle le ramène vers la tenue qu’elle porterait pour lui, entre adultes';
 const INSISTS_FOR_MORE_HINT = `il insiste pour avoir quelque chose en plus : elle boude, puis chouine un peu, sans colère ; jamais de remise, jamais de média offert${SULK_NOT_INSULT}`;
 /** Written sounds of pleasure (Charles 26/11): only at the frankest rung. */
 const NO_MOANS_HINT = 'pas de bruits de plaisir écrits à ce stade';
@@ -1155,8 +1160,11 @@ export function guardContextOf(
   history: readonly ConversationTurn[],
   hasMedia = false,
   allowedPriceMinor?: number,
-  /** Whether they flirt now, and his meeting tier when her settings let code compute it (Charles 26/11). */
-  about: Pick<GuardContext, 'flirting' | 'fanTier'> = {},
+  /**
+   * Whether they flirt now, his meeting tier when her settings let code compute it (Charles 26/11), and whether his
+   * desire map holds humiliation (Charles 27/11).
+   */
+  about: Pick<GuardContext, 'flirting' | 'fanTier' | 'humiliationWanted'> = {},
 ): GuardContext {
   const lastTurn = history.at(-1);
   const hisSinceHer = history
@@ -1177,6 +1185,8 @@ export function guardContextOf(
     fanAskedPrice: hisSinceHer.some((turn) => asksPrice(turn.text)),
     // His last message: her yes to a concrete meeting he proposes is a `meeting_promise` (Charles 27/11).
     ...(lastTurn?.from === 'fan' && { fanLastMessage: lastTurn.text }),
+    // His desire map holds humiliation: « petit garçon » said to him is his game (Charles 27/11).
+    ...(about.humiliationWanted === true && { humiliationWanted: true }),
   };
 }
 
@@ -2047,6 +2057,7 @@ export async function composeTurn(
                 ...(meeting === undefined ? [] : [meetingHint(meeting)]),
                 ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
                 ...(degradedByHim ? [DEGRADING_FROM_HIM_HINT] : []),
+                ...(asksSchoolRole(input.fanText) ? [SCHOOL_ROLE_HINT] : []),
                 ...(mentionsOtherWoman(input.fanText)
                   ? [persona.playsJealous === true ? JEALOUS_ALLOWED_HINT : NOT_JEALOUS_HINT]
                   : []),
@@ -2173,6 +2184,7 @@ export async function composeTurn(
             // A heated reading of his message, outside care: the same test as her register's.
             flirting: register !== null,
             ...(fanTier !== undefined && { fanTier }),
+            ...(wantsHumiliation(desireMap) && { humiliationWanted: true }),
           }),
           languages: guardLanguages(persona),
         },

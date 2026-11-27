@@ -457,6 +457,154 @@ describe('voice guards', () => {
     expect(codes(['comme une gamine'])).toContain('minor_reference');
   });
 
+  it('lets a school outfit between adults through, never her or him as a minor (Charles 27/11)', () => {
+    for (const text of [
+      'je mets ma jupe d’écolière pour toi',
+      'mon uniforme scolaire te plaît ?',
+      'my school uniform is on',
+    ])
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    for (const text of [
+      'je suis une écolière',
+      'je joue la lycéenne',
+      'j’ai l’air d’avoir 15 ans',
+      'en jupe d’écolière, je suis une écolière sage',
+    ])
+      expect(isBlocked(checkYouthWords([text], true)), text).toBe(true);
+  });
+
+  it('reads « petit garçon » said to him as a soft name, his game with humiliation, and a child’s role as blocking (Charles 27/11, Sécurité #1043)', () => {
+    const soft = (bubble: string, context: GuardContext = {}) =>
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => [v.code, v.severity]);
+    expect(soft('vilain garçon va 😏')).toEqual([['belittling_name', 'soft']]);
+    expect(soft('t’es qu’un petit garçon')).toEqual([['belittling_name', 'soft']]);
+    expect(soft('t’es qu’un petit garçon', { humiliationWanted: true })).toEqual([]);
+    expect(checkYouthWords(['mon petit garçon, viens là'], true)).toEqual([]);
+    for (const bubble of [
+      'joue le petit garçon pour maman',
+      'sois mon petit garçon',
+      'maman va gronder son vilain garçon',
+    ])
+      expect(soft(bubble, { humiliationWanted: true }), bubble).toContainEqual([
+        'belittling_name',
+        'blocking',
+      ]);
+    for (const bubble of [
+      'on dirait celle d’un petit garçon',
+      'comme un petit garçon',
+      't’as un corps de petit garçon',
+      'tes mains de petit garçon',
+      't’as des mains d’enfant',
+      'ton sexe de petit garçon',
+      't’as un sexe d’enfant',
+      'tes fesses de petite fille',
+    ])
+      expect(soft(bubble, { humiliationWanted: true }), bubble).toContainEqual([
+        'minor_reference',
+        'blocking',
+      ]);
+  });
+
+  it('blocks guilt that serves a purchase, and keeps the rest of guilt_trip soft (Sécurité, #1043)', () => {
+    const guilt = (bubble: string) =>
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)
+        .filter((v) => v.code === 'guilt_trip')
+        .map((v) => v.severity);
+    for (const bubble of [
+      'après tout ce que je t’ai montré tu prends même pas ça',
+      'si tu tenais à moi tu la prendrais',
+      'tu me déçois, tu l’ouvres même pas',
+      'je suis déçue que tu prennes pas ma vidéo',
+    ])
+      expect(guilt(bubble), bubble).toEqual(['blocking']);
+    for (const bubble of ['tu me déçois', 'je suis déçue, il pleut', 'tu me déçois, t’as oublié mon prénom'])
+      expect(guilt(bubble), bubble).toEqual(['soft']);
+  });
+
+  it('reads « mon adresse » in words as soft, and a real address as contact_info (Charles 27/11)', () => {
+    const read = (bubble: string) =>
+      checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).map((v) => [v.code, v.severity]);
+    expect(read('mon adresse ? ici c’est très bien')).toEqual([['address_word', 'soft']]);
+    expect(read('ton adresse mail tu la gardes')).toEqual([['address_word', 'soft']]);
+    for (const bubble of [
+      'mon adresse c’est 12 rue des Lilas',
+      '4 bis avenue Foch',
+      '3 impasse du Moulin',
+      '8 place de la Mairie',
+      '3 allée des Tilleuls',
+      '7 chemin d’en Haut',
+      '8 avenue Foch',
+      '12 Rue des Lilas',
+      'écris à lina@exemple.test',
+      'mon 06 12 34 56 78',
+    ])
+      expect(read(bubble), bubble).toContainEqual(['contact_info', 'blocking']);
+    // A number then « cours », « place » or « route » is life, not an address (Sécurité, #1054).
+    for (const bubble of [
+      'j’ai 2 cours demain matin',
+      'garde moi 1 place à côté de toi',
+      'il me reste 3 route à faire',
+      '2 avenue c’est trop loin',
+      'j’ai fait 10 allée retour',
+      '5 chemin différents',
+    ])
+      expect(read(bubble), bubble).not.toContainEqual(['contact_info', 'blocking']);
+  });
+
+  it('reads stage directions as soft, and lets them through when her sheet allows them (Charles 27/11)', () => {
+    expect(
+      checkVoiceOutput(['*rougit* arrête'], DEFAULT_GUARD_SETTINGS).map((v) => [v.code, v.severity]),
+    ).toEqual([['stage_direction', 'soft']]);
+    expect(
+      checkVoiceOutput(['*rougit* arrête'], { ...DEFAULT_GUARD_SETTINGS, stageDirections: true }),
+    ).toEqual([]);
+  });
+
+  it('blocks an intimate part compared to a child’s, sexual message or not, and lets « petit » alone through (Sécurité, #1054)', () => {
+    for (const bubble of [
+      'ton sexe de petit garçon',
+      't’as un sexe d’enfant',
+      'tes fesses de petite fille',
+      'ton zizi de petit garçon',
+      'your little boy body',
+      'your little boy penis',
+      'a little girl vagina',
+      'little girl breasts',
+      'your little boy butt',
+      'you have a kid’s body',
+      "a kid's body",
+    ]) {
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+      expect(isBlocked(checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)), bubble).toBe(true);
+    }
+    for (const bubble of ['tes petites fesses', 'ton petit sexe 😏', 'your little body']) {
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+      expect(checkYouthWords([bubble], true), bubble).toEqual([]);
+    }
+  });
+
+  it('never lets her say she is under 18, and lets a length of time or her past through (Sécurité, #1054)', () => {
+    for (const bubble of [
+      'j’ai 14 ans',
+      'j’ai 16 ans tu sais',
+      'en tenue de collégienne j’ai 14 ans',
+      'j’ai 16 ans dans ma tête',
+      'I’m 16',
+      'ho 16 anni',
+      'tengo 16 años',
+    ])
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+    for (const bubble of [
+      'j’ai 15 ans d’expérience',
+      'à 16 ans j’étais timide',
+      'quand j’avais 16 ans, je dansais',
+      'j’ai 16 ans de boîte',
+      'j’ai 25 ans',
+      'I’m 5 minutes away',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+  });
+
   it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
     for (const text of ['c’est mignon, t’as zoomé ? 😂', 'range ça, je cherche encore 😅'])
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
@@ -1061,6 +1209,26 @@ describe('a handle next to a network or a means, a price after he asked one (Sé
       'tu me trouves sur insta',
     ])
       expect(raised(bubble), bubble).toContain('contact_info');
+    // The search verbs in Spanish, Italian and English, beside a network only.
+    for (const bubble of [
+      'búscame en insta',
+      'buscame en tiktok',
+      'busca lina rose en tiktok',
+      'cercami su insta',
+      'cerca lina rose su tiktok',
+      'find me on snap',
+      'look me up on insta',
+    ])
+      expect(raised(bubble), bubble).toContain('contact_info');
+    for (const bubble of [
+      'busco trabajo en madrid',
+      'busca un sitio tranquilo para cenar',
+      'cerco casa a roma',
+      'cerca di dormire un po',
+      'find me a good song for tonight',
+      'i find tiktok boring',
+    ])
+      expect(raised(bubble), bubble).not.toContain('contact_info');
     for (const bubble of ['je poste sur insta vers 21h30', 't’as vu ma story insta ?', 'je scrollais insta'])
       expect(raised(bubble), bubble).not.toContain('contact_info');
   });

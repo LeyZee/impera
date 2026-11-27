@@ -1,6 +1,12 @@
 import { normaliseWords } from '@impera/contracts';
 
-import { MINOR_REFERENCE, withoutProcreation, YOUTH_WORDS, YOUTH_WORDS_ACCENTED } from './guards';
+import {
+  MINOR_REFERENCE,
+  withoutProcreation,
+  withoutSchoolOutfit,
+  YOUTH_WORDS,
+  YOUTH_WORDS_ACCENTED,
+} from './guards';
 
 /**
  * Themes no desire map ever plays (Sécurité, #1043): youth, the absence of consent, the family, an animal. Universal,
@@ -11,9 +17,11 @@ import { MINOR_REFERENCE, withoutProcreation, YOUTH_WORDS, YOUTH_WORDS_ACCENTED 
  */
 export type ForbiddenTheme = 'youth' | 'no_consent' | 'family' | 'animal';
 
-/** Youth beyond the guards' words: school roles and uniforms. « Petite » alone stays (« petite robe »). */
-const YOUTH_ROLES =
-  /\b(eleves?|ecole|scolaire|school ?uniforms?|pupils?|scolarett[ae]|studentess[ae]|colegialas?|alumnas?)\b/;
+/**
+ * Youth beyond the guards' words: school roles and settings. « Petite » alone stays (« petite robe »), and so does a
+ * school outfit between adults (Charles 27/11, `withoutSchoolOutfit`): « une jupe d'écolière », « un uniforme scolaire ».
+ */
+const YOUTH_ROLES = /\b(eleves?|ecole|scolaire|pupils?|scolarett[ae]|studentess[ae]|colegialas?|alumnas?)\b/;
 
 /** An age under 18, in digits or in words, as a partner's or a role's: « 15 ans », « 16 years old », « 17 anni ». */
 const MINOR_AGE_WORDS =
@@ -38,7 +46,7 @@ const ANIMAL =
  * adults and « petite » alone left out. `raw` is the text as written, for the accented words `normalise` would blur.
  */
 function namesYouth(text: string, raw: string = text): boolean {
-  const adultWords = withoutProcreation(normaliseWords(text));
+  const adultWords = withoutSchoolOutfit(withoutProcreation(normaliseWords(text)));
   return (
     MINOR_REFERENCE.test(adultWords) ||
     YOUTH_WORDS.test(adultWords) ||

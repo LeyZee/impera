@@ -731,8 +731,11 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         undefined,
         history[lastAnswer]?.text,
       );
-      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
-        scripts = { ...scripts, salesFrozen: true };
+      // A doubt on his age freezes the sales; asked to be like his own child, a human takes it, nothing frozen
+      // (Sécurité, #1054).
+      const minor = signs.includes('minor_suspected') || signs.includes('minor_fantasy');
+      if (minor || signs.includes('his_child_role')) {
+        if (minor) scripts = { ...scripts, salesFrozen: true };
         const held: PlaygroundTurn = {
           bubbles: [],
           violations: [],

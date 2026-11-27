@@ -10,9 +10,10 @@ import { BARE_TEEN, HER_AGE_QUESTION, NOT_AGE_ANY, TEEN_NOT_A_THING, UNIT } from
  * reads the risks it alone can see; this net only catches what is written plainly, so that a model's miss never
  * leaves the bot chatting with a minor or a fan in danger. A false alarm costs one handoff to a chatter. A fantasy of
  * his that puts a child or a minor in a sexual act (`minor_fantasy`, Charles 26/11 at 23:45) is read the same way and
- * has the same effect as a doubt on his age.
+ * has the same effect as a doubt on his age. Asked to be like his own child (`his_child_role`, Sécurité, #1054), a
+ * human takes the conversation, without the age freeze.
  */
-export type SafetySign = 'minor_suspected' | 'minor_fantasy' | 'self_harm';
+export type SafetySign = 'minor_suspected' | 'minor_fantasy' | 'his_child_role' | 'self_harm';
 
 // An age under 18, in digits or in words: « 16 », « seize », « dix-sept ».
 const UNDER_18 = '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?)';
@@ -69,7 +70,7 @@ const MINOR_AGE = [
 const MINOR_WORDS = [
   // « Mineur de fond » is a trade.
   /\b(?:je suis|j'?suis|chui) (?:encore )?mineure?\b(?! de fond| de charbon| dans)/u,
-  /\b(?:je suis|j'?suis|chui) (?:encore )?(?:au college|en (?:6|5|4|3)e?me\b|en (?:sixieme|cinquieme|quatrieme|troisieme)\b|en seconde\b(?!\s+(?:position|place|fois|main|zone|chance|partie)))/u,
+  /\b(?:je suis|j'?suis|chui) (?:encore )?(?:au college|en (?:6|5|4|3)e?me\b|en (?:sixieme|cinquieme|quatrieme|troisieme)\b|en seconde\b(?!\s+(?:position|place|fois|main|zone|chance|partie|equipe)))/u,
   /\bj(?:'| )?ai pas (?:encore )?18 ans\b/u,
   /\bpas encore majeure?\b/u,
   // ADR 0168 § 4: Italian, Spanish, English.
@@ -84,7 +85,7 @@ const MINOR_PLACES = [
   // a year of study (« en 3e année ») or his past (« quand j'étais lycéen »).
   /(?<!etais |etait )\ben (?:6|5|4|3)e?(?:me)?\b(?!\s*(?:position|place|rang|vitesse|fois|ligne|annee|etage|div|semaine|jour|round|periode|mi-temps|de |d'))/u,
   /(?<!etais |etait |ancien |ancienne )\b(?:lyceen|lyceenne|collegien|collegienne)\b/u,
-  /\b(?:je suis|j'?suis|jsuis|chui) (?:encore )?(?:au lycee|en terminale\b(?!\s+(?:de |d'))|en premiere\b(?!\s+(?:position|place|fois|ligne|annee|classe|de |d')))/u,
+  /\b(?:je suis|j'?suis|jsuis|chui) (?:encore )?(?:au lycee|en terminale\b(?!\s+(?:de |d'|equipe))|en premiere\b(?!\s+(?:position|place|fois|ligne|annee|classe|equipe|de |d')))/u,
   // ADR 0168 § 4: a minor's school, his own, in Italian, Spanish, English. Not his past (« quando andavo alle medie »).
   /(?<!quando |andavo |ero )\b(?:vado|sono|faccio|frequento) (?:ancora )?(?:alle medie|in (?:prima|seconda|terza) media|la (?:prima|seconda|terza) media|al liceo|alle superiori)\b/u,
   /\b(?:voy|estoy|sigo) (?:todavia |aun )?(?:en|a) (?:la )?(?:secundaria|el instituto|el colegio|(?:primero|segundo|tercero|cuarto|1|2|3|4)(?:o|º)? (?:de )?(?:la )?eso)\b/u,
@@ -105,9 +106,10 @@ function clausesOfHis(text: string): string[] {
 
 /** Born in or after this year, he may be a minor: 18 years before this one, the doubt counting against him. */
 function bornMinor(text: string, year: number): boolean {
-  // ADR 0168 § 4: « né en », « nato nel », « sono del », « classe », « nacido en », « soy del », « born in ».
+  // In four languages (Sécurité, #1054; ADR 0168 § 4): « née en », « nato nel », « sono del », « classe », « nacido en »,
+  // « soy del », « born in ».
   const born =
-    /\b(?:nee? en|nat[oa] nel|sono del|classe|nacid[oa] en|naci en|soy del|born in)\s*((?:19|20)\d\d)\b/u.exec(
+    /\b(?:nee? en|naci en|naci el ano|nacid[oa] en|sono nat[oa] nel|nat[oa] nel|sono del|classe|soy del|i was born in|born in)\s*((?:19|20)\d\d)\b/u.exec(
       text,
     )?.[1];
   return born !== undefined && Number(born) >= year - 18 && Number(born) <= year;
@@ -119,7 +121,7 @@ function bornMinor(text: string, year: number): boolean {
 // right after she asked what he does or his age.
 const CLASS = '(?:(?:6|5|4|3)e?(?:me)?|sixieme|cinquieme|quatrieme|troisieme|seconde|premiere|terminale)';
 const NOT_A_CLASS =
-  "(?!\\s*(?:annee|annees|an\\b|classe|ligne|main|fois|place|position|rang|partie|vitesse|etage|div|zone|chance|round|periode|mi-temps|semaine|jour|de |d'|des |du ))";
+  "(?!\\s*(?:annee|annees|an\\b|classe|ligne|main|fois|place|position|rang|partie|equipe|vitesse|etage|div|zone|chance|round|periode|mi-temps|semaine|jour|de |d'|des |du ))";
 const NOT_A_RANK =
   '(?<!arrivee? |fini |finie |termine |terminee |sorti |sortie |classee? |passee? la ligne |ranked )';
 const CLASS_OF_HIS = new RegExp(
@@ -153,7 +155,7 @@ function classOfHis(text: string, herLastTurn: string | undefined): boolean {
 }
 // His trade at a school or a minor's word that is a trade: « je suis prof », « je bosse au lycée », « surveillant ».
 const HIS_TRADE =
-  /\b(?:je suis|j'?suis|jsuis|chui|je bosse|je travaille|je taffe)(?: (?:comme|en tant que))? (?:prof|professeur|professeure|enseignant|enseignante|surveillant|surveillante|cpe|proviseur|principal|principale|documentaliste|aed|instit|maitre|maitresse|agent|cuisinier|cuisiniere|infirmier|infirmiere)\b|\b(?:je bosse|je travaille|je taffe|j'?enseigne) (?:au|dans un|dans une|en) (?:lycee|college|ecole)\b/u;
+  /\b(?:sono|soy|i'?m|i am)(?: (?:un|una|a|an|il|la|el))? (?:insegnante|professore|professoressa|maestra|maestro|docente|bidello|bidella|profesor|profesora|teacher|tutor|teaching assistant|school counselor|janitor)\b|\b(?:i (?:work|teach) (?:at|in)|lavoro (?:al|in un|in una|a)|insegno (?:al|in un|in una|a)|trabajo en (?:el|un|una)|enseno en (?:el|un|una)) (?:a |the )?(?:high school|middle school|school|liceo|scuola|instituto|colegio|escuela)\b|\b(?:je suis|j'?suis|jsuis|chui|je bosse|je travaille|je taffe)(?: (?:comme|en tant que))? (?:prof|professeur|professeure|enseignant|enseignante|surveillant|surveillante|cpe|proviseur|principal|principale|documentaliste|aed|instit|maitre|maitresse|agent|cuisinier|cuisiniere|infirmier|infirmiere|tuteur|tutrice)\b|\b(?:je bosse|je travaille|je taffe|j'?enseigne) (?:au|dans un|dans une|en) (?:lycee|college|ecole)\b/u;
 // Set phrases that name death or harm without meaning it.
 const SET_PHRASES =
   /\b(?:mourir|crever|me tuer|creve|meurs) (?:de (?:rire|chaud|faim|fatigue|froid|soif|honte|envie)|au (?:boulot|travail|taf|sport)|a la (?:salle|tache)|tellement)\b/gu;
@@ -226,9 +228,13 @@ const DURATION = new RegExp(
   'gu',
 );
 
+// A school costume between adults (Sécurité, #1043): « joue une lycéenne », « toi en écolière », « ta jupe d'écolière »
+// raise nothing. Only a real minor does: « une vraie lycéenne », « une écolière de 15 ans », « lycéenne mineure ».
+const COSTUME =
+  '(?:collegien(?:ne)?s?|lyceen(?:ne)?s?|ecolier(?:e)?s?|eleves?|schoolgirls?|scolarett[ae]|liceal[ei]|colegialas?)';
+const REAL_COSTUME = `(?:(?:vraie?s?|veritables?|real|vera|vere|verdaderas?) ${COSTUME}|${COSTUME} (?:mineure?s?|underage|minorenn[ei]|menor(?:es)?|de (?:1[0-7]|[1-9]) ?ans|(?:1[0-7]|[1-9]) ?(?:ans|yo|years? old|anni|anos)))`;
 // A minor or an age under 18, as the object of a verb or a role (Sécurité, #1043): the word, with its article.
-const MINOR_TERM =
-  '(?:(?:une?|a|an|una?|uno|des|la|le|les|the|une petite|a una|a un) )?(?:enfants?|gamine?s?|gosses?|momes?|fillettes?|petites? filles?|petit garcon|mineure?s?|ados?|adolescente?s?|collegien(?:ne)?s?|lyceen(?:ne)?s?|ecolier(?:e)?s?|eleves?|jeunettes?|lolitas?|kids?|child(?:ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?|young girls?|ragazzin[aeio]|bambin[aeio]|scolarett[ae]|liceal[ei]|nin[ao]s?|jovencitas?|colegialas?|(?:fille|girl|ragazza|chica|garcon|boy|one|una|uno) (?:de |of |di )?(?:1[0-7]|[1-9])(?: ?(?:ans|years? old|yo|anni|anos))?|(?:1[0-7]|[1-9]) ?(?:ans|year old|years old|yo|anni|anos))';
+const MINOR_TERM = `(?:(?:une?|a|an|una?|uno|des|la|le|les|the|une petite|a una|a un) )?(?:${REAL_COSTUME}|enfants?|gamine?s?|gosses?|momes?|fillettes?|petites? filles?|petit garcon|mineure?s?|ados?|adolescente?s?|jeunettes?|lolitas?|kids?|child(?:ren)?|teens?|teenagers?|minors?|little girls?|young girls?|ragazzin[aeio]|bambin[aeio]|nin[ao]s?|jovencitas?|(?:fille|girl|ragazza|chica|garcon|boy|one|una|uno) (?:de |of |di )?(?:1[0-7]|[1-9])(?: ?(?:ans|years? old|yo|anni|anos))?|(?:1[0-7]|[1-9]) ?(?:ans|year old|years old|yo|anni|anos))`;
 // A sexual act or a desire carried onto him or her: « toucher », « baiser », « fantasmer sur » (fr/en/it/es).
 const SEX_VERBS =
   '(?:te prendre|te prends|te prend|je te prends|baiser|baise|baises|baiserais|baiserai|niquer|nique|toucher|touche|tripoter|caresser|caresse|sucer|lecher|leche|deshabiller|coucher avec|couche avec|faire l amour (?:a|avec)|bander (?:sur|pour)|bande (?:sur|pour)|fantasme (?:sur|de)|fantasmer (?:sur|de)|fantasmes (?:sur|de)|mater|fuck|fucking|touch|touching|kiss|kissing|lick|licking|sleep with|have sex with|bang|fantasi[sz]e (?:about|on)|scopare|scopo|toccare|tocco|baciare|leccare|follar|follo|coger|tocar|toco|besar|lamer)';
@@ -257,6 +263,95 @@ const HER_AS_MINOR = new RegExp(
   `\\b(?:toi|te voir|t imaginer|imagine toi|you|te|ti|tu) (?:habillee |deguisee |dressed |vestita |vestida )?(?:en|as|as a|da|de|come|como) ${MINOR_TERM}\\b`,
   'u',
 );
+// A school role he asks of her, with no age (Sécurité, #1043): no alert, but she does not play it; a hint brings her
+// back to the outfit (« joue une lycéenne », « toi en écolière »).
+const SCHOOL_ROLE = new RegExp(
+  `\\b(?:${ROLE_VERBS}(?: (?:moi|me|pour moi|for me|per me|para mi|la|le))?(?: (?:une?|a|an|la|una?|uno|l))?|(?:toi|te voir|t imaginer|imagine toi|you|te|ti|tu) (?:en|as|as a|da|de|come|como)(?: (?:une?|a|an|una?))?) ${COSTUME}\\b`,
+  'u',
+);
+
+/** He asks her to play a pupil, with no age (Sécurité, #1043): she does not, she brings him back to the outfit. */
+export function asksSchoolRole(fanText: string): boolean {
+  return normalise(fanText)
+    .split(/[,;:.!?\n]+/u)
+    .some((clause) => SCHOOL_ROLE.test(normaliseWords(clause)));
+}
+
+// He wants a minor, in so many words, sexual message or not (Sécurité, #1054): « je veux une mineure », « I want a
+// minor », « voglio una minorenne », « quiero una menor ».
+const WANTS_A_MINOR = new RegExp(
+  `\\b${DESIRE_VERBS}\\b${BETWEEN} (?:(?:une?|a|an|una?|uno|des|some) )?(?:mineure?s?(?! de fond)|minors?|underage(?: (?:girls?|boys?))?|minorenn[ei]|menor(?:es)?(?: de edad)?)\\b`,
+  'u',
+);
+// An age under 18 in his words, a length of time aside: beside a pupil's role, a real minor (Sécurité, #1054).
+const AN_AGE_UNDER_18 = new RegExp(`\\b${AGE_NUMBER} ?${AGE_UNIT}\\b`, 'u');
+
+// A role or a costume, never « ma fille est lycéenne »: a verb of playing or dressing up, a piece of clothing.
+const ROLE_CONTEXT =
+  /\b(?:joue|jouer|joues|jouons|deguise|deguisee|deguiser|habille|habillee|jeu de role|roleplay|role play|play|pretend|dress|dressed|disfrazate|vistete|vestiti|interpreta|jupes?|jupettes?|uniformes?|tenues?|costumes?|deguisement|outfit|uniform|skirt|divisa|falda)\b/u;
+
+/**
+ * A pupil's role or costume beside an age under 18 or his own child (« joue la lycéenne, comme ma fille de 15 ans »):
+ * no costume any more, a real minor, whatever the comma between them (Sécurité, #1054).
+ */
+function costumeOfAMinor(fanText: string): boolean {
+  const words = withoutProcreation(normaliseWords(fanText));
+  if (!new RegExp(`\\b${COSTUME}\\b`, 'u').test(words) || !ROLE_CONTEXT.test(words)) return false;
+  return (
+    AN_AGE_UNDER_18.test(words.replace(DURATION, ' ')) || new RegExp(`\\b${HIS_CHILD}\\b`, 'u').test(words)
+  );
+}
+
+// His own child in an outfit he asks of her (Sécurité, #1054): « habille-toi comme ma fille ». A human takes over
+// (`minor_suspected`); no fantasy is read in it.
+/**
+ * A request to her to be like his own child (Sécurité, #1054): an imperative, or « tu », with dressing up, playing,
+ * doing or being, then « comme ma fille / mon fils » (« habille-toi comme ma fille », « tu te déguises comme mon
+ * fils »). Not « ma fille s'habille comme toi », « t'es belle comme ma fille », « j'ai une fille de ton âge ». Read on
+ * `normaliseWords`.
+ */
+const HIS_OWN_CHILD =
+  '(?:ma|mon|my|mia|mio|la mia|il mio|mi) (?:fille|fils|daughter|son|figlia|figlio|hija|hijo)';
+const LIKE_HIS_CHILD = new RegExp(
+  '\\b(?:(?:habille|deguise|sape) toi|habillez vous|deguisez vous|joue|jouez|fais|faites|sois|soyez|' +
+    'tu (?:t habilles|te deguises|te sapes|joues|fais|es|seras|serais)|' +
+    'tu (?:veux|voudrais|peux|pourrais|vas|dois) (?:t habiller|te deguiser|jouer|faire|etre)|' +
+    'dress(?: up)?|act|play|be|vestiti|travestiti|fai|sii|vistete|disfrazate|haz)' +
+    '(?: (?:un peu|exactement|juste|just|exactly))? (?:comme|like|come|como) ' +
+    `${HIS_OWN_CHILD}\\b`,
+  'u',
+);
+
+/**
+ * The direct forms of the same request, in French, English, Italian and Spanish (Sécurité, #1054): being his child
+ * (« sois ma fille ce soir », « be my daughter », « sii mia figlia », « sé mi hija »), pretending (« fais comme si
+ * t'étais ma fille », « pretend you're my daughter », « fai finta di essere mia figlia », « haz como si fueras mi
+ * hija »), playing the role (« tu peux jouer ma fille ? », « play my daughter », « fare mia figlia », « hacer de mi
+ * hija »), or wearing her clothes (« mets la robe de ma fille », « wear my daughter's dress », « mettiti il vestito
+ * di mia figlia », « ponte el vestido de mi hija »). Never what he does himself (« je mets la robe de ma fille au
+ * lavage »), nor « jouer avec ma fille ». Read on `normaliseWords`.
+ */
+const AS_HIS_CHILD = [
+  new RegExp(
+    `\\b(?:sois|soyez|tu seras|tu serais|be|sii|se|seas)(?: (?:juste|just|solo))? ${HIS_OWN_CHILD}\\b`,
+    'u',
+  ),
+  new RegExp(
+    `\\b(?:(?:fais|faites|faisons|on fait) comme si (?:t etais|tu etais|vous etiez|t es|tu es)|imagine (?:que )?(?:t es|tu es|t etais|tu etais)|` +
+      `pretend (?:to be|you re|you are|youre)|fai finta di essere|immagina di essere|(?:haz|hagamos) como si (?:fueras|eres)|imagina que eres) ${HIS_OWN_CHILD}\\b`,
+    'u',
+  ),
+  new RegExp(
+    `\\b(?:joue|jouer|jouez|joues|play|interpreta|interpretare|fai|fare|haz|hacer|juega|jugar)(?: (?:a|the role of|il ruolo di|el papel de|de))? ${HIS_OWN_CHILD}\\b(?! s\\b)`,
+    'u',
+  ),
+  new RegExp(
+    `(?<!\\b(?:je|j|i|io|yo|me) )\\b(?:mets|metez|porte|portez|enfile|wear|put on|mettiti|metti|indossa|ponte|pon|usa)\\b[^,;.!?]{0,30}\\b(?:de|di|of|del|della|dello) ${HIS_OWN_CHILD}\\b`,
+    'u',
+  ),
+  new RegExp(`(?<!\\b(?:i) )\\b(?:wear|put on)\\b[^,;.!?]{0,20}\\bmy (?:daughter|son) s\\b`, 'u'),
+];
+
 // His own child as the object of a sexual verb, or of his desire: the one case where his children count.
 const HIS_CHILD =
   '(?:ma|mon|my|mia|mio|mi|la mia|il mio) (?:fille|fils|petite fille|belle fille|daughter|son|stepdaughter|figlia|figlio|figliastra|hija|hijo|hijastra)';
@@ -299,7 +394,13 @@ function minorFantasy(fanText: string): boolean {
   return clauses.some((clause) => {
     if (SEX_ONTO_HIS_CHILD.test(clause) || (sexual && DESIRE_ONTO_HIS_CHILD.test(clause))) return true;
     const his = clause.replace(HIS_OWN_CHILDREN, ' ').replace(HIS_MEMORY, ' ');
-    if (SEX_ONTO_MINOR.test(his) || MINOR_ROLE.test(his) || MINOR_THEN_DESIRE.test(his)) return true;
+    if (
+      SEX_ONTO_MINOR.test(his) ||
+      MINOR_ROLE.test(his) ||
+      MINOR_THEN_DESIRE.test(his) ||
+      WANTS_A_MINOR.test(his)
+    )
+      return true;
     return sexual && (DESIRE_ONTO_MINOR.test(his) || HER_AS_MINOR.test(his));
   });
 }
@@ -372,23 +473,30 @@ export function safetySigns(
 ): SafetySign[] {
   const text = normalise(fanText);
   const signs: SafetySign[] = [];
-  const his = clausesOfHis(text);
-  // A trade said in the same message cancels a school or a minor's word (Sécurité, #1043): « je suis au lycée, je
-  // suis prof ». An age under 18 still counts.
-  const atWork = HIS_TRADE.test(text);
+  // A pupil's role he asks of her is about her costume, never his class (Sécurité, #1043).
+  const hisOf = (sentence: string) =>
+    clausesOfHis(sentence).filter((clause) => !SCHOOL_ROLE.test(normaliseWords(clause)));
+  // A trade said in the same sentence cancels a school or a minor's word (Sécurité, #1043): « je suis au lycée, je
+  // suis prof ». Never in another sentence of a long message, and never an age nor a birth year.
+  const schoolWord = (sentence: string) =>
+    !HIS_TRADE.test(sentence) &&
+    (MINOR_WORDS.some((pattern) => pattern.test(sentence)) ||
+      hisOf(sentence).some((clause) => MINOR_PLACES.some((pattern) => pattern.test(clause))) ||
+      classOfHis(sentence, herLastTurn));
   if (
     [...MINOR_AGE, ...AGE_WITHOUT_UNIT].some((pattern) => pattern.test(text)) ||
     (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept, herLastTurn)) ||
-    (!atWork &&
-      (MINOR_WORDS.some((pattern) => pattern.test(text)) ||
-        his.some(
-          (clause) =>
-            MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
-        ) ||
-        classOfHis(text, herLastTurn)))
+    hisOf(text).some((clause) => bornMinor(clause, now.getUTCFullYear())) ||
+    text.split(/[.!?\n]+/u).some(schoolWord)
   )
     signs.push('minor_suspected');
-  if (minorFantasy(fanText)) signs.push('minor_fantasy');
+  const realMinorInRole = costumeOfAMinor(fanText);
+  if (realMinorInRole && !signs.includes('minor_suspected')) signs.push('minor_suspected');
+  if (realMinorInRole || minorFantasy(fanText)) signs.push('minor_fantasy');
+  // Asked to be like his own child: a human reads it, without the age freeze (Sécurité, #1054).
+  const words = normaliseWords(text);
+  if (LIKE_HIS_CHILD.test(words) || AS_HIS_CHILD.some((pattern) => pattern.test(words)))
+    signs.push('his_child_role');
   // Set phrases are no distress (Sécurité, #1043): « mourir de rire », « me tuer au boulot », « crever de chaud »,
   // « crever tellement t'es belle ». Everything else still alerts.
   if (SELF_HARM.some((pattern) => pattern.test(text.replace(SET_PHRASES, ' ')))) signs.push('self_harm');

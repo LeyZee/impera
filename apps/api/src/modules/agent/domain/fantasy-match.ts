@@ -69,6 +69,16 @@ export function desireMapOf(notes: string): DesireMap {
   return map;
 }
 
+// A fantasy of humiliation, his (Charles 27/11): being put down, made small, submitted. In four languages.
+const HUMILIATION =
+  /\b(humili\w*|umili\w*|humill\w*|rabaiss\w*|degrad\w*|soumis\w*|soumission|submissive|cuckold|cocu|petit garcon|vilain garcon|naughty boy|little boy|se faire (traiter|gronder|remettre a sa place))\b/;
+
+/** His desire map holds a fantasy of humiliation, and none of his limits says otherwise. */
+export function wantsHumiliation(map: DesireMap): boolean {
+  const said = (items: readonly string[]) => items.some((item) => HUMILIATION.test(normaliseWords(item)));
+  return said([...map.desires, ...map.wordsThatWork]) && !said([...map.limits, ...map.coolsHim]);
+}
+
 /**
  * His map without what her persona refuses (Charles 26/11 at 21:22): a fantasy, an outfit or a word that touches one of
  * her disgusts, what she never says or never does is neither played nor taken as a script's target. His limits stay.
