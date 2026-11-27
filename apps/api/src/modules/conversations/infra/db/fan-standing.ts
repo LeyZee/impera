@@ -5,6 +5,7 @@ import {
   type FanId,
   type FanStanding,
   type FanTiersSetting,
+  type MeetingTierSettings,
   type TimeWasterSetting,
 } from '@impera/contracts';
 import { eq, schema, sql, type Transaction } from '@impera/db';
@@ -48,17 +49,32 @@ export async function tiersAndRate(
   };
 }
 
-/** Her time-waster rule (ADR 0135), or `undefined` when the agency set none or it no longer reads. */
-export async function timeWasterSettingOf(
-  tx: Transaction,
-  creatorId: CreatorId,
-): Promise<TimeWasterSetting | undefined> {
+/** Her rules for the agent that the owner or the agency set, each absent when never set. */
+export interface AgentRules {
+  /** Her time-waster rule (ADR 0135); absent, nobody is a time-waster. */
+  readonly timeWaster?: TimeWasterSetting;
+  /** Her meeting tiers (guide 26/11); absent, no fan goes past the second. */
+  readonly meetingTiers?: MeetingTierSettings;
+}
+
+/** Her rules from her stored settings: none when they no longer read (nobody is ever judged on a broken setting). */
+export function agentRulesOf(settings: unknown): AgentRules {
+  const parsed = CreatorSettingsSchema.safeParse(settings ?? {});
+  if (!parsed.success) return {};
+  const { timeWaster, meetingTiers } = parsed.data;
+  return {
+    ...(timeWaster !== undefined && { timeWaster }),
+    ...(meetingTiers !== undefined && { meetingTiers }),
+  };
+}
+
+/** Her rules for the agent, read in one go with the fan's figures. */
+export async function agentRulesFor(tx: Transaction, creatorId: CreatorId): Promise<AgentRules> {
   const [creator] = await tx
     .select({ settings: schema.creators.settings })
     .from(schema.creators)
     .where(eq(schema.creators.id, creatorId));
-  const settings = CreatorSettingsSchema.safeParse(creator?.settings ?? {});
-  return settings.success ? settings.data.timeWaster : undefined;
+  return agentRulesOf(creator?.settings);
 }
 
 /** His euros and his dollars at that rate, in euro cents, never below zero. */

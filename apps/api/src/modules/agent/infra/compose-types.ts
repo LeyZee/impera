@@ -41,7 +41,7 @@ import type { TrapAssessment } from '../domain/traps';
 import type { AftercareTurn, FollowUpTurn } from '../domain/turn-briefs';
 import type { OfferRefusal } from '../domain/turn-sale';
 import type { OfferInput, ScriptsInput } from '../domain/turn-scripts';
-import type { WornLimits } from '../domain/worn';
+import type { HerRecentMessage, WornLimits } from '../domain/worn';
 
 import type { VoiceExample } from './calibration-record';
 
@@ -215,9 +215,10 @@ export interface ComposeTurnInput {
   readonly fanTier?: FanTier | null;
   /**
    * Her last outgoing messages to all her fans, newest first (passe 2 du 26/11): what comes back in too many of them
-   * is worn, and she does not say it again. Absent: only what she sent him is read.
+   * is worn, and she does not say it again; only what came back to several fans counts (`WORN_MIN_CONVERSATIONS`).
+   * Absent: only what she sent him is read.
    */
-  readonly herRecent?: readonly string[];
+  readonly herRecent?: readonly HerRecentMessage[];
 }
 
 /** What his desire score is counted from (`desireScore`). */

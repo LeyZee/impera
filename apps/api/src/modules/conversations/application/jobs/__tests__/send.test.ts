@@ -81,6 +81,7 @@ function world(send: OutboundSender['sendText']) {
       countForDraft: () => Promise.resolve(0),
       textsForDraft: unused,
       history: unused,
+      herRecent: unused,
       fanStats: unused,
     },
     cardReads: { pace: unused, toRead: unused, markRead: unused },

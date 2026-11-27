@@ -25,4 +25,18 @@ describe('CreatorSettings', () => {
     expect(settings.llm.contextBudgetTokens).toBe(12_000);
     expect(CreatorSettingsSchema.parse({ identityPolicy: 'disclose' })).not.toHaveProperty('identityPolicy');
   });
+
+  it('keeps her meeting tiers only when the three durations rise (guide 26/11), absent by default', () => {
+    expect(CreatorSettingsSchema.parse({})).not.toHaveProperty('meetingTiers');
+    const meetingTiers = { newFanHours: 3, closeFanHours: 17, veryCloseFanHours: 41 };
+    expect(CreatorSettingsSchema.parse({ meetingTiers }).meetingTiers).toEqual(meetingTiers);
+    for (const wrong of [
+      { newFanHours: 17, closeFanHours: 3, veryCloseFanHours: 41 },
+      { newFanHours: 3, closeFanHours: 41, veryCloseFanHours: 41 },
+      { newFanHours: 0, closeFanHours: 17, veryCloseFanHours: 41 },
+      { newFanHours: 3, closeFanHours: 17 },
+    ]) {
+      expect(CreatorSettingsSchema.safeParse({ meetingTiers: wrong }).success).toBe(false);
+    }
+  });
 });

@@ -465,10 +465,10 @@ describe('createDraftComposer', () => {
 
   it('names her phrases worn across her fans to the voice, and writes once more an answer that says one (passe 2)', async () => {
     // Invented lines of hers to other fans.
-    const herRecent = Array.from(
-      { length: 5 },
-      (_, i) => `Soirée tranquille ${String(i)}, un verre de vin et Churro`,
-    );
+    const herRecent = Array.from({ length: 5 }, (_, i) => ({
+      conversationId: `conversation-other-${String(i)}`,
+      text: `Soirée tranquille ${String(i)}, un verre de vin et Churro`,
+    }));
     const { draftComposer, seen } = composer({
       voice: { bubbles: ['Un verre de vin sous la couette 😌'] },
       voiceAfter: { bubbles: ['Je dessine un peu, et toi ?'] },
@@ -502,6 +502,42 @@ describe('createDraftComposer', () => {
       meeting: { given: ['too_early'], teased: false },
     });
     expect(teased).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'tease' } });
+  });
+
+  it('reads his meeting tier from her settings, absent past the second for nobody (guide 26/11)', async () => {
+    const meet: Brief = { ...BRIEF, intent: 'asks_to_meet', risks: ['meet_request'] };
+    // A payer known 50 hours: past every duration of these arbitrary settings, so very close.
+    const payer = {
+      ...INPUT,
+      fan: { ...INPUT.fan, spentMinor: 2_000, firstMessageAt: new Date('2026-10-15T08:00:00Z') },
+    };
+    const withTiers = composer({ brief: meet });
+    const close = await withTiers.draftComposer.compose({
+      ...payer,
+      fan: { ...payer.fan, meetingTiers: { newFanHours: 3, closeFanHours: 17, veryCloseFanHours: 41 } },
+    });
+    expect(close).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'reason', reason: 'safety' } });
+
+    const without = composer({ brief: meet });
+    const second = await without.draftComposer.compose(payer);
+    expect(second).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'reason', reason: 'needs_time' } });
+  });
+
+  it('never names to him what she repeats to another fan alone: his first name stays his (Sécurité 27/11)', async () => {
+    // Invented: six messages to one other fan with his first name, and an anecdote told to three fans.
+    const toOne = Array.from({ length: 6 }, (_, i) => ({
+      conversationId: 'conversation-other',
+      text: `Bonne nuit mon Baptistin ${String(i)}`,
+    }));
+    const toThree = ['conversation-a', 'conversation-b', 'conversation-c', 'conversation-a'].map(
+      (conversationId) => ({ conversationId, text: 'Soirée tranquille avec Churro sur le canapé' }),
+    );
+    const { draftComposer, seen } = composer({ voice: { bubbles: ['Je dessine un peu, et toi ?'] } });
+    await draftComposer.compose({ ...INPUT, herRecent: [...toOne, ...toThree] });
+    const prompt = JSON.stringify(seen.voiceInputs?.[0] ?? {});
+    expect(prompt).not.toContain('baptistin');
+    expect(prompt).not.toContain('Baptistin');
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.at(-1) ?? '').toContain('churro');
   });
 
   it('answers an insult herself, never sorry, and makes him earn it when he comes back (passes 8 and 16, Charles 21/11)', async () => {

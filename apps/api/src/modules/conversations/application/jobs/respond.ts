@@ -55,6 +55,8 @@ export interface RespondDeps {
 
 /** Messages the engine reads. */
 export const HISTORY_LIMIT = 40;
+/** Her last texts to all her fans read for her worn phrases: the agent's window (`DEFAULT_WORN_LIMITS`) fits in it. */
+const HER_RECENT_LIMIT = 60;
 
 /** Holds that give the conversation to the chatters; the others put it back to `idle`. */
 const HANDOFF_REASONS: readonly HoldReason[] = [
@@ -451,6 +453,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
+        herRecent: await tx.messages.herRecent(HER_RECENT_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
         sales: await tx.events.salesState(conversation.id),
         scriptRun,
@@ -518,6 +521,10 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       ...(read.sales.usedObjectionReplies.length > 0 && {
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
+      ...((read.sales.meeting.given.length > 0 || read.sales.meeting.teased) && {
+        meeting: read.sales.meeting,
+      }),
+      ...(read.herRecent.length > 0 && { herRecent: read.herRecent }),
       scriptRun: read.scriptRun?.run ?? null,
       ...(read.scriptAbandon !== null && { scriptAbandon: read.scriptAbandon }),
       fanAvailability: read.conversation.fanAvailability,
@@ -625,6 +632,22 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
             tx,
             conversation,
             { type: 'script_abandon_teased', payload: { scriptRunId: read.scriptRun.id } },
+            meta,
+          );
+        }
+        // He asked to see her: the reason given, or her one tease, never again to him (Charles 21/11).
+        const meetingAnswer = result.meetingAnswer;
+        if (meetingAnswer?.kind === 'reason' || meetingAnswer?.kind === 'tease') {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            {
+              type: 'meeting_answered',
+              payload: {
+                conversationId: conversation.id,
+                reason: meetingAnswer.kind === 'reason' ? meetingAnswer.reason : null,
+              },
+            },
             meta,
           );
         }

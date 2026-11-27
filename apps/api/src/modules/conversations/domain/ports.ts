@@ -4,6 +4,8 @@ import type {
   FanTier,
   FanTiersSetting,
   TimeWasterSetting,
+  MeetingTierSettings,
+  MeetingReason,
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
@@ -217,6 +219,11 @@ interface MessageRepository {
   textsForDraft(draftId: DraftId): Promise<readonly string[]>;
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
+  /**
+   * Her last `limit` texts to all her fans, newest first, each with its conversation, the platform's automations left
+   * out: what her worn phrases are counted on, across fans only (passe 2 du 26/11, Sécurité 27/11).
+   */
+  herRecent(limit: number): Promise<readonly HerRecentMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
   /** His spend and first message; his tier and last purchase from her sales register (ADR 0132, 0128) at `now`. */
   fanStats(fanId: FanId, now: Date): Promise<FanStats>;
@@ -322,6 +329,20 @@ interface SalesState {
   readonly usedObjectionReplies: readonly string[];
   /** When she last answered each sale trouble (`sale_trouble`), since the last takeover; `null`: never. */
   readonly saleTrouble: SaleTroubleSeen;
+  /** What she already answered him about meeting her (`meeting_answered`), whenever, a takeover included. */
+  readonly meeting: MeetingJournal;
+}
+
+/** The reasons she already gave him for not meeting yet, and whether she already teased him once (Charles 21/11). */
+/** One of her last texts, and the conversation it went to: a phrase is worn only across several fans. */
+interface HerRecentMessage {
+  readonly conversationId: ConversationId;
+  readonly text: string;
+}
+
+interface MeetingJournal {
+  readonly given: readonly MeetingReason[];
+  readonly teased: boolean;
 }
 
 /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7). */
@@ -667,6 +688,11 @@ interface FanStats {
   readonly registerSpentMinor?: number;
   /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */
   readonly timeWaster?: TimeWasterSetting;
+  /**
+   * Her meeting tiers (guide 26/11), as the owner set them: the agent reads his tier from them when he asks to see
+   * her. Absent, no fan goes past the second.
+   */
+  readonly meetingTiers?: MeetingTierSettings;
 }
 
 interface FanContext extends FanStats {
@@ -739,6 +765,10 @@ export interface ComposeInput {
   readonly openCustomOrder?: OpenCustomOrder | null;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
   readonly usedObjectionReplies?: readonly string[];
+  /** What she already answered him about meeting her (`meeting_answered`); absent, nothing given yet. */
+  readonly meeting?: MeetingJournal;
+  /** Her last texts to all her fans, newest first: her worn phrases (passe 2 du 26/11). Absent: none read. */
+  readonly herRecent?: readonly HerRecentMessage[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
   /** His runs before `scriptRun` that went cold, and her teases about `scriptRun` when he left it (Charles 20/11). */
@@ -843,6 +873,13 @@ export type ComposeResult =
       readonly saleTrouble?: SaleTroubleKind;
       /** She teased him about the run he left: one `script_abandon_teased` on that run (Charles 20/11). */
       readonly abandonTeased?: true;
+      /**
+       * He asked to see her: the reason code chose, or her tease once every reason was given (Charles 21/11). A reason
+       * or the tease is one `meeting_answered`; « heavy » and « next party » journal nothing.
+       */
+      readonly meetingAnswer?:
+        | { readonly kind: 'reason'; readonly reason: MeetingReason }
+        | { readonly kind: 'tease' | 'heavy' | 'next_party' };
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;

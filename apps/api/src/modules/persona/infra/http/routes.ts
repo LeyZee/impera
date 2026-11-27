@@ -4,6 +4,7 @@ import {
   ArchivedCreatorSchema,
   CopilotSwitchesSchema,
   FanTiersSettingSchema,
+  MeetingTiersBodySchema,
   CreatorIdSchema,
   CreatorListSchema,
   CreatorSummarySchema,
@@ -209,6 +210,40 @@ export function createCreatorRoutes(
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
         const tiers = await directory.setFanTiers(request.params.id, request.body, user.id);
+        if (tiers === null) throw new CreatorNotFound();
+        return tiers;
+      },
+    );
+
+    // Créatrices › (elle) › Compte: after how many hours a fan who asks to see her is no longer new, close, very close
+    // (guide 26/11). The owner's alone, like the tiers of her fans; `null` removes them.
+    app.get(
+      '/creators/:id/meeting-tiers',
+      {
+        preValidation: requireRole('owner'),
+        schema: { params: CreatorParamsSchema, response: { 200: MeetingTiersBodySchema } },
+      },
+      async (request) => {
+        const tiers = await directory.meetingTiers(request.params.id);
+        if (tiers === null) throw new CreatorNotFound();
+        return tiers;
+      },
+    );
+
+    app.put(
+      '/creators/:id/meeting-tiers',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: CreatorParamsSchema,
+          body: MeetingTiersBodySchema,
+          response: { 200: MeetingTiersBodySchema },
+        },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const tiers = await directory.setMeetingTiers(request.params.id, request.body, user.id);
         if (tiers === null) throw new CreatorNotFound();
         return tiers;
       },

@@ -663,6 +663,90 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     expect(composer.inputs.at(-1)).toMatchObject({ scriptAbandon: { earlier: [], teased: 1 } });
   });
 
+  it('journals the meeting reason she gave and her one tease, and gives them back to her (Charles 21/11)', async () => {
+    const id = await fanWrites('c-meet', 'On se voit quand ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Pas si vite toi 😌'],
+      softViolations: [],
+      costUsd: 0,
+      meetingAnswer: { kind: 'reason', reason: 'too_early' },
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)).not.toHaveProperty('meeting');
+
+    await fanWrites('c-meet', 'Allez, un verre ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Tu lâches rien hein 😏'],
+      softViolations: [],
+      costUsd: 0,
+      meetingAnswer: { kind: 'tease' },
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)).toMatchObject({ meeting: { given: ['too_early'], teased: false } });
+
+    // « Heavy » journals nothing: the journal stays the reason and the tease.
+    await fanWrites('c-meet', 'Sérieux, quand ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Tu insistes 🙃'],
+      softViolations: [],
+      costUsd: 0,
+      meetingAnswer: { kind: 'heavy' },
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)).toMatchObject({ meeting: { given: ['too_early'], teased: true } });
+    const journaled = (await events(id)).filter((event) => event.type === 'meeting_answered');
+    expect(journaled.map((event) => event.payload)).toEqual([
+      { conversationId: id, reason: 'too_early' },
+      { conversationId: id, reason: null },
+    ]);
+  });
+
+  it('gives her last texts to all her fans, newest first, the platform automations left out (passe 2 du 26/11)', async () => {
+    const herText = async (conversation: string, text: string, origin?: 'welcome') => {
+      counter += 1;
+      await conversations.ingestMessage({
+        creatorId,
+        platformAccountId,
+        platformConversationId: conversation,
+        platformFanId: `fan-${conversation}`,
+        fanDisplayName: 'Julien',
+        message: {
+          ref: { platform: 'reveal', id: `m-${String(counter)}` },
+          conversationRef: { platform: 'reveal', id: conversation },
+          direction: 'outbound',
+          text,
+          media: [],
+          priceMinor: null,
+          currency: null,
+          isPaid: false,
+          createdAt: new Date(Date.UTC(2026, 9, 18, 20, 0, counter)).toISOString(),
+          ...(origin !== undefined && { origin }),
+        },
+        correlationId: 'test',
+      });
+    };
+    await herText('c-other-fan', 'Un chocolat chaud sous le plaid 😌');
+    await herText('c-other-fan', 'Bienvenue chez moi', 'welcome');
+    await herText('c-other-fan', 'Et toi ta soirée ?');
+    const id = await fanWrites('c-recent', 'Coucou');
+    composer.next = { kind: 'draft', bubbles: ['Coucou toi'], softViolations: [], costUsd: 0 };
+    await respond(id);
+    const herRecent = composer.inputs.at(-1)?.herRecent ?? [];
+    const [other] = await test.admin.db
+      .select({ id: schema.conversations.id })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.platformConversationId, 'c-other-fan'));
+    // Each text with the conversation it went to: a phrase is worn only across fans (Sécurité 27/11).
+    expect(herRecent.slice(0, 2)).toEqual([
+      { conversationId: other?.id, text: 'Et toi ta soirée ?' },
+      { conversationId: other?.id, text: 'Un chocolat chaud sous le plaid 😌' },
+    ]);
+    expect(herRecent.map((message) => message.text)).not.toContain('Bienvenue chez moi');
+  });
+
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {
     const id = await fanWrites('c-awaited', 'Je vais pas bien');
     composer.next = { kind: 'held', reason: 'handoff', cause: 'distress', detail: ['distress'], costUsd: 0 };

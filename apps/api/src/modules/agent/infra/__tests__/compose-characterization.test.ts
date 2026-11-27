@@ -486,13 +486,11 @@ const CASES: readonly Case[] = [
       ...BASE,
       fanText: 'J’ai vu une autre fille hier',
       spenderRegister: 'girlfriend',
-      herRecent: [
-        'je bois un verre de vin sur les toits',
-        'je bois un verre de vin sur les toits',
-        'je bois un verre de vin sur les toits',
-        'je bois un verre de vin sur les toits',
-        'je bois un verre de vin sur les toits',
-      ],
+      // To five different fans: worn only across conversations (Sécurité 27/11).
+      herRecent: ['c1', 'c2', 'c3', 'c4', 'c5'].map((conversationId) => ({
+        conversationId,
+        text: 'je bois un verre de vin sur les toits',
+      })),
     },
   },
   {

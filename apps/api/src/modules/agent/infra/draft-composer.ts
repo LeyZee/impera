@@ -12,6 +12,7 @@ import type {
   Language,
   MediaDescription,
   MediaFlag,
+  MeetingTierSettings,
   MessageOrigin,
   ObjectionReplies,
   OpenCustomOrder,
@@ -66,6 +67,7 @@ import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
 import { spenderRegisterOf } from '../domain/spender-register';
 import { handoffCauseOf } from '../domain/traps';
+import type { HerRecentMessage } from '../domain/worn';
 
 import {
   composeTurn,
@@ -90,6 +92,13 @@ function lastAutomationOf(history: AgentComposeInput['history']): { lastAutomati
     (m) => m.direction === 'outbound' && (m.origin === 'welcome' || m.origin === 'expiration_reminder'),
   );
   return last === undefined ? {} : { lastAutomationAt: last.at };
+}
+
+/** Her meeting tiers as `composeTurn` reads them (guide 26/11); nothing when the owner set none. */
+function meetingTiersOf(input: { readonly fan: { readonly meetingTiers?: MeetingTierSettings } }): {
+  meetingTiers?: MeetingTierSettings;
+} {
+  return input.fan.meetingTiers === undefined ? {} : { meetingTiers: input.fan.meetingTiers };
 }
 
 /** His turn or hers, with what code says of an automation or a story reply (ADR 0110). */
@@ -143,6 +152,11 @@ export interface AgentComposeInput {
     readonly tier?: FanTier | null;
     /** His last purchase in her sales register (ADR 0128 § 1); absent, not read. */
     readonly lastPurchaseAt?: Date | null;
+    /**
+     * Her meeting tiers (guide 26/11), read by `conversations` with his figures: his tier when he asks to see her, and
+     * whether her close-only words are open to him. Absent, he never goes past the second.
+     */
+    readonly meetingTiers?: MeetingTierSettings;
   };
   /** His desire score as stored on the conversation (P3-12), and when it was counted; absent, he starts at 0. */
   readonly desire?: { readonly score: number; readonly at: Date };
@@ -199,8 +213,11 @@ export interface AgentComposeInput {
   readonly saleTrouble?: SaleTroubleSeen;
   /** What she already answered him about meeting her, and how close he is (Charles 21/11); absent, nothing given. */
   readonly meeting?: ComposeTurnInput['meeting'];
-  /** Her last outgoing messages to all her fans, newest first: her worn phrases (passe 2 du 26/11). Absent: none read. */
-  readonly herRecent?: readonly string[];
+  /**
+   * Her last outgoing messages to all her fans, newest first, each with its conversation: her worn phrases (passe 2 du
+   * 26/11), counted across fans only. Absent: none read.
+   */
+  readonly herRecent?: readonly HerRecentMessage[];
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -853,6 +870,7 @@ async function quietTurn(
     fanText: '',
     media: [],
     fanNotes: input.fan.notes.join('\n'),
+    ...meetingTiersOf(input),
     situation: {
       now: input.now,
       timeZone,
@@ -1297,6 +1315,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
         ...(input.timeWaster !== undefined && { timeWaster: input.timeWaster }),
+        ...meetingTiersOf(input),
         spenderRegister: spenderRegisterOf(input.fan.tier, {
           fragile: stop.flags?.fragile === true,
           care: careForced,

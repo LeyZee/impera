@@ -18,6 +18,7 @@ import {
   newId,
   type CreatorId,
   type FanId,
+  type MeetingReason,
   type OpenCustomOrder,
 } from '@impera/contracts';
 import {
@@ -34,7 +35,7 @@ import { z } from 'zod';
 
 import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
-import { fanStanding, timeWasterSettingOf } from './fan-standing';
+import { agentRulesFor, fanStanding } from './fan-standing';
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
@@ -208,6 +209,26 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           origin: row.origin === null ? null : MessageOriginSchema.parse(row.origin),
         }));
       },
+      async herRecent(limit) {
+        const rows = await tx
+          .select({ conversationId: schema.messages.conversationId, text: schema.messages.text })
+          .from(schema.messages)
+          .where(
+            and(
+              eq(schema.messages.creatorId, creatorId),
+              eq(schema.messages.direction, 'outbound'),
+              sql`${schema.messages.text} <> ''`,
+              // Her words, not the platform's automations (ADR 0110 § 6): a welcome repeats by design.
+              sql`(${schema.messages.origin} is null or ${schema.messages.origin} not in ('welcome', 'expiration_reminder'))`,
+            ),
+          )
+          .orderBy(sql`${schema.messages.platformCreatedAt} desc, ${schema.messages.id} desc`)
+          .limit(limit);
+        return rows.map((row) => ({
+          conversationId: ConversationIdSchema.parse(row.conversationId),
+          text: row.text,
+        }));
+      },
       async fanStats(fanId, now) {
         const [totals] = await tx
           .select({
@@ -220,7 +241,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         const firstMessageAt = totals?.firstMessageAt ?? null;
         // His tier and last purchase from her sales register (ADR 0132 § 1), the figures « Fans » shows.
         const standing = await fanStanding(tx, CreatorIdSchema.parse(creatorId), fanId, now);
-        const timeWaster = await timeWasterSettingOf(tx, CreatorIdSchema.parse(creatorId));
+        const rules = await agentRulesFor(tx, CreatorIdSchema.parse(creatorId));
         return {
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
@@ -229,7 +250,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             lastPurchaseAt: standing.lastPurchaseAt === null ? null : new Date(standing.lastPurchaseAt),
             registerSpentMinor: standing.spentMinor,
           }),
-          ...(timeWaster !== undefined && { timeWaster }),
+          ...rules,
         };
       },
     },
@@ -514,17 +535,25 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
                 'objection_reply_used',
                 'takeover_started',
                 'sale_trouble',
+                'meeting_answered',
               ]),
             ),
           )
           .orderBy(schema.conversationEvents.seq);
         let customOrderOpen = false;
+        const given: MeetingReason[] = [];
+        let teased = false;
         const usedObjectionReplies: string[] = [];
         let paymentHelpAt: Date | null = null;
         let complaintAt: Date | null = null;
         for (const { body, at } of rows.map(toStoredEvent)) {
           if (body.type === 'custom_order_opened') customOrderOpen = true;
           if (body.type === 'objection_reply_used') usedObjectionReplies.push(body.payload.replyId);
+          // Never reset: a reason given before a takeover was still given to him (Charles 21/11).
+          if (body.type === 'meeting_answered') {
+            if (body.payload.reason === null) teased = true;
+            else if (!given.includes(body.payload.reason)) given.push(body.payload.reason);
+          }
           // A human took the conversation: what was open is theirs, and a trouble after them is a new one.
           if (body.type === 'takeover_started') {
             customOrderOpen = false;
@@ -534,7 +563,12 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           if (body.type === 'sale_trouble' && body.payload.kind === 'payment_help') paymentHelpAt = at;
           if (body.type === 'sale_trouble' && body.payload.kind === 'purchase_complaint') complaintAt = at;
         }
-        return { customOrderOpen, usedObjectionReplies, saleTrouble: { paymentHelpAt, complaintAt } };
+        return {
+          customOrderOpen,
+          usedObjectionReplies,
+          saleTrouble: { paymentHelpAt, complaintAt },
+          meeting: { given, teased },
+        };
       },
       async list(conversationId) {
         const rows = await tx

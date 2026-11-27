@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { LlmRoleSchema } from './enums';
+import { MeetingTierSettingsSchema } from './meeting-tiers';
 import { FanTiersSettingSchema } from './to-talk';
 
 /**
@@ -65,5 +66,7 @@ export const CreatorSettingsSchema = z.object({
   fanTiers: FanTiersSettingSchema.prefault({}),
   /** Her time-waster rule (ADR 0135), set by the owner or a manager; absent, nobody is a time-waster. */
   timeWaster: TimeWasterSettingSchema.optional(),
+  /** When a fan asking to see her moves up a tier (guide 26/11), set by the owner; absent, nobody past the second. */
+  meetingTiers: MeetingTierSettingsSchema.optional(),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;

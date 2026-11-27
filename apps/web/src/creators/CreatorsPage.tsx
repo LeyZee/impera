@@ -16,6 +16,7 @@ import { DropsSection } from './drops/DropsSection';
 import { FanTiersSection } from './fan-tiers/FanTiersSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
+import { MeetingTiersSection } from './meeting-tiers/MeetingTiersSection';
 import { CreatorsList } from './overview/CreatorsList';
 import { useCreatorsOverview } from './overview/api';
 import { hasActivePersonaOf } from './overview/model';
@@ -428,6 +429,11 @@ export function CreatorsPage({
           {isOwner ? (
             <div id="paliers" className="cr-account__card">
               <FanTiersSection creatorId={current.id} />
+            </div>
+          ) : null}
+          {isOwner ? (
+            <div id="rencontre" className="cr-account__card">
+              <MeetingTiersSection creatorId={current.id} />
             </div>
           ) : null}
           <div id={accountCardId('profile')} className="cr-account__card">
