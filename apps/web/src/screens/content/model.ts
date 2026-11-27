@@ -2,6 +2,7 @@ import {
   DROP_CATEGORY_LABELS,
   DROP_FORMAT_RULES,
   DROP_MIME_TYPES,
+  REDOABLE_DROP_STATES,
   SNIFF_BYTES,
   WITHDRAWABLE_DROP_STATES,
   headRefusal,
@@ -14,6 +15,7 @@ import {
   type DropMediaKind,
   type DropMime,
   type DropState,
+  type RedoneDrop,
 } from '@impera/contracts';
 
 import { MOMENT_EMOJIS, MOMENT_LABELS } from '@/creators/scripts/model';
@@ -34,6 +36,10 @@ export const CATEGORY_EMOJIS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: '🎞️',
   instagram_post: '🖼️',
   telegram_post: '📣',
+  whale_gift: '🎁',
+  voice_beep: '🎙️',
+  voice_real: '🎙️',
+  sale_video: '🎬',
 };
 
 /** What she puts in each category, in her words (ADR 0055 § 1, « Ce qu'elle y met »). */
@@ -47,6 +53,10 @@ export const CATEGORY_HINTS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: 'Une vidéo verticale',
   instagram_post: 'Une ou plusieurs photos',
   telegram_post: 'Une vidéo ou une photo',
+  whale_gift: 'Une photo ou une courte vidéo inédite, jamais nue',
+  voice_beep: 'Un vocal de 30 s au plus : « laisse-moi un message après le bip »',
+  voice_real: 'Un ou deux vocaux de 30 s au plus : la preuve que tu es bien réelle',
+  sale_video: 'Une vidéo de 10 min au plus, hors scripts, vendue à part',
 };
 
 /**
@@ -57,7 +67,21 @@ export const CATEGORY_HINTS: Readonly<Record<DropCategory, string>> = {
 export const DROP_OUTPUTS: readonly {
   readonly name: string;
   readonly categories: readonly DropCategory[];
-}[] = [{ name: 'Reveal', categories: ['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm'] }];
+}[] = [
+  {
+    name: 'Reveal',
+    categories: [
+      'feed_shoot',
+      'feed_video',
+      'reveal_story',
+      'mass_dm',
+      'whale_gift',
+      'sale_video',
+      'voice_beep',
+      'voice_real',
+    ],
+  },
+];
 
 /** The extensions a browser may give no type for (MKV often), read as the type they are (ADR 0070 § 2). */
 const MIME_BY_EXTENSION: Readonly<Record<string, DropMime>> = {
@@ -168,10 +192,10 @@ export function toShoot(requests: readonly ContentRequest[], drops: readonly Con
 
 /**
  * Whether « En route » goes above « Déposer »: while a file of it is still to go up (sending, or cut and to resume),
- * she sees it without scrolling (recette CRE-09).
+ * or one waits for her replacement (trou 7 du 21/11), she sees it without scrolling (recette CRE-09).
  */
 export const routeFirst = (moving: readonly ContentDrop[]): boolean =>
-  moving.some((drop) => drop.files.some((file) => file.state === 'awaiting'));
+  moving.some((drop) => drop.files.some((file) => file.state === 'awaiting') || toReplaceOf(drop).length > 0);
 
 /**
  * Her open requests, the nearest first (« À tourner »): those a drop already answers are on their way, except while
@@ -187,8 +211,61 @@ export function openRequests(
     .toSorted((a, b) => a.dueOn.localeCompare(b.dueOn) || a.createdAt.localeCompare(b.createdAt));
 }
 
+/**
+ * What the agency asked her to redo without a request (trou 7 du 21/11), newest first: gone once she drops that
+ * category again after it was asked. The server keeps each 14 days.
+ */
+export function toRedo(redone: readonly RedoneDrop[], drops: readonly ContentDrop[]): RedoneDrop[] {
+  return redone
+    .filter(
+      (one) =>
+        !drops.some(
+          (drop) =>
+            drop.category === one.category &&
+            drop.state !== 'withdrawn' &&
+            Date.parse(drop.createdAt) > Date.parse(one.redo.at),
+        ),
+    )
+    .toSorted((a, b) => Date.parse(b.redo.at) - Date.parse(a.redo.at));
+}
+
 /** Out of her hands: published, or a script her team copied into Reveal (SC-03 c, recette créatrice 8). */
-const isOut = (drop: ContentDrop): boolean => drop.state === 'published' || drop.exportedAt !== null;
+/**
+ * The media she replaces in place on her card (trou 7 du 21/11): one her team asked again, or one the cleaning refused,
+ * in a drop received and not out. A script copied into Reveal still takes it: replaced, it is to copy again.
+ */
+export function toReplaceOf(drop: ContentDrop): ContentDropFile[] {
+  if (!REDOABLE_DROP_STATES.has(drop.state) || (drop.exportedAt !== null && drop.category !== 'script'))
+    return [];
+  return drop.files.filter((file) => file.redo !== null || file.state === 'refused');
+}
+
+/**
+ * The media she sent in place of others (trou 7 du 21/11) still on their way in a settled drop: the drop keeps its state
+ * on the server until their receipt settles it again.
+ */
+const inFlightOf = (drop: ContentDrop): ContentDropFile[] =>
+  drop.state === 'ready' || drop.state === 'blocked'
+    ? drop.files.filter((file) => file.state === 'awaiting' || file.state === 'received')
+    : [];
+
+/**
+ * Its state as her card says it: « À refaire » while a medium of it waits for her replacement, then « En envoi » and
+ * « Reçu » while the one she sent goes up and is prepared (trou 7 du 21/11).
+ */
+export function stateWord(drop: ContentDrop): string {
+  if (toReplaceOf(drop).length > 0) return 'À refaire';
+  const moving = inFlightOf(drop);
+  if (moving.some((file) => file.state === 'awaiting')) return STATE_WORDS.uploading;
+  if (moving.length > 0) return STATE_WORDS.received;
+  return STATE_WORDS[drop.state];
+}
+
+/** Out, unless a medium of it waits for her or the one she sent is on its way: then it is in « En route ». */
+const isOut = (drop: ContentDrop): boolean =>
+  (drop.state === 'published' || drop.exportedAt !== null) &&
+  toReplaceOf(drop).length === 0 &&
+  inFlightOf(drop).length === 0;
 
 /**
  * « En route »: what she dropped and is not out yet, newest first; a withdrawn drop leaves her screen, a script she is
@@ -233,6 +310,10 @@ const OUT_WHERE: Readonly<Record<ContentDrop['category'], string>> = {
   instagram_reel: 'sur Instagram',
   instagram_post: 'sur Instagram',
   telegram_post: 'sur Telegram',
+  whale_gift: 'dans Reveal',
+  voice_beep: 'dans Reveal',
+  voice_real: 'dans Reveal',
+  sale_video: 'dans Reveal',
 };
 
 /** How a drop's state reads (ADR 0055 § 6). */
@@ -249,6 +330,9 @@ export const STATE_WORDS: Readonly<Record<DropState, string>> = {
 
 /** The tone of a state's chip: amber only when she has something to do (relecture Extension). */
 export function stateTone(drop: ContentDrop): 'warn' | 'ok' | 'calm' {
+  if (toReplaceOf(drop).length > 0) return 'warn';
+  // Her replacement on its way: nothing for her to do, whatever the drop was.
+  if (inFlightOf(drop).length > 0) return 'calm';
   if (drop.state === 'blocked') return 'warn';
   if (drop.state === 'ready' || drop.state === 'scheduled' || drop.state === 'published') return 'ok';
   return 'calm';
@@ -340,13 +424,30 @@ export function mayWithdrawHere(drop: ContentDrop): boolean {
 }
 
 /**
- * The files of a settled drop (ready or blocked) that were refused, in their order: each keeps its line and its
- * reason on her card (recette MED-03). A replaced file is out of the drop and never shown.
+ * The files of a settled drop (ready or blocked) that keep a line on her card, in their order: refused or asked again,
+ * each with its reason (recette MED-03, trou 7 du 21/11), and the one she sent in place of another while it goes up and
+ * is prepared. A replaced file is out of the drop and never shown.
  */
-export function refusedOf(drop: ContentDrop): ContentDropFile[] {
+export function linesOf(drop: ContentDrop): ContentDropFile[] {
   if (drop.state !== 'ready' && drop.state !== 'blocked') return [];
-  return drop.files.filter((file) => file.state === 'refused');
+  return drop.files.filter(
+    (file) =>
+      file.state === 'refused' ||
+      file.redo !== null ||
+      file.state === 'awaiting' ||
+      file.state === 'received',
+  );
 }
+
+const ACCEPT_BY_KIND: Readonly<Record<DropMediaKind, string>> = {
+  image: 'image/*,.heic,.heif',
+  video: 'video/*,.mov,.m4v,.3gp,.mkv,.webm,.avi',
+  audio: 'audio/*,.m4a,.mp3,.aac',
+};
+
+/** What her gallery offers to replace a medium: a script's step takes its kind, any other drop its category's. */
+export const acceptOfReplacing = (drop: ContentDrop, file: ContentDropFile): string =>
+  file.slotKey === null ? acceptOf(drop.category) : ACCEPT_BY_KIND[file.kind];
 
 /** What a file's line says, from its state on the server and, while it goes up here, its progress. */
 export function fileLine(file: ContentDropFile, live: LiveSend | undefined): string {
@@ -362,6 +463,8 @@ export function fileLine(file: ContentDropFile, live: LiveSend | undefined): str
   }
   // Received: its bytes are whole, the cleaning (or the conversion of a heavy video) runs. She has nothing to do.
   if (file.state === 'received') return 'En préparation';
+  // Asked again by her team: its sentence, as written; she replaces it.
+  if (file.redo !== null) return file.redo.sentence;
   if (file.state === 'kept') return 'Bien reçu';
   if (file.state === 'duplicate') return 'Déjà dans ta médiathèque';
   return file.refusal ?? 'Refusé';
@@ -422,11 +525,20 @@ const MONTHS = [
 const daysBetween = (today: string, day: string): number =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS);
 
-/** « Pour aujourd’hui », « Pour demain », « Pour jeudi », « Pour le 12 nov. », « En retard depuis lundi ». */
 /** « le 3 nov. », with its year when it is not this year's (recette MED-10: « le 1 janv. » said no year). */
 export function namedDay(day: string, today: string): string {
   const date = new Date(`${day}T00:00:00Z`);
   const named = `le ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
+  return day.slice(0, 4) === today.slice(0, 4) ? named : `${named} ${day.slice(0, 4)}`;
+}
+
+/** « Pour aujourd’hui », « Pour demain », « Pour jeudi », « Pour le 12 nov. », « En retard depuis dim. 8 nov. ». */
+const WEEKDAYS_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'] as const;
+
+/** « dim. 8 nov. », with its year when it is not this year's: the day a request was due, never only its weekday. */
+function lateDay(day: string, today: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  const named = `${WEEKDAYS_SHORT[date.getUTCDay()] ?? ''} ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
   return day.slice(0, 4) === today.slice(0, 4) ? named : `${named} ${day.slice(0, 4)}`;
 }
 
@@ -435,12 +547,20 @@ export function dueOf(dueOn: string, today: string): { readonly text: string; re
   const date = new Date(`${dueOn}T00:00:00Z`);
   const weekday = WEEKDAYS[date.getUTCDay()] ?? '';
   const named = namedDay(dueOn, today);
-  if (days < 0) return { text: `En retard depuis ${days >= -6 ? weekday : named}`, late: true };
+  // Late, always its date: « depuis dimanche » read on a Sunday said which one? (recette visuelle 16/11, CRE-13).
+  if (days < 0) return { text: `En retard depuis ${lateDay(dueOn, today)}`, late: true };
   if (days === 0) return { text: 'Pour aujourd’hui', late: false };
   if (days === 1) return { text: 'Pour demain', late: false };
   if (days <= 6) return { text: `Pour ${weekday}`, late: false };
   return { text: `Pour ${named}`, late: false };
 }
+
+/**
+ * What is due from her now (recette visuelle 16/11, CRE-01, CRE-13): « À tourner » cut at today, late first. Her
+ * morning page names these; Contenu lights the first one's button.
+ */
+export const dueNow = (items: readonly ToShoot[], today: string): ToShoot[] =>
+  items.filter((item) => item.request !== null && item.request.dueOn <= today);
 
 /** « Aujourd’hui », « Hier », « Lundi », « 12 nov. »: when she dropped it, in her own time. */
 export function droppedOn(createdAt: string, today: string, zone: string): string {

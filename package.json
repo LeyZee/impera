@@ -45,6 +45,8 @@
     "probe": "pnpm --filter @impera/evals run probe",
     "probe:vision": "pnpm --filter @impera/evals run probe:vision",
     "playground": "pnpm --filter @impera/api run playground",
+    "comment-calibration": "pnpm --filter @impera/api run comment-calibration",
+    "fan-sim": "pnpm --filter @impera/api run fan-sim",
     "sandbox:world": "pnpm --filter @impera/api sandbox:world"
   },
   "devDependencies": {

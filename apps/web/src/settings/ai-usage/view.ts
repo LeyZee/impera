@@ -48,12 +48,22 @@ export const USES: Readonly<
   },
   sense: { label: 'Regarder les médias', note: 'photos, vidéos et vocaux décrits', colour: SERIES[2] },
   trend_watch: { label: 'Veille des tendances', note: 'les idées de contenu', colour: SERIES[3] },
+  instagram_comment: {
+    label: 'Commentaires Instagram',
+    note: 'ses réponses sous ses publications',
+    colour: OTHER,
+  },
+  instagram_caption: {
+    label: 'Légendes Instagram',
+    note: 'les légendes proposées pour ses Reels',
+    colour: OTHER,
+  },
   judge: { label: 'Tests de qualité', note: 'les évaluations de l’agent', colour: OTHER },
   probe: { label: 'Essais réels', note: 'tes essais des services', colour: OTHER },
 };
 
 /** The uses in the neutral colour share one slice: two slices of one colour could not be told apart. */
-const FOLDED_USES: readonly AiUsageUse[] = ['judge', 'probe'];
+const FOLDED_USES: readonly AiUsageUse[] = ['judge', 'probe', 'instagram_comment', 'instagram_caption'];
 
 /** « 3,42 € », to the cent; under a cent « 0,004 € », so a cheap call never reads as free. */
 export function eurText(eur: number): string {
@@ -224,10 +234,14 @@ export function useSlices(usage: AiUsage): Slice[] {
     });
   } else if (folded.length > 1) {
     const calls = folded.reduce((total, use) => total + use.calls, 0);
+    // A real spend never hides under a name of tests: with her Instagram comments in, the slice names what it holds.
+    const onlyTests = folded.every((use) => use.use === 'judge' || use.use === 'probe');
     slices.push({
-      key: 'tests',
-      label: 'Tests et essais',
-      note: `évaluations de l’agent et essais des services · ${callsText(calls)}`,
+      key: onlyTests ? 'tests' : 'others',
+      label: onlyTests ? 'Tests et essais' : 'Autres usages',
+      note: onlyTests
+        ? `évaluations de l’agent et essais des services · ${callsText(calls)}`
+        : `${folded.map((use) => USES[use.use].label).join(', ')} · ${callsText(calls)}`,
       colour: OTHER,
       eur: folded.reduce((total, use) => total + use.eur, 0),
     });

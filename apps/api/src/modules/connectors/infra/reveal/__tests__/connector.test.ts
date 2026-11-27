@@ -318,6 +318,8 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect((await connector.getFanNote(fan('fan_02'))).text).toContain('Prénom : Prénom02');
     expect(await connector.getFanNote(fan('fan_01'))).toEqual({ text: '' });
     expect(await connector.getCreatorNotes()).toEqual([{ text: 'Note du modèle de test' }]);
+    // Her bio, read only (ADR 0154): the profile's own text.
+    expect(await connector.getCreatorProfile()).toEqual({ bio: 'Description de test' });
     const ppv = await connector.getFanPpvStats(fan('fan_02'));
     expect(ppv).toMatchObject({ purchased: 2, offered: 3, highestPriceMinor: 3_000, lowestPriceMinor: 500 });
     // Sequence 1's last step, sent to fan 02 at minute 2 240 of the world, never bought.
@@ -351,6 +353,16 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       media: [{ ref: { id: 'media_02' }, kind: 'image' }],
       previewMedia: [{ ref: { id: 'media_09' }, kind: 'video' }],
     });
+  });
+
+  it('carries the totals the platform counts on each step, sequence or loose (ADR 0129 § 12)', async () => {
+    const scripts = await connect(world()).listPlatformScripts();
+    // fan_02 bought the first two steps of sequence 1 and was sent the third; a step of a sequence takes its line's.
+    expect(scripts[0]?.steps.map((step) => [step.ref.id, step.totals])).toEqual([
+      ['script_1_1', { sent: 1, purchased: 1, paidMinor: 500 }],
+      ['script_1_2', { sent: 1, purchased: 1, paidMinor: 1_500 }],
+      ['script_1_3', { sent: 1, purchased: 0, paidMinor: 0 }],
+    ]);
   });
 
   it('reads the steps already sent to a fan, and which were bought (ADR 0018 § 5)', async () => {
@@ -419,6 +431,43 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     });
   });
 
+  it('reads which media Reveal sent for free, and only those (ADR 0145 § 2)', async () => {
+    const fake = world();
+    const [conversation] = fake.state().conversations;
+    if (conversation === undefined) throw new Error('fixture changed');
+    const sent = (
+      id: string,
+      mediaIds: string[],
+      bundle: { priceCents: number; mediaIds: string[] } | null,
+    ) =>
+      fake.state().messages.push({
+        id,
+        conversationId: conversation.id,
+        direction: 'out',
+        content: 'Texte inventé',
+        mediaIds,
+        bundle:
+          bundle === null
+            ? null
+            : { id: `${id}_b`, ...bundle, teasingMediaIds: [], paidAt: null, transactionId: null },
+        author: null,
+        scriptId: null,
+        isUnread: true,
+        createdAt: fake.state().now,
+      });
+    sent('msg_free_a', ['media_11'], null);
+    sent('msg_free_b', [], { priceCents: 0, mediaIds: ['media_12'] });
+    sent('msg_paid', [], { priceCents: 1_500, mediaIds: ['media_13'] });
+    const vault = await connect(fake).listVaultMedia({});
+    const free = (id: string) => vault.find((m) => m.ref.id === id)?.sentForFree;
+    expect([free('media_11'), free('media_12'), free('media_13'), free('media_14')]).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
   it('cuts a vault folder’s name and a description longer than the contract allows, never half an emoji', async () => {
     const fake = world();
     const state = fake.state();
@@ -445,6 +494,80 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       ['ppv', 500],
     ]);
     expect(await connector.listTransactions({ since: new Date(all[1]?.createdAt ?? 0) })).toHaveLength(1);
+  });
+});
+
+describe('RevealApiConnector: her automations (ADR 0110)', () => {
+  it('marks the opener he chose, his reply to a story, her welcome and her reminder; reads them once', async () => {
+    const fake = world();
+    const state = fake.state();
+    state.model.hooks = ['Salut %NAME%, je passe te dire coucou', 'Hello toi'];
+    state.model.welcomeMessage = 'Bienvenue chez moi, %NAME% !';
+    state.model.expirationReminderMessage = 'Ton abonnement finit dans trois jours';
+    const ofConversation = state.messages.filter((m) => m.conversationId === 'conv_01');
+    const [first, second, third, fourth] = [
+      ofConversation.find((m) => m.direction === 'in'),
+      ofConversation.find((m) => m.direction === 'out'),
+      ofConversation.findLast((m) => m.direction === 'in'),
+      ofConversation.findLast((m) => m.direction === 'out'),
+    ];
+    if (first === undefined || second === undefined || third === undefined || fourth === undefined)
+      throw new Error('the default world has messages both ways in conv_01');
+    first.content = 'Salut Léa, je passe te dire coucou';
+    second.content = 'Bienvenue chez moi, Max !';
+    third.storyReply = {
+      storyId: 'story_test',
+      thumbnailUrl: 'https://media.example.test/story',
+      mediaType: 'video',
+      isExpired: false,
+    };
+    fourth.content = 'Ton abonnement finit dans trois jours';
+    const paths: string[] = [];
+    const connector = connect(fake, { log: (entry) => paths.push(entry.route) });
+
+    const all = await connector.fetchMessages(fan('conv_01'), {});
+    const originOfId = (id: string) => all.find((m) => m.ref.id === id)?.origin;
+    expect([first, second, third, fourth].map((m) => originOfId(m.id))).toEqual([
+      'hook',
+      'welcome',
+      'story_reply',
+      'expiration_reminder',
+    ]);
+    expect(all.filter((m) => m.origin !== undefined)).toHaveLength(4);
+
+    await connector.fetchMessages(fan('conv_01'), { limit: 5 });
+    expect(paths.filter((route) => route === 'models.sayHello')).toHaveLength(1);
+  });
+
+  it('reads the messages without marks when her automations cannot be read, and asks again 5 min later', async () => {
+    const fake = world();
+    fake.state().model.hooks = ['Hello toi'];
+    const first = fake.state().messages.find((m) => m.conversationId === 'conv_01' && m.direction === 'in');
+    if (first === undefined) throw new Error('the default world has a fan message in conv_01');
+    first.content = 'Hello toi';
+    let failing = true;
+    let sayHelloCalls = 0;
+    const fetch: RevealFetch = (url, init) => {
+      if (!url.includes('/say-hello')) return fake.fetch(url, init);
+      sayHelloCalls += 1;
+      return failing ? Promise.resolve(new Response('{}', { status: 500 })) : fake.fetch(url, init);
+    };
+    let now = new Date('2026-11-16T12:00:00.000Z');
+    const connector = connect(fake, { fetch, now: () => now });
+    const all = await connector.fetchMessages(fan('conv_01'), {});
+    expect(all).toHaveLength(320);
+    expect(all.some((m) => m.origin !== undefined)).toBe(false);
+
+    // Not asked again for 5 minutes, then read again.
+    const calls = sayHelloCalls;
+    failing = false;
+    now = new Date('2026-11-16T12:04:59.000Z');
+    await connector.fetchMessages(fan('conv_01'), { limit: 5 });
+    expect(sayHelloCalls).toBe(calls);
+    now = new Date('2026-11-16T12:05:01.000Z');
+    const later = await connector.fetchMessages(fan('conv_01'), {});
+    expect(sayHelloCalls).toBe(calls + 1);
+    expect(later.filter((m) => m.origin === 'hook')).toHaveLength(1);
   });
 });
 

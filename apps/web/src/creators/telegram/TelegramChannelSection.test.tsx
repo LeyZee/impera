@@ -55,6 +55,29 @@ const view = (config: TelegramChannelConfig, patch: Record<string, unknown> = {}
   ...patch,
 });
 
+/** Her links that are on, as « Liens » holds them: the section reads them and only chooses the channel's. */
+const LINKS = [
+  {
+    id: '0192f3a0-0000-7000-8000-0000000000e1',
+    name: 'Telegram',
+    url: 'https://redirect.example.test/nora',
+    destination: 'mon live TikTok ce soir 21 h',
+  },
+  {
+    id: '0192f3a0-0000-7000-8000-0000000000e2',
+    name: 'Story',
+    url: 'https://redirect.example.test/story',
+    destination: '',
+  },
+];
+const withLinks = (): Reply => ({
+  status: 200,
+  body: view(
+    SaveTelegramChannelBodySchema.parse({ config: { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, links: LINKS } })
+      .config,
+  ),
+});
+
 const echo = (body: unknown) => ({
   ...view(SaveTelegramChannelBodySchema.parse(body).config),
   saved: true,
@@ -126,8 +149,8 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     expect(save()).toHaveProperty('disabled', true);
   });
 
-  it('saves her channel, a second slot and her first link as the channel’s', async () => {
-    const puts = serve({ put: (body) => ({ status: 200, body: echo(body) }) });
+  it('saves her channel, a second slot and the link chosen for the channel', async () => {
+    const puts = serve({ get: withLinks, put: (body) => ({ status: 200, body: echo(body) }) });
     renderSection();
     choose(await screen.findByRole('combobox', { name: 'Son canal' }), /Canal de Nora/u);
     fireEvent.click(screen.getByRole('button', { name: /Ajouter un créneau/u }));
@@ -136,18 +159,14 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     if (second === undefined) throw new Error('no second slot');
     for (const day of ['samedi', 'dimanche'])
       fireEvent.click(within(second).getByRole('button', { name: day }));
-    fireEvent.click(screen.getByRole('button', { name: /Ajouter un lien/u }));
-    fireEvent.change(screen.getByLabelText('Nom de ce lien'), { target: { value: 'Telegram' } });
-    fireEvent.change(screen.getByLabelText('Adresse du lien « Telegram »'), {
-      target: { value: ' https://redirect.example.test/nora ' },
-    });
-    fireEvent.change(screen.getByLabelText('Où il mène (le lien « Telegram »)'), {
-      target: { value: 'mon live TikTok ce soir 21 h ' },
-    });
-    expect(screen.getByRole('button', { name: 'Lien du canal : le lien « Telegram »' })).toHaveProperty(
-      'ariaPressed',
-      'true',
-    );
+    // Her links are read, never typed here: no field for a name or an address, no way to add or remove one.
+    expect(screen.queryByRole('button', { name: /Ajouter un lien/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Retirer le lien/u })).toBeNull();
+    expect(screen.getByText('Mène à : mon live TikTok ce soir 21 h')).toBeDefined();
+    // The chosen link says so as a state; the others offer to take its place.
+    fireEvent.click(screen.getByRole('button', { name: 'Choisir le lien « Telegram » pour le canal' }));
+    expect(screen.queryByRole('button', { name: 'Choisir le lien « Telegram » pour le canal' })).toBeNull();
+    expect(screen.getAllByText('Lien du canal')).toHaveLength(1);
     expect(screen.getByLabelText('Texte du lien')).toHaveProperty('value', 'Viens me parler ✨');
     fireEvent.click(save());
     await waitFor(() => {
@@ -159,14 +178,9 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
       { minute: 1140, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
       { minute: 1320, role: 'engagement', days: [1, 2, 3, 4, 5], enabled: true },
     ]);
-    expect(sent.links).toEqual([
-      {
-        id: sent.channelLinkId,
-        name: 'Telegram',
-        url: 'https://redirect.example.test/nora',
-        destination: 'mon live TikTok ce soir 21 h',
-      },
-    ]);
+    // The links go back as they were read: the server refuses a save that changes them.
+    expect(sent.links).toEqual(LINKS);
+    expect(sent.channelLinkId).toBe(LINKS[0]?.id);
     expect(await screen.findByText('Enregistré : les posts partiront à ces créneaux.')).toBeDefined();
   });
 
@@ -200,30 +214,13 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     expect(save()).toHaveProperty('disabled', true);
   });
 
-  it('says a link just added « à compléter », and flags its fields once she writes in it (recette créatrice 10)', async () => {
+  it('sends to « Liens » when she has no link that is on', async () => {
     serve({});
     renderSection();
-    fireEvent.click(await screen.findByRole('button', { name: /Ajouter un lien/u }));
-    expect(screen.queryByText('Donne-lui un nom.')).toBeNull();
-    expect(screen.queryByText(/lignes à corriger/u)).toBeNull();
-    expect(screen.getAllByText('Une ligne à compléter').length).toBeGreaterThan(0);
-    expect(save()).toHaveProperty('disabled', true);
-    fireEvent.change(screen.getByLabelText('Nom de ce lien'), { target: { value: 'Telegram' } });
-    // One link is one line, its name and its address with it.
-    expect(screen.getAllByText('Une ligne à corriger').length).toBeGreaterThan(0);
-    expect(screen.getByText('Une adresse complète qui commence par https://, sans espace.')).toBeDefined();
-  });
-
-  it('keeps the save shut on an address that is not https, and says why', async () => {
-    serve({});
-    renderSection();
-    fireEvent.click(await screen.findByRole('button', { name: /Ajouter un lien/u }));
-    fireEvent.change(screen.getByLabelText('Nom de ce lien'), { target: { value: 'Telegram' } });
-    fireEvent.change(screen.getByLabelText('Adresse du lien « Telegram »'), {
-      target: { value: 'http://redirect.example.test/nora' },
-    });
-    expect(screen.getByText('Une adresse complète qui commence par https://, sans espace.')).toBeDefined();
-    expect(save()).toHaveProperty('disabled', true);
+    expect(
+      await screen.findByText('Aucun lien allumé pour l’instant : ajoute-en un dans Trafic.'),
+    ).toBeDefined();
+    expect(screen.queryByRole('list', { name: 'Liens de redirection' })).toBeNull();
   });
 
   it('shows the server’s sentence when it refuses', async () => {

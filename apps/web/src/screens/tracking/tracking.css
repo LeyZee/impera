@@ -357,6 +357,47 @@
   background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
   color: var(--nv-ink);
 }
+/* His care mode (ADR 0088, trou béant 4): since when and what it means, then « Il va mieux », asked twice. A calm
+ * blue (the series' blue, light) and a heart, seen without reading; never the amber of a person to act, the only
+ * alarm on the conversation (Design, recette du 21/11). */
+.tr-care {
+  background: color-mix(in srgb, var(--nv-series-2) 13%, transparent);
+  color: var(--nv-ink);
+}
+.tr-care > p:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.tr-care > p:first-child strong {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+}
+.nv-status.tr-status--care {
+  --_c: var(--nv-series-2);
+}
+/* On the first line of a title that wraps, as on a phone. */
+.tr-care__icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: var(--nv-series-2);
+}
+.tr-care__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tr-care__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.tr-care__actions .nv-btn {
+  min-height: 44px;
+}
 /* Giving the hand back: the note the agent keeps, then the button that sends it, side by side when there is room. */
 .tr-hand__give {
   display: flex;
@@ -613,15 +654,20 @@
     flex-direction: row;
     align-items: center;
   }
-  /* A creator's long name gives way before the pseudo: cut with « … », her whole name in its title. */
+  /* A creator's name that does not fit beside the pseudo goes under it, whole: never cut three ways for one name
+     (« Lina Te… », « Maya … », PIL-10). Only a name wider than the whole list is cut, at its end. */
+  .tr-groups .tr-row__name {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
   .tr-groups .tr-row__pseudo {
     flex: 0 0 auto;
     max-width: 100%;
   }
   .tr-groups .tr-row__creator {
     display: block;
-    flex: 0 1 auto;
-    min-width: 3em;
+    flex: 0 0 auto;
+    max-width: 100%;
     line-height: 22px;
     overflow: hidden;
     text-overflow: ellipsis;

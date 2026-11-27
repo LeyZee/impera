@@ -23,7 +23,9 @@ const CREATORS = [
   { id: LEA, displayName: 'Léa', timezone: 'Europe/Paris' },
 ];
 
-const at = (minutesAgo: number): string => new Date(Date.now() - minutesAgo * 60_000).toISOString();
+/** The page's clock in every test: « il y a 5 min » holds however long the run takes. */
+const NOW = new Date('2026-11-21T15:00:00.000Z');
+const at = (minutesAgo: number): string => new Date(NOW.getTime() - minutesAgo * 60_000).toISOString();
 
 const trigger = (n: number, creatorId: string, minutesAgo: number, patch: Record<string, unknown> = {}) => ({
   id: `0192f3a0-0000-7000-8000-${String(n).padStart(12, '0')}`,
@@ -137,10 +139,13 @@ const lines = async (): Promise<HTMLElement[]> =>
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
 });
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -213,7 +218,17 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     await waitFor(() => {
       expect(triggerReads(calls).some((call) => call.query['alert'] === GROUP)).toBe(true);
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Tout marquer comme vu' }));
+    const all = await screen.findByRole('button', { name: 'Tout marquer comme vu' });
+    // At the end of the list's header, after its filters, never alone above them (recette visuelle 16/11).
+    const head = all.parentElement;
+    expect(head?.className).toBe('hi-head');
+    expect(head?.lastElementChild).toBe(all);
+    expect(head?.firstElementChild?.getAttribute('aria-label')).toBe('Filtres');
+    // The filter's list opens as wide as its longest alert, never cutting it on two lines.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Alerte' }));
+    expect(screen.getByRole('listbox').parentElement?.style.width).toBe('max-content');
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Alerte' }), { key: 'Escape' });
+    fireEvent.click(all);
     expect((await screen.findByRole('status')).textContent).toBe('2 alertes marquées comme vues.');
     expect(calls.filter((call) => call.method === 'POST').map((call) => call.body)).toEqual([
       { creatorId: NORA, untilId: '0192f3a0-0000-7000-8000-000000000001', alert: GROUP },

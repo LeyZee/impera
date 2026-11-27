@@ -1,6 +1,5 @@
-import type { AgentMode, CreatorOverview, CreatorTodoCount } from '@impera/contracts';
+import type { CreatorOverview, CreatorTodoCount } from '@impera/contracts';
 
-import { MODE_LABEL } from '@/agent/mode';
 import { clockAt } from '@/scheduling/time';
 import { categoryName, dueOf } from '@/screens/content/model';
 import { eur } from '@/screens/dashboard/logic';
@@ -26,11 +25,6 @@ const MONTHS = [
   'nov.',
   'déc.',
 ] as const;
-
-/** Her agent: Automatique is what runs alone, Arrêt what a person must lift. */
-export function modeOf(mode: AgentMode): { readonly label: string; readonly tone: Tone } {
-  return { label: MODE_LABEL[mode], tone: mode === 'auto' ? 'ok' : mode === 'stop' ? 'warn' : 'calm' };
-}
 
 /** « du 16 au 20 nov. », « le 16 nov. » on the fortnight's first day. */
 export function fortnightOf(from: string, to: string): string {

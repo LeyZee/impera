@@ -1,4 +1,4 @@
-/* Créatrices › Canal Telegram (ADR 0080 § 6). Prefix `tc-` (`tg-` is Réglages › Telegram's). */
+/* Créatrices › Canal Telegram (ADR 0080 § 6). Prefix `tc-` (`tg-` is Réglages › Bots Telegram's). */
 
 /* One plate per block: the plate's padding is enough below the last line. */
 .tc-page .ps-block {
@@ -73,8 +73,7 @@
   list-style: none;
 }
 
-.tc-slot__fields,
-.tc-link__fields {
+.tc-slot__fields {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -116,11 +115,23 @@
   position: absolute;
   inset: -6px -2px;
 }
-.tc-slot .ps-entry__remove::after {
-  inset: -11px;
+/* The × of a slot or an example: a round button of its own, 36px seen beside 44px fields, 44px to the finger. */
+.tc-slot .ps-entry__remove,
+.tc-example__end .ps-entry__remove {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  font-size: 22px;
+  color: var(--nv-ink-muted);
+  background: color-mix(in srgb, var(--nv-ink) 6%, transparent);
 }
-.tc-slot__end,
-.tc-link__end {
+.tc-slot .ps-entry__remove::after {
+  inset: -4px;
+}
+.tc-example__end .ps-entry__remove::after {
+  inset: -4px;
+}
+.tc-slot__end {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -134,45 +145,54 @@
 .tc-slot[data-off='true'] .tc-time {
   color: var(--nv-ink-faint);
 }
-.tc-slot[data-invalid='true'] .nv-field__control,
-.tc-link [aria-invalid='true'] {
+.tc-slot[data-invalid='true'] .nv-field__control {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
 }
 
-/* Each link with where it leads is one card. */
+/* Each of her links that are on, read here: its name, where it leads, and the chip that makes it the channel's. */
 .tc-link {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px;
   border-radius: var(--nv-radius-md);
   background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
 }
-.tc-link__fields {
-  row-gap: 10px;
+.tc-link[data-chosen='true'] {
+  background: var(--nv-plate-hover);
 }
-
-/* One width for « Lien du canal » and « Choisir pour le canal », so the fields of every link line up. */
-.tc-link__end .nv-chip {
-  min-width: 10.75rem;
-  justify-content: center;
-}
-.tc-link__field {
-  flex: 1 1 160px;
+.tc-link__read {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
   min-width: 0;
 }
-.tc-link__field--url {
-  flex: 3 1 260px;
+.tc-link__read-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
-.tc-link__field .nv-field__control {
-  width: 100%;
+.tc-link__read-place {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
 }
-/* Its own line under the name and the address, as it comes in the page; on a phone, before the chip. */
-.tc-link__destination {
-  flex: 1 1 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px 12px;
-  min-width: 0;
+/* The state and the action sit at the same place, on the line of the name; a long name wraps, they never go under. */
+.tc-link__state,
+.tc-link__choose {
+  flex: none;
+}
+.tc-link__state {
+  gap: 6px;
+}
+/* A small button to the eye, 44px to the finger. */
+.tc-link__choose {
+  position: relative;
+}
+.tc-link__choose::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
 }
 /* One label style in the links block: « Où il mène » and « Texte du lien ». */
 .tc-field-label {
@@ -182,26 +202,10 @@
   font-weight: 600;
   color: var(--nv-ink-muted);
 }
-.tc-link__destination .nv-field__control {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-/* Grows to a second line rather than cutting a word; no handle, no scroll bar. */
-.tc-link__area.nv-field__control {
-  display: block;
-  min-height: var(--nv-target-min);
-  field-sizing: content;
-  resize: none;
-  overflow: hidden;
-}
 .tc-slot__state {
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
-}
-.tc-link__url {
-  font-family: var(--nv-font-mono);
-  font-size: var(--nv-text-footnote);
 }
 
 /* Her example posts: a field that grows with the post, the cross beside it. */
@@ -234,7 +238,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding-top: 10px;
+  /* Its 36px × centred on the field's first line. */
+  padding-top: 4px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -276,22 +281,5 @@
   .tc-day {
     flex: 1 1 0;
     min-width: 0;
-  }
-  .tc-link__field,
-  .tc-link__field--url {
-    flex: 1 1 100%;
-  }
-  .tc-link__end .nv-chip {
-    min-width: 0;
-  }
-  .tc-link__destination {
-    order: 1;
-    flex-wrap: wrap;
-  }
-  .tc-link__end {
-    order: 2;
-  }
-  .tc-link__destination .nv-field__control {
-    flex-basis: 100%;
   }
 }

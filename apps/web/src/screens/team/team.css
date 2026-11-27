@@ -939,7 +939,7 @@
   cursor: pointer;
 }
 
-/* Équipe › Reveal (ADR 0076): the review's plates, one under the other, as Réglages › Ventes draws its import. */
+/* Équipe › Comptes Reveal (ADR 0076): the review's plates, one under the other, as Réglages › Plateformes draws its import. */
 .rv-stack {
   display: flex;
   flex-direction: column;
@@ -1029,4 +1029,13 @@
     align-items: flex-start;
     padding-top: clamp(var(--nv-space-6), 12vh, 112px);
   }
+}
+
+/* A member's pills under his name, not at the row's right where they cut the line of his creators (recette visuelle
+   16/11, GES-21). */
+.tm-row__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
 }

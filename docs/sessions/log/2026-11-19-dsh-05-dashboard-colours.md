@@ -1,0 +1,7 @@
+# 2026-11-19 — DSH-05 Le Dashboard en couleurs — done
+Fait : jetons de Design (agence en bleu, tendance verte et ambre, sortes de vente en cyan et agence au bleu du logo, choix de Charles du 19/11) ; avenant du 17/11 à l'ADR 0106 ; parts de l'agence et des créatrices par jour dans la réponse du Dashboard (jamais au MCP) ; courbe du chiffre d'affaires selon la tendance ; une petite courbe sous Net (les deux autres retirées sur la décision de Charles du 19/11) ; tests unitaires, d'intégration et d'écran.
+Pas fait : rien ; avis Design, « ok captures » de Charles sur les trois lots, OK de Design et de Bilan obtenus.
+Décisions : relecture Design du 19/11 : pastilles en vert et ambre, ambre de trait propre au Jour, plus de bulle sur la courbe du chiffre d’affaires : la phrase sous le chiffre lit le jour survolé ou touché sur place, et la courbe prend toute la hauteur libre de la carte (96 px au moins), rampe dans l’ordre des poids habituels (fixe par sorte), dernière date des barres ancrée à droite au téléphone ; la courbe dit la même chose que le pourcentage, verte aussi quand rien n'est comparable ; chaque jour est arrondi seul, comme son chiffre d'affaires (au centime en euros, à un centime près par jour en dollars).
+Découvertes : aucune ; le vide des tuiles est réglé (Net seul en haut, parts et TVA en trois tuiles).
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓ (intégration en CI) ; captures dashboard-couleurs-1 (données inventées).

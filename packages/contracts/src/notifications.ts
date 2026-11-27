@@ -94,6 +94,8 @@ export const PushMessageSchema = z.object({
   url: AppPathSchema,
   /** A newer message with the same tag replaces the older one on the screen (a grouped burst of sales). */
   tag: z.string().max(64).optional(),
+  /** Shown without sound nor vibration: an alert « en sourdine » (ADR 0150 § 1). */
+  silent: z.boolean().optional(),
 });
 export type PushMessage = z.infer<typeof PushMessageSchema>;
 
@@ -111,7 +113,8 @@ export type PushTestResult = z.infer<typeof PushTestResultSchema>;
 /**
  * What a notification is about (CR-01): the reason that makes it unique for an account with its object, and sets the
  * rules. A sale and the start or the end of one's own shift are never capped; the start of one's own shift and the
- * first reminder of its report (`own_shift_end`, ADR 0077) ring even in the quiet hours. EQ-12, CR-04 and CR-13 bring
+ * first reminder of its report (`own_shift_end`, ADR 0077) ring even in the quiet hours, as does a creator's safety relay
+ * (`safety_alert`, ADR 0150 § 6). EQ-12, CR-04 and CR-13 bring
  * their own. `agency_share` tells the owner of an alert on the agency's share (ADR 0054 §§ 2 and 5, PAY-04), under the
  * rules of every other: quiet hours and the daily cap.
  */
@@ -124,9 +127,51 @@ export const NOTIFICATION_REASONS = [
   'streak',
   'team',
   'agency_share',
+  /** An alert of a creator's tab, to a role it reaches (ADR 0150): outside the daily cap, held in the quiet hours. */
+  'creator_alert',
+  /**
+   * A human relay for safety of her tab (ADR 0150 § 6, locked on « reçoit »): it rings even in the quiet hours and
+   * outside the daily cap, which it does not consume.
+   */
+  'safety_alert',
+  /**
+   * A change among the owners (ADR 0096 §§ 2 and 5): an owner added, a removal asked, cancelled or applied. It rings
+   * even in the quiet hours and outside the daily cap: the notice only protects an owner who hears of it.
+   */
+  'owner_change',
+  /**
+   * A question put to a creator on her « À décider » card (ADR 0164 § 9): once per question, held in the quiet hours,
+   * within the daily cap like a reminder.
+   */
+  'decision',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
+
+/**
+ * The sorts of notification a creator chooses herself in Moi › Notifications (ADR 0150 § 16 ter): an agency request
+ * (a task of her agenda), the week to validate, her earnings (her part of a sale), her lives. Each one is on until she
+ * turns it off; the agency neither reads nor changes these choices, and they touch no alert of the team.
+ */
+export const NOTIFICATION_KINDS = ['agency_request', 'week_to_validate', 'earnings', 'lives'] as const;
+export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
+export type NotificationKind = z.infer<typeof NotificationKindSchema>;
+
+/** `GET` and `PUT /v1/notifications/kinds`: every sort, on or off. */
+export const NotificationKindsSchema = z.strictObject({
+  agency_request: z.boolean(),
+  week_to_validate: z.boolean(),
+  earnings: z.boolean(),
+  lives: z.boolean(),
+});
+export type NotificationKinds = z.infer<typeof NotificationKindsSchema>;
+
+export const DEFAULT_NOTIFICATION_KINDS: NotificationKinds = {
+  agency_request: true,
+  week_to_validate: true,
+  earnings: true,
+  lives: true,
+};
 
 /**
  * A notification asked by another module: once only for an account, its reason and its object (`objectKey`: a sale's
@@ -138,11 +183,40 @@ export const NotificationRequestSchema = z.object({
   objectKey: z.string().min(1).max(200),
   timeZone: z.string().min(1),
   message: PushMessageSchema,
+  /** The sort she may turn off (ADR 0150 § 16 ter); turned off, it is kept silent, never rung. */
+  kind: NotificationKindSchema.optional(),
 });
 export type NotificationRequest = z.infer<typeof NotificationRequestSchema>;
 
 /** What became of it: rung now, held for the recap, grouped with a burst of sales, silent past the cap, or already done. */
 export type NotificationOutcome = 'rang' | 'held' | 'grouped' | 'silent' | 'duplicate';
+
+/** How many days « Tes notifications » goes back: the recap of a night, a weekend away, never an archive. */
+export const NOTIFICATION_INBOX_DAYS = 7;
+/** At most this many lines, newest first. */
+export const NOTIFICATION_INBOX_MAX = 60;
+
+/**
+ * One line of « Tes notifications » (trou 9 du 21/11): every notification asked for the account, rung or not. `quiet`
+ * is true for the ones that never rang on their own (held for the quiet hours then recapped, or kept past the daily
+ * cap): the recap says « t’attendent dans Impera », this is where they wait. Title and path only, as on the lock screen:
+ * never a fan's name nor what he wrote (ADR 0020).
+ */
+export const NotificationInboxItemSchema = z.object({
+  id: z.uuid(),
+  reason: NotificationReasonSchema,
+  title: z.string().min(1).max(PUSH_TITLE_MAX),
+  url: AppPathSchema,
+  quiet: z.boolean(),
+  at: z.iso.datetime({ offset: true }),
+});
+export type NotificationInboxItem = z.infer<typeof NotificationInboxItemSchema>;
+
+/** `GET /v1/notifications/inbox`: the account's own, the last {@link NOTIFICATION_INBOX_DAYS} days. */
+export const NotificationInboxSchema = z.object({
+  items: z.array(NotificationInboxItemSchema).max(NOTIFICATION_INBOX_MAX),
+});
+export type NotificationInbox = z.infer<typeof NotificationInboxSchema>;
 
 export const NOTIFICATION_ERROR_CODES = [
   /** « Tester » with no device subscribed on this account. */

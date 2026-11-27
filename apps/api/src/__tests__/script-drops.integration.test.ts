@@ -21,7 +21,7 @@ import {
   type CreatorId,
   type DropMediaDescription,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withTenantMember } from '@impera/db';
+import { and, eq, schema, sql, withTenantJob, withTenantMember } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LlmGateway, ScriptSummaryInput } from '@impera/llm';
 import { unzipSync } from 'fflate';
@@ -443,12 +443,41 @@ describe('/v1/creator-space/content/script-drops', () => {
         .set({ state: 'kept', mediaAssetId: medium?.id ?? null })
         .where(eq(schema.contentDropFiles.id, file.id));
     }
-    const due = await createDrizzleRetentionStore(test.service.db).dueOriginals(
-      new Date('2026-11-06T12:00:00Z'),
-    );
-    expect(due.filter((one) => one.creatorId === nora).map((one) => [one.mediaAssetId, one.reason])).toEqual([
-      [media.gone, 'withdrawn'],
-    ]);
+    const retention = createDrizzleRetentionStore(test.service.db, app.db.db);
+    const now = new Date('2026-11-06T12:00:00Z');
+    const due = (await retention.dueOriginals(now)).filter((one) => one.creatorId === nora);
+    expect(due.map((one) => [one.mediaAssetId, one.reason])).toEqual([[media.gone, 'withdrawn']]);
+    // Each erasure in its own creator (SEC-16): named with another's id, hers is not found, nothing removed nor said.
+    const [gone] = due;
+    if (gone === undefined) throw new Error('the replaced original is not due');
+    const removed: string[] = [];
+    const remove = (key: string) => Promise.resolve(void removed.push(key));
+    expect(await retention.erase({ ...gone, creatorId: ines }, now, 'test', remove)).toBe(false);
+    await retention.eraseFailed({ ...gone, creatorId: ines }, now, 'test');
+    // The live one, still held by her script, stays even when asked by name: the job reads her drops.
+    expect(
+      await retention.erase({ ...gone, mediaAssetId: media.live, reason: 'due' }, now, 'test', remove),
+    ).toBe(false);
+    expect(removed).toEqual([]);
+    const held = await test.admin.db
+      .select({ id: schema.mediaAssets.id })
+      .from(schema.mediaAssets)
+      .where(and(eq(schema.mediaAssets.creatorId, nora), sql`${schema.mediaAssets.erasedAt} is null`));
+    expect(held.map((one) => one.id).toSorted()).toEqual([media.gone, media.live].toSorted());
+    const said = await test.admin.db
+      .select({ id: schema.domainEvents.id })
+      .from(schema.domainEvents)
+      .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${media.gone}`);
+    expect(said).toEqual([]);
+    // In her own creator it goes, bytes then row, and is said once.
+    expect(await retention.erase(gone, now, 'test', remove)).toBe(true);
+    expect(removed).toEqual([gone.storageKey]);
+    expect(await retention.erase(gone, now, 'test', remove)).toBe(false);
+    const erased = await test.admin.db
+      .select({ type: schema.domainEvents.type, creatorId: schema.domainEvents.creatorId })
+      .from(schema.domainEvents)
+      .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${media.gone}`);
+    expect(erased).toEqual([{ type: 'content_media_erased', creatorId: nora }]);
     // The library's version she shoots stays frozen.
     const [version] = await test.admin.db
       .select({ frozen: sql<boolean>`${schema.scriptStructureVersions.frozenAt} is not null` })
@@ -622,6 +651,61 @@ describe('/v1/creator-space/content/script-drops', () => {
     });
   });
 
+  it('never puts a medium of her script in the archive of a free drop: left out, and the sheet says so (ADR 0145 § 2)', async () => {
+    const [script] = await test.admin.db
+      .select({ by: schema.contentDrops.createdBy })
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, dropId));
+    const [medium] = await test.admin.db
+      .select({ id: schema.mediaAssets.id })
+      .from(schema.contentDropFiles)
+      .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.contentDropFiles.mediaAssetId))
+      .where(
+        and(
+          eq(schema.contentDropFiles.dropId, dropId),
+          eq(schema.contentDropFiles.state, 'kept'),
+          sql`${schema.contentDropFiles.replacedAt} is null`,
+          sql`${schema.mediaAssets.erasedAt} is null`,
+        ),
+      )
+      .limit(1);
+    if (script === undefined || medium === undefined) throw new Error('fixture changed');
+    // The same photo sent again for a Mass DM: the cleaning finds it a duplicate of her script's.
+    const massDm = newId(ContentDropIdSchema);
+    await test.admin.db.insert(schema.contentDrops).values({
+      id: massDm,
+      creatorId: nora,
+      category: 'mass_dm',
+      state: 'ready',
+      createdBy: script.by,
+    });
+    await test.admin.db.insert(schema.contentDropFiles).values({
+      id: newId(ContentDropFileIdSchema),
+      creatorId: nora,
+      dropId: massDm,
+      position: 0,
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: 10,
+      state: 'duplicate',
+      mediaAssetId: medium.id,
+    });
+    const exported = await call('GET', `/v1/creators/${nora}/drops/${massDm}/export`, 'owner');
+    expect(exported.statusCode, exported.body).toBe(200);
+    const archive = unzipSync(new Uint8Array(exported.rawPayload));
+    const names = Object.keys(archive);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/\/00-fiche\.txt$/u);
+    expect(new TextDecoder().decode(archive[names[0] ?? ''])).toContain(
+      'Un média est laissé de côté : il est vendu dans un de ses scripts, il ne part jamais offert.',
+    );
+    // Withdrawn after: the later tests count her drops waiting for a description.
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: script.by })
+      .where(eq(schema.contentDrops.id, massDm));
+  });
+
   it('confirms her script copied into Reveal once, by the team: her originals of it go 30 days later (SC-03 c)', async () => {
     // Given back for this test: the archive's own refused an erased original.
     await test.admin.db
@@ -754,15 +838,11 @@ describe('/v1/creator-space/content/script-drops', () => {
       });
     };
 
-    // Her switch off (§ 9): the brain is never called.
+    // No media described yet: the brain is never called.
     await summarize();
     expect(told).toEqual([]);
 
-    // On, a media not described yet: it waits.
-    await test.admin.db
-      .update(schema.creators)
-      .set({ settings: { describeDrops: true } })
-      .where(eq(schema.creators.id, nora));
+    // A media not described yet: it waits.
     for (const id of media.slice(0, 2)) await describe(id);
     await again();
     await summarize();
@@ -770,7 +850,10 @@ describe('/v1/creator-space/content/script-drops', () => {
 
     // The last one described: the job asked for this script alone, which is told and kept.
     await describe(media[2] ?? '');
-    expect(await createDrizzleScriptSummaryStore(test.service.db).enqueueFor(media[2] ?? '', 'test')).toBe(1);
+    // Asked in her creator only (SEC-16): the same medium named from another creator enqueues nothing.
+    const asking = createDrizzleScriptSummaryStore(app.db.db);
+    expect(await asking.enqueueFor(ines, media[2] ?? '', 'test')).toBe(0);
+    expect(await asking.enqueueFor(nora, media[2] ?? '', 'test')).toBe(1);
     await summarize();
     expect(told).toHaveLength(1);
     expect(told[0]?.scriptName).toBe('Soirée inventée');
@@ -818,8 +901,7 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(written).toBeInstanceOf(Error);
   });
 
-  it('lets the owner alone turn her switch; turned on, what waits for a description is enqueued again (ADR 0083 § 2, § 9)', async () => {
-    const url = `/v1/creators/${nora}/drop-descriptions`;
+  it('asks again each hour what waits for a description, with no switch: the drop is the choice (ADR 0145 § 5)', async () => {
     const queued = async (task: string) => {
       const rows = await test.admin.db.execute(sql`
         select j.key from graphile_worker._private_jobs j
@@ -831,7 +913,7 @@ describe('/v1/creator-space/content/script-drops', () => {
         .map((row) => row.key ?? '')
         .sort();
     };
-    // The hourly run, for every creator whose switch is on.
+    // The hourly run, for every creator not archived.
     const hourly = () =>
       test.admin.db.execute(
         sql`select public.enqueue_job(task => 'content_drops.describe_backlog', payload => '{}'::jsonb)`,
@@ -842,31 +924,14 @@ describe('/v1/creator-space/content/script-drops', () => {
         taskList: { 'content_drops.describe_backlog': app.tasks['content_drops.describe_backlog'] },
       });
 
-    // Hers to read nowhere, the owner's alone.
-    expect((await call('GET', url, 'nora')).statusCode).toBe(403);
-    expect((await call('PUT', url, 'nora', { on: false })).statusCode).toBe(403);
-    expect((await call('GET', url, 'owner')).json()).toEqual({ on: true });
-    const missing = await call('GET', `/v1/creators/${newId(CreatorIdSchema)}/drop-descriptions`, 'owner');
-    expect([missing.statusCode, codeOf(missing.body).code]).toEqual([404, 'creator_not_found']);
+    // The switch and its route are gone (17/11): nothing to turn, by anyone.
+    const gone = await call('GET', `/v1/creators/${nora}/drop-descriptions`, 'owner');
+    expect(gone.statusCode).toBe(404);
+    expect(
+      (await call('PUT', `/v1/creators/${nora}/drop-descriptions`, 'owner', { on: false })).statusCode,
+    ).toBe(404);
 
-    // Off, then on again: audited each time; on, her backlog is asked at once.
-    expect((await call('PUT', url, 'owner', { on: false })).json()).toEqual({ on: false });
-    expect(await queued('content_drops.describe_backlog')).toEqual([]);
-    expect((await call('PUT', url, 'owner', { on: true })).json()).toEqual({ on: true });
-    expect((await call('PUT', url, 'owner', { on: true })).json()).toEqual({ on: true });
-    expect(await queued('content_drops.describe_backlog')).toEqual([
-      `content_drops.describe_backlog:${nora}`,
-    ]);
-    const audit = await test.admin.db
-      .select({ action: schema.auditLog.action })
-      .from(schema.auditLog)
-      .where(eq(schema.auditLog.entityId, nora))
-      .orderBy(schema.auditLog.createdAt);
-    expect(audit.map((row) => row.action)).toEqual([
-      'creator.describe_drops_off',
-      'creator.describe_drops_on',
-    ]);
-
+    await hourly();
     // Her media were described with another prompt than the gateway's of now: each one is asked again, once. Her
     // script told with the brain's prompt of now, after its last description, is left alone; the two others, never
     // told, are asked.
@@ -1175,9 +1240,28 @@ describe('/v1/creator-space/content/script-drops', () => {
           () => null,
           (error: unknown) => error,
         );
-    const store = createDrizzleScriptSummaryStore(test.service.db);
-    expect(await store.summarized(dropId, row.mediaHash, 'summary-v2')).toBe(true);
-    expect(await store.summarized(dropId, 'other-media', 'summary-v2')).toBe(false);
+    const store = createDrizzleScriptSummaryStore(app.db.db);
+    expect(await store.summarized(nora, dropId, row.mediaHash, 'summary-v2')).toBe(true);
+    expect(await store.summarized(nora, dropId, 'other-media', 'summary-v2')).toBe(false);
+    // The job in another creator (SEC-16): neither her script nor what was told of it, and nothing written for her.
+    expect(await store.target(ines, dropId)).toBeNull();
+    expect(await store.target(nora, dropId)).toMatchObject({ creatorId: nora });
+    expect(await store.summarized(ines, dropId, row.mediaHash, 'summary-v2')).toBe(false);
+    const asJob = (creatorId: string, values: Partial<typeof schema.scriptDropSummaries.$inferInsert>) =>
+      withTenantJob(app.db.db, creatorId, 'drop_media', (tx) =>
+        tx.insert(schema.scriptDropSummaries).values({ ...row, id: crypto.randomUUID(), ...values }),
+      ).then(
+        () => null,
+        (error: unknown) => error,
+      );
+    const byBrain = { author: 'brain', model: 'brain-test', validatedBy: null, validatedAt: null } as const;
+    expect(await asJob(ines, { ...byBrain, promptHash: 'summary-v3' })).toBeInstanceOf(Error);
+    expect(await asJob(ines, { ...byBrain, promptHash: 'summary-v3', creatorId: ines })).toBeInstanceOf(
+      Error,
+    );
+    // Never a telling by hand nor a validated one, even in her creator; the brain's own passes.
+    expect(await asJob(nora, { promptHash: 'summary-v3' })).toBeInstanceOf(Error);
+    expect(await asJob(nora, { ...byBrain, promptHash: 'summary-v3' })).toBeNull();
     expect(await insert({ validatedBy: null, validatedAt: null })).toBeInstanceOf(Error);
     expect(await insert({ reviewReasons: ['price'] })).toBeInstanceOf(Error);
 

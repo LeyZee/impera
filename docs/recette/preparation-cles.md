@@ -6,7 +6,7 @@ But : le jour où une clé arrive, tout ce qui ne dépend pas de la clé a déj�
 
 | Clé ou accès | Où elle se pose | Ce qui est prêt | Ce qui manque avant la pose |
 |---|---|---|---|
-| **xAI (Grok)** : cerveau et voix | Réglages › Modèles IA | coffre chiffré, vérification au collage, 429 = injoignable, refus = rouge, budget 20 €/jour, `pnpm probe`, `pnpm evals` (job nightly-evals) | mode simulé pour jouer l'agent à l'écran avant la clé ; chemins d'API à reconfirmer à la pose |
+| **xAI (Grok)** : cerveau et voix | Réglages › Modèles IA | coffre chiffré, vérification au collage, 429 = injoignable, refus = rouge, budget 25 €/jour, `pnpm probe`, `pnpm evals` (job evals, chaque semaine et à chaque changement de l'IA) | mode simulé pour jouer l'agent à l'écran avant la clé ; chemins d'API à reconfirmer à la pose |
 | **Google (Gemini)** : vision | Réglages › Modèles IA | vérification, `pnpm probe:vision`, port `FetchMedia` | médias factices et descriptions attendues (SC-04) |
 | **Mistral** : relais d'écriture et juge des évals | Réglages › Modèles IA | ligne et vérificateur | rien de bloquant |
 | **ElevenLabs** : vocaux clonés (copilote seulement) | Réglages › Modèles IA | vérification | accord formel de Messa pour la voix clonée ; envoi d'un vocal sur Reveal inconnu (capture, E7) |

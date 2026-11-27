@@ -3,6 +3,7 @@ import {
   DraftIdSchema,
   newId,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   ShiftFeedbackIdSchema,
   ShiftIdSchema,
   ShiftTemplateIdSchema,
@@ -38,8 +39,21 @@ const bodiesFor = (
   ids: Readonly<Record<Seeded, string>>,
 ): Readonly<Record<string, Record<string, unknown>>> => ({
   'POST /v1/conversations/:id/mode': { mode: 'auto' },
+  // The vault by choice (ADR 0145 § 5): the owner's alone, so A's people stop at the guard, B's account or not.
+  'PUT /v1/creators/:creatorId/vault/choices': {
+    platformAccountId: newId(PlatformAccountIdSchema),
+    folders: [{ folderRef: null, imported: true }],
+    media: [],
+  },
+  'POST /v1/creators/:creatorId/vault/describe': {
+    platformAccountId: newId(PlatformAccountIdSchema),
+    platformMediaIds: ['vault_media_inventee'],
+    confirm: null,
+    idempotencyKey: newId(PlatformAccountIdSchema),
+  },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
     descriptionIds: ['00000000-0000-4000-8000-000000000000'],
   },
@@ -59,22 +73,13 @@ const bodiesFor = (
   'POST /v1/creators/:creatorId/drops/:id/summary/validate': {
     summaryId: '00000000-0000-4000-8000-000000000000',
   },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/validate': {
-    identityId: '00000000-0000-4000-8000-000000000000',
-  },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/correct': {
-    content: {
-      ambiance: 'Ambiance inventée',
-      energy: 'soft',
-      setting: 'Décor inventé',
-      useWhen: ['Situation inventée'],
-      avoidWhen: [],
-    },
-  },
+  // The owner's alone (ADR 0092 § 6): A's people stop at the guard, B's creator or not.
+  'PUT /v1/dashboard/agency/objectives/:creatorId/:month': { amountMinor: 100_000 },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
   'POST /v1/team/members/:memberId/notes': { body: 'Note inventée' },
+  'POST /v1/scheduling/shift-feedback/:shiftFeedbackId/incident': { step: 'seen' },
   'PUT /v1/scheduling/shifts/:shiftId/feedback': {
     id: newId(ShiftFeedbackIdSchema),
     nothingToReport: true,
@@ -151,6 +156,7 @@ type Seeded =
   | 'member'
   | 'shift'
   | 'report'
+  | 'feedback'
   | 'user'
   | 'template';
 
@@ -175,6 +181,8 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
   sha256: 'a logo of the agency',
   file: 'a calendar feed token, read without a session',
   field: 'a field of the fan’s card, a closed code (ADR 0085)',
+  day: 'a calendar day; the route reads the session’s own creator (her day, ADR 0140)',
+  item: 'a line of her own day, a closed code (ADR 0140)',
 };
 
 /**
@@ -183,6 +191,9 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
  */
 const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/alerts/triggers/:id/seen': 'a trigger of the person’s own alerts',
+  'POST /v1/team/announcements/:announcementId/read': 'an announcement to the team: announcements tests',
+  'GET /v1/team/announcements/:announcementId/readers': 'an announcement to the team: announcements tests',
+  'POST /v1/team/announcements/:announcementId/withdraw': 'an announcement to the team: announcements tests',
   'DELETE /v1/scheduling/settings/versions/:id': 'an agency planning version',
   'DELETE /v1/scheduling/swap-requests/:shiftSwapRequestId': 'swap requests: leaves-swaps tests',
   'POST /v1/scheduling/swap-requests/:shiftSwapRequestId/answer': 'swap requests: leaves-swaps tests',
@@ -208,13 +219,38 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'PATCH /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id/ticks/:day': 'creator space: creator-tasks tests',
+  'PUT /v1/creator-space/shoot-items/:id': 'creator space: creator-week tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/answer':
+    'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/later':
+    'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/other-ideas':
+    'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
+  'POST /v1/creator-space/stops/:id/withdraw':
+    'creator space: creator-limits tests (another creator’s line stays)',
+  'POST /v1/creator-space/absences/:id/cancel':
+    'creator space: creator-limits tests (another creator’s absence stays)',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
+  'GET /v1/creator-space/drops/:id/descriptions':
+    'creator space: content-stock tests (another creator gets 404)',
+  'POST /v1/creator-space/drops/:id/descriptions/validate':
+    'creator space: content-stock tests (another creator gets 404)',
+  'POST /v1/creator-space/drops/:id/descriptions/correct':
+    'creator space: content-stock tests (another creator’s drop is never found)',
+  'GET /v1/creator-space/drops/:id/files/:fileId/thumbnail':
+    'creator space: content-stock tests (another creator gets 404)',
+  'GET /v1/creator-space/drops/:id/files/:fileId/media':
+    'creator space: content-stock tests (same file read)',
+  'POST /v1/creator-space/drops/:id/files/:fileId/replace':
+    'creator space: content-drops tests (another creator gets 404)',
   'GET /v1/payroll/contractors/:memberId/documents/:documentId/file':
     'contractor documents: contractor tests',
   'POST /v1/payroll/contractors/:memberId/documents/:documentId/review':
     'contractor documents: contractor tests',
+  'POST /v1/payroll/sale-claims/:saleClaimId/answer':
+    'a claim on a sale, kept to its creator: payroll-sale-claims tests (a manager of another creator neither reads nor answers it)',
   'POST /v1/payroll/statements/:statementId/validate': 'statements: payroll tests',
   'POST /v1/payroll/statements/:statementId/pay': 'statements: payroll tests',
   'GET /v1/payroll/invoices/:invoiceId/pdf': 'invoices: invoicing tests',
@@ -247,6 +283,7 @@ function seededFor(path: string, name: string): Seeded | undefined {
     memberId: 'member',
     shiftId: 'shift',
     shiftReportId: 'report',
+    shiftFeedbackId: 'feedback',
     userId: 'user',
     templateId: 'template',
   };
@@ -256,8 +293,11 @@ function seededFor(path: string, name: string): Seeded | undefined {
 /** Filler for a parameter beside B's creator: any value, the creator's guard answers first. */
 function filler(name: string): string {
   if (name === 'day') return '2026-11-06';
+  // A date of her clock far ahead: a past one is refused before the guard could prove anything.
+  if (name === 'date') return '2099-01-01';
   if (name === 'slotKey' || name === 'segmentKey') return 'a';
   if (name === 'field') return 'first_name';
+  if (name === 'month') return '2026-11-01';
   return '00000000-0000-4000-8000-000000000000';
 }
 
@@ -432,6 +472,19 @@ describe('no route lets the people of one creator reach another one (audit des t
       .from(schema.shiftReports)
       .where(eq(schema.shiftReports.id, report));
     if (shift === undefined) throw new Error('B’s shift was not seeded');
+    // A feedback of B's shift with its incident (trous béants n° 1): one of another creator answers as unknown.
+    const feedback = newId(ShiftFeedbackIdSchema);
+    await admin.insert(schema.shiftFeedbacks).values({
+      id: feedback,
+      creatorId: bea,
+      platformAccountId: beas,
+      shiftId: shift.id,
+      memberId: chatterOfB.id,
+      period: PERIOD,
+      nothingToReport: false,
+      incident: 'Incident inventé',
+      createdBy: chatterOfB.userId,
+    });
     const accountOfB = await account('bea-compte@example.test', 'creator', [bea]);
     const template = newId(ShiftTemplateIdSchema);
     await admin.insert(schema.shiftTemplates).values({
@@ -454,6 +507,7 @@ describe('no route lets the people of one creator reach another one (audit des t
       member: chatterOfB.id,
       shift: shift.id,
       report,
+      feedback,
       user: accountOfB.userId,
       template,
     };

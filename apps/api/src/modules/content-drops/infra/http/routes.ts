@@ -1,5 +1,3 @@
-import { Readable } from 'node:stream';
-
 import {
   CompleteDropFileBodySchema,
   ContentDropFileIdSchema,
@@ -8,6 +6,8 @@ import {
   ContentRequestIdSchema,
   ContentRequestSchema,
   CorrectDropCategoryBodySchema,
+  RedoDropBodySchema,
+  ReplaceDropFileBodySchema,
   CorrectDropDescriptionBodySchema,
   CreateContentDropBodySchema,
   CreateContentRequestBodySchema,
@@ -23,7 +23,6 @@ import {
   ScriptDropSchema,
   ScriptSlotParamsSchema,
   DropDescriptionsReviewSchema,
-  DropDescriptionsSwitchSchema,
   StartScriptDropBodySchema,
   ValidateDropDescriptionsBodySchema,
   ValidateScriptSummaryBodySchema,
@@ -48,21 +47,20 @@ import {
 } from '../../application/script-drops';
 import { exportScript } from '../../application/script-export';
 import { finishUpload, uploadOf } from '../../application/uploads';
-import { byteRangeOf } from '../../domain/byte-range';
-import { ContentDropFileNotFound, DropDescriptionsCreatorNotFound } from '../../domain/errors';
 import type {
   AgencyContentStore,
   CreatorContentStore,
-  DescribeSwitch,
   DescriptionReview,
   DropStorage,
 } from '../../domain/ports';
+
+import { sendMedium, sendThumbnail } from './serve-medium';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
 /** A `creator` session whose account is not linked to exactly one creator (the base forbids it): refused. */
-class CreatorAccountForbidden extends DomainError {
+export class CreatorAccountForbidden extends DomainError {
   constructor() {
     super('creator_forbidden', 'Ce compte n’est lié à aucune créatrice');
   }
@@ -99,7 +97,6 @@ const CreatorFileParamsSchema = z.object({
 });
 const CreatorRequestParamsSchema = z.object({ creatorId: CreatorIdSchema, id: ContentRequestIdSchema });
 /** Short: a picture made meanwhile shows within minutes; the browser does not ask at each page. */
-const THUMBNAIL_CACHE_SECONDS = 300;
 const ScriptDropParamsSchema = z.object({ dropId: ContentDropIdSchema });
 
 /**
@@ -112,7 +109,6 @@ export function createContentDropRoutes(
   agency: AgencyContentStore,
   storage: DropStorage,
   scripts: ScriptDropDeps,
-  describeSwitch: DescribeSwitch,
   review: DescriptionReview,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
@@ -120,7 +116,6 @@ export function createContentDropRoutes(
   return (app) => {
     const creatorOnly = { preValidation: requireRole('creator') };
     const team = { preValidation: requireRole('owner', 'operator') };
-    const owner = { preValidation: requireRole('owner') };
 
     app.get(
       '/creator-space/content',
@@ -163,6 +158,28 @@ export function createContentDropRoutes(
           uploadOf(
             storage,
             await creator.fileTarget(signedIn(request.user), request.params.id, request.params.fileId),
+          ),
+        ),
+    );
+
+    app.post(
+      '/creator-space/drops/:id/files/:fileId/replace',
+      {
+        ...creatorOnly,
+        schema: {
+          params: FileParamsSchema,
+          body: ReplaceDropFileBodySchema,
+          response: { 200: ContentDropSchema },
+        },
+      },
+      (request) =>
+        asCreator(() =>
+          creator.replaceFile(
+            signedIn(request.user),
+            request.params.id,
+            request.params.fileId,
+            request.body,
+            clock(),
           ),
         ),
     );
@@ -303,6 +320,37 @@ export function createContentDropRoutes(
       { ...team, schema: { params: CreatorDropParamsSchema } },
       async (request, reply) => {
         await agency.withdraw(request.params.creatorId, signedIn(request.user), request.params.id, clock());
+        return reply.code(204).send();
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/redo',
+      { ...team, schema: { params: CreatorFileParamsSchema, body: RedoDropBodySchema } },
+      async (request, reply) => {
+        await agency.redoFile(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.params.fileId,
+          request.body.sentence,
+          clock(),
+        );
+        return reply.code(204).send();
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/redo',
+      { ...team, schema: { params: CreatorDropParamsSchema, body: RedoDropBodySchema } },
+      async (request, reply) => {
+        await agency.redo(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.sentence,
+          clock(),
+        );
         return reply.code(204).send();
       },
     );
@@ -487,28 +535,20 @@ export function createContentDropRoutes(
         ),
     );
 
-    // Her medium's reduced picture (SC-04 lot c4, ADR 0030 § 4), from our own origin (the CRM's CSP: `img-src 'self'`).
+    // Her medium's reduced picture and the medium itself (SC-04 lot c4), served by `serve-medium.ts`.
     app.get(
       '/creators/:creatorId/drops/:id/files/:fileId/thumbnail',
       { ...team, schema: { params: CreatorFileParamsSchema } },
       async (request, reply) => {
         const { creatorId, id, fileId } = request.params;
-        const file = await review.file(creatorId, signedIn(request.user), id, fileId);
-        if (file?.thumbnailKey == null) throw new ContentDropFileNotFound();
-        const stream = await storage.read(file.thumbnailKey);
-        if (stream === null) throw new ContentDropFileNotFound();
-        return reply
-          .header('content-type', 'image/jpeg')
-          .header('cache-control', `private, max-age=${String(THUMBNAIL_CACHE_SECONDS)}`)
-          .header('x-content-type-options', 'nosniff')
-          .send(Readable.from(stream));
+        return sendThumbnail(
+          reply,
+          storage,
+          await review.file(creatorId, signedIn(request.user), id, fileId),
+        );
       },
     );
 
-    /*
-     * Her medium itself while its original is held (SC-04 lot c4, ADR 0044 § 2), from our own origin (`media-src
-     * 'self'`): a photo whole, a video in the parts its player asks (`Range`). Each opening is audited, not each part.
-     */
     app.get(
       '/creators/:creatorId/drops/:id/files/:fileId/media',
       { ...team, schema: { params: CreatorFileParamsSchema } },
@@ -516,30 +556,9 @@ export function createContentDropRoutes(
         const { creatorId, id, fileId } = request.params;
         const userId = signedIn(request.user);
         const file = await review.file(creatorId, userId, id, fileId);
-        if (file?.originalKey == null) throw new ContentDropFileNotFound();
-        const range = byteRangeOf(request.headers.range, file.bytes);
-        if (range.kind === 'unsatisfiable')
-          return reply
-            .code(416)
-            .header('content-range', `bytes */${String(file.bytes)}`)
-            .send();
-        const part = range.kind === 'part' ? { start: range.start, end: range.end } : undefined;
-        const stream = await storage.read(file.originalKey, part);
-        if (stream === null) throw new ContentDropFileNotFound();
-        if (part === undefined || part.start === 0) await review.opened(creatorId, userId, file, request.id);
-        reply
-          .header('content-type', file.mime)
-          .header('accept-ranges', 'bytes')
-          .header('cache-control', 'private, no-store')
-          .header('x-content-type-options', 'nosniff')
-          .header('content-disposition', 'inline');
-        if (part === undefined) reply.header('content-length', String(file.bytes));
-        else
-          reply
-            .code(206)
-            .header('content-range', `bytes ${String(part.start)}-${String(part.end)}/${String(file.bytes)}`)
-            .header('content-length', String(part.end - part.start + 1));
-        return reply.send(Readable.from(stream));
+        return sendMedium(reply, storage, file, request.headers.range, (seen) =>
+          review.opened(creatorId, userId, seen, request.id),
+        );
       },
     );
 
@@ -622,39 +641,6 @@ export function createContentDropRoutes(
           { shootingContext: request.body.shootingContext, steps: request.body.steps },
           clock(),
         ),
-    );
-
-    // Her switch (ADR 0083 § 9): the owner's alone, turned on once the vision model is checked on her real media.
-    // Turned on, what she dropped meanwhile is described and her sent scripts told.
-    app.get(
-      '/creators/:creatorId/drop-descriptions',
-      { ...owner, schema: { params: CreatorParamsSchema, response: { 200: DropDescriptionsSwitchSchema } } },
-      async (request) => {
-        const on = await describeSwitch.read(request.params.creatorId);
-        if (on === null) throw new DropDescriptionsCreatorNotFound();
-        return { on };
-      },
-    );
-
-    app.put(
-      '/creators/:creatorId/drop-descriptions',
-      {
-        ...owner,
-        schema: {
-          params: CreatorParamsSchema,
-          body: DropDescriptionsSwitchSchema,
-          response: { 200: DropDescriptionsSwitchSchema },
-        },
-      },
-      async (request) => {
-        const on = await describeSwitch.set(
-          request.params.creatorId,
-          request.body.on,
-          signedIn(request.user),
-        );
-        if (on === null) throw new DropDescriptionsCreatorNotFound();
-        return { on };
-      },
     );
 
     return Promise.resolve();

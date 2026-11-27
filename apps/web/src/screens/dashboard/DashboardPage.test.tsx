@@ -203,7 +203,7 @@ describe('DashboardPage on the server’s data', () => {
     expect(screen.getByText('28 €')).toBeDefined();
     const sellers = screen.getByRole('list', { name: 'Qui a vendu' });
     expect(sellers.textContent).toMatch(/L’agent.*Maya.*Chatteur non relié/u);
-    expect(screen.getByText('1 vente · à relier dans Équipe › Reveal')).toBeDefined();
+    expect(screen.getByText('1 vente · à relier dans Équipe › Comptes Reveal')).toBeDefined();
     expect(
       screen.getByText(/1 remboursement porte sur une vente plus ancienne que le registre/u),
     ).toBeDefined();
@@ -304,7 +304,9 @@ describe('DashboardPage on the server’s data', () => {
     renderDashboard(false);
     expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeDefined();
     expect(screen.queryByRole('link', { name: 'Choisir un groupe' })).toBeNull();
-    expect(screen.getByText('Le propriétaire choisit ce groupe dans Réglages › Telegram.')).toBeDefined();
+    expect(
+      screen.getByText('Le propriétaire choisit ce groupe dans Réglages › Bots Telegram.'),
+    ).toBeDefined();
     cleanup();
     serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
     renderDashboard(true);
@@ -705,9 +707,11 @@ describe('DashboardPage of the owner', () => {
     renderDashboard(true);
     expect(await screen.findByText(/^Aucune sauvegarde réussie depuis le 26 octobre/u)).toBeDefined();
     // Where the export is read and a restore test noted, one click away (DASH-19).
-    expect(screen.getByRole('link', { name: 'Voir les sauvegardes' }).getAttribute('href')).toBe(
-      '/reglages/sauvegardes',
-    );
+    expect(
+      screen
+        .getByRole('link', { name: /^Aucune sauvegarde réussie depuis le 26 octobre/u })
+        .getAttribute('href'),
+    ).toBe('/reglages/sauvegardes');
   });
 
   it('says when none was ever made, and nothing while they are on time', async () => {
@@ -738,7 +742,7 @@ describe('DashboardPage of the owner', () => {
         : { status: 200, body: apiDashboard() },
     );
     renderDashboard(true);
-    expect(await screen.findByText('Aucun essai de restauration récent')).toBeDefined();
+    expect(await screen.findByText('Essai de restauration à faire')).toBeDefined();
   });
 
   it('is the owner’s alone: nobody else reads the exports', async () => {
@@ -792,16 +796,6 @@ describe('DashboardPage before any creator exists', () => {
     expect(screen.queryByText('Kévin')).toBeNull();
     expect(screen.queryByText('Exemple')).toBeNull();
     expect(screen.queryByRole('radio')).toBeNull();
-  });
-
-  it('tells an account that cannot add one who does', async () => {
-    serveDashboard({ status: 200, body: apiDashboard() }, []);
-    renderDashboard();
-    await waitFor(() => {
-      expect(headline()).toBe('Aucune créatrice pour l’instant');
-    });
-    expect(screen.getByText(/Le propriétaire de l’agence les ajoute/u)).toBeDefined();
-    expect(screen.queryByRole('link')).toBeNull();
   });
 });
 
@@ -994,14 +988,5 @@ describe('DashboardPage, its best fans', () => {
     await waitFor(() => {
       expect(location()).toBe(`/suivi?conversation=${theo.conversationId}&creatrice=${CREATOR.id}`);
     });
-  });
-
-  it('is read only for an account whose rail has no Suivi', async () => {
-    serveDashboard({ status: 200, body: apiDashboard() });
-    renderDashboard(false, false);
-    const theo = await screen.findByText('Théo');
-    expect(theo.closest('button')).toBeNull();
-    fireEvent.click(theo);
-    expect(location()).toBe('/');
   });
 });

@@ -1,5 +1,4 @@
-import type { AgencyPeriod } from '@impera/contracts';
-
+import { isDay, type AgencySelection } from './agency/period';
 import type { AgentCard, AgentState, Lever, Period, SalesSeries, Todo, Tone } from './model';
 
 import type { AgentMode } from '@/agent/mode';
@@ -12,16 +11,29 @@ export interface DashboardSearch {
   readonly periode?: '7j' | '30j' | '90j' | 'jour';
   /** The creator shown (recette 05/11, PRO-28): a shared link opens hers; without it, the one followed on the device. */
   readonly creatrice?: string;
+  /** The agency's days (ADR 0146): a day, a week, a month (the address with none) or the days chosen. */
+  readonly vue?: 'jour' | 'semaine' | 'mois' | 'perso';
+  /** A day of the period read, or the first and last days chosen. */
+  readonly date?: string;
+  readonly du?: string;
+  readonly au?: string;
+  /** A day of the period compared with; none, the one just before. */
+  readonly vs?: string;
 }
 
 const PERIOD_PARAMS = { week: '7j', month: '30j' } as const satisfies Partial<Record<Period, string>>;
 
 /** Anything else in the address than a known period reads as today. */
 export function parseDashboardSearch(search: Record<string, unknown>): DashboardSearch {
-  const { periode, creatrice } = search;
+  const { periode, creatrice, vue, date, du, au, vs } = search;
   return {
     ...(periode === '7j' || periode === '30j' || periode === '90j' || periode === 'jour' ? { periode } : {}),
     ...(typeof creatrice === 'string' && /^[0-9a-f-]{36}$/iu.test(creatrice) ? { creatrice } : {}),
+    ...(vue === 'jour' || vue === 'semaine' || vue === 'mois' || vue === 'perso' ? { vue } : {}),
+    ...(isDay(date) ? { date } : {}),
+    ...(isDay(du) ? { du } : {}),
+    ...(isDay(au) ? { au } : {}),
+    ...(isDay(vs) ? { vs } : {}),
   };
 }
 
@@ -34,27 +46,46 @@ export const dashboardSearch = (period: Period, creatrice?: string): DashboardSe
   ...(creatrice === undefined ? {} : { creatrice }),
 });
 
-const AGENCY_PARAMS = { day: 'jour', month: '30j', quarter: '90j' } as const satisfies Partial<
-  Record<AgencyPeriod, string>
->;
+const UNIT_OF = { jour: 'day', semaine: 'week', mois: 'month' } as const;
+const VUE_OF = { day: 'jour', week: 'semaine', month: 'mois' } as const;
 
-/** The agency's period (ADR 0078): 7 days when the address names none. */
-export const agencyPeriodOf = (search: DashboardSearch): AgencyPeriod =>
-  search.periode === 'jour'
-    ? 'day'
-    : search.periode === '30j'
-      ? 'month'
-      : search.periode === '90j'
-        ? 'quarter'
-        : 'week';
+/**
+ * The agency's days (ADR 0146): the month running when the address names none. An older link's `periode` opens its
+ * nearest unit; days chosen without both ends read as the month.
+ */
+export function agencySelectionOf(search: DashboardSearch): AgencySelection {
+  const compare = search.vs === undefined ? {} : { compareAt: search.vs };
+  if (search.vue === 'perso') {
+    if (search.du !== undefined && search.au !== undefined && search.du <= search.au) {
+      return { unit: 'custom', from: search.du, to: search.au, ...compare };
+    }
+    return { unit: 'month' };
+  }
+  const unit =
+    search.vue !== undefined
+      ? UNIT_OF[search.vue]
+      : search.periode === 'jour'
+        ? 'day'
+        : search.periode === '7j'
+          ? 'week'
+          : 'month';
+  return { unit, ...(search.date === undefined ? {} : { at: search.date }), ...compare };
+}
 
-export const agencySearch = (period: AgencyPeriod, creatrice?: string): DashboardSearch => ({
-  ...(period === 'week' ? {} : { periode: AGENCY_PARAMS[period] }),
+export const agencySearch = (selection: AgencySelection, creatrice?: string): DashboardSearch => ({
+  ...(selection.unit === 'custom'
+    ? { vue: 'perso', du: selection.from, au: selection.to }
+    : {
+        ...(selection.unit === 'month' ? {} : { vue: VUE_OF[selection.unit] }),
+        ...(selection.at === undefined ? {} : { date: selection.at }),
+      }),
+  ...(selection.compareAt === undefined ? {} : { vs: selection.compareAt }),
   ...(creatrice === undefined ? {} : { creatrice }),
 });
 
-/** The agent's blocks know three periods: three months read as the last 30 days, and say so (ADR 0078 § 3). */
-export const agentPeriodOf = (period: AgencyPeriod): Period => (period === 'quarter' ? 'month' : period);
+/** The agent's blocks know three rolling periods: a month or days chosen read as the last 30 days (ADR 0078 § 3). */
+export const agentPeriodOf = (selection: AgencySelection): Period =>
+  selection.unit === 'day' ? 'day' : selection.unit === 'week' ? 'week' : 'month';
 
 /** « 1 846 € », « 10,50 € »: the cents only when there are some, never rounded away (ADR 0011: exact money). */
 export function eur(value: number): string {

@@ -59,6 +59,13 @@ describe('decideNotification', () => {
     expect(decideNotification(base)).toEqual({ action: 'ring' });
   });
 
+  it('keeps a sort she turned off silent, day or night, a sale too (ADR 0150 § 16 ter)', () => {
+    expect(decideNotification({ ...base, turnedOff: true })).toEqual({ action: 'silent' });
+    expect(decideNotification({ ...base, kind: 'sale', turnedOff: true })).toEqual({ action: 'silent' });
+    const night = new Date('2026-11-10T23:00:00Z');
+    expect(decideNotification({ ...base, at: night, turnedOff: true })).toEqual({ action: 'silent' });
+  });
+
   it('holds everything for the recap in the quiet hours, sales too', () => {
     const night = new Date('2026-11-10T23:00:00Z');
     const until = new Date('2026-11-11T07:00:00Z');
@@ -81,6 +88,35 @@ describe('decideNotification', () => {
     });
     expect(isCapped('own_shift_end')).toBe(false);
     expect(isCapped('own_shift_start')).toBe(false);
+  });
+
+  it('rings a change among the owners at night and past the cap: the notice only helps an owner who hears of it (ADR 0096 § 2)', () => {
+    const night = new Date('2026-11-10T23:00:00Z');
+    expect(decideNotification({ ...base, kind: 'owner_change', at: night })).toEqual({ action: 'ring' });
+    expect(decideNotification({ ...base, kind: 'owner_change', cappedRungToday: DEFAULT_DAILY_CAP })).toEqual(
+      {
+        action: 'ring',
+      },
+    );
+    expect(isCapped('owner_change')).toBe(false);
+  });
+
+  it('rings a safety relay of a creator at night, past the cap, under any quiet hours, and never counts it (ADR 0150 § 6)', () => {
+    const night = new Date('2026-11-10T23:00:00Z');
+    expect(decideNotification({ ...base, kind: 'safety_alert', at: night })).toEqual({ action: 'ring' });
+    expect(decideNotification({ ...base, kind: 'safety_alert', cappedRungToday: DEFAULT_DAILY_CAP })).toEqual(
+      { action: 'ring' },
+    );
+    // Quiet hours of his own, 13:00 – 17:00: 15:00 in Paris is in them.
+    const own = { startMinute: 13 * 60, endMinute: 17 * 60 };
+    expect(decideNotification({ ...base, kind: 'safety_alert', quiet: own })).toEqual({ action: 'ring' });
+    expect(isCapped('safety_alert')).toBe(false);
+    // Any other alert of her tab waits for the recap at night, and rings all day past the cap (Charles, 19/11).
+    expect(decideNotification({ ...base, kind: 'creator_alert', at: night }).action).toBe('hold');
+    expect(
+      decideNotification({ ...base, kind: 'creator_alert', cappedRungToday: DEFAULT_DAILY_CAP }),
+    ).toEqual({ action: 'ring' });
+    expect(isCapped('creator_alert')).toBe(false);
   });
 
   it('holds the second reminder, a plain reminder, for the recap, and counts it in the cap', () => {

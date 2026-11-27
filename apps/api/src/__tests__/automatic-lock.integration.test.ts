@@ -233,7 +233,7 @@ describe('the server lock of Automatique (ADR 0019)', () => {
   it('opens Automatique once the lock is open, and the Dashboard says so', async () => {
     const response = await setAgentMode('auto');
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ mode: 'auto', globalStop: false });
+    expect(response.json()).toEqual({ mode: 'auto', globalStop: false, pausedUntil: null });
     expect(await conversationMode()).toBe('auto');
     expect(await dashboard()).toMatchObject({ mode: 'auto', automatic: { open: true, missing: [] } });
     // Told to the urgent groups after its audit line (ADR 0046 § 8); asked again, nothing changes and nothing is told.

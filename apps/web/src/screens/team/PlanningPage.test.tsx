@@ -67,6 +67,7 @@ const night = {
   endsAt: '2026-10-28T04:00:00Z',
   templateId: TEMPLATE,
   stoppedAt: null,
+  checkedInAt: null,
 };
 
 const ACCOUNTS = [
@@ -406,7 +407,7 @@ describe('Équipe › Planning', () => {
     );
     // The night shift starts on Tuesday 27, at the agency's hour.
     const row = screen.getByRole('row', { name: /Nora Vidal/u });
-    expect(within(row).getByRole('rowheader').textContent).toContain('Nora Vidal@nora sur Reveal');
+    expect(within(row).getByRole('rowheader').textContent).toContain('Nora Vidal@nora');
     expect(within(row).getAllByRole('cell')[1]?.contains(chip)).toBe(true);
     // On Wednesday, where a phone shows that day alone, the same shift is read and reached again, its edge breathing.
     const wednesday = screen.getByRole('button', {
@@ -450,6 +451,46 @@ describe('Équipe › Planning', () => {
     if (!(day instanceof HTMLInputElement)) throw new Error('no day field');
     // Written as French writes it, never by the system's date field (recette #561).
     expect(day.value).toBe('29/10/2026');
+  });
+
+  it('reads a créneau in the order of the day, draws a shift once and keeps the amber for the next day (GES-05)', async () => {
+    // Thursday 29, 16 h – 22 h in Paris: half of the 12 h – 18 h créneau, then on into the 18 h – 0 h one.
+    const afternoon = {
+      ...night,
+      id: id(110),
+      startsAt: '2026-10-29T15:00:00Z',
+      endsAt: '2026-10-29T21:00:00Z',
+      templateId: null,
+    };
+    serve({ planning: planning([], [night, afternoon]) });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    const thursday = within(row).getAllByRole('cell')[3];
+    const slots = [...(thursday?.querySelectorAll('.sc-slot') ?? [])];
+    // 12 h – 16 h to fill above the shift that starts at 16 h, never under it.
+    const noon = [...(slots[2]?.children ?? [])].map((one) => one.className);
+    expect(noon).toEqual(['sc-slot__fill', 'sc-chip']);
+    // In the evening one, the shift only goes on: its name and « suite », no hours, then 22 h – 0 h to fill.
+    const evening = slots[3];
+    const suite = evening?.querySelector('.cal-chip--cont');
+    expect(text(suite)).toBe('Théosuite');
+    expect(suite?.getAttribute('aria-hidden')).toBe('true');
+    expect(evening?.querySelectorAll('.sc-chip__hours')).toHaveLength(0);
+    expect([...(evening?.children ?? [])].map((one) => one.className)).toEqual([
+      'sc-chip cal-chip--cont',
+      'sc-slot__fill',
+    ]);
+    // The shift is said once to a screen reader: on its first créneau.
+    expect(within(thursday ?? row).getAllByRole('button', { name: /^Théo, 16\sh – 22\sh/u })).toHaveLength(1);
+    // Amber within the day ahead only (from Wednesday 1 h): up to Thursday's night, quiet from Thursday 6 h on.
+    const wednesday = within(row).getAllByRole('cell')[2];
+    const soon = [...(wednesday?.querySelectorAll('.sc-slot__fill') ?? [])].map((one) =>
+      one.getAttribute('data-soon'),
+    );
+    expect(soon).toEqual(['true', 'true', 'true', 'true']);
+    expect(
+      slots.map((one) => one.querySelector('.sc-slot__fill')?.getAttribute('data-soon') ?? null),
+    ).toEqual(['true', null, null, null]);
   });
 
   it('leaves a suspended member’s shifts to fill: marked on the grid, counted, and said in the sheet (EQP-03)', async () => {

@@ -1,4 +1,5 @@
 import type {
+  ReplaceDropFileBody,
   ContentDrop,
   DropDescriptionsReview,
   ContentDropFileId,
@@ -46,6 +47,17 @@ export interface CreatorContentStore {
    * once), and the drop answered as it is. A file already past `awaiting` answers the same.
    */
   markSent(userId: string, dropId: string, fileId: string, correlationId: string): Promise<ContentDrop>;
+  /**
+   * The file she sends in place of a medium the team asked again, or one refused (trou 7 du 21/11): it takes its
+   * place, waits for its bytes, and the drop is received again. The same file replayed answers the drop as it is.
+   */
+  replaceFile(
+    userId: string,
+    dropId: string,
+    fileId: string,
+    body: ReplaceDropFileBody,
+    now: Date,
+  ): Promise<ContentDrop>;
 }
 
 /** Her script drop, the frozen version it shoots and the moment its request fixed (`null` before SC-03 c2). */
@@ -330,6 +342,20 @@ export interface AgencyContentStore {
   ): Promise<ContentDrop>;
   withdraw(creatorId: string, userId: string, dropId: string, now: Date): Promise<void>;
   /**
+   * « À refaire » (trou 7 du 21/11): withdrawn as `withdraw` does, with the agency's sentence for her; its request opens
+   * again. A drop already withdrawn answers, whatever its sentence.
+   */
+  redo(creatorId: string, userId: string, dropId: string, sentence: string, now: Date): Promise<void>;
+  /** « À refaire » on one medium of a drop received and not out: the drop stays, she replaces it. Replayed, it answers. */
+  redoFile(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    fileId: string,
+    sentence: string,
+    now: Date,
+  ): Promise<void>;
+  /**
    * A script names a frozen version of its structure (SC-02 lot b): `freeze` gives it, once the structure is checked
    * usable for her and before the request is written; `null` refuses it like a structure out of reach.
    */
@@ -446,8 +472,6 @@ export interface MediaToDescribe {
   readonly storageKey: string;
   /** Its original left the storage (CR-06 c): nothing to read. */
   readonly erased: boolean;
-  /** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9): off, her drops wait undescribed. */
-  readonly describes: boolean;
   readonly category: DropCategory;
   /** For a script's slot: its key and the frozen version she shot. */
   readonly script: { readonly slotKey: string; readonly versionId: string } | null;
@@ -455,11 +479,12 @@ export interface MediaToDescribe {
 
 /** `content_drops.describe_file`'s reads and its next run, as the owner role. */
 export interface DescriptionQueue {
-  target(mediaAssetId: string): Promise<MediaToDescribe | null>;
+  /** The medium in this creator, `null` when she has none of that id: the job's creator is never taken on its word. */
+  target(creatorId: string, mediaAssetId: string): Promise<MediaToDescribe | null>;
   /** The job again at `runAt` (budget spent, disk short), keyed by the medium: a new job, never twice. */
   later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
   /** One more try of the vision AI failed on this medium: its count of failures, this one included. */
-  failed(mediaAssetId: string): Promise<number>;
+  failed(creatorId: string, mediaAssetId: string): Promise<number>;
 }
 
 /** The media module's description of a dropped media, seen from here (ADR 0083). */
@@ -490,8 +515,6 @@ export interface DropDescriber {
 /** A sent script to be told step by step (ADR 0083 § 6), as the owner role reads it. */
 export interface ScriptToSummarize {
   readonly creatorId: string;
-  /** Her switch (`CreatorSettings.describeDrops`, § 9): off, her script waits untold. */
-  readonly describes: boolean;
   readonly versionId: string;
   /** The moment her request fixed; `null`, the structure's own. */
   readonly moment: ShotMoment | null;
@@ -513,17 +536,17 @@ export interface SummarizedScript {
   readonly promptHash: string;
 }
 
-/** `content_drops.summarize_script`'s reads, writes and next runs, as the owner role. */
+/** `content_drops.summarize_script`'s reads, writes and next runs, in the creator the job carries. */
 export interface ScriptSummaryStore {
   /** `null` for a drop that is not a script, is withdrawn, or is still being filled. */
-  target(dropId: string): Promise<ScriptToSummarize | null>;
+  target(creatorId: string, dropId: string): Promise<ScriptToSummarize | null>;
   /** Whether this set of media and descriptions of the script was already told with this version of the prompt. */
-  summarized(dropId: string, mediaHash: string, promptHash: string): Promise<boolean>;
+  summarized(creatorId: string, dropId: string, mediaHash: string, promptHash: string): Promise<boolean>;
   save(creatorId: string, dropId: string, summary: SummarizedScript): Promise<void>;
   /** The job again at `runAt` (budget spent), keyed by the drop. */
   later(creatorId: string, dropId: string, correlationId: string, runAt: Date): Promise<void>;
-  /** The job for each sent script holding this medium in a live slot, now; how many. */
-  enqueueFor(mediaAssetId: string, correlationId: string): Promise<number>;
+  /** The job for each sent script of hers holding this medium in a live slot, now; how many. */
+  enqueueFor(creatorId: string, mediaAssetId: string, correlationId: string): Promise<number>;
 }
 
 /** The brain that tells a script (ADR 0083 § 6), seen from here: never a price, from the cards and descriptions. */
@@ -570,22 +593,36 @@ export interface DescriptionBacklog {
   ): Promise<{ readonly media: number; readonly scripts: number }>;
 }
 
-/** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9), read and set by the owner. */
-export interface DescribeSwitch {
-  /** `null` for a creator that does not exist. */
-  read(creatorId: string): Promise<boolean | null>;
-  /**
-   * Set and audited; turned on, the backlog of this creator is enqueued in the same transaction (her drops described
-   * while it was off). `null` for a creator that does not exist.
-   */
-  set(creatorId: string, on: boolean, userId: string): Promise<boolean | null>;
-}
-
 /**
  * The agency's review of a drop's descriptions and of a script's synthesis (ADR 0030 § 3, ADR 0083 § 7), as the owner
  * or an active manager (`withTenantMember`; a chatter is refused). Every write is stamped with the account that makes
  * it and audited; each answers the drop's review as it now stands.
  */
+/**
+ * Her own review of her media's descriptions (ADR 0163 § 4): read, validate as they are, correct the words. In her
+ * account; the other gestures of the review stay the agency's.
+ */
+export interface CreatorDescriptionReview {
+  read(userId: string, dropId: string): Promise<DropDescriptionsReview>;
+  validate(
+    userId: string,
+    dropId: string,
+    descriptionIds: readonly string[],
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  correct(
+    userId: string,
+    dropId: string,
+    descriptionId: string,
+    detailed: string,
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  file(userId: string, dropId: string, fileId: string): Promise<ReviewedFile | null>;
+  opened(userId: string, file: ReviewedFile, correlationId: string): Promise<void>;
+}
+
 export interface DescriptionReview {
   read(creatorId: string, userId: string, dropId: string): Promise<DropDescriptionsReview>;
   /** These rows validated as they are; a row already validated stays as it was. */
@@ -686,9 +723,10 @@ export interface MediaToThumbnail {
 
 /** `content_drops.make_thumbnail`'s reads and writes, and the hourly backlog, as the owner role (SC-04 lot c4). */
 export interface ThumbnailQueue {
-  target(mediaAssetId: string): Promise<MediaToThumbnail | null>;
+  /** The medium in this creator, `null` when she has none of that id: the job's creator is never taken on its word. */
+  target(creatorId: string, mediaAssetId: string): Promise<MediaToThumbnail | null>;
   /** Tried: its picture's key, or `null` when the file did not give one. Once: a medium already tried stays. */
-  settle(mediaAssetId: string, thumbnailKey: string | null, now: Date): Promise<void>;
+  settle(creatorId: string, mediaAssetId: string, thumbnailKey: string | null, now: Date): Promise<void>;
   /** The job again at `runAt` (disk short), keyed by the medium. */
   later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
   /** Each photo and video of a live drop never tried, its original held, enqueued; how many. */

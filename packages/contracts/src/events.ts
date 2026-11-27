@@ -92,6 +92,11 @@ const draftPayload = z.object({
    */
   leavesFanWaiting: z.literal(true).optional(),
   /**
+   * On `draft_approved` and `draft_edited`: a chatter sent it himself on the platform, from the copilot panel, and what
+   * left decided the verdict (ADR 0086 § 5). Nothing is sent after it; the message itself already answered the fan.
+   */
+  sentOnPlatform: z.literal(true).optional(),
+  /**
    * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
    * on the fixed help bubble, given once per episode. Absent everywhere else.
    */
@@ -123,6 +128,10 @@ const controlPayload = z.object({
   mode: ConversationModeSchema.optional(),
 });
 
+/** What went wrong with a sale of his that she answers once before a human (ADR 0156 § 4 and § 7). */
+export const SALE_TROUBLE_KINDS = ['payment_help', 'purchase_complaint'] as const;
+export type SaleTroubleKind = (typeof SALE_TROUBLE_KINDS)[number];
+
 /**
  * Why the agent hands a conversation to a human. Closed list: alerts rank on it (urgent or important), never on the
  * free `reason` text.
@@ -153,6 +162,11 @@ export const HANDOFF_CAUSES = [
    * timed by them, never by the agent. Ranked « important », never urgent: nothing is set on his limits.
    */
   'custom_order',
+  /**
+   * A sale still goes wrong after she answered it once (ADR 0156 § 4 and § 7): he still cannot open the step waiting,
+   * or he complains again about what he bought. A human takes over; the detail says which.
+   */
+  'sale_trouble',
 ] as const;
 export const HandoffCauseSchema = z.enum(HANDOFF_CAUSES);
 export type HandoffCause = z.infer<typeof HandoffCauseSchema>;
@@ -255,6 +269,10 @@ export const EVENT_TYPES = [
   'script_step_opened',
   'script_step_refused',
   'script_ended',
+  'scripts_exhausted',
+  'sale_trouble',
+  'script_abandon_teased',
+  'offer_proposed',
   'session_state_changed',
   'budget_threshold_crossed',
   'ai_credits_low',
@@ -276,6 +294,7 @@ export const EVENT_TYPES = [
   'sales_feed_mismatch',
   'agency_share_mismatch',
   'agency_share_changed',
+  'account_uncovered',
   'connection_state_changed',
   'security_alert',
   'content_drop_received',
@@ -326,6 +345,11 @@ const invoiceDuePayload = z.object({
   inclVatMinor: z.number().int().min(0),
   payoutBlock: PayoutBlockSchema.nullable(),
 });
+
+/** What an `offer_proposed` is (ADR 0150 § 12), a closed list. */
+export const OFFER_PROPOSED_KINDS = ['practice_offer', 'custom_order', 'service_request'] as const;
+/** The uses of « Ses comptes » (ADR 0143 § 7), a closed list. */
+export const OFFER_PROPOSED_USAGES = ['lives', 'practice', 'personal', 'other'] as const;
 
 /** Payload schema of every event type. Adding a type here is a contract change (ADR 0007). */
 export const EVENT_PAYLOADS = {
@@ -389,9 +413,10 @@ export const EVENT_PAYLOADS = {
   }),
   /**
    * Out of her reply slots, with nobody on shift (P3-14): no draft, his message waits for `until`, the opening of her
-   * next slot, when the answer is tried again. The conversation stays pending.
+   * next slot, when the answer is tried again. The conversation stays pending. `time_waster`: his answer waits his
+   * turn (ADR 0135 § 6), the same way.
    */
-  reply_deferred: z.object({ reason: z.enum(['outside_hours']), until: z.iso.datetime() }),
+  reply_deferred: z.object({ reason: z.enum(['outside_hours', 'time_waster']), until: z.iso.datetime() }),
   /**
    * The engine's desire score of the fan changed (P3-12): written with the result it came with, only when it moved.
    * The conversation projects the last one; `before` is the stored score cooled down to that moment, `null` for the
@@ -439,6 +464,36 @@ export const EVENT_PAYLOADS = {
   script_step_opened: scriptPayload,
   script_step_refused: scriptPayload,
   script_ended: scriptPayload,
+  /**
+   * The agent would open a script for him (the gate of ADR 0103 open, his desire at the threshold, no pause) and none
+   * is playable for him any more (ADR 0150 § 9): once per episode, until a script starts again for him. Nothing else.
+   */
+  scripts_exhausted: z.strictObject({ conversationId: ConversationIdSchema }),
+  /**
+   * A sale went wrong for him and she answered it once (ADR 0156 § 4 and § 7, ADR 0158 § 48): she helped him open the
+   * step waiting (`payment_help`), or answered his complaint about what he bought (`purchase_complaint`). The same
+   * trouble again soon after goes to a human (`sale_trouble`).
+   */
+  sale_trouble: z.strictObject({
+    conversationId: ConversationIdSchema,
+    kind: z.enum(SALE_TROUBLE_KINDS),
+  }),
+  /**
+   * He left in the middle of a script, a paid step still waiting (ADR 0158, Charles 20/11), and she teased him about
+   * it once on a hot message of his: one per tease, on the run he left, so that she never says it more than due.
+   */
+  script_abandon_teased: scriptPayload,
+  /**
+   * Something sold outside the scripts was put forward by the agent (ADR 0150 §§ 12–14): what she offers around her
+   * practice (`practice_offer`, ADR 0143 § 10). `custom_order` and `service_request` are read from their own events.
+   * Never the fan's words, never an account's name, never a price.
+   */
+  offer_proposed: z.strictObject({
+    conversationId: ConversationIdSchema,
+    kind: z.enum(OFFER_PROPOSED_KINDS),
+    /** The use of the account he was pointed to, as « Ses comptes » names it (ADR 0143 § 7). */
+    usage: z.enum(OFFER_PROPOSED_USAGES).optional(),
+  }),
   session_state_changed: z.object({
     platformAccountId: PlatformAccountIdSchema,
     from: SessionStateSchema,
@@ -653,6 +708,20 @@ export const EVENT_PAYLOADS = {
       .max(SALES_FEED_MISMATCH_DAYS_MAX),
   }),
   /**
+   * ADR 0094 § 1 (lot a), « compte sans personne »: a créneau of the planning began on this account with no chatter in
+   * post and the agent not answering in Automatique, while a fan wrote to the account in the 24 hours before. Published
+   * once per account and créneau (unique index); the zone is the planning's, to say the créneau's hours. For the
+   * owner and the managers only: never a chatter, never her.
+   */
+  account_uncovered: z.strictObject({
+    creatorId: CreatorIdSchema,
+    platform: PlatformSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    slotStartsAt: z.iso.datetime(),
+    slotEndsAt: z.iso.datetime(),
+    timeZone: z.string().min(1),
+  }),
+  /**
    * CRM-04 lot d3 (ADR 0054 § 2, question 5): on the fortnight just over, a creator's part as the platform reads it
    * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale and per refund, on
    * one account and in one currency. Only the days a percentage covers are compared, each with its own; `sales` and
@@ -760,6 +829,10 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('script_step_opened'),
   typedEvent('script_step_refused'),
   typedEvent('script_ended'),
+  typedEvent('scripts_exhausted'),
+  typedEvent('sale_trouble'),
+  typedEvent('script_abandon_teased'),
+  typedEvent('offer_proposed'),
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),
   typedEvent('ai_credits_low'),
@@ -781,6 +854,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('sales_feed_mismatch'),
   typedEvent('agency_share_mismatch'),
   typedEvent('agency_share_changed'),
+  typedEvent('account_uncovered'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('content_drop_received'),

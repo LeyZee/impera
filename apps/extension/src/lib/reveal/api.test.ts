@@ -36,8 +36,16 @@ function errorBody(code: string): unknown {
 
 describe('sendSession', () => {
   it('sends the session of the specification with the link, never the CRM’s cookie', async () => {
-    const fetchFn = answer(204, null);
-    expect(await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, fetchFn)).toBe('synced');
+    const fetchFn = answer(200, {
+      sessionState: 'valid',
+      expiresAt: '2026-11-12T09:05:00.000Z',
+      reconnectFirst: true,
+      kept: false,
+    });
+    expect(await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, fetchFn)).toEqual({
+      state: 'synced',
+      stored: { expiresAt: '2026-11-12T09:05:00.000Z', reconnectFirst: true, kept: false },
+    });
     const [url, init] = vi.mocked(fetchFn).mock.calls[0] ?? [];
     expect(url).toBe(`${ORIGIN}/v1/connector/sessions`);
     expect(init?.method).toBe('POST');
@@ -57,35 +65,37 @@ describe('sendSession', () => {
     ]);
   });
 
+  it('says « open » when the extension synced alone, so the server tells the gesture apart (ADR 0147 § 2)', async () => {
+    const fetchFn = answer(200, {
+      sessionState: 'valid',
+      expiresAt: null,
+      reconnectFirst: false,
+      kept: false,
+    });
+    await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, fetchFn, 'open');
+    const [, init] = vi.mocked(fetchFn).mock.calls[0] ?? [];
+    const body: unknown = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+    expect(body).toEqual({ platformAccountId: ACCOUNT, session: JSON.stringify(SESSION), trigger: 'open' });
+  });
+
+  // A 2xx is a session stored: an answer without its details only loses the hour (an older CRM answered 204).
+  it('takes a stored session whose answer says nothing of its end', async () => {
+    expect(await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(204, null))).toEqual({
+      state: 'synced',
+      stored: { expiresAt: null, reconnectFirst: false, kept: false },
+    });
+  });
+
   it('tells a removed link, a chatter’s link, another model and an outage apart', async () => {
-    expect(await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(401, errorBody('x')))).toBe('revoked');
-    expect(
-      await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(403, errorBody(CONNECTOR_LINK_FORBIDDEN))),
-    ).toBe('not-owner');
-    expect(
-      await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(409, errorBody(CONNECTOR_SESSION_CONFLICT))),
-    ).toBe('other-model');
-    expect(
-      await sendSession(
-        ORIGIN,
-        TOKEN,
-        ACCOUNT,
-        SESSION,
-        answer(409, errorBody(CONNECTOR_SESSION_MEMBER_CONFLICT)),
-      ),
-    ).toBe('other-member');
-    expect(
-      await sendSession(
-        ORIGIN,
-        TOKEN,
-        ACCOUNT,
-        SESSION,
-        answer(422, errorBody(CONNECTOR_SESSION_UNPROCESSABLE)),
-      ),
-    ).toBe('refused');
-    expect(await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(503, errorBody('x')))).toBe(
-      'unreachable',
-    );
+    const state = async (status: number, code: string): Promise<string> =>
+      (await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(status, errorBody(code)))).state;
+    expect(await state(401, 'x')).toBe('revoked');
+    expect(await state(403, CONNECTOR_LINK_FORBIDDEN)).toBe('not-owner');
+    expect(await state(409, CONNECTOR_SESSION_CONFLICT)).toBe('other-model');
+    expect(await state(409, CONNECTOR_SESSION_MEMBER_CONFLICT)).toBe('other-member');
+    expect(await state(422, CONNECTOR_SESSION_UNPROCESSABLE)).toBe('refused');
+    expect(await state(503, 'x')).toBe('unreachable');
+    expect(await state(429, 'x')).toBe('busy');
   });
 });
 

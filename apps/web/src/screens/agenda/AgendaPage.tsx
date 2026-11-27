@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type JSX } from 'react';
 
 import { AddDialog, type AddPreset } from './AddDialog';
+import { DayCard } from './DayCard';
 import { DayView } from './DayView';
 import { FreshnessNote } from './FreshnessNote';
 import { MonthView } from './MonthView';
@@ -16,6 +17,7 @@ import { PhoneDialog } from './PhoneDialog';
 import { SuggestionDialog, UndatedSuggestions } from './SuggestionCard';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
+import { WeekCard } from './WeekCard';
 import { WeekGrid } from './WeekGrid';
 import { WeekList } from './WeekList';
 import { moveTask, tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
@@ -260,19 +262,25 @@ export function AgendaPage({
           </Skeleton>
         )
       ) : (
-        <Views
-          agenda={agenda}
-          view={seen}
-          wide={wide}
-          day={shown}
-          monday={monday}
-          onDay={onDay}
-          onView={onView}
-          onTick={tick}
-          onMove={move}
-          onOpen={setOpen}
-          shifts={shifts}
-        />
+        <>
+          {/* Her day first, what she posts today; then her week of shooting, once the agency sent it: above the
+              views, on every one of them (ADR 0140). */}
+          <DayCard />
+          <WeekCard monday={monday} zone={agenda.timeZone} today={herToday} />
+          <Views
+            agenda={agenda}
+            view={seen}
+            wide={wide}
+            day={shown}
+            monday={monday}
+            onDay={onDay}
+            onView={onView}
+            onTick={tick}
+            onMove={move}
+            onOpen={setOpen}
+            shifts={shifts}
+          />
+        </>
       )}
       {agenda === undefined ? null : (
         <p className="ag-foot">
@@ -285,7 +293,7 @@ export function AgendaPage({
                 setRepliesShown(!repliesShown);
               }}
             >
-              <NavIcon name="team" />
+              <NavIcon name="people" />
               {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
             </button>
           )}

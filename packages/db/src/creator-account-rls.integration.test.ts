@@ -176,7 +176,10 @@ const CREATOR_DECISIONS: Readonly<
   fans: 'readsOnly',
   fan_facts: 'readsOnly',
   fan_summaries: 'readsOnly',
-  media_descriptions: 'readsOnly',
+  media_descriptions: {
+    exception:
+      'she validates and corrects the description of a medium of her own drops (ADR 0162 § 4): restrictive policies carved for it',
+  },
   media_assets: 'readsOnly',
   media_sends: 'readsOnly',
   media_platform_refs: 'readsOnly',
@@ -186,14 +189,19 @@ const CREATOR_DECISIONS: Readonly<
   drafts: 'closed',
   script_runs: 'closed',
   conversation_events: 'closed',
+  // His custom orders (ADR 0159 § A): her yes comes with the next lot; until then she reads nothing of them.
+  custom_orders: 'closed',
   llm_calls: 'closed',
   calibration_ratings: 'closed',
   blind_tests: 'closed',
   notifications: 'closed',
   kill_switches: 'closed',
+  // Her dated exceptions (ADR 0148 § 3): the agency's setting, like her hours.
+  agent_hour_exceptions: 'closed',
   custom_alerts: 'closed',
   alert_seen: 'closed',
   system_alert_settings: 'closed',
+  creator_alert_routes: 'closed',
   persona_versions: {
     exception:
       'elle écrit sa persona (Moi › Persona, ADR 0042 § 8) par la porte de l’agence : son enregistrement et son activation écrivent aussi le journal d’audit et les événements',

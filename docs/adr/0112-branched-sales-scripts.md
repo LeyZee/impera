@@ -1,6 +1,6 @@
 # 0112. Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit
 
-Statut : accepted (« ok 0112 » de Charles le 16/11/2026, 0 h 37, après ses choix du 16/11 à 0 h 00, 0 h 01, 0 h 02, 0 h 05 et 0 h 07, fil « Concevoir les scripts de vente à branches » ; relu par Agent et Médias)
+Statut : accepted (« ok 0112 » de Charles le 16/11/2026, 0 h 37, après ses choix du 16/11 à 0 h 00, 0 h 01, 0 h 02, 0 h 05 et 0 h 07, fil « Concevoir les scripts de vente à branches » ; relu par Agent et Médias). Amendement du 19/11/2026 (§ 20 à 26, créer un script à l'écran et le recopier dans Reveal) : accepted (Charles, 19/11/2026, 17 h 26 heure de Paris, « Oui, comme la maquette » sur la carte du fil)
 Date : 2026-11-16
 Précise : l'ADR 0098 (déroulé d'un script par fan), l'ADR 0099 (coffre et scripts de Reveal), l'ADR 0100 (rôle `script_writer`), l'ADR 0090 (objections), l'ADR 0103 (porte, ventes fictives au playground). Ne remplace rien : un script sans branche reste celui de l'ADR 0098.
 
@@ -85,6 +85,32 @@ Le 15/11/2026 au soir, Charles veut que l'IA vende par des scripts à branches, 
 18. **Playground** : on joue le fan sur les vrais scripts (ADR 0103 § 15–18) ; « Pourquoi » dit l'étape, la branche et la condition qui l'a choisie.
 
 19. **Mesure** : par script, étape et branche, taux d'ouverture, taux d'achat et revenu.
+
+## Amendement du 19/11/2026 : créer un script à l'écran, le recopier dans Reveal (accepté)
+
+Le 17/11/2026, Charles constate que l'onglet Scripts de la fiche montre le coffre mais ne permet pas de créer un script. L'ADR 0149 range la liste des scripts et « Nouveau script » dans l'onglet Scripts de la fiche à sept onglets. La maquette de l'éditeur (données inventées), revue trois fois avec lui les 17 et 19/11, est validée le 19/11/2026 à 16 h 59 heure de Paris (« je valide », fil « Concevoir les scripts de vente à branches »). Les écritures de séquence de Reveal ne sont toujours pas capturées : Impera ne crée rien chez Reveal.
+
+20. **L'onglet Scripts de la fiche** (ADR 0149 § 1) a trois vues, dans un même sélecteur : « Scripts » (les scripts importés de Reveal et les scripts en préparation, en une liste, avec « Nouveau script » en action principale), « À copier dans Reveal » et « Structures » (propriétaire seul, l'écran actuel inchangé). L'adresse garde la vue et le script ouverts : `vue=a-copier|structures`, `script=nouveau|<id>`. L'éditeur s'ouvre en pleine page, les onglets de la fiche toujours visibles, avec un retour « ← Scripts ».
+
+21. **Un script créé à l'écran est un script en préparation** (pas un « brouillon », mot réservé aux réponses de l'agent). Il a les mêmes champs, les mêmes manques et les mêmes refus que tout script (§ 13, § 14). Ses médias se choisissent seulement parmi les médias importés et décrits du coffre de la créatrice (ADR 0145 § 5). Il porte son moment (« se joue le jour » ou « la nuit »), qui sert au refus du mélange (§ 14). Un script en préparation n'est jamais proposé ni envoyé : il n'a pas de `scriptRef`.
+
+22. **Recopie à la main.** Un script en préparation sans manque peut passer « Prêt à copier ». Il apparaît alors dans la vue « À copier dans Reveal » avec sa marche à suivre pas à pas : séquence au même nom, étapes dans l'ordre, branches d'une même étape au même rang, prix et médias de chaque branche. Quelqu'un de l'agence le recopie dans Reveal ; l'écran n'y écrit rien.
+
+23. **L'import suivant le reconnaît.** Une séquence importée se rattache à un script prêt à copier seulement si tout correspond : même nom, même nombre d'étapes, mêmes branches à chaque rang, mêmes médias et mêmes prix. Les réglages qui ne vivent qu'à Impera (conditions, messages après le média, rythme) passent alors sur le script importé, qui reçoit son `scriptRef`, et le script en préparation se ferme. Sans correspondance exacte, rien n'est rattaché, et la fiche dit ce qui diffère. L'activation reste humaine et sans manque (§ 13).
+
+24. **Le rail de l'éditeur** (§ 17) ne dessine plus d'escalier de prix. Il montre, pour chaque chemin, ce qu'un fan paie étape par étape et au total, avec ses avertissements (§ 14) ; un avertissement commun à tous les chemins ne s'écrit qu'une fois. Au-dessus, un résumé de la version active renvoie à ses performances.
+
+25. **La mesure** (§ 19) a sa vue dans l'éditeur, « Performances », à côté de « Construire ». De haut en bas : une phrase qui dit ce que rapporte la version active et l'étape à travailler en premier ; des tuiles avec leur évolution par rapport à la période d'avant de même durée, et une mini-courbe chacune ; « À faire », des pistes tirées des chiffres, la plus urgente d'abord ; « Pourquoi » : où les fans s'arrêtent à chaque étape (achat, réponse sans achat, lu sans réponse, pas lu) et le taux d'achat de chaque branche avec son intervalle de confiance, hachuré tant que l'échantillon est trop petit ; puis le revenu par fan, semaine par semaine. La liste compare les scripts sur 7, 30 ou 90 jours. Les chiffres sont calculés côté serveur, jamais par l'écran ; le seuil d'échantillon est une règle du code.
+
+26. **Couleurs** : l'encre pour les quantités, l'or de la vente pour les achats, le vert et l'ambre seulement pour le sens d'une évolution, comme sur le Dashboard. Les branches n'ont pas de teinte à elles : le bleu et le rose disent déjà l'agence et la créatrice. Chaque graphique a une bulle de survol. Les sélecteurs reprennent la barre d'onglets de la fiche.
+
+Conséquences de l'amendement : une migration (Bilan) pour garder le script en préparation, son moment, son état « prêt à copier » et son rattachement ; la reconnaissance à l'import s'ajoute à l'import des séquences ; la vue Performances lit les tables d'envoi et d'achat existantes, sans nouvelle donnée de fan.
+
+## Amendement du 20/11/2026 : jour, nuit, ou jour et nuit (accepté)
+
+Décision de Charles du 20/11/2026 (16 h 48, heure de Paris), relayée par le coordinateur.
+
+27. **Le moment d'un script en préparation** (§ 21) prend trois valeurs : « se joue le jour », « la nuit » ou « jour et nuit » (un script polyvalent). La créatrice ou l'agence le choisit à la main sur le script. Il ne se déduit jamais de la description des médias, qui décrit ce qu'elle voit (tenue, couleur, lieu) sans trancher le moment. Le nom recopié dans Reveal est celui du script, sans emoji ajouté par Impera. Pour l'agent, un script « jour et nuit » n'a pas de moment imposé (ADR 0098 § 3).
 
 ## Conséquences
 

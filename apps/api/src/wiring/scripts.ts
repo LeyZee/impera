@@ -1,9 +1,9 @@
 import { JOB_PAYLOADS, ScriptStructureIdSchema, asPersonaV2 } from '@impera/contracts';
-import type { LlmGateway } from '@impera/llm';
 
 import { defineTask } from '../jobs';
-import { PlatformReadUnavailable, type ConnectorsModule } from '../modules/connectors';
+import { PlatformReadUnavailable, salesFeedTimeZone, type ConnectorsModule } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
+import { scriptRunsForTeam } from '../modules/conversations';
 import type { PersonaModule } from '../modules/persona';
 import { createScriptsModule, type ScriptsModule } from '../modules/scripts';
 
@@ -29,8 +29,6 @@ export function wireScripts(
     /** The platform's scripts of an account (fiche vault-sync, `platformReads`), for the import (ADR 0099 § 1 time 2). */
     readonly connectors: Pick<ConnectorsModule, 'platformReads'>;
     readonly cardFontsDir: string;
-    /** The brain that writes a native script's identity (SC-04 lot c8). */
-    readonly brain: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
     /** Tests only: another clock than the server's. */
     readonly now?: () => Date;
   },
@@ -42,7 +40,6 @@ export function wireScripts(
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
     cardFontsDir: deps.cardFontsDir,
-    brain: deps.brain,
     limitsOf: async (creatorId) => {
       const active = await deps.persona.versions.active(creatorId);
       // Her strict rules, wherever the format keeps them (ADR 0079 § 4).
@@ -65,6 +62,9 @@ export function wireScripts(
           throw error;
         }
       },
+      dayZone: salesFeedTimeZone,
+      // Her runs, for the performance of her scripts (ADR 0129, sous-lot 4c): read by the team, under her RLS.
+      runsSince: (creatorId, userId, since) => scriptRunsForTeam(shared.db, creatorId, userId, since),
     },
   });
   const now = deps.now ?? (() => new Date());
@@ -87,35 +87,19 @@ export function wireScripts(
         JOB_PAYLOADS['scripts.import_platform_scripts'],
         shared.logger,
         async (payload, context) => {
-          const run = await module.jobs.importPlatformScripts(payload, now());
+          const run = await module.jobs.importPlatformScripts(payload, now(), (error) => {
+            context.logger.warn(
+              { err: error, platformAccountId: payload.platformAccountId },
+              'scripts: the scripts ready to copy could not be recognised; the next import retries',
+            );
+          });
           context.logger.info(
             { platformAccountId: payload.platformAccountId, ...run },
             'scripts: the native scripts imported',
           );
         },
       ),
-      'scripts.identify_platform_script': defineTask(
-        'scripts.identify_platform_script',
-        JOB_PAYLOADS['scripts.identify_platform_script'],
-        shared.logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.identifyPlatformScript(payload);
-          context.logger.info(
-            { platformScriptId: payload.platformScriptId, outcome },
-            'scripts: a native script’s identity',
-          );
-        },
-      ),
-      'scripts.identify_backlog': defineTask(
-        'scripts.identify_backlog',
-        JOB_PAYLOADS['scripts.identify_backlog'],
-        shared.logger,
-        async (_payload, context) => {
-          const queued = await module.jobs.identifyBacklog(`job:${context.jobId}`);
-          context.logger.info({ queued }, 'scripts: native scripts whose identity may be due, enqueued');
-        },
-      ),
     },
-    routes: [module.routes, module.platformScriptRoutes],
+    routes: [module.routes, module.platformScriptRoutes, module.preparedScriptRoutes],
   };
 }

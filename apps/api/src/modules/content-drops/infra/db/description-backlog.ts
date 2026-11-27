@@ -1,14 +1,8 @@
-import {
-  AuditEntryIdSchema,
-  CreatorSettingsSchema,
-  DESCRIPTION_TRIES,
-  JOB_MAX_ATTEMPTS,
-  newId,
-} from '@impera/contracts';
-import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import { DESCRIPTION_TRIES, JOB_MAX_ATTEMPTS } from '@impera/contracts';
+import { sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
-import type { DescribeSwitch, DescriptionBacklog } from '../../domain/ports';
+import type { DescriptionBacklog } from '../../domain/ports';
 
 /** At most this many each hour per kind: the rest comes the next hour, the day's budget spends itself anyway. */
 const MEDIA_PER_RUN = 500;
@@ -16,10 +10,12 @@ const SCRIPTS_PER_RUN = 200;
 
 const CountSchema = z.object({ n: z.coerce.number().int() });
 
-/** Her switch on, read in the base; one creator, or every one. */
+/**
+ * A creator not archived; one, or every one. Her drops are described on arrival, with no switch (ADR 0145 § 5, choix
+ * de Charles 17/11: the drop is the choice).
+ */
 const switchedOn = (creatorId: string | null) =>
-  sql`(c.settings->>'describeDrops')::boolean is true and c.archived_at is null
-    and (${creatorId}::uuid is null or c.id = ${creatorId}::uuid)`;
+  sql`c.archived_at is null and (${creatorId}::uuid is null or c.id = ${creatorId}::uuid)`;
 
 /**
  * Each medium of a live drop with no description of now: none for a drop, or only the vision's of an older prompt,
@@ -108,57 +104,5 @@ export function createDrizzleDescriptionBacklog(adminDb: Database): DescriptionB
         media: await enqueueMedia(tx, creatorId, prompts.describe, correlationId),
         scripts: await enqueueScripts(tx, creatorId, prompts.summarize, correlationId),
       })),
-  };
-}
-
-/**
- * Her switch, the owner's to set (ADR 0083 § 9). Written as the owner role in `creators.settings` (out of RLS, the
- * route admits the owner alone), audited; turned on, her backlog is enqueued in the same transaction.
- */
-export function createDrizzleDescribeSwitch(adminDb: Database): DescribeSwitch {
-  const { creators } = schema;
-  return {
-    read: (creatorId) =>
-      withAdmin(adminDb, async (tx) => {
-        const [row] = await tx
-          .select({ settings: creators.settings })
-          .from(creators)
-          .where(eq(creators.id, creatorId))
-          .limit(1);
-        return row === undefined ? null : CreatorSettingsSchema.parse(row.settings).describeDrops;
-      }),
-    set: (creatorId, on, userId) =>
-      withAdmin(adminDb, async (tx) => {
-        const [row] = await tx
-          .select({ settings: creators.settings })
-          .from(creators)
-          .where(eq(creators.id, creatorId))
-          .for('update')
-          .limit(1);
-        if (row === undefined) return null;
-        const was = CreatorSettingsSchema.parse(row.settings).describeDrops;
-        if (was === on) return on;
-        await tx
-          .update(creators)
-          .set({ settings: sql`${creators.settings} || jsonb_build_object('describeDrops', ${on}::boolean)` })
-          .where(eq(creators.id, creatorId));
-        await tx.insert(schema.auditLog).values({
-          id: newId(AuditEntryIdSchema),
-          userId,
-          action: on ? 'creator.describe_drops_on' : 'creator.describe_drops_off',
-          entity: 'creator',
-          entityId: creatorId,
-          details: {},
-        });
-        if (on)
-          await tx.execute(sql`select public.enqueue_job(
-            task => 'content_drops.describe_backlog',
-            payload => ${JSON.stringify({ creatorId })}::jsonb,
-            max_attempts => ${JOB_MAX_ATTEMPTS['content_drops.describe_backlog']}::int,
-            job_key => ${`content_drops.describe_backlog:${creatorId}`},
-            job_key_mode => 'replace'
-          )`);
-        return on;
-      }),
   };
 }

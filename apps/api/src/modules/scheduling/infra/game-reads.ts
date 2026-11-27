@@ -1,5 +1,24 @@
-import type { TeamMemberId } from '@impera/contracts';
-import { sql, type Transaction } from '@impera/db';
+import {
+  CurrencySchema,
+  PayPeriodSchema,
+  PlatformAccountIdSchema,
+  TeamMemberIdSchema,
+  type Currency,
+  type PayPeriod,
+  type PlatformAccountId,
+  type TeamMemberId,
+  type UserId,
+} from '@impera/contracts';
+import {
+  enterCreator,
+  eq,
+  schema,
+  SNAPSHOT_READ,
+  sql,
+  withMember,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 import { z } from 'zod';
 
 /**
@@ -39,4 +58,105 @@ export async function shiftsForGameUnscoped(
     const row = RowSchema.parse(raw);
     return { endsAt: row.ends_at, reportedAt: row.reported_at };
   });
+}
+
+/**
+ * A shift whose reports the agency validated, as the game counts it (ADR 0118 § 1 and § 2): when it was held, the
+ * account, the period and the currency it was declared in, the total validated (the report and its corrections), and what pay takes
+ * off a gross on that account for that period. Never a comment, an incident nor who reviewed it.
+ */
+export interface ValidatedShiftForGame {
+  readonly platformAccountId: PlatformAccountId;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly period: PayPeriod;
+  readonly currency: Currency;
+  readonly grossMinor: number;
+  readonly vatBps: number;
+  readonly platformFeeBps: number;
+}
+
+const ValidatedRowSchema = z.object({
+  platform_account_id: PlatformAccountIdSchema,
+  starts_at: instant,
+  ends_at: instant,
+  period: PayPeriodSchema,
+  currency: CurrencySchema,
+  gross_minor: z.coerce.number().int(),
+  vat_bps: z.number().int(),
+  platform_fee_bps: z.number().int(),
+});
+
+/**
+ * The member's shifts with a validated total, the oldest first, among the rows the transaction reads. A report counts
+ * once validated, never before (§ 2); one sent back or still waiting is not read, so a refusal takes its amount away
+ * (§ 4). A report without rules for its period was never validated: it is left out. So is one of a period whose pay
+ * reads the account's sales: the sales are that shift's one source (§ 3), and the report has no effect on pay either
+ * (ADR 0084 § 3).
+ */
+async function validatedShiftsOf(tx: Transaction, memberId: TeamMemberId): Promise<ValidatedShiftForGame[]> {
+  const result = await tx.execute(sql`
+    select r.platform_account_id, s.starts_at, s.ends_at, r.period::text as period, r.currency, sum(r.amount_minor) as gross_minor,
+      rules.vat_bps, rules.platform_fee_bps
+    from shift_reports r
+    join shifts s on s.id = r.shift_id
+    join lateral (
+      select a.vat_bps, a.platform_fee_bps, a.earnings_source from account_pay_rules a
+      where a.platform_account_id = r.platform_account_id and a.from_period <= r.period
+      order by a.from_period desc limit 1
+    ) rules on true
+    where r.member_id = ${memberId} and r.status = 'validated' and rules.earnings_source = 'declared'
+    group by s.id, r.platform_account_id, s.starts_at, s.ends_at, r.period, r.currency, rules.vat_bps, rules.platform_fee_bps
+    order by s.starts_at, s.id`);
+  return result.rows.map((raw) => {
+    const row = ValidatedRowSchema.parse(raw);
+    return {
+      platformAccountId: row.platform_account_id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      period: row.period,
+      currency: row.currency,
+      grossMinor: row.gross_minor,
+      vatBps: row.vat_bps,
+      platformFeeBps: row.platform_fee_bps,
+    };
+  });
+}
+
+/** Every creator's: the game's job runs on the admin connection, a read bounded to that job. */
+export function validatedShiftsForGameUnscoped(
+  tx: Transaction,
+  memberId: TeamMemberId,
+): Promise<ValidatedShiftForGame[]> {
+  return validatedShiftsOf(tx, memberId);
+}
+
+/**
+ * The account's own, read as itself, creator by creator under the policies of its reports: never a colleague's, and
+ * nothing for an account that is no member.
+ */
+export function ownValidatedShiftsForGame(
+  db: Database,
+  userId: UserId,
+  creatorIds: readonly string[],
+): Promise<ValidatedShiftForGame[]> {
+  return withMember(
+    db,
+    userId,
+    async (tx) => {
+      const [member] = await tx
+        .select({ id: schema.teamMembers.id })
+        .from(schema.teamMembers)
+        .where(eq(schema.teamMembers.userId, userId));
+      if (member === undefined) return [];
+      const memberId = TeamMemberIdSchema.parse(member.id);
+      const read: ValidatedShiftForGame[] = [];
+      for (const creatorId of creatorIds) {
+        await enterCreator(tx, creatorId, creatorIds);
+        read.push(...(await validatedShiftsOf(tx, memberId)));
+      }
+      return read.toSorted((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+    },
+    SNAPSHOT_READ,
+  );
 }

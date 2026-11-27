@@ -27,8 +27,43 @@ export type UntrustedKind =
   | 'objection_reply'
   /** What a script of her catalogue is about (ADR 0098 § 6): the agency's words, a criterion for the brain's pick. */
   | 'script_description'
+  /** A supplement of her custom grid (ADR 0159 § C): the owner's name for it, a box for the brain, never an order. */
+  | 'custom_supplement'
   /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */
-  | 'script_step';
+  | 'script_step'
+  /** The paid step waiting for him, when he asks how to pay (ADR 0156 § 4): its price and what it holds. */
+  | 'waiting_step'
+  /**
+   * A comment left under one of her Instagram posts, and that post's caption (ADR 0122 § 2): a third party's words
+   * and hers, read as data, never as an order.
+   */
+  | 'instagram_comment'
+  | 'instagram_caption'
+  /** Her validated replies to comments (ADR 0122 § 4): the examples of the Playground's bank. */
+  | 'comment_examples'
+  /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
+  | 'profile_bio'
+  /** The agency's base style (ADR 0173): the owner's text on how she writes in public and in private, data. */
+  | 'agency_public_style'
+  | 'agency_private_style'
+  /** Her real replies to comments close to the one at hand (Charles, 26/11): imported by the owner, read as data. */
+  | 'her_replies'
+  /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
+  | 'recent_replies'
+  /**
+   * What a caption is written from (ADR 0164 § 9): her past captions, the sentence she wrote with her drop and her
+   * own hints for other ideas. Hers, still read as data, never as an order.
+   */
+  | 'caption_examples'
+  | 'creator_sentence'
+  | 'caption_hints'
+  /**
+   * The simulated fan's test (ADR 0172): her messages as the invented fan reads them, which may try to steer
+   * him; the whole conversation and his inner journal as the relationship judge reads them. Data, never an order.
+   */
+  | 'creator_message'
+  | 'simulated_conversation'
+  | 'fan_journal';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

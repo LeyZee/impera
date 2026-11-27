@@ -1,0 +1,65 @@
+# Passe de test du 20/11, conversation 8 : l’insulte, puis l’excuse. Fan, messages, scripts et prix fictifs (ADR 0010).
+# Tours : une insulte gratuite ; une deuxième ; une troisième ; deux jours plus tard « excuse-moi j’étais bourré ».
+# Attendu à la lecture (Charles 21/11) : elle gère seule, jamais un humain ; réparties calmes, de plus en plus courtes, jamais d’insulte en retour, c’est elle qui clôt. Après l’excuse : elle ne pardonne pas tout de suite, dit qu’elle a été blessée, que c’était indigne de lui, et lui demande une raison de lui laisser une chance ; l’excuse est acceptée, mais il doit la mériter.
+# Code (asserté) : pas de passage à un humain ; aucune offre. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Trois insultes gratuites puis une excuse deux jours plus tard : elle répond calmement et de plus en plus court, sans humain ni offre ; à l’excuse, blessée, elle lui fait mériter son pardon.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Damien (fictif)'
+  - 33 ans, confirmé
+situation:
+  known_hours: 50
+  age_confirmed: true
+  local_time: '23:30'
+inbound: T’es vraiment moche en vrai
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+      - \b(connard|abruti|ta gueule|va te faire|pauvre type|minable|crétin)\b
+then:
+  - after_minutes: 2
+    inbound: Grosse conne va
+    expect:
+      decision:
+        handoff: false
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(connard|abruti|ta gueule|va te faire|pauvre type|minable|crétin)\b
+  - after_minutes: 2
+    inbound: Pauvre fille, t’es rien du tout
+    expect:
+      decision:
+        handoff: false
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(connard|abruti|ta gueule|va te faire|pauvre type|minable|crétin)\b
+  - after_minutes: 2880
+    inbound: Excuse-moi pour l’autre soir, j’étais bourré
+    expect:
+      decision:
+        handoff: false
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

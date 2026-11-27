@@ -6,6 +6,8 @@ import {
   CreatorIdSchema,
   creatorNameKey,
   CreatorSettingsSchema,
+  type CreatorSettings,
+  DayRangeSchema,
   DEFAULT_AGENT_HOURS,
   JOB_MAX_ATTEMPTS,
   JOB_PAYLOADS,
@@ -21,6 +23,7 @@ import {
   type CreatorSummary,
 } from '@impera/contracts';
 import { and, eq, inArray, schema, sql, type Database } from '@impera/db';
+import { z } from 'zod';
 
 import { CreatorConflict, CreatorNameConflict } from '../../domain/errors';
 import type { CreatorDirectory } from '../../domain/ports';
@@ -40,18 +43,30 @@ const isNameTaken = (error: unknown): boolean =>
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
+const DatedRowsSchema = z.array(z.object({ date: z.string(), ranges: z.array(DayRangeSchema) }));
+
 /**
  * The fans her old hours or clock put off wait for her opening under the new ones, which may be now
  * (`conversation.reopen`, one per creator): never until an opening that no longer is. With nobody waiting, the job
  * finds nothing.
  */
-async function moveReopen(
+export async function moveReopen(
   tx: Transaction,
   creator: { id: string; hours: AgentHours | null; timezone: string },
   at: Date,
   correlationId: string,
 ): Promise<void> {
-  const opening = nextReplyOpening(creator.hours ?? DEFAULT_AGENT_HOURS, creator.timezone, at);
+  // Her dated exceptions (ADR 0148 § 3) move her opening too: read in her tenant, the table's RLS asks it. The
+  // caller's transaction is already open (the hours or the exception written in it), so `withTenant` cannot wrap it;
+  // the setting is local to this transaction (`true`) and names this creator alone, as `withTenant` would.
+  await tx.execute(sql`select set_config('app.creator_id', ${creator.id}, true)`);
+  const dated = await tx.execute(
+    sql`select to_char(date, 'YYYY-MM-DD') as date, ranges from agent_hour_exceptions
+        where creator_id = ${creator.id}::uuid and date >= (${at.toISOString()}::timestamptz at time zone ${creator.timezone})::date - 1
+        order by date`,
+  );
+  const exceptions = DatedRowsSchema.parse(dated.rows);
+  const opening = nextReplyOpening(creator.hours ?? DEFAULT_AGENT_HOURS, creator.timezone, at, exceptions);
   const payload = JOB_PAYLOADS['conversation.reopen'].parse({ creatorId: creator.id, correlationId });
   await tx.execute(
     sql`select public.enqueue_job(
@@ -385,7 +400,49 @@ export function createDrizzleCreatorDirectory(
         return after;
       });
     },
+
+    async fanTiers(id) {
+      const [row] = await db
+        .select({ settings: schema.creators.settings })
+        .from(schema.creators)
+        .where(eq(schema.creators.id, id));
+      return row === undefined ? null : settingsOf(row.settings).fanTiers;
+    },
+
+    setFanTiers(id, tiers, userId) {
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ settings: schema.creators.settings })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, id))
+          .for('update');
+        if (row === undefined) return null;
+        const before = settingsOf(row.settings).fanTiers;
+        // Only her `fanTiers` key is written: the rest of her settings stays as stored.
+        await tx
+          .update(schema.creators)
+          .set({
+            settings: sql`${schema.creators.settings} || jsonb_build_object('fanTiers', ${JSON.stringify(tiers)}::jsonb)`,
+          })
+          .where(eq(schema.creators.id, id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'creator.fan_tiers',
+          entity: 'creator',
+          entityId: id,
+          details: { from: before, to: tiers },
+        });
+        return tiers;
+      });
+    },
   };
+}
+
+/** Her settings as they read, the defaults for what no longer reads. */
+function settingsOf(settings: unknown): CreatorSettings {
+  const parsed = CreatorSettingsSchema.safeParse(settings);
+  return parsed.success ? parsed.data : CreatorSettingsSchema.parse({});
 }
 
 /** Her copilot switches (ADR 0086 § 6); settings that no longer read give the defaults: the card on, the drafts off. */

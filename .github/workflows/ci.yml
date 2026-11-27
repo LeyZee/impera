@@ -5,11 +5,12 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 3 * * *' # nightly: e2e, and the evals smoke when the xAI key is set
+    - cron: '0 3 * * *' # nightly: e2e (the evals have their own workflow, evals.yml)
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # By event too: a merge on main cancels the previous push run, never a manual or nightly run of main (21/11).
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -44,10 +45,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
-  test:
-    name: Tests (unit + integration)
+  # The tests in parallel, so that a pull request waits about a quarter of the time (Charles, 20/11/2026: the merge
+  # queue was slow, never by taking a test out). Every test still runs on every pull request: the unit tests and the
+  # end to end on their own runners, the integration tests split in four by Vitest (`--shard`), each with its own
+  # Postgres. `Tests (unit + integration)` below waits for them all, under the name the branch protection requires.
+  test-part:
+    name: Tests (${{ matrix.part }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [unit, e2e, integration 1/4, integration 2/4, integration 3/4, integration 4/4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
@@ -100,14 +109,33 @@ jobs:
           path: ~/ffmpeg-debs
           key: ${{ steps.image.outputs.key }}
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm test:integration
+      - if: matrix.part == 'unit'
+        run: pnpm test
+      # One shard of every package's integration tests; a package with no file in this shard passes.
+      - if: startsWith(matrix.part, 'integration ')
+        run: pnpm exec turbo run test:integration -- --shard="${PART#integration }" --passWithNoTests
         env:
+          PART: ${{ matrix.part }}
           TESTCONTAINERS_RYUK_DISABLED: 'true'
       # Phase 0 end to end: API and worker inline, FakeConnector, a fan message to a sent draft (P0-07b).
-      - run: pnpm test:e2e
+      - if: matrix.part == 'e2e'
+        run: pnpm test:e2e
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
+
+  test:
+    name: Tests (unit + integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [test-part]
+    if: always()
+    steps:
+      - name: Every part passed
+        env:
+          RESULT: ${{ needs.test-part.result }}
+        run: |
+          echo "test-part: $RESULT"
+          test "$RESULT" = success
 
   audit:
     name: Dependency audit
@@ -125,7 +153,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [check, test]
+    needs: [check]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
@@ -156,6 +184,10 @@ jobs:
             echo "AUTH_SECRET=$(openssl rand -base64 32)"
             echo "AUTH_BASE_URL=http://127.0.0.1:8080"
             echo "WEB_ORIGIN=http://127.0.0.1:8080"
+            # No built-in address for the extension: it must be https (ADR 0067, second amendement), this run is http.
+            echo "EXTENSION_CRM_ORIGIN="
+            # Sentry (OPS-18), required in production: a DSN on a `.invalid` host, which never resolves, so nothing leaves.
+            echo "SENTRY_DSN=https://ci@errors.invalid/1"
             # The invoices' buckets (ADR 0037), required in production at two https hosts: nothing is issued in this
             # run, so none is reached (`.invalid` never resolves); the boot only checks them.
             for bucket in INVOICES_S3:primary INVOICES_COPY_S3:copy; do
@@ -194,6 +226,16 @@ jobs:
           curl -fsSI http://127.0.0.1:8080/manifest.webmanifest | grep -i "cache-control: no-cache" >/dev/null
           curl -fsS http://127.0.0.1:8080/manifest.webmanifest | grep '"display": "standalone"' >/dev/null
           curl -fsSI http://127.0.0.1:8080/icons/icon-512.png | grep -i "content-type: image/png" >/dev/null
+      # Least privilege: the owner's URL reaches only the services that run as the owner, never the API nor the worker.
+      - name: The owner's URL only where migrations and ops scripts run
+        run: |
+          for service in api worker; do
+            if $COMPOSE exec -T "$service" printenv DATABASE_ADMIN_URL >/dev/null; then
+              echo "$service receives DATABASE_ADMIN_URL" >&2
+              exit 1
+            fi
+          done
+          $COMPOSE --profile ops run --rm --no-deps ops printenv DATABASE_ADMIN_URL >/dev/null
       # The daily export (ADR 0028) end to end, but to a folder instead of the bucket: dump, check, encrypt, then a
       # restore into an empty database with the queue emptied, and the same row counts.
       - name: Backup export and restore
@@ -231,42 +273,3 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test:e2e
-
-  # Apart from the e2e, so that each night says both (« nightly vert », 06/11): without the xAI key the evals are
-  # skipped, said in the run's summary and as a warning, and the night stays green; with it, both fail without
-  # something to measure, and a failure turns the night red.
-  nightly-evals:
-    name: Nightly evals smoke
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      HAS_XAI_KEY: ${{ secrets.LLM_XAI_API_KEY != '' }}
-    steps:
-      - name: Évaluations sautées, clé absente
-        if: env.HAS_XAI_KEY != 'true'
-        run: |
-          echo "::warning title=Évaluations sautées::Clé xAI absente : pnpm probe et pnpm evals n'ont pas tourné cette nuit."
-          echo "### Évaluations sautées, clé absente" >> "$GITHUB_STEP_SUMMARY"
-          echo "Le secret \`LLM_XAI_API_KEY\` n'est pas posé : \`pnpm probe\` et \`pnpm evals\` n'ont pas tourné, rien n'a été mesuré." >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: env.HAS_XAI_KEY == 'true'
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
-        if: env.HAS_XAI_KEY == 'true'
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
-        if: env.HAS_XAI_KEY == 'true'
-        with: { node-version-file: .nvmrc, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-        if: env.HAS_XAI_KEY == 'true'
-      - run: pnpm build
-        if: env.HAS_XAI_KEY == 'true'
-      - run: pnpm probe
-        if: env.HAS_XAI_KEY == 'true'
-        env:
-          LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
-          LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}
-      - run: pnpm evals
-        if: env.HAS_XAI_KEY == 'true'
-        env:
-          LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
-          LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}

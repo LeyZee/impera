@@ -203,6 +203,7 @@ function renderPage(
   canAddCreator = true,
   selfScope = false,
   nothingListed?: string,
+  only: string | null = null,
 ): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
@@ -220,6 +221,7 @@ function renderPage(
           onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
           canDecide={canDecide}
           canAddCreator={canAddCreator}
+          only={only}
           selfScope={selfScope}
           nothingListed={nothingListed}
         />
@@ -387,6 +389,34 @@ describe('TrackingPage', () => {
       .map((row) => row.querySelector('.tr-row__creator')?.textContent.replace(' · ', ''));
     expect(names).toContain('Léa');
     expect(names).toContain('Nina');
+  });
+
+  it('reads one creator alone when the menu’s selector is set on her, as an account that has only her (ADR 0134 § 3)', async () => {
+    serve({
+      creators: { status: 200, body: { creators: [LEA, NINA] } },
+      conversations: {
+        [LEA.id]: { items: [conversation('1')], nextCursor: null },
+        [NINA.id]: { items: [conversation('2')], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, true, false, undefined, NINA.id);
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    // One creator on screen: her name is not said again on the row.
+    expect(list.querySelector('.tr-row__creator')).toBeNull();
+  });
+
+  it('reads every creator when the one chosen is no longer listed', async () => {
+    serve({
+      creators: { status: 200, body: { creators: [LEA, NINA] } },
+      conversations: {
+        [LEA.id]: { items: [conversation('1')], nextCursor: null },
+        [NINA.id]: { items: [conversation('2')], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, true, false, undefined, '0192f3a0-0000-7000-8000-00000000dead');
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('opens a conversation outside every list when the link names its creator (Dashboard, fan reader)', async () => {
@@ -784,6 +814,64 @@ describe('the reader of Suivi', () => {
     });
   });
 
+  it('says his care mode since when, and closes it on « Il va mieux » asked twice (trou béant 4)', async () => {
+    const posted = serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
+    });
+    renderPage(OPEN);
+    const since = await screen.findByText(/^Mode soin depuis/u);
+    // A state to know, in calm blue with a heart: the amber stays for a person to act (recette du 21/11).
+    expect(since.closest('.tr-care')?.classList.contains('tr-hand--alert')).toBe(false);
+    expect(since.querySelector('svg.tr-care__icon')).not.toBeNull();
+    expect(screen.getByText(/rien ne lui est vendu/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Il va mieux' }));
+    // Nothing goes on the first click: the second says what changes.
+    expect(posted).toEqual([]);
+    expect(screen.getByText(/Ses ventes restent gelées/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Oui, il va mieux' }));
+    await waitFor(() => {
+      expect(posted).toEqual([{ action: 'close', body: {} }]);
+    });
+  });
+
+  it('says « Mode soin » under his name and at the head of his sheet, never « Rien à faire » (Design 21/11)', async () => {
+    serve({
+      ...withDraft,
+      detail: () => ({
+        status: 200,
+        body: waiting({
+          careSince: '2026-10-17T19:00:00Z',
+          state: 'idle',
+          openDrafts: [],
+          lastInboundAt: '2026-10-17T20:00:00Z',
+          lastOutboundAt: '2026-10-17T20:05:00Z',
+        }),
+      }),
+    });
+    renderPage(OPEN);
+    await screen.findByText(/^Mode soin depuis/u);
+    expect(document.querySelector('.tr-reader__state-label')?.textContent).toBe('Mode soin');
+    expect(screen.queryByText('Rien à faire', { selector: '.tr-reader__state-label' })).toBeNull();
+    expect(screen.queryByText('Rien à signaler')).toBeNull();
+  });
+
+  it('shows a chatter the care mode without « Il va mieux », and a creator nothing of it', async () => {
+    serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByText(/^Mode soin depuis/u)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Il va mieux' })).toBeNull();
+    expect(screen.getByText(/Seuls le propriétaire et un manager/u)).toBeTruthy();
+    cleanup();
+
+    renderPage(OPEN, false);
+    await screen.findByText('Fan 1');
+    expect(screen.queryByText(/^Mode soin depuis/u)).toBeNull();
+  });
+
   it('folds the fan’s limits to one line, in amber when one stops the agent', async () => {
     serve({
       ...withDraft,
@@ -803,7 +891,7 @@ describe('the reader of Suivi', () => {
     expect(line.closest('.tr-warn')).toBeNull();
   });
 
-  it('says nothing to learn once every line is learnt, and never asks for a creator', async () => {
+  it('says nothing to learn once every line is learnt', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
     renderPage(OPEN);
     await screen.findByText('Limites du fan');
@@ -811,13 +899,6 @@ describe('the reader of Suivi', () => {
       expect(kycCalls()).toHaveLength(1);
     });
     expect(screen.queryByText('À apprendre')).toBeNull();
-    cleanup();
-
-    serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }), kyc: ['job'] });
-    renderPage(OPEN, false);
-    await screen.findByText('Limites du fan');
-    expect(screen.queryByText('À apprendre')).toBeNull();
-    expect(kycCalls()).toHaveLength(0);
   });
 
   it('says nothing to learn when the server does not answer for it', async () => {
@@ -1235,13 +1316,13 @@ describe('the reader of Suivi', () => {
     expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
   });
 
-  it('lets a creator read, never decide', async () => {
+  it('lets a chatter decide his draft, and only read the fan’s limits', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
-    renderPage(OPEN, false);
-    expect(await screen.findByText('Tu lis seulement : l’équipe décide.')).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Reprendre la main' })).toBeNull();
-    // Her fan's limits: read, never changed.
+    // His own Suivi, as ChatterTrackingPage mounts it (selfScope).
+    renderPage(OPEN, true, true, true);
+    expect(await screen.findByRole('button', { name: 'Valider' })).toBeDefined();
+    expect(screen.queryByText('Tu lis seulement : l’équipe décide.')).toBeNull();
+    // The fan's limits: read, changed by the owner and the managers only.
     expect(await screen.findByRole('switch', { name: /Ventes gelées/u })).toHaveProperty('disabled', true);
     expect(screen.queryByRole('button', { name: 'Confirmer son âge' })).toBeNull();
   });
@@ -1569,6 +1650,26 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     renderPage('/suivi', true, false, true);
     const yours = await screen.findByRole('list', { name: 'À toi' });
     expect(yours.textContent).toContain('Tu as la main');
+  });
+
+  it('says a state all the lines of « À toi » share once, in its title, never on each line (PIL-10)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: {
+          items: [
+            conversation('1', { state: 'human', heldBy: 'other' }),
+            conversation('2', { state: 'human', heldBy: 'other' }),
+          ],
+          nextCursor: null,
+        },
+      },
+    });
+    renderPage('/suivi');
+    const yours = await screen.findByRole('list', { name: 'À toi' });
+    expect(yours.textContent).not.toContain('Un humain répond');
+    const title = yours.closest('section')?.querySelector('.tr-group__title');
+    expect(title?.textContent).toBe('À toi2un humain répond');
   });
 
   it('shows a chatter another person’s hand without a way to give it back (EQ-13)', async () => {

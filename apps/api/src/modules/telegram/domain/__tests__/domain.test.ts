@@ -225,6 +225,30 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('tells a créneau begun with nobody to the « pour toutes » groups, on the planning’s clock (ADR 0094)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'account_uncovered',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        slotStartsAt: '2026-11-20T21:30:00.000Z',
+        slotEndsAt: '2026-11-21T05:00:00.000Z',
+        timeZone: 'Europe/Paris',
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      allCreatorsOnly: true,
+      oncePerThread: true,
+      threadKey: 'account_uncovered:018f3e5c-0000-7000-8000-0000000000a1:2026-11-20T21:30:00.000Z',
+      title: 'Important',
+      body: 'Compte sans personne chez Reveal : le créneau de 22 h 30 à 6 h a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.',
+      link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
+    });
+  });
+
   it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
     expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
       kind: 'notice',
@@ -628,6 +652,37 @@ describe('classification (ADR 0020 §2)', () => {
       })?.body,
     ).toBe(
       'Clé d’accès (Face ID, empreinte) ajoutée sur un compte de l’équipe (réseau 198.51.100.x). Si personne ne l’a fait, retire ses clés et ferme ses sessions.',
+    );
+    // The owners (ADR 0096): never a name, and the notice said in hours, not as a date of some zone.
+    const owner = { userId: 'owner-2', role: 'owner' as const, network: null };
+    expect(
+      bodyOf({ kind: 'security_alert', alert: { reason: 'owner_added', ...owner, by: 'owner-1' } })?.body,
+    ).toBe(
+      'Un membre de l’équipe vient de devenir propriétaire (deux au plus). Si ce n’est pas voulu, l’autre propriétaire peut demander son retrait dans Réglages › Sécurité.',
+    );
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: {
+          reason: 'owner_removal_requested',
+          ...owner,
+          by: 'owner-1',
+          effectiveAt: '2026-11-23T10:00:00.000Z',
+        },
+      })?.body,
+    ).toBe(
+      'Un propriétaire a demandé le retrait de l’autre : il prend effet dans 72 h. Le propriétaire visé peut l’annuler d’ici là dans Réglages › Sécurité.',
+    );
+    expect(
+      bodyOf({ kind: 'security_alert', alert: { reason: 'owner_removal_cancelled', ...owner } })?.body,
+    ).toBe('Le propriétaire visé a annulé le retrait qui attendait : il y a toujours deux propriétaires.');
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: { reason: 'owner_removed', userId: 'owner-2', role: 'operator', network: null, by: 'owner-1' },
+      })?.body,
+    ).toBe(
+      'Le préavis est passé sans annulation : un compte n’est plus propriétaire, ses sessions sont fermées.',
     );
     expect(
       bodyOf({

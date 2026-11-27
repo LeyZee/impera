@@ -434,6 +434,23 @@
   grid-column: 1 / -1;
 }
 
+/*
+ * « D'où vient mon argent »: the Dashboard's ring and legend, in the kinds' own colours (a kind keeps its colour on
+ * every screen). The arcs draw once on arrival; a slice lit comes out of the ring.
+ */
+.mf-money {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nv-space-4);
+}
+/* The ring, its rows and their lighting are the design system's (`nv-donut`, `nv-breakdown`): no change column here. */
+.mf-money .mf-kinds {
+  flex: 1 1 200px;
+  --nv-breakdown-cols: auto minmax(0, 1fr) auto 38px;
+}
+
 @media (max-width: 640px) {
   .mf-card__body {
     gap: var(--nv-space-3);

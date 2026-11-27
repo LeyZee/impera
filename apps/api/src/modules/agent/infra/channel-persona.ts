@@ -1,6 +1,14 @@
-import { PERSONA_SHEET, type ChannelPostViolation, type StoredPersona } from '@impera/contracts';
+import {
+  asPersonaV2,
+  CAPTION_MAX,
+  COMMENT_REPLY_MAX,
+  PERSONA_SHEET,
+  type ChannelPostViolation,
+  type StoredPersona,
+} from '@impera/contracts';
 
 import { checkExplicit, checkVoiceOutput } from '../domain/guards';
+import { checkPlaceNames, placeNames } from '../domain/place-names';
 
 import { guardSettingsOf, personaForModels } from './persona-file';
 
@@ -24,38 +32,70 @@ interface StoredVersion {
   readonly persona: StoredPersona;
 }
 
-/**
- * Who she is for a post of her Telegram channel (ADR 0080 § 5), read as her drafts read her, and her guards on its
- * words: the agent's, and nothing explicit, since the channel is public (§ 5.4). The `telegram` module's port, wired
- * by the composition root.
- */
-export function channelWriterPersona(
-  stored: StoredVersion,
-  now: Date,
-): {
+interface PublicWriterPersona {
   readonly version: string;
   readonly creatorName: string;
   readonly personaSheet: string;
   check(texts: readonly string[]): ChannelPostViolation[];
-} {
+}
+
+/**
+ * Who she is for anything she writes in public, read as her drafts read her but without her intimacy, and her guards
+ * on its words: the agent's, nothing explicit, and never a place where she lives (ADR 0080 § 5.9). One list of what stays private for every public surface, so that
+ * none drifts from the others; `maxChars` is the longest text the surface holds.
+ */
+function publicWriterPersona(
+  stored: StoredVersion,
+  now: Date,
+  options: { readonly maxChars: number },
+): PublicWriterPersona {
   const persona = personaForModels(
     stored.persona,
     stored.creatorName,
     now.toISOString().slice(0, 10),
     PRIVATE_ANSWERS,
   );
-  const settings = { ...guardSettingsOf(persona), maxBubbleChars: CHANNEL_GUARD_CHARS };
+  const settings = { ...guardSettingsOf(persona), maxBubbleChars: options.maxChars };
+  // Her town and her « lieu de vie », left out while still a placeholder of the sheet.
+  const { city, place_of_life: placeOfLife } = asPersonaV2(stored.persona).sheet.identity;
+  const places = placeNames([city, placeOfLife].map((answer) => (answer?.startsWith('<') ? null : answer)));
   return {
     version: stored.version,
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
     check: (texts) =>
-      [...checkVoiceOutput(texts, { ...settings, maxBubbles: texts.length }), ...checkExplicit(texts)].map(
-        (violation) => ({
-          code: violation.code,
-          blocking: violation.severity === 'blocking',
-          match: violation.match ?? null,
-        }),
-      ),
+      [
+        ...checkVoiceOutput(texts, { ...settings, maxBubbles: texts.length }),
+        ...checkExplicit(texts),
+        ...checkPlaceNames(texts, places),
+      ].map((violation) => ({
+        code: violation.code,
+        blocking: violation.severity === 'blocking',
+        match: violation.match ?? null,
+      })),
   };
+}
+
+/**
+ * Who she is for a post of her Telegram channel (ADR 0080 § 5): the channel is public (§ 5.4). The `telegram`
+ * module's port, wired by the composition root.
+ */
+export function channelWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
+  return publicWriterPersona(stored, now, { maxChars: CHANNEL_GUARD_CHARS });
+}
+
+/**
+ * Who she is for a reply to a comment under one of her Instagram posts (ADR 0122 § 2): her public panels only, and
+ * the same guards on a text as short as a reply. The `instagram-comments` module's port, wired by the composition root.
+ */
+export function commentWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
+  return publicWriterPersona(stored, now, { maxChars: COMMENT_REPLY_MAX });
+}
+
+/**
+ * Who she is for the caption of one of her Reels (ADR 0164 § 9): her public panels only, and the same guards on a text
+ * as long as Instagram lets a caption be. The `instagram-captions` module's port, wired by the composition root.
+ */
+export function captionWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
+  return publicWriterPersona(stored, now, { maxChars: CAPTION_MAX });
 }

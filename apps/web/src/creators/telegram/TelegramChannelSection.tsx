@@ -1,7 +1,6 @@
 import {
   CHANNEL_EXAMPLE_MAX,
   CHANNEL_EXAMPLES_MAX,
-  LINK_DESTINATION_MAX,
   type ChannelSlot,
   type ChannelSlotRole,
   type RedirectLink,
@@ -27,7 +26,6 @@ import {
   DAY_NAMES,
   DAY_SHORT,
   EXAMPLES_FULL,
-  LINKS_FULL,
   SLOT_ROLES,
   SLOTS_FULL,
   SLOTS_RULE,
@@ -38,7 +36,6 @@ import {
   blankLines,
   issuesOf,
   pendingLines,
-  newLink,
   nextSlot,
   rhythmWords,
   sameConfig,
@@ -161,9 +158,6 @@ function ChannelForm({
   };
   const editSlots = (slots: ChannelSlot[]): void => {
     edit({ ...draft, slots });
-  };
-  const editLinks = (links: RedirectLink[], channelLinkId = draft.channelLinkId): void => {
-    edit({ ...draft, links, channelLinkId });
   };
 
   async function save(): Promise<void> {
@@ -408,46 +402,24 @@ function ChannelForm({
             Liens
           </h3>
           <p className="ps-lead">
-            Le lien du canal finit chaque post, et le texte parle de l’endroit où il mène.
+            Le lien du canal finit chaque post, et le texte parle de l’endroit où il mène. Ses liens se
+            règlent dans Trafic ; ici, tu choisis celui du canal.
           </p>
-          <ul className="tc-links" aria-label="Liens de redirection">
-            {draft.links.map((link) => (
-              <LinkLine
-                key={link.id}
-                link={link}
-                isChannelLink={draft.channelLinkId === link.id}
-                nameIssue={issues.get(`link:${link.id}:name`) ?? null}
-                urlIssue={issues.get(`link:${link.id}:url`) ?? null}
-                destinationIssue={issues.get(`link:${link.id}:destination`) ?? null}
-                onChange={(next) => {
-                  editLinks(draft.links.map((one) => (one.id === link.id ? next : one)));
-                }}
-                onChoose={() => {
-                  editLinks(draft.links, link.id);
-                }}
-                onRemove={() => {
-                  editLinks(
-                    draft.links.filter((one) => one.id !== link.id),
-                    draft.channelLinkId === link.id ? null : draft.channelLinkId,
-                  );
-                }}
-              />
-            ))}
-          </ul>
-          {draft.links.length >= 20 ? (
-            <p className="ps-hint">{LINKS_FULL}</p>
+          {draft.links.length === 0 ? (
+            <p className="ps-hint">Aucun lien allumé pour l’instant : ajoute-en un dans Trafic.</p>
           ) : (
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm ps-self-start"
-              onClick={() => {
-                const link = newLink();
-                // Her first link is the channel's until another is chosen.
-                editLinks([...draft.links, link], draft.channelLinkId ?? link.id);
-              }}
-            >
-              <span aria-hidden="true">+</span> Ajouter un lien
-            </button>
+            <ul className="tc-links" aria-label="Liens de redirection">
+              {draft.links.map((link) => (
+                <LinkLine
+                  key={link.id}
+                  link={link}
+                  isChannelLink={draft.channelLinkId === link.id}
+                  onChoose={() => {
+                    edit({ ...draft, channelLinkId: link.id });
+                  }}
+                />
+              ))}
+            </ul>
           )}
           <div className="tc-form">
             <div className="tc-setting">
@@ -638,117 +610,41 @@ function SlotLine({
   );
 }
 
+/** One of her links that are on, as « Liens » holds it: read here, where only the channel's own is chosen. */
 function LinkLine({
   link,
   isChannelLink,
-  nameIssue,
-  urlIssue,
-  destinationIssue,
-  onChange,
   onChoose,
-  onRemove,
 }: {
   link: RedirectLink;
   isChannelLink: boolean;
-  nameIssue: string | null;
-  urlIssue: string | null;
-  destinationIssue: string | null;
-  onChange: (link: RedirectLink) => void;
   onChoose: () => void;
-  onRemove: () => void;
 }): JSX.Element {
-  const nameId = useId();
-  const urlId = useId();
-  const destinationId = useId();
-  const name = link.name.trim();
-  const named = name === '' ? 'ce lien' : `le lien « ${name} »`;
-  const of = name === '' ? 'de ce lien' : `du lien « ${name} »`;
   return (
     <li className="tc-link" data-chosen={isChannelLink ? 'true' : undefined}>
-      <div className="tc-link__fields">
-        <span className="tc-link__field">
-          <label className="sr-only" htmlFor={nameId}>
-            Nom {of}
-          </label>
-          <input
-            id={nameId}
-            className="nv-field__control nv-glass tc-link__name"
-            value={link.name}
-            maxLength={60}
-            placeholder="Nom (Telegram, Insta bio…)"
-            aria-invalid={nameIssue === null ? undefined : true}
-            onChange={(event) => {
-              onChange({ ...link, name: event.target.value });
-            }}
-          />
+      <span className="tc-link__read">
+        <span className="tc-link__read-name">{link.name}</span>
+        {link.destination === '' ? null : (
+          <span className="tc-link__read-place">Mène à : {link.destination}</span>
+        )}
+      </span>
+      {isChannelLink ? (
+        // A state, not an action: the link the channel's posts end on.
+        <span className="nv-status nv-status--sent tc-link__state">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none">
+            <path d="M3 8.5l3.2 3.2L13 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          Lien du canal
         </span>
-        <span className="tc-link__field tc-link__field--url">
-          <label className="sr-only" htmlFor={urlId}>
-            Adresse {of}
-          </label>
-          <input
-            id={urlId}
-            className="nv-field__control nv-glass tc-link__url"
-            value={link.url}
-            inputMode="url"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="https://…"
-            aria-invalid={urlIssue === null ? undefined : true}
-            onChange={(event) => {
-              onChange({ ...link, url: event.target.value });
-            }}
-          />
-        </span>
-        <span className="tc-link__end">
-          <button
-            type="button"
-            className="nv-chip"
-            aria-pressed={isChannelLink}
-            aria-label={`Lien du canal : ${named}`}
-            onClick={onChoose}
-          >
-            {isChannelLink ? 'Lien du canal' : 'Choisir pour le canal'}
-          </button>
-          <button
-            type="button"
-            className="ps-entry__remove"
-            aria-label={`Retirer ${named}`}
-            onClick={onRemove}
-          >
-            ×
-          </button>
-        </span>
-        <span className="tc-link__destination">
-          <label className="tc-field-label" htmlFor={destinationId}>
-            Où il mène<span className="sr-only"> ({named})</span>
-          </label>
-          <DestinationArea
-            id={destinationId}
-            value={link.destination}
-            maxLength={LINK_DESTINATION_MAX}
-            placeholder="mon Reveal, mon live TikTok ce soir 21 h…"
-            aria-describedby={
-              destinationIssue === null
-                ? `${destinationId}-hint`
-                : `${destinationId}-hint ${destinationId}-error`
-            }
-            aria-invalid={destinationIssue === null ? undefined : true}
-            onChange={(destination) => {
-              onChange({ ...link, destination });
-            }}
-          />
-          <span className="sr-only" id={`${destinationId}-hint`}>
-            Le post parle de cet endroit, sans adresse.
-          </span>
-        </span>
-      </div>
-      {nameIssue === null ? null : <p className="ps-error">{nameIssue}</p>}
-      {urlIssue === null ? null : <p className="ps-error">{urlIssue}</p>}
-      {destinationIssue === null ? null : (
-        <p className="ps-error" id={`${destinationId}-error`}>
-          {destinationIssue}
-        </p>
+      ) : (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm tc-link__choose"
+          aria-label={`Choisir le lien « ${link.name} » pour le canal`}
+          onClick={onChoose}
+        >
+          Choisir pour le canal
+        </button>
       )}
     </li>
   );
@@ -780,43 +676,6 @@ function LabelField({
       />
       {issue === null ? null : <p className="ps-error">{issue}</p>}
     </div>
-  );
-}
-
-/**
- * Where a link leads: one line of text that wraps instead of being cut on a phone. Enter adds no line; a pasted line
- * break becomes a space, since the sentence is said in one line.
- */
-function DestinationArea({
-  id,
-  value,
-  onChange,
-  ...rest
-}: {
-  id: string;
-  value: string;
-  maxLength: number;
-  placeholder: string;
-  'aria-describedby': string;
-  'aria-invalid': true | undefined;
-  onChange: (value: string) => void;
-}): JSX.Element {
-  const ref = useGrowingArea(value);
-  return (
-    <textarea
-      ref={ref}
-      id={id}
-      rows={1}
-      className="nv-field__control nv-glass tc-link__area"
-      value={value}
-      {...rest}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') event.preventDefault();
-      }}
-      onChange={(event) => {
-        onChange(event.target.value.replace(/\s*[\r\n]+\s*/gu, ' '));
-      }}
-    />
   );
 }
 

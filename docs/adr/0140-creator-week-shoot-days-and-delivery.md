@@ -114,3 +114,24 @@ a) Échéance : le dimanche à 23 h pour toutes les créatrices, modifiable par 
 b) Validation : il valide et corrige chaque semaine avant qu'elle parte, sans date de fin (§ 13).
 c) Lives : rien d'automatique, la créatrice planifie les siens (§ 15).
 d) Médias de Relance demandés chaque semaine, hors séances, pour les Mass DM (§ 4).
+
+## Avenant du 20/11/2026 : le rythme dicté par Charles
+
+Charles a fixé le rythme de la semaine. Il remplace les valeurs par défaut des § 4 et § 5 (le code les porte dans `WEEK_DEFAULTS`, réglables par créatrice plus tard) :
+
+- **Séances boudoir** : trois par semaine dans l'idéal, deux acceptables. Une séance alimente tout : le post du feed (photos et vidéos de quelques secondes), une photo ou une vidéo pour le Mass DM qui annonce la séance, et quelques photos « cadeaux » jamais publiées et jamais nues. La fiche de la séance le dit, et « Livrer ma semaine » demande un média de Mass DM par séance. Cela remplace le choix d) : les médias de Relance viennent des séances, plus d'une ligne à part.
+- **Vidéo du jour** : une par jour pour le feed vidéo public de Reveal, en une seule ligne coupée entre ses jours comme les stories. Elle n'est jamais reprise sur Instagram.
+- **Story Reveal** : une par jour (inchangé).
+- **Script** : un toutes les deux semaines. Sans script demandé ni script arrivé depuis quatorze jours, la semaine demande « Ton prochain script ».
+
+Ses couleurs : chaque type de contenu a sa couleur sur la carte de la créatrice, qu'elle peut changer ; le choix est gardé sur son appareil. Instagram et Telegram (listes à cocher de sa journée, jamais de publication à sa place) feront l'objet d'un lot à part.
+
+## Second avenant du 20/11/2026 : sa journée, Instagram et Telegram
+
+Charles a fixé ce qu'elle publie chaque jour. Ce sont des listes à cocher dans « Ma journée », au-dessus de sa semaine dans son Agenda. Rien n'est jamais publié à sa place, et aucune automatisation ne touche Instagram.
+
+- **L'essentiel du jour**, en tête et en grand : sa story Reveal, sa vidéo du jour sur le fil vidéo public de Reveal, et sa story Instagram qui mène à Reveal. Pour cette dernière, la carte explique pourquoi elle compte le plus : c'est elle qui fait venir les nouveaux abonnés. Elle se fait sage, avec le sticker lien.
+- **En bonus**, par réseau, jamais en rouge : 3 autres stories Instagram (au moins 4 avec celle qui mène à Reveal), 2 posts Instagram, 1 Reel d'essai ; 2 posts écrits sur Telegram et, le soir, la vidéo du jour de Reveal sur son canal.
+- Rien ne passe de Reveal à Instagram. La vidéo du jour peut aller sur Telegram.
+- Le rythme vit dans le code (`DAY_DEFAULTS`), le même pour toutes jusqu'à ses réglages (lot 3). Seul ce qu'elle a fait est gardé : `creator_day_ticks`, une ligne par jour et par élément, écrite par elle seule sur son compte, le jour même ou le lendemain dans son fuseau. Son équipe la lit, et rien n'est supprimé.
+- Chaque post a sa coche : une ligne de deux posts a deux coches. Ses couleurs couvrent aussi Instagram et Telegram.

@@ -44,7 +44,8 @@ describe('readAvailability', () => {
   });
 
   it('goes to « non » on someone beside him, an appointment or work, whatever he said with it', () => {
-    for (const negative of ['someone_nearby', 'leaving_soon', 'busy_now']) {
+    // « Je suis crevé » too (passe 2 du 26/11, conversation 40).
+    for (const negative of ['someone_nearby', 'leaving_soon', 'busy_now', 'tired']) {
       expect(readAvailability(turn({ signals: ['alone', 'free_now', negative] }))).toMatchObject({
         state: 'no',
         signal: negative,
@@ -101,6 +102,23 @@ describe('sexualizes', () => {
     );
     expect(sexualizes({ intent: 'chat', sentiment: 'positive', desireSignals: ['body_compliment'] })).toBe(
       false,
+    );
+  });
+
+  it('reads a flirt as sexualizing only as his words do, never on his mood (Charles, 20/11)', () => {
+    const DESIRE = {
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire'],
+    };
+    expect(sexualizes(DESIRE)).toBe(false);
+    expect(sexualizes(DESIRE, 'tu es super belle')).toBe(false);
+    expect(sexualizes(DESIRE, 'j’ai trop envie de toi')).toBe(true);
+    expect(
+      sexualizes({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['asks_about_her_body'] }),
+    ).toBe(false);
+    expect(sexualizes({ intent: 'flirt', sentiment: 'positive', desireSignals: ['explicit_language'] })).toBe(
+      true,
     );
   });
 });

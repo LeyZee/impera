@@ -39,6 +39,7 @@ import type {
   AlertNames,
   BotsStore,
   ChannelPersonaSource,
+  ChannelLinksSource,
   ChannelsStore,
   Clock,
   DeliveriesStore,
@@ -61,7 +62,7 @@ import { createTelegramRoutes, type TelegramRoutesOptions } from './infra/routes
 import { createTelegramApi } from './infra/telegram-api';
 
 export { SCANNED_EVENT_TYPES } from './domain/classify';
-export type { ChannelPersonaSource } from './domain/ports';
+export type { ChannelLinksSource, ChannelPersonaSource } from './domain/ports';
 
 export interface TelegramDeps {
   readonly bots: BotsStore;
@@ -71,6 +72,8 @@ export interface TelegramDeps {
   readonly privateLinks?: PrivateLinksStore;
   /** ADR 0080: the creators' channels; without it, the channel routes answer 503 and the routing checks nothing. */
   readonly channels?: ChannelsStore;
+  /** Her redirect links where they are kept since INS-03; without it, the links of the channel's setting are read. */
+  readonly channelLinks?: ChannelLinksSource;
   readonly clock?: Clock;
   /** WEB_ORIGIN: the links of the messages open the CRM. */
   readonly webOrigin: string;
@@ -134,6 +137,7 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     ...(deps.channels !== undefined && { channels: deps.channels }),
   };
   const channels = deps.channels;
+  const links = deps.channelLinks === undefined ? {} : { links: deps.channelLinks };
   const writer = deps.channelWriter;
   const privateLinks = deps.privateLinks;
   const linking: PrivateLinkApi = {
@@ -171,18 +175,18 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     channel: (creatorId) =>
       channels === undefined
         ? Promise.reject(new TelegramChannelsUnavailable())
-        : channelView({ bots: deps.bots, channels }, creatorId),
+        : channelView({ bots: deps.bots, channels, ...links }, creatorId),
     saveChannel: (creatorId, config, userId) =>
       channels === undefined
         ? Promise.reject(new TelegramChannelsUnavailable())
-        : saveChannel({ bots: deps.bots, channels }, creatorId, config, userId),
+        : saveChannel({ bots: deps.bots, channels, ...links }, creatorId, config, userId),
     tryChannelPost: (creatorId, body) =>
       channels === undefined
         ? Promise.reject(new TelegramChannelsUnavailable())
         : writer === undefined
           ? Promise.reject(new TelegramChannelWriterUnavailable())
           : tryChannelPost(
-              { channels, persona: writer.persona, voice: channelVoiceOf(writer.gateway) },
+              { channels, ...links, persona: writer.persona, voice: channelVoiceOf(writer.gateway) },
               creatorId,
               body,
             ),
@@ -230,6 +234,7 @@ export interface TelegramStartOptions {
   readonly salesDay: SalesDayReader;
   readonly usdRate: UsdRateReader;
   readonly channelWriter?: ChannelWriter;
+  readonly channelLinks?: ChannelLinksSource;
 }
 
 /** Builds the module on Postgres and the Telegram Bot API, and re-seals the tokens of a past rotation. */
@@ -251,6 +256,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     salesDay: options.salesDay,
     usdRate: options.usdRate,
     ...(options.channelWriter !== undefined && { channelWriter: options.channelWriter }),
+    ...(options.channelLinks !== undefined && { channelLinks: options.channelLinks }),
   });
   const report = await module.start();
   if (report.unreadable.length > 0) options.onUnreadableTokens(report.unreadable);

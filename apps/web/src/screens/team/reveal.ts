@@ -10,7 +10,7 @@ import type {
 import { longDay, noteDay } from './model';
 
 /**
- * Équipe › Reveal, without React (ADR 0076): where each account of the platform's team shows, what its list offers,
+ * Équipe › Comptes Reveal, without React (ADR 0076): where each account of the platform's team shows, what its list offers,
  * and how a proposal, a model and a gap read. The server proposes and decides; this only says it.
  */
 
@@ -138,11 +138,14 @@ export function linkLabel(row: TeamImportRow): string {
   return row.link.kind === 'agent' ? 'L’agent' : row.link.memberDisplayName;
 }
 
-/** The models the platform assigns the account (§ 7): its creator in Impera, else its handle, said as not imported. */
+/**
+ * The models the platform assigns the account (§ 7): its creator in Impera, else its handle as the platform shows it
+ * (« @lune »), said as not imported (recette visuelle 16/11, GES-10).
+ */
 export function modelsLine(row: TeamImportRow, platform: string): string | null {
   if (row.models.length === 0) return null;
   const names = row.models.map(
-    (model) => model.creatorDisplayName ?? `${model.handle} (modèle ${platform} non importée)`,
+    (model) => model.creatorDisplayName ?? `@${model.handle} (modèle ${platform} non importé)`,
   );
   return `Modèles sur ${platform} : ${names.join(', ')}`;
 }

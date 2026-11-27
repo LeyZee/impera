@@ -40,10 +40,9 @@ export function passkeysText(count: number): string {
 }
 
 /** « 2 nov. 2026 », « 1er nov. 2026 »: the day a key was added. */
+/** A day as the CRM writes dates (recette du 16/11, EXT-26): « 15/11/2026 ». */
 export function dayText(at: string): string {
-  const text = new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-  // « 1er nov. 2026 », never « 1 nov. »
-  return text.replace(/^1 /u, '1er ');
+  return new Date(at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 /** Sessions of one device on one network: a browser that signs in often leaves many, read as one line. */

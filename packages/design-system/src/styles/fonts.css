@@ -1,7 +1,8 @@
 /*
  * Font faces, served with the app (no third-party request, the extension works offline; recette R-G17):
  * Geist (UI) and Geist Mono (keyboard hints) as variable fonts, Instrument Serif (empty states), Playfair Display
- * italic 600 (the name, as in the logo). Each face carries unicode ranges: the browser only fetches the subsets a
+ * italic 600 (the name, as in the logo), in its latin subset alone: it writes one word, « Impera » (recette du 16/11,
+ * EXT-25: two files instead of eight). Each face carries unicode ranges: the browser only fetches the subsets a
  * page uses. Every family in tokens.css falls back to the system stack (SF Pro on Apple).
  * Must be the first import of the consuming stylesheet (CSS requires @import before other rules).
  */
@@ -9,4 +10,4 @@
 @import '@fontsource-variable/geist-mono/wght.css';
 @import '@fontsource/instrument-serif/400.css';
 @import '@fontsource/instrument-serif/400-italic.css';
-@import '@fontsource/playfair-display/600-italic.css';
+@import '@fontsource/playfair-display/latin-600-italic.css';

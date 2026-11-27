@@ -42,6 +42,8 @@ export function wireContentDrops(
     /** The brain that tells each script she sends, from its cards and its media's descriptions (ADR 0083 § 6). */
     readonly brain: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
     readonly storage?: DropStorage;
+    /** Told each time a medium of hers is described (ADR 0164 § 9): whoever proposes something from it. */
+    readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
   },
 ): WiredContentDrops {
   const module = createContentDropsModule({
@@ -53,6 +55,7 @@ export function wireContentDrops(
     describer: createDropDescriptions({ adminDb: shared.adminDb, gateway: deps.vision }),
     brain: deps.brain,
     ...(deps.storage !== undefined && { storage: deps.storage }),
+    ...(deps.onDescribed !== undefined && { onDescribed: deps.onDescribed }),
   });
   return {
     module,
@@ -74,7 +77,11 @@ export function wireContentDrops(
         JOB_PAYLOADS['content_drops.describe_file'],
         shared.logger,
         async (payload, context) => {
-          const outcome = await module.jobs.describeFile(payload.mediaAssetId, payload.correlationId);
+          const outcome = await module.jobs.describeFile(
+            payload.creatorId,
+            payload.mediaAssetId,
+            payload.correlationId,
+          );
           context.logger.info(
             { mediaAssetId: payload.mediaAssetId, outcome },
             'content drops: dropped media described',
@@ -86,7 +93,11 @@ export function wireContentDrops(
         JOB_PAYLOADS['content_drops.summarize_script'],
         shared.logger,
         async (payload, context) => {
-          const outcome = await module.jobs.summarizeScript(payload.dropId, payload.correlationId);
+          const outcome = await module.jobs.summarizeScript(
+            payload.creatorId,
+            payload.dropId,
+            payload.correlationId,
+          );
           context.logger.info({ dropId: payload.dropId, outcome }, 'content drops: sent script summarized');
         },
       ),
@@ -106,7 +117,11 @@ export function wireContentDrops(
         JOB_PAYLOADS['content_drops.make_thumbnail'],
         shared.logger,
         async (payload, context) => {
-          const outcome = await module.jobs.makeThumbnail(payload.mediaAssetId, payload.correlationId);
+          const outcome = await module.jobs.makeThumbnail(
+            payload.creatorId,
+            payload.mediaAssetId,
+            payload.correlationId,
+          );
           context.logger.info(
             { mediaAssetId: payload.mediaAssetId, outcome },
             'content drops: reduced picture of a medium',

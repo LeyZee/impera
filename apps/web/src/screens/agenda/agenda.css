@@ -322,7 +322,9 @@
   background: var(--nv-glass-fill);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
+/* One line: the chevron must never fall alone to the next line (avis Design, téléphone 390 px). */
 .ag-streak {
+  white-space: nowrap;
   text-decoration: none;
   transition: background-color 0.15s ease;
 }
@@ -344,6 +346,8 @@
   margin: -6px 0;
 }
 .ag-streak__go {
+  /* The base styles make an svg a block: inline, it stays on the text's line. */
+  display: inline-block;
   flex: none;
   width: 12px;
   height: 12px;
@@ -397,6 +401,20 @@
   margin: 0;
   font-size: var(--nv-text-footnote);
   color: var(--nv-warning);
+}
+/* Her timed tasks gone by unticked (recette visuelle 16/11, CRE-05): a warning, amber, their titles in it. */
+.ag-glance__missed {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-warning);
+}
+.ag-glance__missed b {
+  font-weight: 600;
+}
+.ag-missed {
+  color: var(--nv-warning);
+  font-weight: 600;
 }
 
 /* ── Sections ──────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -1355,7 +1373,7 @@
   font: inherit;
   cursor: pointer;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 5px;
   min-width: 0;
   padding: 2px 7px;
@@ -1364,9 +1382,7 @@
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink);
   text-align: left;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   background: color-mix(in srgb, var(--ag-c) 18%, transparent);
   transition: filter var(--nv-dur-base) var(--nv-ease-out);
 }
@@ -1387,8 +1403,14 @@
 .ag-mini > .ag-mini__title {
   flex: 1 1 auto;
   min-width: 0;
+  /* Two lines before « … » (recette visuelle 16/11, CRE-04): « Rendez-vous comptable » reads whole on a column. */
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* ── Semaine on a computer: seven columns, hours down ─────────────────────────────────────────────────────────── */
@@ -1397,7 +1419,8 @@
   padding: 0;
 }
 .ag-wk__scroll {
-  max-height: 680px;
+  /* The hours take the height the window has left, never a band of empty plate under them (CRE-24). */
+  max-height: max(420px, calc(100dvh - 300px));
   overflow: auto;
   overscroll-behavior: contain;
   /* The rows on top grow when « fans » arrives: the browser must not push the hours down to « keep » its place. */
@@ -1456,13 +1479,6 @@
   color: var(--nv-on-neon);
   background: var(--nv-neon-solid);
   box-shadow: 0 6px 18px -8px var(--nv-neon);
-}
-.ag-wk__routine {
-  font-size: 11px;
-  color: var(--nv-ink-faint);
-}
-.ag-wk__routine[data-full] {
-  color: var(--nv-success);
 }
 .ag-wk__all {
   border-bottom: 1px solid var(--nv-hairline);
@@ -1578,14 +1594,27 @@
     var(--nv-shadow-focus);
 }
 .ag-wk__ev b {
+  /* Two lines when the block holds them, then « … » (recette visuelle 16/11, CRE-04); a short block keeps one. */
+  display: -webkit-box;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.ag-wk__ev[data-short] b {
+  display: block;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
 }
 .ag-wk__ev > span {
   color: var(--nv-ink-muted);
   white-space: nowrap;
+}
+/* Its hours never cut: the one thing to read on a narrow column (CRE-04). */
+.ag-wk__ev > .nv-num {
+  flex: none;
 }
 .ag-wk__ev[data-short] {
   flex-direction: row;
@@ -1671,6 +1700,12 @@
   border-top: 1px solid var(--nv-hairline);
   font-size: var(--nv-text-caption);
   color: var(--nv-ink-faint);
+  /* Said when the hand is on the grid, not as a notice under it the whole time (CRE-24); its place is kept. */
+  opacity: 0;
+  transition: opacity var(--nv-dur-base) var(--nv-ease-out);
+}
+.ag-wk:is(:hover, :focus-within) .ag-wk__hint {
+  opacity: 1;
 }
 
 /* ── Mois on a computer ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -1684,9 +1719,10 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 .ag-month__names span {
-  padding: 8px;
+  /* On the day numbers' axis, not centred above them (recette visuelle 16/11, CRE-25). */
+  padding: 8px 12px;
   font-size: var(--nv-text-caption);
-  text-align: center;
+  text-align: left;
   color: var(--nv-ink-faint);
   border-bottom: 1px solid var(--nv-hairline);
 }
@@ -1855,7 +1891,8 @@ summary.ag-brief__title:focus-visible {
 .ag-foot {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  /* On the content's edge, not floating in the middle under it (recette visuelle 16/11, CRE-11). */
+  justify-content: flex-start;
   gap: var(--nv-space-2);
   margin: var(--nv-space-4) 0 0;
 }
@@ -1901,18 +1938,44 @@ summary.ag-brief__title:focus-visible {
   color: var(--nv-ink-muted);
 }
 .ag-replies--cell li {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+/* The hours first, whole; the name after them, cut first (recette visuelle 16/11, CRE-04). */
+.ag-replies__cell {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 4px;
+}
+.ag-replies__cell > .nv-num {
   white-space: nowrap;
 }
+/*
+ * Someone answers her fans that day: a discreet dot by the day's number, said once under the month, never a name in
+ * every cell (recette visuelle 16/11, CRE-04).
+ */
+.ag-month__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .ag-month__fans {
-  margin-top: auto;
-  padding-left: 7px;
-  overflow: hidden;
-  font-size: 11px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nv-ink-faint);
+}
+.ag-month__legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-top: 1px solid var(--nv-hairline);
+  font-size: var(--nv-text-caption);
   color: var(--nv-ink-faint);
+}
+.ag-month__legend .ag-month__fans {
+  flex: none;
 }
 
 /* ── Recette, lot A ───────────────────────────────────────────────────────────────────────────────────────────── */
@@ -1939,4 +2002,17 @@ summary.ag-brief__title:focus-visible {
 /* CREA-21: a timed task whose time is over, not ticked. */
 .ag-late {
   color: var(--nv-warning);
+}
+/*
+ * On a phone, a task's line is 44 px to the finger, as its ring is (recette visuelle 16/11, CRE-22): a title alone
+ * no longer makes a 20 px target. Its look does not change.
+ */
+@media (max-width: 720px) {
+  .ag-task__body {
+    min-height: 44px;
+    justify-content: center;
+  }
+  .ag-foot .nv-btn {
+    height: 44px;
+  }
 }

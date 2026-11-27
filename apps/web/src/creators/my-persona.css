@@ -11,6 +11,52 @@
 .mp-block__title {
   margin: 0;
 }
+/*
+ * A panel folded on its title (recette visuelle 16/11, CRE-03): the title and what it holds on a 60 px line that is
+ * the whole width of the plate to the finger, the answers on the plate's inset once open.
+ */
+.mp-block--fold {
+  padding: 0;
+  gap: 0;
+}
+.mp-fold {
+  border-radius: inherit;
+}
+.mp-fold > .mp-fold__head {
+  min-height: 60px;
+  padding-inline: var(--nv-plate-pad);
+  border-radius: inherit;
+}
+.mp-fold__head .mp-block__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mp-fold__head .nv-disclosure__sum {
+  flex: none;
+}
+.mp-fold__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+/* A long answer cut on its rubrics: each rubric a small title over its words. */
+.mp-rubrics {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.mp-rubrics dt {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.mp-rubrics dd {
+  margin: 0;
+}
+
 /* Label in a narrow faint column, value in ink: each block reads at a glance. */
 .mp-fields {
   margin: 0;

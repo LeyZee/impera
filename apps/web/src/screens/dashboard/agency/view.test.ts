@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { AGENCY_WEEK } from './fixture';
 import {
-  arcs,
   bestSlot,
   busiest,
   byWeek,
@@ -20,8 +19,9 @@ import {
   moneyParts,
   moneyShares,
   moneyTip,
+  percentText,
   OTHER,
-  SERIES,
+  KINDS,
   sellerRanking,
   sharesOf,
   shortEuros,
@@ -49,9 +49,9 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
   it('folds the rare kinds in « Autres ventes », each kind in its fixed colour', () => {
     const slices = kindSlices(AGENCY_WEEK.kinds);
     expect(slices.map((slice) => [slice.label, slice.cents, slice.colour])).toEqual([
-      ['Abonnements', 42_000, SERIES[0]],
-      ['PPV en privé', 112_600, SERIES[1]],
-      ['Tips', 28_000, SERIES[3]],
+      ['Abonnements', 42_000, KINDS[1]],
+      ['PPV en privé', 112_600, KINDS[0]],
+      ['Tips', 28_000, KINDS[2]],
       ['Autres ventes', 2_000, OTHER],
     ]);
   });
@@ -71,7 +71,7 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     const day = AGENCY_WEEK.days[0];
     if (day === undefined) throw new Error('fixture');
     expect(dayStacks(day)).toEqual([6_000, 10_000, 0, 4_000, 0]);
-    expect(STACKS.map((stack) => stack.colour)).toEqual([...SERIES, OTHER]);
+    expect(STACKS.map((stack) => stack.colour)).toEqual([KINDS[1], KINDS[0], KINDS[3], KINDS[2], OTHER]);
   });
 
   it('reads three months a week a column on a phone, the last week shorter', () => {
@@ -101,12 +101,6 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     expect(hoursLabel(18)).toBe('18\u00a0h\u00a0–\u00a019\u00a0h');
     expect(hourLabel(0)).toBe('0\u00a0h');
     expect(busiest(Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)))).toBeNull();
-  });
-
-  it('draws a ring whose arcs follow each other', () => {
-    const [first, second] = arcs([1, 3], 10, 0);
-    expect(first?.offset).toBe(0);
-    expect(second?.offset).toBeCloseTo(-15.71, 1);
   });
 });
 
@@ -220,6 +214,13 @@ describe('sharesOf', () => {
   });
 });
 
+describe('percentText (PAY-16)', () => {
+  it('says a share with its tenth only when it has one', () => {
+    expect(percentText(37.5)).toBe('37,5\u00a0%');
+    expect(percentText(62)).toBe('62\u00a0%');
+  });
+});
+
 describe('moneyShares', () => {
   it('splits the revenue and the net to 100 % each, the amounts untouched', () => {
     const figures = {
@@ -232,6 +233,10 @@ describe('moneyShares', () => {
     const shares = moneyShares(figures);
     expect(shares.ofRevenue).toEqual({ fansVat: 17, commission: 17, creator: 41, agency: 25 });
     expect(shares.ofNet.creator + shares.ofNet.agency).toBe(100);
+    // To the tenth of a point: 37,5 % of the net is never said « 37 % » (PAY-16).
+    expect(
+      moneyShares({ ...figures, netMinor: 8_000, agencyMinor: 3_000, creatorMinor: 5_000 }).ofNet,
+    ).toEqual({ creator: 62.5, agency: 37.5 });
     expect(figures.agencyMinor).toBe(2_490);
   });
 });

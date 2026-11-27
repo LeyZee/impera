@@ -16,6 +16,9 @@ const PUBLISHED: ReadonlySet<EventType> = new Set([
   'message_sent',
   'handoff_requested',
   'alert_triggered',
+  // ADR 0150: the router of her alerts reads them in the outbox.
+  'scripts_exhausted',
+  'offer_proposed',
   'takeover_started',
   'takeover_ended',
   'send_failed',

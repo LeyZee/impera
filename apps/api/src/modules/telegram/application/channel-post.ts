@@ -1,5 +1,4 @@
 import {
-  DEFAULT_TELEGRAM_CHANNEL_CONFIG,
   err,
   ok,
   type ChannelPostDraft,
@@ -11,7 +10,9 @@ import {
 } from '@impera/contracts';
 
 import { channelChecks, guardedTexts, linkOf, renderChannelPost } from '../domain/channel-post';
-import type { ChannelPersonaSource, ChannelsStore, ChannelVoice } from '../domain/ports';
+import type { ChannelLinksSource, ChannelPersonaSource, ChannelsStore, ChannelVoice } from '../domain/ports';
+
+import { channelConfigOf } from './channel';
 
 /**
  * A post of her channel written as production will write it (ADR 0080 § 5), for the playground's « Post du canal »
@@ -20,6 +21,7 @@ import type { ChannelPersonaSource, ChannelsStore, ChannelVoice } from '../domai
  */
 export interface ChannelPostDeps {
   readonly channels: ChannelsStore;
+  readonly links?: ChannelLinksSource;
   readonly persona: ChannelPersonaSource;
   readonly voice: ChannelVoice;
 }
@@ -31,7 +33,8 @@ export async function tryChannelPost(
   body: TryChannelPostBody,
 ): Promise<Result<TriedChannelPost, ChannelTryRefusalKind> | null> {
   if (!(await deps.channels.creatorActive(creatorId))) return null;
-  const config = (await deps.channels.findChannel(creatorId))?.config ?? DEFAULT_TELEGRAM_CHANNEL_CONFIG;
+  // Her links that are on: a link switched off is unknown here, as one removed was.
+  const { config } = await channelConfigOf(deps, creatorId);
   // Only the main post carries a link (§ 5.8): an engagement post or a poll has none, whatever was asked.
   const main = body.kind === 'main';
   const linkId = main ? (body.linkId ?? config.channelLinkId) : null;

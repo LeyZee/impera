@@ -23,11 +23,15 @@ export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 const TIMEOUT_MS = 15_000;
 const CAPTURES_TIMEOUT_MS = 60_000;
 
-/** `revoked`: the link was removed in the CRM (401); `unreachable`: no answer, or the server is down, try later. */
+/**
+ * `revoked`: the link was removed in the CRM (401); `busy`: the CRM is there but counts too many tries (429), wait a
+ * minute; `unreachable`: no answer, a timeout or the server is down, try later.
+ */
 export type Sent<T> =
   | { readonly kind: 'ok'; readonly value: T }
   | { readonly kind: 'revoked' }
   | { readonly kind: 'refused'; readonly code: string | null }
+  | { readonly kind: 'busy' }
   | { readonly kind: 'unreachable' };
 
 export async function call<T>(
@@ -63,7 +67,8 @@ export async function call<T>(
     // The trend watch's cap and a missing vision model are answers, not outages.
     if (code === TREND_WATCH_BUDGET_LIMITED || code === TREND_CAPTURE_VISION_UNAVAILABLE)
       return { kind: 'refused', code };
-    return { kind: 'unreachable' };
+    // The CRM answered: it is up, only counting the tries of the last minute (Bilan, 20/11).
+    return response.status === 429 ? { kind: 'busy' } : { kind: 'unreachable' };
   }
   if (!response.ok) return { kind: 'refused', code: await errorCodeOf(response) };
   const value = parse(await response.json().catch(() => null));
@@ -125,6 +130,7 @@ export async function sendCaptures(
       return 'described';
     case 'revoked':
       return 'revoked';
+    case 'busy':
     case 'unreachable':
       return 'failed';
     case 'refused':

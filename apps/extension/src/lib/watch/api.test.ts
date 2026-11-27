@@ -62,6 +62,10 @@ describe('sendReadings', () => {
       code: 'validation_failed',
     });
     expect(await sendReadings(ORIGIN, TOKEN, BATCH, answer(503, {}))).toEqual({ kind: 'unreachable' });
+    // A 429 is a CRM that answers: it only counts the tries of the last minute (Bilan, 20/11).
+    expect(await sendReadings(ORIGIN, TOKEN, BATCH, answer(429, errorBody('rate_limited')))).toEqual({
+      kind: 'busy',
+    });
     const down: Fetch = () => Promise.reject(new TypeError('offline'));
     expect(await sendReadings(ORIGIN, TOKEN, BATCH, down)).toEqual({ kind: 'unreachable' });
   });

@@ -1,4 +1,4 @@
-import type { AgencyInsights, AgencyPeriod, AgencySaleKind, DashboardSalesSeller } from '@impera/contracts';
+import type { AgencyInsights, AgencySaleKind, DashboardSalesSeller } from '@impera/contracts';
 
 import { clockOf } from '@/scheduling/time';
 
@@ -8,11 +8,18 @@ import { clockOf } from '@/scheduling/time';
  */
 
 /**
- * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the four categorical
- * series (validated Nuit and Jour, never violet, gold, red or cyan, the agent's, the sale's and the statuses'), then
- * « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
+ * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the cyan ramp
+ * (`--nv-kind-1..4`, light to dark, apart from the money's rose and blue, avenant du 17/11 à l'ADR 0106 § 10, choix B
+ * de Charles le 19/11), then « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
  * creators' bars and the hours' ramp take the data ink alone.
  */
+export const KINDS = [
+  'var(--nv-kind-1)',
+  'var(--nv-kind-2)',
+  'var(--nv-kind-3)',
+  'var(--nv-kind-4)',
+] as const;
+/** The four categorical series, for what is not money (the AI's providers and uses, Consommation IA). */
 export const SERIES = [
   'var(--nv-series-1)',
   'var(--nv-series-2)',
@@ -20,21 +27,6 @@ export const SERIES = [
   'var(--nv-series-4)',
 ] as const;
 export const OTHER = 'var(--nv-series-other)';
-
-export const PERIOD_OPTIONS: readonly { readonly id: AgencyPeriod; readonly label: string }[] = [
-  { id: 'day', label: 'Aujourd’hui' },
-  { id: 'week', label: '7 jours' },
-  { id: 'month', label: '30 jours' },
-  { id: 'quarter', label: '3 mois' },
-];
-
-/** « par rapport à … »: the period the deltas compare to. */
-export const AGAINST: Readonly<Record<AgencyPeriod, string>> = {
-  day: 'par rapport à hier',
-  week: 'par rapport aux 7 jours d’avant',
-  month: 'par rapport aux 30 jours d’avant',
-  quarter: 'par rapport aux 3 mois d’avant',
-};
 
 /** « 1 846 € », « 10,50 € » from cents: the cents only when there are some (ADR 0011: exact money). */
 export function euros(cents: number): string {
@@ -75,10 +67,10 @@ export function shareOf(part: number, whole: number): number {
  * largest fractions, the first one on a tie. Only the percentages move, never an amount (recette du 13/11 : 17 + 17 +
  * 42 + 25 = 101 %). Zeros for an empty whole.
  */
-export function sharesOf(parts: readonly number[], whole: number): number[] {
+export function sharesOf(parts: readonly number[], whole: number, points = 100): number[] {
   if (whole <= 0) return parts.map(() => 0);
-  // In whole cents × 100, never in floats: two equal remainders stay equal, the tie goes to the first part.
-  const scaled = parts.map((part) => Math.max(0, part) * 100);
+  // In whole cents × points, never in floats: two equal remainders stay equal, the tie goes to the first part.
+  const scaled = parts.map((part) => Math.max(0, part) * points);
   const shares = scaled.map((one) => Math.floor(one / whole));
   const target = Math.round(scaled.reduce((sum, one) => sum + one, 0) / whole);
   const order = scaled
@@ -91,6 +83,11 @@ export function sharesOf(parts: readonly number[], whole: number): number[] {
     left -= 1;
   }
   return shares;
+}
+
+/** « 37,5 % », « 62 % »: a share with its tenth when it has one, a non-breaking space before the sign. */
+export function percentText(share: number): string {
+  return `${share.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u00a0%`;
 }
 
 /** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
@@ -128,7 +125,10 @@ function split(figures: MoneyFigures): Record<MoneyPart['key'], number> {
 export interface MoneyShares {
   /** Of the revenue, the four parts adding up to 100. */
   readonly ofRevenue: Readonly<Record<MoneyPart['key'], number>>;
-  /** Of the net, the two parts adding up to 100. */
+  /**
+   * Of the net, the two parts adding up to 100, to the tenth: a percentage agreed with a creator is often a half
+   * (37,5 %), and her sheet says it so; the Dashboard never says « 37 % » for it (PAY-16).
+   */
   readonly ofNet: Readonly<Record<'creator' | 'agency', number>>;
 }
 
@@ -138,10 +138,14 @@ export function moneyShares(figures: MoneyFigures): MoneyShares {
     [parts.fansVat, parts.commission, parts.creator, parts.agency],
     figures.revenueMinor,
   );
-  const [creatorOfNet = 0, agencyOfNet = 0] = sharesOf([parts.creator, parts.agency], figures.netMinor);
+  const [creatorOfNet = 0, agencyOfNet = 0] = sharesOf(
+    [parts.creator, parts.agency],
+    figures.netMinor,
+    1_000,
+  );
   return {
     ofRevenue: { fansVat, commission, creator, agency },
-    ofNet: { creator: creatorOfNet, agency: agencyOfNet },
+    ofNet: { creator: creatorOfNet / 10, agency: agencyOfNet / 10 },
   };
 }
 
@@ -213,7 +217,7 @@ export function moneyTip(input: {
       `${String(input.revenueShare ?? shareOf(input.cents, input.revenueMinor))}\u00a0%`,
     ]);
   if (input.netMinor !== null && input.netMinor > 0)
-    rows.push(['Part du net', `${String(input.netShare ?? shareOf(input.cents, input.netMinor))}\u00a0%`]);
+    rows.push(['Part du net', percentText(input.netShare ?? shareOf(input.cents, input.netMinor))]);
   return { title: input.title, rows, text: input.text };
 }
 
@@ -247,14 +251,26 @@ const KIND_SLICES: readonly {
 /** What « Autres ventes » holds, for its tip. */
 export const OTHER_KINDS_NOTE = 'Liens de paiement, boudoir, messages payants et le reste.';
 
+/**
+ * Each kind's step of the ramp, by its usual weight (relecture Design 19/11): the PPV, the biggest, the strongest tone,
+ * then the subscriptions, the tips, the Mass DM; « Autres ventes » the neutral fold. Fixed per kind, never by the
+ * period's rank: a filter or another month never repaints a kind (dataviz: colour follows the entity).
+ */
+const KIND_STEP: Readonly<Record<string, number>> = { ppv: 0, subscriptions: 1, tips: 2, mass_dm: 3 };
+
+function kindColour(key: string): string {
+  const step = KIND_STEP[key];
+  return step === undefined ? OTHER : (KINDS[step] ?? OTHER);
+}
+
 /** The kinds' ring: every slice in its fixed colour, empty ones kept out (a slice of nothing says nothing). */
 export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
-  return KIND_SLICES.map((slice, i) => {
+  return KIND_SLICES.map((slice) => {
     const mine = kinds.filter((one) => slice.kinds.includes(one.kind));
     return {
       key: slice.key,
       label: slice.label,
-      colour: SERIES[i] ?? OTHER,
+      colour: kindColour(slice.key),
       cents: mine.reduce((sum, one) => sum + one.revenueMinor, 0),
       previousCents: mine.reduce((sum, one) => sum + one.previousRevenueMinor, 0),
       sales: mine.reduce((sum, one) => sum + one.sales, 0),
@@ -266,7 +282,8 @@ export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
 export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>> = {
   member: 'Les ventes des membres de l’équipe, reliés à leur compte Reveal.',
   agent: 'Ce que l’agent a vendu seul, sur la clé de l’agence.',
-  unlinked: 'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Reveal).',
+  unlinked:
+    'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Comptes Reveal).',
   none: 'Une vente sans chatteur : un abonnement, un renouvellement, un tip spontané.',
 };
 
@@ -297,10 +314,10 @@ export interface Stack {
 }
 
 /** The stacks of the chart of the period: the kinds, in the ring's order and colours (the agency's as one creator's). */
-export const STACKS: readonly Stack[] = KIND_SLICES.map((slice, i) => ({
+export const STACKS: readonly Stack[] = KIND_SLICES.map((slice) => ({
   key: slice.key,
   label: slice.label,
-  colour: SERIES[i] ?? OTHER,
+  colour: kindColour(slice.key),
 }));
 
 /** A day's (or an hour's) amounts by kind, in the stacks' order. */
@@ -403,29 +420,6 @@ export function heatOf(cents: number, max: number): number {
   return max > 0 ? Math.round((cents / max) * 100) / 100 : 0;
 }
 
-/** An arc of a ring of `radius`: its dash and where it starts, clockwise from the top, a gap between arcs. */
-export function arcs(
-  values: readonly number[],
-  radius: number,
-  gap = 2,
-): { readonly dash: string; readonly offset: number }[] {
-  const circumference = 2 * Math.PI * radius;
-  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
-  const shown = values.filter((value) => value > 0).length;
-  const round = (n: number): number => Math.round(n * 100) / 100;
-  let start = 0;
-  return values.map((value) => {
-    const length = total > 0 ? (Math.max(0, value) / total) * circumference : 0;
-    const visible = shown > 1 ? Math.max(0, length - gap) : length;
-    const arc = {
-      dash: `${String(round(visible))} ${String(round(circumference))}`,
-      offset: start === 0 ? 0 : round(-start),
-    };
-    start += length;
-    return arc;
-  });
-}
-
 /** « heure de Paris » for the platform's zone: the city of an IANA zone, its last part. */
 export function zoneLabel(timeZone: string): string {
   const city = timeZone.split('/').pop()?.replaceAll('_', ' ') ?? timeZone;
@@ -453,4 +447,49 @@ export function ppvRate(sent: number | null, purchased: number): number | null {
 export function signedCount(n: number): string {
   const text = Math.abs(n).toLocaleString('fr-FR');
   return n > 0 ? `+${text}` : n < 0 ? `−${text}` : '0';
+}
+
+/** A refund's kind, one sale's word (ADR 0092 § 4): the ring's names, the folded ones said each. */
+export const REFUND_KIND: Readonly<Record<AgencySaleKind, string>> = {
+  subscriptions: 'Abonnement',
+  ppv: 'PPV en privé',
+  mass_dm: 'Mass DM',
+  tips: 'Tip',
+  payment_links: 'Lien de paiement',
+  boudoir: 'Boudoir',
+  paid_messages: 'Message payant',
+  other: 'Autre vente',
+};
+
+/** How long after its sale a refund came: « le jour même », « 3 jours après »; none for a sale out of the register. */
+export function refundDelayLabel(days: number | null): string {
+  if (days === null) return 'vente hors registre';
+  if (days === 0) return 'le jour même';
+  return `${days.toLocaleString('fr-FR')} jour${days > 1 ? 's' : ''} après`;
+}
+
+/** When a refund came, always with its day: « 6 nov., 14 h 05 », in the platform's zone. */
+export function refundDateLabel(iso: string, timeZone: string): string {
+  const at = new Date(iso);
+  const time = at
+    .toLocaleTimeString('fr-FR', { timeZone, hour: 'numeric', minute: '2-digit' })
+    .replace(':', '\u00a0h\u00a0');
+  return `${at.toLocaleDateString('fr-FR', { timeZone, day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+/** A seller's key in the refunds' filter: a member by id, the others by kind. */
+export const sellerKeyOf = (seller: DashboardSalesSeller): string =>
+  seller.kind === 'member' ? `member:${seller.memberId}` : seller.kind;
+
+/** The refunds a filter keeps: one creator or all, one seller or all (`'all'`). */
+export function refundsKept(
+  list: AgencyInsights['refundList'],
+  creatorId: string,
+  seller: string,
+): AgencyInsights['refundList'] {
+  return list.filter(
+    (one) =>
+      (creatorId === 'all' || one.creatorId === creatorId) &&
+      (seller === 'all' || sellerKeyOf(one.seller) === seller),
+  );
 }

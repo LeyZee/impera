@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { MessageAuthorSchema, MessageDirectionSchema, PlatformSchema, SessionStateSchema } from './enums';
+import {
+  MessageAuthorSchema,
+  MessageDirectionSchema,
+  MessageOriginSchema,
+  PlatformSchema,
+  SessionStateSchema,
+} from './enums';
 import { PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -51,6 +57,8 @@ export const ExternalMessageSchema = z.object({
    * creator's side (`human`: the creator herself or a chatter). Absent when the platform does not say.
    */
   author: MessageAuthorSchema.optional(),
+  /** Written by an automation of the platform, or his answer to a story (ADR 0110); absent otherwise. */
+  origin: MessageOriginSchema.optional(),
   createdAt: z.iso.datetime(),
 });
 export type ExternalMessage = z.infer<typeof ExternalMessageSchema>;
@@ -124,6 +132,13 @@ export type FanNote = z.infer<typeof FanNoteSchema>;
 export const CreatorNoteSchema = z.object({ text: z.string().min(1) });
 export type CreatorNote = z.infer<typeof CreatorNoteSchema>;
 
+/**
+ * Her public profile on the platform (`getCreatorProfile`, ADR 0154): her bio as every subscriber could read it before
+ * writing to her; empty when she has none. Read only: Impera never writes it.
+ */
+export const CreatorProfileSchema = z.object({ bio: z.string() });
+export type CreatorProfile = z.infer<typeof CreatorProfileSchema>;
+
 /** One bundle the fan was offered in the conversation, bought or not. */
 const PpvOfferSchema = z.object({
   ref: ExternalRefSchema,
@@ -166,6 +181,22 @@ export const PlatformStepDiscountSchema = z
   });
 export type PlatformStepDiscount = z.infer<typeof PlatformStepDiscountSchema>;
 
+/**
+ * What the platform counts on a step since it exists, every seller together, never by day nor by fan (ADR 0129 § 12):
+ * its sends, its packs paid and what they brought. Kept one row a day, so that a period reads as a difference.
+ */
+/** The ceiling of a step's totals: the column's 32-bit integer, so that an aberrant value is set aside, never stored. */
+export const PLATFORM_STEP_TOTAL_MAX = 2_147_483_647;
+const stepTotal = z.number().int().min(0).max(PLATFORM_STEP_TOTAL_MAX);
+
+export const PlatformStepTotalsSchema = z.object({
+  sent: stepTotal,
+  purchased: stepTotal,
+  /** Minor units, VAT included, as the platform shows it. */
+  paidMinor: stepTotal,
+});
+export type PlatformStepTotals = z.infer<typeof PlatformStepTotalsSchema>;
+
 export const PlatformScriptStepSchema = z.object({
   /** The step as the platform names it: what a send of this step refers to. */
   ref: ExternalRefSchema,
@@ -189,6 +220,8 @@ export const PlatformScriptStepSchema = z.object({
    * has none. Impera never sells at it: such a step is never sent and its script never offered (recette 16/11, Charles).
    */
   discount: PlatformStepDiscountSchema.nullable(),
+  /** Its totals as the platform counts them (ADR 0129 § 12); absent when the platform gives none. Never in a version. */
+  totals: PlatformStepTotalsSchema.optional(),
 });
 export type PlatformScriptStep = z.infer<typeof PlatformScriptStepSchema>;
 
@@ -252,6 +285,8 @@ export const VaultMediaSchema = z.object({
   suggestedPriceMinor: z.object({ min: z.number().int().min(0), max: z.number().int().min(0) }).nullable(),
   /** The platform's blurred preview; `null` when it gives none or one that does not read as a blurhash. */
   blurhash: BlurhashSchema.nullable(),
+  /** The platform says it was sent for free (in a message or a Mass DM): offered, never sold again (ADR 0145 § 2). */
+  sentForFree: z.boolean(),
 });
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 
@@ -296,6 +331,8 @@ export const ConnectorCapabilitiesSchema = z.object({
   mediaDownload: z.boolean(),
   /** `readVaultPreview`: a vault media's small picture read on demand, never kept (ADR 0138). */
   vaultPreview: z.boolean(),
+  /** `getCreatorProfile`: her public profile as every subscriber reads it, read only (ADR 0154). */
+  creatorProfile: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 

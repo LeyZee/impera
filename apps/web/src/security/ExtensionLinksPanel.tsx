@@ -37,11 +37,12 @@ export function labelProblem(label: string): string | null {
 }
 
 /**
- * « Relier l’extension » (VEI-02, ADR 0066 § 7): the browsers where the person watches Instagram for the agency's
- * morning ideas. Each link gives one code, shown once, that the person pastes in the extension; unlinking a browser
- * stops what it sends. Shown to the owner and the managers only: the watch is theirs.
+ * « Relier l’extension » (VEI-02, ADR 0066 § 7, ADR 0109): the browsers where the person uses the extension. Each link
+ * gives one code, shown once, that the person pastes in the extension; unlinking a browser stops what it sends. The
+ * whole team links: a chatter's copilot gestures count by it (recette du 16/11, EXT-02); `watches` adds the Instagram
+ * watch to what the link is for.
  */
-export function ExtensionLinksPanel(): JSX.Element {
+export function ExtensionLinksPanel({ watches }: { readonly watches: boolean }): JSX.Element {
   const [links, setLinks] = useState<readonly ExtensionLink[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [step, setStep] = useState<'idle' | 'naming'>('idle');
@@ -121,11 +122,13 @@ export function ExtensionLinksPanel(): JSX.Element {
   const full = links !== null && links.length >= EXTENSION_LINKS_MAX;
 
   return (
-    <Panel title="Relier l’extension" eyebrow="Veille Instagram">
+    <Panel title="Relier l’extension" eyebrow="Extension Impera">
       <PanelSection>
         <p className={MUTED}>
-          Pendant que tu regardes Instagram, l’extension Impera relève les posts qui marchent pour les idées
-          du matin. Relie chaque navigateur où elle est installée, {String(EXTENSION_LINKS_MAX)} au plus.
+          {watches
+            ? 'Relie chaque navigateur où l’extension Impera est installée : tes gestes du copilote comptent alors à ton nom, et pendant que tu regardes Instagram, elle relève les posts qui marchent pour les idées du matin.'
+            : 'Relie chaque navigateur où l’extension Impera est installée : tes gestes du copilote comptent alors à ton nom.'}{' '}
+          {String(EXTENSION_LINKS_MAX)} au plus.
         </p>
         {loadError !== null ? (
           <p className="text-sm text-[var(--nv-warning)]" role="alert">

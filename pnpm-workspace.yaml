@@ -32,6 +32,11 @@ overrides:
   '@hono/node-server': 2.1.5
   express-rate-limit: 8.7.2
   encodeurl: 2.0.1
+  # Quarantine (14 days) for the tree of @sentry/node 11.11.0 (OPS-18): its bundler plugins take glob ^14.0.3, whose
+  # 14.0.6 (12/11/2026) and minimatch 11.0.9 (16/11/2026) are too recent; these passed it on 20/11/2026. Remove each
+  # once the newer one is 14 days old.
+  glob@14: 14.0.4
+  minimatch@11: 11.0.5
 
 auditConfig:
   ignoreGhsas:

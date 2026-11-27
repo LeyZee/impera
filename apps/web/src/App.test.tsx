@@ -616,4 +616,30 @@ describe('App on the screens of a contractor’s file', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Installer l’extension' })).toBeDefined();
   });
+
+  // ADR 0024, amendement du 16/11, point 2: the manager keeps the copilot and no longer has the watch.
+  it('shows a manager the copilot in the extension’s guide, and the watch to the owner alone', async () => {
+    serveAs(member('manager'));
+    window.history.replaceState(null, '', '/aide/extension');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Installer l’extension' })).toBeDefined();
+    expect(screen.getAllByText('Le copilote sur Reveal').length).toBeGreaterThan(0);
+    expect(screen.queryByText('La veille Instagram')).toBeNull();
+    cleanup();
+    serveAs(OWNER);
+    window.history.replaceState(null, '', '/aide/extension');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Installer l’extension' })).toBeDefined();
+    expect(screen.getAllByText('Le copilote sur Reveal').length).toBeGreaterThan(0);
+    expect(screen.getByText('La veille Instagram')).toBeDefined();
+  });
+
+  it('links a manager’s extension for the copilot alone, in Moi › Sécurité', async () => {
+    serveAs(member('manager'));
+    window.history.replaceState(null, '', '/moi/securite');
+    render(<App />);
+    expect(await screen.findByText(/tes gestes du copilote comptent alors à ton nom/u)).toBeDefined();
+    expect(screen.queryByText(/relève les posts qui marchent/u)).toBeNull();
+    expect(screen.queryByText(/copilote et veille/u)).toBeNull();
+  });
 });

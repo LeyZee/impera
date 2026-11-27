@@ -1,6 +1,7 @@
 import {
   ActivatePersonaVersionBodySchema,
   ActivatePersonaVersionParamsSchema,
+  ChatterPersonaSchema,
   CreatePersonaVersionBodySchema,
   CreatorIdSchema,
   DomainError,
@@ -20,7 +21,7 @@ import { z } from 'zod';
 
 import type { PersonaCorrectionStore } from '../../domain/corrections';
 import { withoutObjectionReplies } from '../../domain/redact';
-import { answersOf, sheetOf } from '../../domain/sheet';
+import { answersOf, chatterSheetOf, sheetOf } from '../../domain/sheet';
 import type { PersonaVersionStore } from '../../domain/versions';
 
 import type { RequireRole } from './routes';
@@ -31,7 +32,53 @@ class CreatorForbidden extends DomainError {
   }
 }
 
+/** A chatter of hers outside his shift and its margin (ADR 0025): her sheet waits for his next shift (ADR 0153). */
+class PersonaOffShift extends DomainError {
+  constructor() {
+    super('persona_shift_forbidden', 'Tu n’es pas en poste sur cette créatrice.');
+  }
+}
+
 const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
+
+/**
+ * Who reads her sheet as a chatter does (ADR 0153): the owner and a member whose list holds her, untraced; a member
+ * whose scope is `self` only while his shift window is open on her (`shiftCreatorIds`, ADR 0025), traced.
+ */
+function chatterReaderFor(
+  request: FastifyRequest,
+  creatorId: CreatorId,
+): { userId: string; traced: boolean } {
+  const { user } = request;
+  if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+  if (user.role === 'owner' || user.creatorIds.includes(creatorId)) return { userId: user.id, traced: false };
+  if (user.shiftCreatorIds.includes(creatorId)) return { userId: user.id, traced: true };
+  if (user.routedCreatorIds.includes(creatorId)) throw new PersonaOffShift();
+  throw new CreatorForbidden();
+}
+
+/**
+ * Her whole sheet, the agency's (Charles, 21/11, Sécurité): the owner and an active manager only, the manager on the
+ * creators of his list. Any other operator reads the short sheet (`…/persona/chatter`), never the whole one.
+ */
+class PersonaFullForbidden extends DomainError {
+  constructor() {
+    super(
+      'persona_full_forbidden',
+      'Réservé au propriétaire et aux managers actifs : ta fiche est la fiche courte',
+    );
+  }
+}
+
+/** The owner, or an active manager (scope `agency`, ADR 0024) whose list holds her: who reads her whole sheet. */
+function fullReaderFor(request: FastifyRequest, creatorId: CreatorId): CurrentUser {
+  const user = actorFor(request, creatorId);
+  if (user.role === 'owner' || request.membership?.teamScope === 'agency') return user;
+  throw new PersonaFullForbidden();
+}
+
+/** Today's date in UTC: her age to the day, never her birth date (ADR 0153). */
+const isoToday = (now: Date): string => now.toISOString().slice(0, 10);
 
 /** The signed-in user, allowed on this creator: an owner sees every creator, anyone else their own list. */
 function actorFor(request: FastifyRequest, creatorId: CreatorId): CurrentUser {
@@ -50,19 +97,20 @@ export function createPersonaRoutes(
   corrections: PersonaCorrectionStore,
   requireRole: RequireRole,
   recentLogin: preValidationAsyncHookHandler,
+  now: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
       '/creators/:creatorId/persona',
       {
         // The agency's sheet, its strategies and its history: never the creator's (recette CREA-01), who reads hers
-        // at `…/persona/mine`.
+        // at `…/persona/mine`, nor a chatter's, who reads the short one at `…/persona/chatter` (Charles, 21/11).
         preValidation: requireRole('owner', 'operator'),
         schema: { params: CreatorParamsSchema, response: { 200: PersonaOverviewSchema } },
       },
       async (request) => {
         const { creatorId } = request.params;
-        const user = actorFor(request, creatorId);
+        const user = fullReaderFor(request, creatorId);
         const overview = await store.overview(creatorId);
         return user.role === 'owner' ? overview : withoutObjectionReplies(overview);
       },
@@ -80,6 +128,23 @@ export function createPersonaRoutes(
         const active = await store.active(creatorId);
         if (active === null) return { creatorId, sheet: null, answers: null };
         return { creatorId, sheet: sheetOf(active.persona), answers: answersOf(active.persona) };
+      },
+    );
+
+    app.get(
+      '/creators/:creatorId/persona/chatter',
+      {
+        // The short sheet a chatter reads on shift (ADR 0153): who she is, how she writes, what she never does.
+        preValidation: requireRole('owner', 'operator'),
+        schema: { params: CreatorParamsSchema, response: { 200: ChatterPersonaSchema } },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        const reader = chatterReaderFor(request, creatorId);
+        // Written before anything is read, as for a conversation he opens (ADR 0025).
+        if (reader.traced) await store.traceChatterOpening(creatorId, reader.userId, request.ip);
+        const active = await store.active(creatorId);
+        return { creatorId, sheet: active === null ? null : chatterSheetOf(active.persona, isoToday(now())) };
       },
     );
 
@@ -132,7 +197,9 @@ export function createPersonaRoutes(
       },
       async (request) => {
         const { creatorId } = request.params;
-        const user = actorFor(request, creatorId);
+        // Any reader but the creator herself is checked as for her whole sheet (Charles, 21/11, Sécurité).
+        const user =
+          request.user?.role === 'creator' ? actorFor(request, creatorId) : fullReaderFor(request, creatorId);
         const list =
           user.role === 'creator'
             ? await corrections.mine(user.id)

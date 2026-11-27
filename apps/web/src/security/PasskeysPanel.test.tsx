@@ -84,8 +84,8 @@ describe('Clés d’accès in Sécurité (ADR 0053 § 5)', () => {
     expect(passkeysText(0)).toBe('Aucune clé d’accès');
     expect(passkeysText(1)).toBe('1 clé d’accès');
     expect(passkeysText(3)).toBe('3 clés d’accès');
-    expect(dayText('2026-11-01T10:00:00.000Z')).toBe('1er nov. 2026');
-    expect(dayText('2026-10-28T10:00:00.000Z')).toBe('28 oct. 2026');
+    expect(dayText('2026-11-01T10:00:00.000Z')).toBe('01/11/2026');
+    expect(dayText('2026-10-28T10:00:00.000Z')).toBe('28/10/2026');
   });
 
   it('says a refused gesture after a wrong password, not the password’s refusal', async () => {
@@ -136,7 +136,7 @@ describe('Clés d’accès in Sécurité (ADR 0053 § 5)', () => {
     const list = await screen.findByRole('list', { name: 'Clés d’accès' });
     const [phone, laptop] = within(list).getAllByRole('listitem');
     expect(phone?.textContent).toContain('Safari sur iPhone');
-    expect(phone?.textContent).toContain('iCloud Keychain · ajoutée le 28 oct. 2026 · utilisée il');
+    expect(phone?.textContent).toContain('iCloud Keychain · ajoutée le 28/10/2026 · utilisée il');
     expect(laptop?.textContent).toContain('jamais utilisée');
 
     fireEvent.click(screen.getByRole('button', { name: 'Retirer la clé Chrome sur Windows' }));

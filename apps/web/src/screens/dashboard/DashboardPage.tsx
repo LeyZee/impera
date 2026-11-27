@@ -1,20 +1,20 @@
-import type { AgencyPeriod } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
-import { BackupBanner } from './BackupBanner';
 import { CreatorPicker } from './CreatorPicker';
-import { FunnelPanel } from './Funnel';
+import { AGENT_PATH, FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
-import { PaperworkBanner } from './PaperworkBanner';
-import { ReportsBanner } from './ReportsBanner';
+import { OwnerDecisions } from './OwnerDecisions';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
+import { TodoCard } from './TodoCard';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
+import { SteeringPanel } from './agency/Steering';
+import type { AgencySelection } from './agency/period';
 import { agentRuns, litParts } from './logic';
 import type { Fan, Period, Todo, Tone } from './model';
 import { Section, TONE_COLOR, useFloatingTip } from './parts';
@@ -130,10 +130,7 @@ function Offline({
       {creatorName === null ? null : (
         <header className="db-top nv-enter">
           {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
-          <CreatorPicker
-            onChoose={onCreator}
-            agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
-          />
+          {agency === undefined ? <CreatorPicker onChoose={onCreator} /> : null}
           <div className="db-top__who">
             <span className="db-top__av" aria-hidden="true">
               {initialOf(creatorName)}
@@ -155,8 +152,8 @@ function Offline({
 }
 
 /**
- * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). Whoever can add one is led to
- * Créatrices; anyone else reads who does.
+ * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). The owner, who alone adds one,
+ * is led to Créatrices; a manager or an operator reads that none is entrusted to him yet.
  */
 export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
   return canAddCreator ? (
@@ -172,8 +169,8 @@ export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.El
   ) : (
     <Alone
       tone="idle"
-      headline="Aucune créatrice **pour l’instant**"
-      lead="Le propriétaire de l’agence les ajoute. Leur agent et ce qui attend un humain arriveront ici."
+      headline="Aucune créatrice **ne t’est confiée**"
+      lead="C’est le propriétaire de l’agence qui te les confie. Elles apparaîtront ici."
     />
   );
 }
@@ -207,7 +204,7 @@ export function DashboardPage({
   reviewsReports?: boolean;
   /** The account's rail holds Suivi: a best fan opens his conversation there (DASH-14). */
   opensTracking?: boolean;
-  /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
+  /** The owner, who alone adds a creator: before any creator, the screen leads him to Créatrices (DASH-13). */
   canAddCreator?: boolean;
   /** The owner's and an active manager's: her figures from the register lead the page (ADR 0078). */
   agency?: AgencyView;
@@ -222,11 +219,6 @@ export function DashboardPage({
       <div className="db" aria-busy="true">
         <PageHeader title="Dashboard" />
         {/* The chips keep their place while her Dashboard loads: nothing jumps when it comes (ADM-21). */}
-        {agency === undefined ? null : (
-          <header className="db-top">
-            <CreatorPicker onChoose={onCreator} agency={{ selected: false, onChoose: agency.onAgency }} />
-          </header>
-        )}
         <div className="db-loading nv-plate" aria-label="Chargement du Dashboard" role="status" />
       </div>
     );
@@ -256,8 +248,8 @@ export function DashboardPage({
 
 /** The agency's figures on a creator's Dashboard (ADR 0078): their period, and the way back to the whole agency. */
 export interface AgencyView {
-  readonly period: AgencyPeriod;
-  readonly onPeriod: (period: AgencyPeriod) => void;
+  readonly selection: AgencySelection;
+  readonly onSelection: (selection: AgencySelection) => void;
   readonly onAgency: () => void;
   readonly canOpenSettings: boolean;
 }
@@ -285,9 +277,17 @@ function Loaded({
   const sales = data.sales?.[period] ?? null;
   // With several creators the chips above name her: the header does not say her name a second time (DASH-03).
   const creators = useCreators().data;
-  const several = (creators?.length ?? 0) >= 2;
+  const several = agency === undefined && (creators?.length ?? 0) >= 2;
   // Her photo copied at her import (CRM-07 b2), read in the list: the Dashboard's answer does not carry it.
   const hasPhoto = creators?.find((one) => one.id === creatorId)?.hasAvatar === true;
+  const ownerDecisions = (at: 'top' | 'under-day'): JSX.Element | null =>
+    forOwner ? (
+      <OwnerDecisions
+        creators={creators?.filter((one) => one.id === creatorId) ?? []}
+        showWho={false}
+        at={at}
+      />
+    ) : null;
 
   const navigate = useNavigate();
   // Every line opens in Suivi, where a draft is decided and a handoff given back; a best fan too, on his conversation.
@@ -333,10 +333,8 @@ function Loaded({
       <PageHeader title="Dashboard" />
       <header className="db-top nv-enter">
         {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
-        <CreatorPicker
-          onChoose={onCreator}
-          agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
-        />
+        {/* The owner and an active manager choose her in the menu's selector instead (ADR 0134 § 3). */}
+        {agency === undefined ? <CreatorPicker onChoose={onCreator} /> : null}
         <div className="db-top__who">
           {several ? null : (
             <CreatorFace
@@ -383,14 +381,28 @@ function Loaded({
       {agentHero}
 
       {/* Who is warned of an urgency at night: part of her agent's state, said right under it. The night's alerts and
-          where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
+          where they go are the owner's to set (Réglages › Bots Telegram): anyone else reads it. */}
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
+
+      {/* What she has not answered yet, the owner answering in her place (INS-05): here while one ends soon, else under
+          the day's goal; nothing if nothing waits. */}
+      {ownerDecisions('top')}
 
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
       {agency === undefined ? null : (
+        <SteeringPanel
+          creatorId={creatorId}
+          opensTracking={opensTracking}
+          tip={tip}
+          index={2}
+          afterDay={ownerDecisions('under-day')}
+        />
+      )}
+      {agency === undefined ? null : (
         <AgencyInsightsPanel
-          period={agency.period}
-          onPeriod={agency.onPeriod}
+          index={5}
+          selection={agency.selection}
+          onSelection={agency.onSelection}
           creatorId={creatorId}
           creatorName={data.creator.name}
           canOpenSettings={agency.canOpenSettings}
@@ -405,7 +417,13 @@ function Loaded({
           </Section>
 
           <Section title="Parcours des fans" sub={FUNNEL_SUB[period]} index={3}>
-            <FunnelPanel key={period} counts={sales.funnel.counts} before={sales.funnel.before} tip={tip} />
+            <FunnelPanel
+              key={period}
+              labels={AGENT_PATH}
+              counts={sales.funnel.counts}
+              before={sales.funnel.before}
+              tip={tip}
+            />
           </Section>
         </>
       )}
@@ -454,17 +472,11 @@ function Loaded({
           the reports are the agency's, said on its own view, not under each creator (PIL-04). The day's AI budget is
           never on this screen: on « Toute l'agence » for the owner and an active manager, in Réglages › Consommation IA,
           never to an operator who can set nothing of it (PIL-27). */}
-      {agency === undefined ? (
-        <>
-          <BackupBanner enabled={forOwner} />
-
-          {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
-          <PaperworkBanner enabled={forOwner} />
-
-          {/* The reports that wait on the agency, never left unseen in the queue (ADR 0073). */}
-          <ReportsBanner enabled={reviewsReports} />
-        </>
-      ) : null}
+      {/* The export, the invoices and the documents are the owner's to settle (OPS-02, EQ-06 lot 8d), the reports that
+          wait are their reviewer's (ADR 0073): one card, « À faire » (W3). */}
+      {agency === undefined ? <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} /> : null}
+      {/* Without the steering's cards, what she has not answered stands here when nothing ends soon. */}
+      {agency === undefined ? ownerDecisions('under-day') : null}
 
       {tip.element}
     </div>

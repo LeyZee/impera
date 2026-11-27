@@ -4,14 +4,10 @@ import {
   CHANNEL_POSTS_PER_DAY_MAX,
   CHANNEL_SLOT_GAP_MINUTES,
   CHANNEL_SLOTS_MAX,
-  RedirectLinkIdSchema,
-  REDIRECT_LINKS_MAX,
-  isRedirectUrl,
   labelHasAddress,
   type ChannelChoice,
   type ChannelSlot,
   type ChannelWarning,
-  type RedirectLink,
   type TelegramChannelConfig,
 } from '@impera/contracts';
 
@@ -23,7 +19,7 @@ const NBSP = ' ';
 
 /** What keeps her posts from going out, in amber, with what to do. */
 export const WARNING_TEXT: Readonly<Record<ChannelWarning, string>> = {
-  no_bot: 'Aucun bot Telegram n’est branché : crée-le dans Réglages › Telegram.',
+  no_bot: 'Aucun bot Telegram n’est branché : crée-le dans Réglages › Bots Telegram.',
   no_channel: 'Aucun canal choisi : ajoute le bot comme administrateur de son canal, puis choisis-le ici.',
   channel_gone: 'Le bot n’est plus dans son canal : remets-le administrateur.',
   bot_cannot_post:
@@ -104,14 +100,9 @@ export const SLOT_ROLES = [
 export const TWO_MAINS = 'Un seul post principal par jour.';
 export const SLOTS_FULL = `${String(CHANNEL_SLOTS_MAX)} créneaux au plus.`;
 export const EXAMPLES_FULL = `${String(CHANNEL_EXAMPLES_MAX)} exemples au plus.`;
-export const LINKS_FULL = `${String(REDIRECT_LINKS_MAX)} liens au plus.`;
 export const TOO_MANY = `${String(CHANNEL_POSTS_PER_DAY_MAX)} posts par jour au plus.`;
 
-export function newLink(): RedirectLink {
-  return { id: RedirectLinkIdSchema.parse(crypto.randomUUID()), name: '', url: '', destination: '' };
-}
-
-/** What a line of the form says is wrong, by its key (`link:<id>:name`, `link:<id>:url`, `slot:<rank>`, `label`). */
+/** What a line of the form says is wrong, by its key (`slot:<rank>`, `example:<rank>`, `label`). Her links are set in « Liens » (INS-03). */
 export function issuesOf(config: TelegramChannelConfig): Map<string, string> {
   const issues = new Map<string, string>();
   config.slots.forEach((slot, rank) => {
@@ -129,22 +120,6 @@ export function issuesOf(config: TelegramChannelConfig): Map<string, string> {
       );
     if (shared) issues.set(`slot:${String(rank)}`, TWO_MAINS);
   });
-  const names = new Set<string>();
-  for (const link of config.links) {
-    const name = link.name.trim().toLocaleLowerCase('fr');
-    if (name === '') issues.set(`link:${link.id}:name`, 'Donne-lui un nom.');
-    else if (names.has(name)) issues.set(`link:${link.id}:name`, 'Un autre lien porte ce nom.');
-    names.add(name);
-    if (!isRedirectUrl(link.url.trim())) {
-      issues.set(`link:${link.id}:url`, 'Une adresse complète qui commence par https://, sans espace.');
-    }
-    if (labelHasAddress(link.destination)) {
-      issues.set(
-        `link:${link.id}:destination`,
-        'Dis l’endroit en mots, sans adresse : le lien s’ajoute seul.',
-      );
-    }
-  }
   config.examples.forEach((example, rank) => {
     if (example.trim() === '') issues.set(`example:${String(rank)}`, 'Colle le post, ou retire la ligne.');
   });
@@ -164,9 +139,6 @@ export const issueLine = (key: string): string =>
  */
 export function blankLines(config: TelegramChannelConfig): ReadonlySet<string> {
   const blank = new Set<string>();
-  for (const link of config.links)
-    if (link.name.trim() === '' && link.url.trim() === '' && link.destination.trim() === '')
-      blank.add(`link:${link.id}`);
   config.examples.forEach((example, rank) => {
     if (example.trim() === '') blank.add(`example:${String(rank)}`);
   });
@@ -202,12 +174,6 @@ export function trimmed(config: TelegramChannelConfig): TelegramChannelConfig {
     ...config,
     linkLabel: config.linkLabel.trim(),
     examples: config.examples.map((example) => example.trim()),
-    links: config.links.map((link) => ({
-      ...link,
-      name: link.name.trim(),
-      url: link.url.trim(),
-      destination: link.destination.trim(),
-    })),
   };
 }
 

@@ -8,21 +8,28 @@ import {
   type MyFiguresCell,
   type MyFiguresDay,
   type PayPeriod,
+  type PlatformAccountId,
   type SaleEvent,
+  type SaleType,
 } from '@impera/contracts';
 
 /**
- * A member's own figures (ADR 0104 § A), pure: from the lines of their own statements only, never from the register.
+ * A member's own figures (ADR 0104 § A), pure: from the lines of their own statements and of their own validated
+ * reports (ADR 0118 § 10, the lines the game reads), never from the register.
  * Nothing here compares them to anyone, and nothing here enters a statement.
  */
 
 /** A line of one of the member's statements, with the period that statement pays. */
 export interface FigureLine {
   readonly period: PayPeriod;
+  /** The account the line was sold on: a statement line is one account's. */
+  readonly platformAccountId: PlatformAccountId;
   readonly event: SaleEvent;
   readonly currency: Currency;
   readonly netMinor: number;
   readonly occurredAt: Date | null;
+  /** What was sold; `null` on a statement written before the type was kept, and on a shift counted from its report. */
+  readonly saleType: SaleType | null;
 }
 
 type Net = MyFigures['nets'][number];
@@ -49,8 +56,15 @@ function paidDayOf(line: FigureLine, timeZone: string): string | null {
   return day === null ? null : day < line.period ? line.period : day;
 }
 
-/** The days of `lines` that have an instant, the oldest first, a late line on its period's first day. */
-function daysOf(lines: readonly FigureLine[], timeZone: string): MyFiguresDay[] {
+/**
+ * The days of `lines` that have an instant, the oldest first, a late line on its period's first day. A line of
+ * `reported` is a shift counted from its validated report: a total, so it is no sale of the day's count.
+ */
+function daysOf(
+  lines: readonly FigureLine[],
+  timeZone: string,
+  reported: ReadonlySet<FigureLine>,
+): MyFiguresDay[] {
   const groups = new Map<string, FigureLine[]>();
   for (const line of lines) {
     const day = paidDayOf(line, timeZone);
@@ -61,10 +75,35 @@ function daysOf(lines: readonly FigureLine[], timeZone: string): MyFiguresDay[] 
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([day, group]) => ({
       day,
-      sales: group.filter((line) => line.event === 'sale').length,
+      sales: group.filter((line) => line.event === 'sale' && !reported.has(line)).length,
       refunds: group.filter((line) => line.event !== 'sale').length,
+      reports: group.filter((line) => reported.has(line)).length,
       nets: netsOf(group),
     }));
+}
+
+/**
+ * Where the net of `lines` comes from, by what was sold (ADR 0104 § 6): a refund lowers the net of its own type and
+ * is no sale of its count. A sale whose statement kept no type is counted apart, never as a zero of any type; its
+ * refund is no sale there either.
+ */
+function kindsOf(lines: readonly FigureLine[]): MyFigures['kinds'] {
+  const groups = new Map<SaleType, FigureLine[]>();
+  let untyped = 0;
+  for (const line of lines) {
+    if (line.saleType === null) untyped += line.event === 'sale' ? 1 : 0;
+    else groups.set(line.saleType, [...(groups.get(line.saleType) ?? []), line]);
+  }
+  return {
+    untyped,
+    items: [...groups.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([type, group]) => ({
+        type,
+        sales: group.filter((line) => line.event === 'sale').length,
+        nets: netsOf(group),
+      })),
+  };
 }
 
 /** `day` moved by `count` days, as a calendar day. */
@@ -112,17 +151,24 @@ function bestOf<Key extends string>(sums: ReadonlyMap<Key, number>): { key: Key;
  * - the period under way day by day in the agency's zone, and the period before, stopped at the same day of the
  *   fortnight (a line without an instant counts in a period's net, never in a day; a line that comes late counts from
  *   the first day);
- * - the sales of the last `MY_FIGURES_WEEKS` weeks by weekday and hour, in the member's own zone;
- * - their best day and best fortnight, in the currency that brought them the most.
+ * - the sales read in the last `MY_FIGURES_WEEKS` weeks by weekday and hour, in the member's own zone: a shift counted
+ *   from its report has a total and no hour of sale, so it is not on that grid;
+ * - their best day and best fortnight, in the currency that brought them the most;
+ * - where the net of the period under way comes from, by what was sold, on the sales read only (a report has a total
+ *   and no type).
  */
 export function myFigures(input: {
   readonly lines: readonly FigureLine[];
+  /** The member's shifts counted from their validated report, as lines (`reportLines`, ADR 0118); none by default. */
+  readonly reportLines?: readonly FigureLine[];
   readonly now: Date;
   readonly agencyZone: string;
   readonly memberZone: string;
   readonly period: PayPeriod;
 }): MyFigures {
-  const { lines, now, agencyZone, memberZone, period } = input;
+  const { now, agencyZone, memberZone, period } = input;
+  const reported = new Set(input.reportLines ?? []);
+  const lines = [...input.lines, ...reported];
   const today = calendarDayAt(now, agencyZone);
   const current = lines.filter((line) => line.period === period);
   const before = previousPayPeriod(period);
@@ -134,7 +180,7 @@ export function myFigures(input: {
   });
 
   const since = new Date(now.getTime() - MY_FIGURES_WEEKS * 7 * DAY_MS);
-  const recent = lines.filter(
+  const recent = input.lines.filter(
     (line) => line.event === 'sale' && line.occurredAt !== null && line.occurredAt >= since,
   );
   const cells = new Map<string, { weekday: number; hour: number; lines: FigureLine[] }>();
@@ -171,12 +217,13 @@ export function myFigures(input: {
     period,
     today,
     timeZone: memberZone,
-    days: daysOf(current, agencyZone),
+    days: daysOf(current, agencyZone, reported),
     nets: netsOf(current),
+    kinds: kindsOf(input.lines.filter((line) => line.period === period)),
     previous:
       previous.length === 0
         ? null
-        : { period: before, days: daysOf(previous, agencyZone), toDateNets: netsOf(toDate) },
+        : { period: before, days: daysOf(previous, agencyZone, reported), toDateNets: netsOf(toDate) },
     hours: {
       since: calendarDayAt(since, agencyZone),
       sales: recent.length,

@@ -45,6 +45,7 @@ const columns = {
   suggestedMinMinor: schema.mediaPlatformRefs.suggestedMinMinor,
   suggestedMaxMinor: schema.mediaPlatformRefs.suggestedMaxMinor,
   previewBlurhash: schema.mediaPlatformRefs.previewBlurhash,
+  sentForFreeAt: schema.mediaPlatformRefs.sentForFreeAt,
   lastSyncedAt: schema.mediaPlatformRefs.lastSyncedAt,
   removedAt: schema.mediaPlatformRefs.removedAt,
 };
@@ -69,6 +70,7 @@ function rowOf(row: Row): VaultRefRow {
     suggestedMinMinor: row.suggestedMinMinor,
     suggestedMaxMinor: row.suggestedMaxMinor,
     previewBlurhash: row.previewBlurhash,
+    sentForFree: row.sentForFreeAt !== null,
     lastSyncedAt: row.lastSyncedAt,
     removedAt: row.removedAt,
   };
@@ -123,10 +125,17 @@ export function createDrizzleVaultStore(db: Database): VaultStore {
               platformAccountId: account.id,
               platformMediaId: row.platformMediaId,
               ...values,
+              sentForFreeAt: row.sentForFree ? now : null,
             })
             .onConflictDoUpdate({
               target: [schema.mediaPlatformRefs.platformAccountId, schema.mediaPlatformRefs.platformMediaId],
-              set: values,
+              // Offered: set once, at the first read that says so, and never cleared (ADR 0145 § 2).
+              set: row.sentForFree
+                ? {
+                    ...values,
+                    sentForFreeAt: sql`coalesce(${schema.mediaPlatformRefs.sentForFreeAt}, ${now})`,
+                  }
+                : values,
             });
         }
         if (plan.removals.length > 0) {

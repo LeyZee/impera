@@ -19,8 +19,6 @@ import { createDrizzleVaultDescribeStore, enqueueVaultDescribe } from './vault-d
 export interface VaultDescriptions {
   /** `media.describe_vault`: one lot of an account's vault. Counts, for the log. */
   run(job: { readonly platformAccountId: string; readonly correlationId: string }): Promise<VaultDescribeRun>;
-  /** `media.describe_vault_backlog`, each hour: a run queued for each account whose vault waits. How many. */
-  backlog(correlationId: string): Promise<number>;
   /** A run queued behind a vault sync; one already waiting keeps its time. */
   enqueue(job: {
     readonly creatorId: string;
@@ -67,7 +65,6 @@ export function createVaultDescriptions(deps: {
         },
         job,
       ),
-    backlog: (correlationId) => store.backlog(correlationId),
     enqueue: (job) => enqueueVaultDescribe(deps.adminDb, job),
   };
 }

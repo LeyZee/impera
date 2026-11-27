@@ -1,0 +1,131 @@
+# Passe de test du 20/11, conversation 18 : la baleine qui dépense vite. Fan, messages, scripts et prix fictifs (ADR 0010).
+# Gros acheteur depuis des mois, deux achats cette semaine dont la soirée-démo tout à l’heure, il en redemande ce soir.
+# Attendu à la lecture (Charles 21/11) : rien proposé d’elle-même, elle attend qu’il redemande ; tendresse d’après ; jamais un second script le même soir ; s’il en veut encore, elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui, puis elle l’oriente vers une cam ou une vidéo faite pour lui, sans oui ni prix avant l’accord de la créatrice ; aucune vidéo réservée ; s’il dit qu’il emprunte, gel.
+# Code (asserté) : `offer: false` le même soir, à chaque réponse ; au dernier tour il dit qu’il emprunte, le cerveau lit `money_trouble` (le risque qui gèle ses ventes ; le gel lui-même n’a pas de clé). Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Gros acheteur qui a déjà acheté une soirée ce soir et en redemande : aucun second script le même soir, elle l’oriente vers une demande faite pour lui sans oui ni prix, et s’il dit emprunter le cerveau lit un manque d’argent.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Laurent (fictif)'
+  - 50 ans, confirmé
+situation:
+  availability: confirmed
+  sexualized: true
+  known_hours: 2400
+  age_confirmed: true
+  local_time: '22:30'
+  desire: 85
+  spent_euros: 400
+  last_offer_hours_ago: 1.5
+history:
+  - from: creator
+    text: Alors, cette fin de soirée t’a plu ? 🙈
+    minutes_ago: 20
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme plus intime que la précédente.
+          media: Une courte vidéo en nuisette.
+        - kind: paid
+          price_euros: 35
+          instruction: Le présenter comme la fin de la soirée, la plus intime.
+          media: Une vidéo plus longue, la nuisette retirée.
+    - ref: matin-demo
+      moment: null
+      description: Un réveil paresseux sous la couette, joué à toute heure (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Un selfie au réveil, sous la couette.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite du réveil.
+          media: Des photos au saut du lit.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime du réveil.
+          media: Une courte vidéo sous la douche.
+  run:
+    script: soiree-demo
+    status: bought_out
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: bought
+      - index: 2
+        outcome: bought
+      - index: 3
+        outcome: bought
+    started_minutes_ago: 90
+  history:
+    - script: soiree-demo
+      sent:
+        - 0
+        - 1
+        - 2
+        - 3
+      bought:
+        - 1
+        - 2
+        - 3
+inbound: C’était trop bien tout à l’heure… t’as encore quelque chose pour moi ?
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+then:
+  - after_minutes: 3
+    inbound: Allez, je suis chaud, montre-moi autre chose
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 3
+    inbound: Je m’en fous de dépenser, c’est pour toi
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 3
+    inbound: T’inquiète, au pire j’emprunte un peu à mon frère
+    expect:
+      brief:
+        risks_contain:
+          - money_trouble
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

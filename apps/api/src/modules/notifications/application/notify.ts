@@ -35,6 +35,8 @@ export async function notify(
   at: Date,
 ): Promise<NotificationOutcome> {
   const preferences = await preferencesOf(deps, request.userId);
+  const turnedOff =
+    request.kind !== undefined && !(await deps.preferences.kinds(request.userId))[request.kind];
   const clock = localClock(at, request.timeZone);
   const decision = await deps.registry.record(request, at, clock.day, (facts) =>
     decideNotification({
@@ -43,6 +45,7 @@ export async function notify(
       timeZone: request.timeZone,
       quiet: preferences.quietHours,
       dailyCap: preferences.dailyCap,
+      turnedOff,
       ...facts,
     }),
   );
@@ -62,7 +65,8 @@ export async function recap(deps: NotifyDeps, userId: string, at: Date): Promise
       held === 1
         ? 'Une notification t’attend dans Impera.'
         : `${String(held)} notifications t’attendent dans Impera.`,
-    url: '/',
+    // Where they wait (trou 9 du 21/11): « Tes notifications », not a home page that lists none.
+    url: '/notifications',
     tag: 'quiet-recap',
   });
   return held;

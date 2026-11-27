@@ -6,7 +6,6 @@ import { useCreatorFanInsights } from './api';
 import {
   AGE_LABELS,
   aboutLine,
-  arcsOf,
   caseColour,
   DAYS,
   DAYS_SHORT,
@@ -22,6 +21,7 @@ import {
 } from './insights-view';
 import './insights.css';
 
+import { Donut } from '@/shell/figures/figures';
 import { Panel, PanelSection } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
@@ -74,11 +74,6 @@ function RingCard({
   index: number;
 }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
-  const radius = 52;
-  const arcs = arcsOf(
-    cases.map((c) => c.share),
-    radius,
-  );
   const first = cases[0];
   const shown = lit === null ? null : cases[lit];
   const label = (key: string) => labels[key] ?? key;
@@ -86,67 +81,37 @@ function RingCard({
     <article className="fi-card nv-enter" style={{ '--nv-i': index }}>
       <h3 className="nv-h3 fi-card__title">{title}</h3>
       <div className="fi-ring-row">
-        <div
-          className={lit === null ? 'fi-ring' : 'fi-ring is-lit'}
-          role="img"
-          aria-label={`${title} : ${cases.map((c) => `${label(c.key)} ${percent(c.share)}`).join(', ')}`}
+        <Donut
+          label={`${title} : ${cases.map((c) => `${label(c.key)} ${percent(c.share)}`).join(', ')}`}
+          slices={cases.map((c, i) => ({ key: c.key, colour: caseColour(c.key, i), value: c.share }))}
+          lit={lit}
+          onLit={setLit}
         >
-          <svg viewBox="0 0 132 132" aria-hidden="true">
-            <circle className="fi-ring__track" cx="66" cy="66" r={radius} />
-            {cases.map((c, i) => {
-              const arc = arcs[i];
-              if (arc === undefined || c.share === 0) return null;
-              return (
-                <circle
-                  key={c.key}
-                  className={lit === i ? 'fi-ring__arc is-on' : 'fi-ring__arc'}
-                  cx="66"
-                  cy="66"
-                  r={radius}
-                  style={{
-                    '--_c': caseColour(c.key, i),
-                    '--_dash': arc.dash,
-                    '--_i': i,
-                  }}
-                  strokeDashoffset={arc.offset}
-                  onPointerEnter={() => {
-                    setLit(i);
-                  }}
-                  onPointerLeave={(event) => {
-                    if (event.pointerType === 'mouse') setLit(null);
-                  }}
-                />
-              );
-            })}
-          </svg>
-          <span className="fi-ring__middle" aria-hidden="true">
-            {shown !== null && shown !== undefined ? (
-              <>
-                <b className="fi-ring__value">{percent(shown.share)}</b>
-                <span className="fi-ring__sub">{label(shown.key)}</span>
-              </>
-            ) : idle !== undefined ? (
-              <>
-                <b className="fi-ring__value">{idle.value}</b>
-                <span className="fi-ring__sub">{idle.sub}</span>
-              </>
-            ) : first !== undefined ? (
-              <>
-                <b className="fi-ring__value">
-                  <Count value={first.share} format={first.share === 0 ? percent : plain} />
-                </b>
-                <span className="fi-ring__sub">{label(first.key)}</span>
-              </>
-            ) : null}
-          </span>
-        </div>
-        <ul className="fi-legend">
+          {shown !== null && shown !== undefined ? (
+            <>
+              <b className="nv-donut__value">{percent(shown.share)}</b>
+              <span className="nv-donut__sub">{label(shown.key)}</span>
+            </>
+          ) : idle !== undefined ? (
+            <>
+              <b className="nv-donut__value">{idle.value}</b>
+              <span className="nv-donut__sub">{idle.sub}</span>
+            </>
+          ) : first !== undefined ? (
+            <>
+              <b className="nv-donut__value">
+                <Count value={first.share} format={first.share === 0 ? percent : plain} />
+              </b>
+              <span className="nv-donut__sub">{label(first.key)}</span>
+            </>
+          ) : null}
+        </Donut>
+        <ul className="nv-breakdown fi-legend">
           {cases.map((c, i) => (
             <li key={c.key}>
               <button
                 type="button"
-                className={lit === i ? 'fi-legend__row is-on' : 'fi-legend__row'}
-                style={{ '--_c': caseColour(c.key, i) }}
+                className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
                 aria-pressed={lit === i}
                 onPointerEnter={() => {
                   setLit(i);
@@ -164,7 +129,7 @@ function RingCard({
                   setLit(i);
                 }}
               >
-                <i className="fi-legend__key" aria-hidden="true" />
+                <span className="nv-key" style={{ '--_c': caseColour(c.key, i) }} aria-hidden="true" />
                 <span className="fi-legend__name">{label(c.key)}</span>
                 <b className="fi-legend__share">{percent(c.share)}</b>
               </button>
@@ -251,8 +216,6 @@ function SpendingCard({
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(
       minor / 100,
     );
-  const radius = 52;
-  const [arc] = arcsOf([spending.payingShare, 100 - spending.payingShare], radius, 0);
   // Nobody unlocked yet: one sentence, not a ring at 0 % beside a bar « Rien débloqué » at 100 % (recette CRE-04).
   if (spending.payingShare === 0)
     return (
@@ -266,41 +229,29 @@ function SpendingCard({
       <h3 className="nv-h3 fi-card__title">Ce qu’ils débloquent</h3>
       <div className="fi-spend">
         <div className="fi-spend__lead">
-          <div
-            className="fi-ring fi-ring--solo"
-            role="img"
-            aria-label={`${percent(spending.payingShare)} de tes fans ont déjà débloqué un message`}
+          <Donut
+            label={`${percent(spending.payingShare)} de tes fans ont déjà débloqué un message`}
+            slices={[{ key: 'paying', colour: 'var(--nv-sale)', value: spending.payingShare }]}
+            of={100}
           >
-            <svg viewBox="0 0 132 132" aria-hidden="true">
-              <circle className="fi-ring__track" cx="66" cy="66" r={radius} />
-              {arc === undefined || spending.payingShare === 0 ? null : (
-                <circle
-                  className="fi-ring__arc"
-                  cx="66"
-                  cy="66"
-                  r={radius}
-                  style={{ '--_c': 'var(--nv-sale)', '--_dash': arc.dash, '--_i': 0 }}
-                  strokeDashoffset={arc.offset}
-                />
-              )}
-            </svg>
-            <span className="fi-ring__middle" aria-hidden="true">
-              <b className="fi-ring__value">
-                <Count value={spending.payingShare} format={plain} />
-              </b>
-              <span className="fi-ring__sub">ont déjà débloqué</span>
-            </span>
-          </div>
+            <b className="nv-donut__value">
+              <Count value={spending.payingShare} format={plain} />
+            </b>
+            <span className="nv-donut__sub">ont déjà débloqué</span>
+          </Donut>
           <div className="fi-basket">
-            <span className="fi-basket__label">Panier moyen sur 30 jours</span>
+            {/* One line of notice, not three: what the basket is and how it is counted (recette visuelle 16/11, CRE-19). */}
+            <span className="fi-basket__label">Panier moyen d’un fan qui a payé, sur 30 jours</span>
             {spending.averageBasketMinor === null ? (
               <span className="fi-basket__none">Pas encore assez de fans payants pour le dire.</span>
             ) : (
-              <b className="fi-basket__value">
-                <Count value={spending.averageBasketMinor} format={euros} />
-              </b>
+              <>
+                <b className="fi-basket__value">
+                  <Count value={spending.averageBasketMinor} format={euros} />
+                </b>
+                <span className="fi-basket__note">TVA comprise, avant parts</span>
+              </>
             )}
-            <span className="fi-basket__note">Par fan qui a payé, TVA comprise, avant parts.</span>
           </div>
         </div>
         <BarsInline cases={spending.cases} labels={TIER_LABELS} />
@@ -469,6 +420,10 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
   );
 }
 
+/** The three counts are one figure: rounded to ten, all alike, and none under the threshold. */
+const sameCounts = (fans: CreatorFanInsights['fans']): boolean =>
+  fans.total !== null && fans.newLast30Days === fans.total && fans.wroteLast7Days === fans.total;
+
 /**
  * The panel: three numbers, then a card per question that has enough fans, and for those that wait, what they wait
  * for (recette CRE-04). Under ten fans in all, one short sentence and nothing else. `silent`: the page says once that
@@ -514,11 +469,21 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
       title={<>Qui sont tes fans</>}
     >
       <PanelSection>
-        <div className="fi-stats">
-          <Stat value={data.fans.total} label="fans en tout" />
-          <Stat value={data.fans.newLast30Days} label="nouveaux sur 30 jours" />
-          <Stat value={data.fans.wroteLast7Days} label="t’ont écrit cette semaine" />
-        </div>
+        {sameCounts(data.fans) ? (
+          // Three tiles that say « ≈ 20 » three times say it once (recette visuelle 16/11, CRE-02).
+          <div className="fi-stats fi-stats--one">
+            <Stat
+              value={data.fans.total}
+              label="fans en tout, à peu près autant de nouveaux sur 30 jours et à t’avoir écrit cette semaine"
+            />
+          </div>
+        ) : (
+          <div className="fi-stats">
+            <Stat value={data.fans.total} label="fans en tout" />
+            <Stat value={data.fans.newLast30Days} label="nouveaux sur 30 jours" />
+            <Stat value={data.fans.wroteLast7Days} label="t’ont écrit cette semaine" />
+          </div>
+        )}
         <div className="fi-grid">
           {age.status === 'enough' ? (
             <RingCard

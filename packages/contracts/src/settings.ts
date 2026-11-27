@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { LlmRoleSchema } from './enums';
+import { FanTiersSettingSchema } from './to-talk';
 
 /**
  * Per-creator settings, stored in `creators.settings` (data-model.md). Follow-ups are not here: they live in the
@@ -15,6 +16,32 @@ const ModelOverrideSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
 });
+
+const MinuteRangeSchema = (max: number) =>
+  z
+    .object({ min: z.number().int().min(1).max(max), max: z.number().int().min(1).max(max) })
+    .refine((range) => range.min <= range.max, { message: 'Le minimum dépasse le maximum' });
+
+/**
+ * A time-waster and his scarce attention (ADR 0135), per creator: no value in the repository, the agency enters them.
+ * The waits are drawn in a range, capped at 8 h for « slowed » (§ 6) and a day for « dormant ».
+ */
+export const TimeWasterSettingSchema = z.object({
+  /** Her scripts sent to him that he never entered, before he counts as a time-waster. */
+  minUnenteredScripts: z.number().int().min(1).max(50),
+  /** Known this long with nothing paid on top: the « proven » level, which a tiresome fan turns « dormant ». */
+  provenHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 365),
+  slowedDelayMinutes: MinuteRangeSchema(8 * 60),
+  dormantDelayMinutes: MinuteRangeSchema(24 * 60),
+  /** Her answers to him a day, at most (§ 6: two moments « slowed », one « dormant » at the start). */
+  slowedRepliesPerDay: z.number().int().min(1).max(10),
+  dormantRepliesPerDay: z.number().int().min(1).max(10),
+});
+export type TimeWasterSetting = z.infer<typeof TimeWasterSettingSchema>;
 
 export const CreatorSettingsSchema = z.object({
   llm: z
@@ -32,12 +59,11 @@ export const CreatorSettingsSchema = z.object({
       fanMediaDays: z.number().int().min(1).max(365).default(30),
     })
     .prefault({}),
-  /**
-   * Whether each photo and video she drops is described by the vision AI on arrival (ADR 0083 § 9): off until the
-   * agency has checked the vision model on a few of her real media; her drops wait undescribed meanwhile.
-   */
-  describeDrops: z.boolean().default(false),
   /** Her two switches of the extension's copilot panel (ADR 0086 § 6): the fan's card on, the agent's drafts off. */
   copilot: z.object({ fanCard: z.boolean().default(true), drafts: z.boolean().default(false) }).prefault({}),
+  /** The thresholds of her fans' tiers, in euro cents, set by the owner (Charles, 21/11). */
+  fanTiers: FanTiersSettingSchema.prefault({}),
+  /** Her time-waster rule (ADR 0135), set by the owner or a manager; absent, nobody is a time-waster. */
+  timeWaster: TimeWasterSettingSchema.optional(),
 });
 export type CreatorSettings = z.infer<typeof CreatorSettingsSchema>;

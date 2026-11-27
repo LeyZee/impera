@@ -24,6 +24,7 @@ vi.mock('./push', () => ({
 
 const SERVER_KEY = new Uint8Array(new ArrayBuffer(65)).fill(4);
 
+const ALL_ON = { agency_request: true, week_to_validate: true, earnings: true, lives: true };
 const DEFAULTS = { quietHours: { startMinute: 1320, endMinute: 480 }, dailyCap: 6 };
 
 interface Call {
@@ -32,10 +33,13 @@ interface Call {
   readonly body: unknown;
 }
 
-/** The server: preferences kept as written, the test send answered with `testStatus`. */
-function serve(testStatus = 200): Call[] {
+const EMPTY_INBOX = { items: [] };
+
+/** The server: preferences kept as written, the test send answered with `testStatus`, the inbox as given. */
+function serve(testStatus = 200, inbox: unknown = EMPTY_INBOX, kindsPutStatus = 200): Call[] {
   const calls: Call[] = [];
   let saved: unknown = DEFAULTS;
+  let kinds: unknown = ALL_ON;
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
@@ -45,6 +49,16 @@ function serve(testStatus = 200): Call[] {
       if (url === '/v1/notifications/preferences') {
         if (method === 'PUT') saved = body;
         return Promise.resolve(new Response(JSON.stringify(saved), { status: 200 }));
+      }
+      if (url === '/v1/notifications/kinds') {
+        if (method === 'PUT') {
+          if (kindsPutStatus !== 200) return Promise.resolve(new Response(null, { status: kindsPutStatus }));
+          kinds = body;
+        }
+        return Promise.resolve(new Response(JSON.stringify(kinds), { status: 200 }));
+      }
+      if (url === '/v1/notifications/inbox') {
+        return Promise.resolve(new Response(JSON.stringify(inbox), { status: 200 }));
       }
       if (url === '/v1/notifications/test') {
         return Promise.resolve(
@@ -186,8 +200,9 @@ describe('Notifications, when it rings', () => {
     deviceIs('unsupported');
     renderPage();
     const start = await screen.findByLabelText('Début des heures calmes');
-    expect(start).toHaveProperty('value', '22:00');
-    expect(screen.getByLabelText('Fin des heures calmes')).toHaveProperty('value', '08:00');
+    // Written as the line under them writes them, « 22 h », not « 22:00 » (CHA-26).
+    expect(start).toHaveProperty('value', '22\u00a0h');
+    expect(screen.getByLabelText('Fin des heures calmes')).toHaveProperty('value', '8\u00a0h');
     expect(save()).toHaveProperty('disabled', true);
 
     fireEvent.change(start, { target: { value: '23:30' } });
@@ -202,6 +217,58 @@ describe('Notifications, when it rings', () => {
     await waitFor(() => {
       expect(save()).toHaveProperty('disabled', true);
     });
+  });
+
+  it('lets the creator turn a sort off for herself, saved at once (ADR 0150 § 16 ter)', async () => {
+    const calls = serve();
+    deviceIs('unsupported');
+    renderPage(true);
+    const gains = await screen.findByRole('switch', { name: /^Tes gains/u });
+    expect(gains).toHaveProperty('checked', true);
+    expect(screen.getByText('Toi seule vois ces choix ; l’agence ne les voit pas.')).toBeTruthy();
+    fireEvent.click(gains);
+    expect(await screen.findByText('Tes gains : coupés.')).toBeTruthy();
+    expect(
+      calls.find((call) => call.method === 'PUT' && call.url === '/v1/notifications/kinds')?.body,
+    ).toEqual({
+      ...ALL_ON,
+      earnings: false,
+    });
+    expect(screen.getByRole('switch', { name: /^Tes gains/u })).toHaveProperty('checked', false);
+  });
+
+  it.each([
+    [/^Demandes de l’agence/u, 'Demandes de l’agence : coupées.', 'Demandes de l’agence : activées.'],
+    [/^Ta semaine à valider/u, 'Ta semaine à valider : coupée.', 'Ta semaine à valider : activée.'],
+    [/^Tes gains/u, 'Tes gains : coupés.', 'Tes gains : activés.'],
+    [/^Tes lives/u, 'Tes lives : coupés.', 'Tes lives : activés.'],
+  ])('says each sort off and back on in its own agreement (%s)', async (name, off, on) => {
+    serve();
+    deviceIs('unsupported');
+    renderPage(true);
+    fireEvent.click(await screen.findByRole('switch', { name }));
+    expect(await screen.findByText(off)).toBeTruthy();
+    fireEvent.click(screen.getByRole('switch', { name }));
+    expect(await screen.findByText(on)).toBeTruthy();
+  });
+
+  it('puts a sort back and says so when the save is refused', async () => {
+    serve(200, EMPTY_INBOX, 503);
+    deviceIs('unsupported');
+    renderPage(true);
+    fireEvent.click(await screen.findByRole('switch', { name: /^Tes lives/u }));
+    expect((await screen.findByText('Pas enregistré. Réessaie dans un instant.')).getAttribute('role')).toBe(
+      'alert',
+    );
+    expect(screen.getByRole('switch', { name: /^Tes lives/u })).toHaveProperty('checked', true);
+  });
+
+  it('shows no sorts to the team, whose alerts are set by the owner', async () => {
+    serve();
+    deviceIs('unsupported');
+    renderPage();
+    expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();
+    expect(screen.queryByText('Ce que tu reçois')).toBeNull();
   });
 
   it('never speaks of a shift to the creator, who has none (CREA-12)', async () => {
@@ -261,6 +328,9 @@ describe('Notifications, settings that cannot be read', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
+        if (url === '/v1/notifications/inbox') {
+          return Promise.resolve(new Response(JSON.stringify(EMPTY_INBOX), { status: 200 }));
+        }
         if (url !== '/v1/notifications/preferences') {
           return Promise.resolve(new Response(null, { status: 500 }));
         }
@@ -281,5 +351,47 @@ describe('Notifications, settings that cannot be read', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();
     expect(answers).toBe(2);
+  });
+});
+
+// Trou 9 du 21/11: the recap said « 3 notifications t’attendent dans Impera » and none was to be found.
+describe('Notifications, the ones of the last days', () => {
+  const at = (iso: string) => new Date(iso).toISOString();
+  const line = (id: number, reason: string, title: string, quiet: boolean, when: string) => ({
+    id: `00000000-0000-4000-8000-00000000000${String(id)}`,
+    reason,
+    title,
+    url: '/agenda',
+    quiet,
+    at: at(when),
+  });
+
+  it('says first how many never rang, then each line under its family’s colour, a touch from its page', async () => {
+    serve(200, {
+      items: [
+        line(1, 'sale', 'Nouvelle vente', false, '2026-11-21T09:00:00Z'),
+        line(2, 'reminder', 'Story du jour', true, '2026-11-21T06:00:00Z'),
+        line(3, 'safety_alert', 'Un fan à regarder', true, '2026-11-20T23:00:00Z'),
+      ],
+    });
+    deviceIs('on');
+    renderPage();
+    expect(await screen.findByText('2 arrivées sans sonner')).toBeTruthy();
+    expect(screen.getByText('sur 3 cette semaine')).toBeTruthy();
+    expect(screen.getByText('Story du jour').closest('a')?.getAttribute('data-family')).toBe('day');
+    expect(screen.getByText('Un fan à regarder').closest('a')?.getAttribute('data-family')).toBe('safety');
+    expect(screen.getAllByText('Sans sonner')).toHaveLength(2);
+    // A family of the legend lit by the keyboard: the others step back (the lines follow, in CSS).
+    const safety = screen.getByRole('button', { name: /Sécurité/u });
+    fireEvent.focus(safety);
+    expect(safety.getAttribute('aria-pressed')).toBe('true');
+    expect(safety.closest('.nv-inbox__body')?.getAttribute('data-lit')).toBe('safety');
+  });
+
+  it('says so when the week was quiet', async () => {
+    serve();
+    deviceIs('on');
+    renderPage();
+    expect(await screen.findByText('Rien cette semaine')).toBeTruthy();
   });
 });

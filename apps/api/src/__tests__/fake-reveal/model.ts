@@ -159,7 +159,18 @@ export const FakeNotificationSchema = z.object({
 export const FakeFixtureSchema = z.object({
   /** FakeReveal's clock starts here; only `POST /__clock` moves it. */
   now: iso,
-  model: z.object({ id, userName: z.string(), displayName: z.string(), creatorNote: z.string() }),
+  model: z.object({
+    id,
+    userName: z.string(),
+    displayName: z.string(),
+    creatorNote: z.string(),
+    /** Her bio on her profile (ADR 0154); `Description de test` when left out. */
+    bio: z.string().optional(),
+    /** Her automations (ADR 0110): openers offered to a new fan (`%NAME%` for his name), welcome, reminder. */
+    hooks: z.array(z.string()).optional(),
+    welcomeMessage: z.string().optional(),
+    expirationReminderMessage: z.string().optional(),
+  }),
   /** The team member whose session the connector uses (the « bot » chatter). */
   teamMember: z.object({ userId: id, name: z.string().min(1) }),
   /** The only bearer token FakeReveal accepts (opaque, invented). */
@@ -208,6 +219,7 @@ export const OBSERVED_ON: Record<EndpointName, string> = {
   'conversations.ppvHistory': '2026-11-10',
   'conversations.stats': '2026-11-10',
   'models.get': '2026-11-10',
+  'models.sayHello': '2026-11-16',
   'scripts.list': '2026-11-10',
   'scriptSequences.list': '2026-11-10',
   'vault.folders': '2026-11-10',
@@ -232,6 +244,7 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   /** `PATCH …/note` (E4). */
   fanNoteWrite: true,
   creatorNotes: true,
+  creatorProfile: true,
   ppvStats: true,
   scripts: true,
   scriptHistory: true,

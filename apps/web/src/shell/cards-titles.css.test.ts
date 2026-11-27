@@ -86,7 +86,8 @@ describe('one card (T4: COH-03, COH-11, PIL-12, PIL-30, ETA-20, CHA-13)', () => 
 
   /**
    * Plates whose content is a list of rows, each row carrying the card's inset itself: the plate keeps a thin inset of
-   * its own (4 to 8 px) for the rows' tint. A toolbar (the Playground's rating bar) is not a card either.
+   * its own (4 to 8 px) for the rows' tint. A toolbar (the Playground's rating bar, the vault's bar of actions on a
+   * selection) is not a card either.
    */
   const LIST_PLATES: ReadonlySet<string> = new Set([
     'ins-creators',
@@ -99,16 +100,27 @@ describe('one card (T4: COH-03, COH-11, PIL-12, PIL-30, ETA-20, CHA-13)', () => 
     'tm-panel',
     'tr-panel',
     'pg-bar',
+    'vp-bar',
   ]);
 
   /** The rules that style a card class itself (states and modifiers included), in every sheet. */
-  const cardRules = (name: string): { path: string; rule: Rule }[] =>
-    sheets.flatMap(([path, css]) =>
-      rulesOf(css)
-        .filter((one) => !one.selector.startsWith('@'))
+  const sheetRules = sheets.map(
+    ([path, css]) => [path, rulesOf(css).filter((one) => !one.selector.startsWith('@'))] as const,
+  );
+  const kept = new Map<string, { path: string; rule: Rule }[]>();
+  /** Each sheet is parsed once and each card's rules are kept: a scan per card and per test outgrew the time limit. */
+  const cardRules = (name: string): { path: string; rule: Rule }[] => {
+    const known = kept.get(name);
+    if (known !== undefined) return known;
+    const rules = sheetRules.flatMap(([path, all]) =>
+      all
+        .filter((one) => one.selector.includes(name))
         .filter((one) => one.selector.split(',').some((part) => targets(lastCompound(part), name)))
         .map((one) => ({ path, rule: one })),
     );
+    kept.set(name, rules);
+    return rules;
+  };
 
   /** A card set in a card: an item of a list in it, rounded at 18 (`radius-md`), never at the card's 26. */
   const isItem = (name: string): boolean =>
@@ -316,7 +328,10 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
     expect(found).toEqual([]);
   });
 
-  /** Instrument Serif: the empty states, a spoken line, the trophy's reveal and the name on its stage. */
+  /**
+   * Instrument Serif: the empty states, a spoken line, the trophy's reveal and the name on its stage. A member's rank
+   * on their file is that same name, said once (lot « fiche-jeu-hierarchie-2 », validated 16/11).
+   */
   const SERIF_KEPT: ReadonlySet<string> = new Set([
     '.nv-calm',
     '.nv-empty__title',
@@ -327,6 +342,7 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
     '.ag-reel__quote',
     '.rw-reveal__title',
     '.tc-hero__name',
+    '.rw-member__name',
   ]);
 
   it('keep Instrument Serif for the empty states, never for a title', () => {

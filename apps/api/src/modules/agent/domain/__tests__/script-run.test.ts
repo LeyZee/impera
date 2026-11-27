@@ -7,6 +7,7 @@ import {
   openScriptRun,
   permittedScripts,
   platformScriptFaults,
+  playableFamiliesIn,
   playedScriptRefs,
   reconcileScriptRun,
   scriptStepsHeld,
@@ -182,6 +183,69 @@ describe('permittedScripts', () => {
   });
 });
 
+describe('his language (ADR 0168 § 8)', () => {
+  const FR: PlatformScriptView = { ...BOTH, scriptRef: 'lingerie-fr', family: 'lingerie' };
+  const EN: PlatformScriptView = {
+    ...BOTH,
+    scriptRef: 'lingerie-en',
+    family: 'lingerie',
+    language: 'english',
+  };
+  const SHOWER_EN: PlatformScriptView = { ...BOTH, scriptRef: 'shower-en', language: 'english' };
+  const catalogue = [FR, EN, SHOWER_EN, NIGHT];
+  const ids = (
+    language: 'french' | 'english' | 'italian' | undefined,
+    played: ScriptHistoryView = NO_HISTORY,
+  ) =>
+    permittedScripts(catalogue, {
+      moment: 'night',
+      history: played,
+      ...(language !== undefined && { language }),
+    }).map((script) => script.scriptRef);
+
+  it('opens only a script written in his language; a script that says none is French, and so is a fan without one', () => {
+    expect(ids('english')).toEqual(['lingerie-en', 'shower-en']);
+    expect(ids('french')).toEqual(['lingerie-fr', 'script-night']);
+    expect(ids(undefined)).toEqual(['lingerie-fr', 'script-night']);
+    expect(ids('italian')).toEqual([]);
+  });
+
+  it('plays a family once: the French version received, the English one is not a new script for him', () => {
+    expect(ids('english', history(['lingerie-fr', [0]]))).toEqual(['shower-en']);
+    expect(ids('french', history(['lingerie-en', [0]]))).toEqual(['script-night']);
+  });
+
+  it('opens no script at all when code reads his language as one it does not know', () => {
+    expect(permittedScripts(catalogue, { moment: 'night', history: NO_HISTORY, language: null })).toEqual([]);
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-fr', language: null })).toMatchObject({
+      kind: 'none',
+    });
+  });
+
+  it('decides no start without a version in his language', () => {
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-fr', language: 'italian' })).toEqual({
+      kind: 'none',
+      reason: 'scripts_exhausted',
+    });
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-en', language: 'english' }).kind).toBe(
+      'start',
+    );
+  });
+
+  it('counts her playable stock in his language by family, a version in another language never counting twice', () => {
+    const versions = [
+      FR,
+      { ...FR, scriptRef: 'lingerie-fr-bis' },
+      EN,
+      SHOWER_EN,
+      { ...SHOWER_EN, scriptRef: 'broken-en', family: 'broken', steps: [] },
+    ];
+    expect(playableFamiliesIn(versions, 'french')).toBe(1);
+    expect(playableFamiliesIn(versions, 'english')).toBe(2);
+    expect(playableFamiliesIn(versions, 'italian')).toBe(0);
+  });
+});
+
 describe('applyScriptRunEvent', () => {
   it('sends the steps in order only: a bridge goes after an offered step, a paid step waits to be bought', () => {
     const run = play([sent(0, 1), sent(1, 2), sent(2, 3)]);
@@ -304,8 +368,27 @@ describe('nextScriptStep', () => {
     expect(nextScriptStep({ ...base, brainPick: 'script-day' })).toEqual({ kind: 'none', reason: 'no_pick' });
     expect(nextScriptStep({ ...base, history: history(['script-night', [0]]) })).toEqual({
       kind: 'none',
+      reason: 'scripts_exhausted',
+    });
+  });
+
+  it('says no script is left only where one would open, and from a catalogue that has some (ADR 0150 § 9)', () => {
+    const played = history(['script-night', [0]]);
+    expect(nextScriptStep({ ...base, catalogue: [], history: played })).toEqual({
+      kind: 'none',
       reason: 'no_script',
     });
+    expect(nextScriptStep({ ...base, history: played, careMode: true })).toEqual({
+      kind: 'none',
+      reason: 'held',
+    });
+    expect(
+      nextScriptStep({
+        ...base,
+        history: played,
+        startGate: { open: false, missing: ['availability_unconfirmed'] },
+      }),
+    ).toEqual({ kind: 'wait', reason: 'availability_unconfirmed' });
   });
 
   it('sends the teasing through the policy like a paid step: never before the cooldown (Charles, 12/11)', () => {
@@ -360,6 +443,24 @@ describe('nextScriptStep', () => {
       { type: 'step_bought', stepIndex: 2, at: at(-1) },
     ]);
     expect(nextScriptStep({ ...base, latest: { run: bought, script: NIGHT } })).toEqual({
+      kind: 'send_step',
+      step: toSend(NIGHT, 3),
+    });
+  });
+
+  it('keeps him a few messages in the tension after he bought, before the next paid step (passe 04, guide 26/11)', () => {
+    const bought = play([
+      sent(0, -4),
+      sent(1, -3),
+      sent(2, -2),
+      { type: 'step_bought', stepIndex: 2, at: at(-1) },
+    ]);
+    const latest = { run: bought, script: NIGHT };
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 1 })).toEqual({
+      kind: 'none',
+      reason: 'in_tension',
+    });
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 2 })).toEqual({
       kind: 'send_step',
       step: toSend(NIGHT, 3),
     });
@@ -431,6 +532,62 @@ describe('nextScriptStep', () => {
   });
 });
 
+describe('nextScriptStep after a script he bought out (eval passe-1, 21/11)', () => {
+  /** He bought the whole night script, `minutesAgo` before now: its run, as Reveal and our journal hold it. */
+  const boughtOut = (minutesAgo: number): ScriptRun => {
+    const run = play([
+      sent(0, -minutesAgo),
+      sent(1, -minutesAgo + 1),
+      sent(2, -minutesAgo + 2),
+      { type: 'step_bought', stepIndex: 2, at: at(-minutesAgo + 3) },
+      sent(3, -minutesAgo + 4),
+      { type: 'step_bought', stepIndex: 3, at: at(-minutesAgo + 5) },
+    ]);
+    return { ...run, startedAt: at(-minutesAgo) };
+  };
+  const bought = history(['script-night', [0, 1, 2, 3], [2, 3]]);
+  const after = (minutesAgo: number): NextScriptStepInput => ({
+    ...base,
+    latest: { run: boughtOut(minutesAgo), script: NIGHT },
+    catalogue: [NIGHT, BOTH],
+    history: bought,
+    brainPick: 'script-both',
+    offer: {
+      ...offer,
+      lastOfferAt: at(-minutesAgo),
+      desire: 85,
+      limits: { cooldownHours: 12, minDesire: 75 },
+    },
+  });
+
+  it('opens the next script on its first step a week later, at night, a script for any hour (passe-13)', () => {
+    expect(boughtOut(7 * 24 * 60).status).toBe('bought_out');
+    expect(nextScriptStep(after(7 * 24 * 60))).toEqual({
+      kind: 'start',
+      script: BOTH,
+      step: toSend(BOTH, 0),
+    });
+    // What the eval saw: the brain picked nothing, or his heat fell under her score on this message.
+    expect(nextScriptStep({ ...after(7 * 24 * 60), brainPick: null })).toEqual({
+      kind: 'none',
+      reason: 'no_pick',
+    });
+    const cooled = after(7 * 24 * 60);
+    expect(nextScriptStep({ ...cooled, offer: { ...cooled.offer, desire: 74 } })).toEqual({
+      kind: 'none',
+      reason: 'low_desire',
+    });
+  });
+
+  it('never opens a second script the same evening, even when he asks for more (ADR 0158 § 42, passe-18)', () => {
+    const asks = after(90);
+    expect(nextScriptStep({ ...asks, offer: { ...asks.offer, fanAsksForPaid: true } })).toEqual({
+      kind: 'none',
+      reason: 'cooldown',
+    });
+  });
+});
+
 describe("Reveal's script history (ADR 0018 § 5)", () => {
   it('sells nothing when the history could not be read', () => {
     expect(nextScriptStep({ ...base, history: null })).toEqual({ kind: 'none', reason: 'no_history' });
@@ -447,7 +604,7 @@ describe("Reveal's script history (ADR 0018 § 5)", () => {
     ]).toEqual(['script-night', 'script-both']);
     expect(nextScriptStep({ ...base, history: history(['script-night', [0, 1]]) })).toEqual({
       kind: 'none',
-      reason: 'no_script',
+      reason: 'scripts_exhausted',
     });
   });
 

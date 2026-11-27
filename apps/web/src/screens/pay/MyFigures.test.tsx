@@ -34,8 +34,8 @@ const figuresOf = (over: Record<string, unknown> = {}): MyFigures =>
     today: '2026-11-05',
     timeZone: 'Africa/Porto-Novo',
     days: [
-      { day: '2026-11-02', sales: 2, refunds: 0, nets: [{ currency: 'EUR', netMinor: 6_000 }] },
-      { day: '2026-11-05', sales: 1, refunds: 0, nets: [{ currency: 'EUR', netMinor: 2_000 }] },
+      { day: '2026-11-02', sales: 2, refunds: 0, reports: 0, nets: [{ currency: 'EUR', netMinor: 6_000 }] },
+      { day: '2026-11-05', sales: 1, refunds: 0, reports: 0, nets: [{ currency: 'EUR', netMinor: 2_000 }] },
     ],
     nets: [{ currency: 'EUR', netMinor: 8_000 }],
     previous: { period: '2026-10-16', days: [], toDateNets: [{ currency: 'EUR', netMinor: 10_000 }] },
@@ -49,6 +49,7 @@ const figuresOf = (over: Record<string, unknown> = {}): MyFigures =>
       bestDay: { day: '2026-10-20', currency: 'EUR', netMinor: 9_000 },
       bestPeriod: { period: '2026-10-16', currency: 'EUR', netMinor: 40_000 },
     },
+    kinds: { items: [], untyped: 0 },
     ...over,
   });
 
@@ -125,7 +126,57 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
     expect(text()).toContain('90,00 €');
     expect(text()).toContain('encore 70,00 € pour battre ton meilleur jour');
     expect(text()).toContain('Meilleure quinzaine');
-    expect(text()).toContain('Heures de ton fuseau (Africa/Porto-Novo)');
+    expect(text()).toContain('Heures de ton fuseau (Porto-Novo)');
+  });
+
+  it('dit d’où vient son argent par type de vente, et ce qui n’est pas encore compté sans le dessiner à zéro (§ 6)', async () => {
+    const net = (netMinor: number) => [{ currency: 'EUR', netMinor }];
+    figures = figuresOf({
+      kinds: {
+        untyped: 2,
+        items: [
+          { type: 'ppv', sales: 2, nets: net(6_000) },
+          { type: 'tip', sales: 1, nets: net(2_000) },
+        ],
+      },
+    });
+    renderIn(MyFiguresBoard);
+    await waitFor(() => {
+      expect(screen.getByText('D’où vient mon argent')).toBeTruthy();
+    });
+    expect(document.querySelectorAll('.nv-donut__arc')).toHaveLength(2);
+    const rows = [...document.querySelectorAll('.nv-breakdown__row')].map((row) =>
+      row.textContent.replace(NBSP, ' '),
+    );
+    expect(rows).toEqual(['PPV en privé60 €75 %', 'Tips20 €25 %']);
+    expect(text()).toContain('2 ventes pas encore comptées par type');
+    expect(document.querySelector('.nv-donut__middle')?.textContent.replace(NBSP, ' ')).toBe(
+      '80 €de net réparti',
+    );
+    // A slice lit by the keyboard shows in the middle of the ring.
+    const [first] = screen.getAllByRole('button', { name: /PPV en privé/u });
+    first?.focus();
+    await waitFor(() => {
+      expect(document.querySelector('.nv-donut__middle')?.textContent.replace(NBSP, ' ')).toBe(
+        '75 %PPV en privé2 ventes',
+      );
+    });
+  });
+
+  it('avant tout type gardé, dit « pas encore compté » sans anneau ; sans vente, ne montre pas la carte (§ 6)', async () => {
+    figures = figuresOf({ kinds: { items: [], untyped: 3 } });
+    renderIn(MyFiguresBoard);
+    await waitFor(() => {
+      expect(text()).toContain('Pas encore compté : la répartition arrive avec ta prochaine vente relevée.');
+    });
+    expect(document.querySelector('.nv-donut')).toBeNull();
+    cleanup();
+    figures = figuresOf();
+    renderIn(MyFiguresBoard);
+    await waitFor(() => {
+      expect(screen.getByText('Mes records')).toBeTruthy();
+    });
+    expect(screen.queryByText('D’où vient mon argent')).toBeNull();
   });
 
   it('dit une baisse en encre neutre, sans rouge ni alerte (§ 10)', async () => {
@@ -245,7 +296,7 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
     expect(text()).not.toContain('Palier');
   });
 
-  it('sur un relevé payé sur rapports, dit que le jour par jour vient avec les ventes relevées, sans barres plates', async () => {
+  it('avant tout rapport validé et toute vente relevée, dit d’où viendra le jour par jour, sans barres plates', async () => {
     figures = figuresOf({
       days: [],
       nets: [],
@@ -256,9 +307,56 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
     period = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 75_000, totalMinor: 30_000 })]);
     renderIn(() => <MyFortnightCard />);
     await waitFor(() => {
-      expect(text()).toContain('Le jour par jour arrive avec les ventes relevées.');
+      expect(text()).toContain('Le jour par jour arrive avec tes rapports validés et tes ventes relevées.');
     });
     expect(document.querySelector('.mf-bar')).toBeNull();
+  });
+
+  it('nomme les rapports validés pour ce qu’ils sont, à côté des ventes relevées (ADR 0118 § 10)', async () => {
+    figures = figuresOf({
+      days: [
+        {
+          day: '2026-11-02',
+          sales: 2,
+          refunds: 0,
+          reports: 1,
+          nets: [{ currency: 'EUR', netMinor: 14_000 }],
+        },
+        { day: '2026-11-04', sales: 0, refunds: 0, reports: 1, nets: [{ currency: 'EUR', netMinor: 8_000 }] },
+      ],
+      nets: [{ currency: 'EUR', netMinor: 22_000 }],
+    });
+    renderIn(() => <MyDaysCard />);
+    await waitFor(() => {
+      expect(text()).toContain('220,00 € de net · 2 ventes · 2 rapports validés');
+    });
+    expect(document.querySelectorAll('.mf-bar')).toHaveLength(15);
+    // Under the pointer or the keyboard: the figures first, how to read a report last, only on a day that has one.
+    const bars = [...document.querySelectorAll<HTMLElement>('.mf-bar')];
+    bars[3]?.focus();
+    await waitFor(() => {
+      expect(document.querySelector('.nv-tip')?.textContent.replace(NBSP, ' ')).toBe(
+        'Mercredi 4 novembreNet80,00 €Rapports validés1Un rapport validé compte au jour de son shift, pour son total.',
+      );
+    });
+    bars[2]?.focus();
+    await waitFor(() => {
+      expect(document.querySelector('.nv-tip')?.textContent).not.toContain('Un rapport validé compte');
+    });
+  });
+
+  it('ne compte aucune vente à qui n’a que des rapports validés', async () => {
+    figures = figuresOf({
+      days: [
+        { day: '2026-11-04', sales: 0, refunds: 0, reports: 1, nets: [{ currency: 'EUR', netMinor: 8_000 }] },
+      ],
+      nets: [{ currency: 'EUR', netMinor: 8_000 }],
+    });
+    renderIn(() => <MyDaysCard />);
+    await waitFor(() => {
+      expect(text()).toContain('80,00 € de net · 1 rapport validé');
+    });
+    expect(text()).not.toContain('vente');
   });
 
   it('ne s’affiche pas tant qu’il n’a rien sur la quinzaine', async () => {

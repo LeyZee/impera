@@ -30,27 +30,27 @@ const withMedium = (
  * `content_drops.summarize_script` (ADR 0083 § 6): a script she sent, once each of its photos and videos is described,
  * is told step by step by the brain from its cards and those descriptions, then summed up; kept for the agency to
  * validate beside the grid's prices. It waits while a file is still in the cleaning or a media undescribed (the job
- * comes back after each description), and does nothing while her switch is off. The code holds the steps: an answer
+ * comes back after each description). The code holds the steps: an answer
  * that tells others is a failure, retried. A sum or a currency is asked again once, then kept with its reason.
  * Replayable: the same media with the same descriptions, told with the same prompt, are left alone; a description
  * corrected or a new prompt tells the script again (a new row: the one validated stays).
  */
 export async function summarizeScript(
   deps: SummarizeDeps,
+  creatorId: string,
   dropId: string,
   now: Date,
   correlationId: string,
 ): Promise<SummarizeOutcome> {
-  const target = await deps.store.target(dropId);
+  const target = await deps.store.target(creatorId, dropId);
   if (target === null) return 'gone';
-  if (!target.describes) return 'off';
   if (!target.files.every(withMedium)) return 'waiting';
   const files = target.files.filter(withMedium);
   const seen = files.filter((file) => file.kind !== 'audio').map((file) => file.mediaAssetId);
   const descriptions = await deps.describer.detailed(seen);
   if (seen.some((id) => !descriptions.has(id))) return 'waiting';
   const mediaHash = mediaHashOf(files, descriptions);
-  if (await deps.store.summarized(dropId, mediaHash, deps.summarizer.promptHash)) return 'already';
+  if (await deps.store.summarized(creatorId, dropId, mediaHash, deps.summarizer.promptHash)) return 'already';
 
   const version = await deps.versions.frozen(target.versionId);
   if (version === null) return 'gone';

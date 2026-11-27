@@ -59,6 +59,16 @@ const accounts = (note: SetupNote | null): string | null =>
     ? `${String(note.done)} compte${note.done > 1 ? 's' : ''} sur ${String(note.total)}`
     : null;
 
+/** Her scripts the agent may offer, by when they play: what is there, and what is missing. */
+function scriptsHint(day: number, night: number): string {
+  const count = (n: number, when: string) => `${String(n)} ${n > 1 ? 'scripts' : 'script'} de ${when}`;
+  if (day > 0 && night > 0) return `${count(day, 'jour')} et ${count(night, 'nuit')} prêts dans Reveal.`;
+  if (day === 0 && night === 0) return 'Aucun script prêt dans Reveal : l’agent n’a rien à proposer.';
+  return day === 0
+    ? 'Aucun script de jour prêt dans Reveal : l’agent n’a rien à proposer le jour.'
+    : 'Aucun script de nuit prêt dans Reveal : l’agent n’a rien à proposer la nuit.';
+}
+
 export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupStep[]): SetupLine[] {
   const sheet = (name: CreatorSheet): SetupTarget => ({ kind: 'sheet', sheet: name, creatorId });
   return steps.map(({ key, state, note }): SetupLine => {
@@ -73,7 +83,7 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
       case 'platform_account':
         return line(
           'Son compte Reveal relié',
-          done ? null : 'Importe-la depuis Réglages › Ventes : ses ventes et ses shifts en dépendent.',
+          done ? null : 'Importe-la depuis Réglages › Plateformes : ses ventes et ses shifts en dépendent.',
           { kind: 'page', to: '/reglages/ventes' },
         );
       case 'persona':
@@ -81,6 +91,18 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
           'Sa persona',
           done ? null : 'Ce que l’agent sait d’elle et sa façon de parler.',
           sheet('persona'),
+        );
+      case 'scripts':
+        return line(
+          'Un script de jour et un script de nuit',
+          note?.kind === 'scripts' ? scriptsHint(note.day, note.night) : null,
+          sheet('scripts'),
+        );
+      case 'custom_prices':
+        return line(
+          'Sa grille sur mesure',
+          done ? null : 'Sans elle, l’agent ne donne aucun prix pour une demande personnalisée.',
+          sheet('custom'),
         );
       case 'agency_rate':
         return line(

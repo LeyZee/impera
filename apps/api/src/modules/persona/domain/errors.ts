@@ -10,6 +10,16 @@ import {
 
 /** Error codes of the module (`PERSONA_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 
+/** A date of hers already past, on her clock: its exception no longer changes (ADR 0148 § 3). */
+export class AgentHourExceptionPast extends DomainError {
+  constructor() {
+    super(
+      'agent_hour_exception_conflict' satisfies CreatorErrorCode,
+      'Ce jour est passé : ses heures de ce jour-là ne changent plus',
+    );
+  }
+}
+
 /** Another version was stored since the edit started, or its version number is taken: nothing is stored (409). */
 export class PersonaVersionConflict extends DomainError {
   constructor() {

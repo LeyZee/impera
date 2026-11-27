@@ -11,10 +11,12 @@ import {
   mergeConversations,
   orderLines,
   parseTrackingSearch,
+  sharedLabel,
   sharedMode,
   situationOf,
   statusClass,
   subline,
+  withCare,
 } from './view';
 
 const NOW = new Date('2026-10-17T21:00:00Z');
@@ -128,6 +130,29 @@ describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
   const answered = { lastInboundAt: '2026-10-17T20:00:00Z', lastOutboundAt: '2026-10-17T20:05:00Z' };
   const unanswered = { lastInboundAt: '2026-10-17T20:10:00Z', lastOutboundAt: '2026-10-17T20:05:00Z' };
 
+  it('says « Mode soin » instead of « Rien à faire » under his care mode, never over a task (Design 21/11)', () => {
+    const quiet = situationOf(conversation('1', { state: 'idle', ...answered }));
+    expect(withCare(quiet, true)).toEqual({ hand: 'care', label: 'Mode soin', pill: 'tr-status--care' });
+    expect(withCare(quiet, false)).toBe(quiet);
+    const waits = situationOf(conversation('1', { state: 'idle', ...unanswered }));
+    expect(withCare(waits, true)).toBe(waits);
+    // In the list, under « Mode soin », never « Rien à faire »; a creator never reads it.
+    const careSince = '2026-10-17T19:00:00Z';
+    const lines = [
+      { conversation: conversation('1', { state: 'idle', ...answered, careSince }) },
+      { conversation: conversation('2', { state: 'idle', ...answered }) },
+      { conversation: conversation('3', { state: 'idle', ...unanswered, careSince }) },
+    ];
+    expect(
+      groupByHand(lines).map((g) => [g.hand, g.lines.map((l) => l.conversation.fanDisplayName)]),
+    ).toEqual([
+      ['yours', ['Fan 3']],
+      ['care', ['Fan 1']],
+      ['quiet', ['Fan 2']],
+    ]);
+    expect(groupByHand(lines, false, false).map((g) => g.hand)).toEqual(['yours', 'quiet']);
+  });
+
   it('never says « Rien à faire » while his last message has no answer', () => {
     expect(situationOf(conversation('1', { state: 'idle', ...unanswered }))).toEqual({
       hand: 'yours',
@@ -182,6 +207,15 @@ describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
       ['yours', ['Fan 2', 'Fan 3']],
       ['quiet', ['Fan 1']],
     ]);
+  });
+});
+
+describe('sharedLabel (PIL-10)', () => {
+  it('names the state every line says, from two lines up', () => {
+    expect(sharedLabel(['Un humain répond', 'Un humain répond'])).toBe('Un humain répond');
+    expect(sharedLabel(['Un humain répond', 'À valider'])).toBeNull();
+    expect(sharedLabel(['Un humain répond'])).toBeNull();
+    expect(sharedLabel([])).toBeNull();
   });
 });
 

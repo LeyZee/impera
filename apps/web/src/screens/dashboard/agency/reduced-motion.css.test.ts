@@ -24,7 +24,9 @@ describe('the Dashboard without motion', () => {
   const unclipped = /([^{}]+)\{\s*clip-path:\s*none;\s*\}/u.exec(still)?.[1] ?? '';
 
   it('finds the curves that draw in', () => {
-    expect(clippedAtStart(css)).toEqual(expect.arrayContaining(['.ins-spark', '.ins-subs__plot svg']));
+    expect(clippedAtStart(css)).toEqual(
+      expect.arrayContaining(['.ins-curve__plot svg', '.ins-subs__plot svg']),
+    );
   });
 
   it.each(clippedAtStart(css))('shows %s at once', (selector) => {

@@ -52,7 +52,7 @@ const configSchema = z
     DATABASE_SERVICE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     /**
      * Owner role: the migrations, the backup and the `ops:*` scripts run by hand (`ownerDatabaseUrl`). Neither the
-     * API nor the worker connects with it, so it may be left out of their environment.
+     * API nor the worker connects with it: docker-compose.prod.yml leaves it out of their environment.
      */
     DATABASE_ADMIN_URL: z.preprocess(
       (value) => (value === '' ? undefined : value),
@@ -73,6 +73,17 @@ const configSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     /** Jobs a worker runs at once; jobs of one conversation stay serial whatever this is (ADR 0006). */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+    /**
+     * Connections each process may hold, pool by pool (ADR 0152 § 2). Behind Supabase's pooler in session mode every
+     * client connection holds a server one, so the sum over the API and the worker (plus `migrate` and `backup`) must
+     * stay under the pool size of the project's compute: the runbook writes that budget down. The defaults are the
+     * sizes used until now.
+     */
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+    /** The service role's pool: `withAdmin` and the job queue, so the worker's Graphile Worker runs on it. */
+    DATABASE_SERVICE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
+    /** The rate limiter's own pool (ADR 0027 § 6), apart so a slow count never takes a connection of the modules. */
+    RATE_LIMIT_POOL_MAX: z.coerce.number().int().min(1).max(10).default(3),
     /** Development: run the worker inside the API process (`pnpm dev`). */
     IMPERA_INLINE_WORKER: flag,
     /**
@@ -82,6 +93,12 @@ const configSchema = z
     IMPERA_SANDBOX: flag,
     /** The fake world of `pnpm sandbox:world`; `http://127.0.0.1:4010` when absent. */
     IMPERA_SANDBOX_URL: optionalValue,
+    /**
+     * Where the redirect service of the link connector answers (ADR 0120 § 3, amendment of 20/11/2026):
+     * `https://<domain>`, nothing after. Set by the deployment alone, never by a setting of the CRM. Absent, the link
+     * connector is off; present and invalid, the process refuses to start.
+     */
+    LINK_SERVICE_ORIGIN: optionalValue,
     /** AI service keys pasted in the dashboard are sealed with these (ADR 0016), `v2:<base64>,v1:<base64>`. */
     CREDENTIALS_ENCRYPTION_KEYS: z.string().min(1).optional(),
     /**
@@ -125,6 +142,11 @@ const configSchema = z
     S3_BUCKET: optionalValue,
     S3_ACCESS_KEY_ID: optionalValue,
     S3_SECRET_ACCESS_KEY: optionalValue,
+    /**
+     * Where production errors go (OPS-18): a Sentry DSN, EU region, `https://<key>@<host>/<project>`. Required in
+     * production (below); unset elsewhere, error reporting stays inert: no client, no network.
+     */
+    SENTRY_DSN: optionalValue,
   })
   .superRefine((config, context) => {
     // ADR 0075: never outside a developer's machine. Production refuses it, and so does any address that is not
@@ -160,6 +182,30 @@ const configSchema = z
       }
     }
   })
+  .superRefine((config, context) => {
+    // ADR 0152 § 2: a base reached over the network is reached in TLS whose certificate is checked, never in clear
+    // nor on a certificate taken on trust. A base on this machine or behind a service name of the compose (the CI,
+    // a rehearsal) is not on the network.
+    if (config.NODE_ENV !== 'production') return;
+    const urls = {
+      DATABASE_URL: config.DATABASE_URL,
+      DATABASE_SERVICE_URL: config.DATABASE_SERVICE_URL,
+      ...(config.DATABASE_ADMIN_URL === undefined ? {} : { DATABASE_ADMIN_URL: config.DATABASE_ADMIN_URL }),
+    };
+    for (const [field, value] of Object.entries(urls)) {
+      const url = new URL(value);
+      if (!isNetworkDatabaseHost(url.hostname)) continue;
+      // One sslmode only: given twice, the connection library may keep the last one.
+      const modes = url.searchParams.getAll('sslmode');
+      if (modes.length !== 1 || modes[0] !== 'verify-full') {
+        context.addIssue({
+          code: 'custom',
+          message: `${field} reaches a remote base: it must carry sslmode=verify-full, once (ADR 0152 § 2, deploy.md)`,
+          path: [field],
+        });
+      }
+    }
+  })
   .refine((config) => config.NODE_ENV !== 'production' || config.PASSWORD_BREACH_CHECK === 'on', {
     message: 'PASSWORD_BREACH_CHECK=off is for development only (ADR 0046 § 4)',
     path: ['PASSWORD_BREACH_CHECK'],
@@ -183,6 +229,24 @@ const configSchema = z
       path: ['SESSION_ENCRYPTION_KEYS'],
     },
   )
+  .refine(
+    (config) =>
+      config.LINK_SERVICE_ORIGIN === undefined || linkServiceOriginOf(config.LINK_SERVICE_ORIGIN) !== null,
+    {
+      // The value is never echoed: the name of the host says which service the agency uses.
+      message:
+        'LINK_SERVICE_ORIGIN must be https://<domain>: no port, path, credentials, IP address nor localhost',
+      path: ['LINK_SERVICE_ORIGIN'],
+    },
+  )
+  .refine((config) => config.SENTRY_DSN === undefined || sentryDsnOf(config.SENTRY_DSN) !== null, {
+    message: 'SENTRY_DSN must be an https Sentry DSN, https://<key>@<host>/<project>',
+    path: ['SENTRY_DSN'],
+  })
+  .refine((config) => config.NODE_ENV !== 'production' || config.SENTRY_DSN !== undefined, {
+    message: 'SENTRY_DSN is required in production: its errors must reach Sentry (OPS-18)',
+    path: ['SENTRY_DSN'],
+  })
   .superRefine((config, context) => {
     // The media bucket: all five or none, its endpoint a plain URL, https in production. Its name alone counts for
     // none: `.env.example` and the production compose have always given `impera-media`, with nothing else.
@@ -262,6 +326,44 @@ function endpointOf(value: string | undefined): URL | null {
   return plain && (url.protocol === 'https:' || url.protocol === 'http:') ? url : null;
 }
 
+/** A public domain name in ASCII: dotted labels of letters, digits and hyphens, a top level of letters. */
+const DOMAIN_NAME = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u;
+/** Names that never leave the machine or its network, whatever a resolver answers. */
+const LOCAL_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.home.arpa'];
+
+/**
+ * The origin of the redirect service (ADR 0120 § 3, amendment of 20/11/2026): exactly `https://<domain>`, the domain
+ * a public name in ASCII; `null` otherwise. No port, path, query, fragment nor credentials; no IP address, no local
+ * name, no internationalised label (a look-alike of another host). The link adapter calls this origin and no other.
+ */
+export function linkServiceOriginOf(value: string): string | null {
+  if (!URL.canParse(value)) return null;
+  const url = new URL(value);
+  const host = url.hostname;
+  const plain = value === `https://${host}` && url.port === '' && url.username === '' && url.password === '';
+  const named =
+    DOMAIN_NAME.test(host) &&
+    !host.split('.').some((label) => label.startsWith('xn--')) &&
+    !LOCAL_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  return plain && named ? url.origin : null;
+}
+
+/**
+ * A Sentry DSN: https, a public key as its user, no password, query nor fragment, a project id as its path; `null`
+ * otherwise. Sentry's own parser would refuse a malformed one in silence, and production would report nothing.
+ */
+function sentryDsnOf(value: string): URL | null {
+  if (!URL.canParse(value)) return null;
+  const url = new URL(value);
+  const plain = url.search === '' && url.hash === '' && url.password === '';
+  return plain &&
+    url.protocol === 'https:' &&
+    url.username !== '' &&
+    /^\/(?:[^/]+\/)*\d+$/u.test(url.pathname)
+    ? url
+    : null;
+}
+
 /** Where an endpoint points, as the store builds its URLs (`<endpoint>/<bucket>/<key>`). */
 const locationOf = (url: URL): string => `${url.origin}${url.pathname.replace(/\/+$/u, '')}`.toLowerCase();
 
@@ -322,6 +424,16 @@ export function ownerDatabaseUrl(config: Config): string {
     );
   }
   return config.DATABASE_ADMIN_URL;
+}
+
+/**
+ * True when a base at this host is reached over the network: neither this machine nor a service name of the compose
+ * (a name without a dot, such as `postgres`).
+ */
+function isNetworkDatabaseHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host === '::1' || host.startsWith('127.')) return false;
+  return host.includes('.') || host.includes(':');
 }
 
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */

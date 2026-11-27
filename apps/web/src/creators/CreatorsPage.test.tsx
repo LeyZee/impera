@@ -9,6 +9,7 @@ import demoYaml from '../../../../personas/demo/v0.3.0.yaml?raw';
 import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
+import { viewOf } from './scripts/prepared/fixtures';
 
 /** A version stored at format 2: the draft is the version itself, nothing moved (ADR 0079 § 5). */
 const asDraft = (persona: PersonaV2) => ({ draft: persona, moved: [] });
@@ -193,7 +194,10 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(within(anna).getByText('1 846,50 €')).toBeDefined();
     });
-    expect(within(anna).getByText('Copilote')).toBeDefined();
+    // Her AI's switch on her card (ADR 0148 § 1): the state in words, and the owner's gestures.
+    expect(within(anna).getByText('IA active · Copilote')).toBeDefined();
+    expect(within(anna).getByRole('button', { name: 'Pause' })).toBeDefined();
+    expect(within(anna).getByRole('button', { name: 'Couper' })).toBeDefined();
     expect(within(anna).getByText('du 16 au 20 nov.')).toBeDefined();
     expect(within(anna).getByText(/^Théo jusqu’à/u)).toBeDefined();
     expect(within(anna).getByText('🎬 Feed · Vidéo short')).toBeDefined();
@@ -238,8 +242,11 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     const router = renderAt(operator, '/creatrices');
     const anna = await cardOf('Anna');
     await waitFor(() => {
-      expect(within(anna).getByText('Automatique')).toBeDefined();
+      expect(within(anna).getByText('IA active · Automatique')).toBeDefined();
     });
+    // A scope of one's own reads the state and never changes it (ADR 0148 § 1).
+    expect(within(anna).queryByRole('button', { name: 'Pause' })).toBeNull();
+    expect(within(anna).queryByRole('button', { name: 'Couper' })).toBeNull();
     expect(within(anna).queryByText('Chiffre d’affaires')).toBeNull();
     expect(within(anna).queryByText('En poste')).toBeNull();
     expect(within(anna).queryByText('Contenu attendu')).toBeNull();
@@ -252,16 +259,24 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     });
   });
 
-  it('gives the owner her Accès, in the address, and keeps it from anyone else (CR-02)', async () => {
+  it('gives the owner her Accès, a card of Compte in the address, and keeps it from anyone else (CR-02)', async () => {
     await serve([ANNA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
     const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
-    fireEvent.click(within(views).getByRole('link', { name: 'Accès' }));
+    fireEvent.click(within(views).getByRole('link', { name: 'Compte' }));
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ onglet: 'acces', creatrice: ANNA.id });
+      expect(router.state.location.search).toEqual({ onglet: 'compte', creatrice: ANNA.id });
     });
-    // Her account: the list answers 404 here, so the sheet says the server is silent, never a form to fill.
-    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    // Her account: the list answers 404 here, so the card says the server is silent, never a form to fill.
+    await waitFor(() => {
+      expect(document.getElementById('acces')?.textContent).toContain('Le serveur ne répond pas');
+    });
+    // The address of before the seven tabs lands on the same card (ADR 0149 § 5).
+    router.history.push(`/creatrices?onglet=acces&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'compte', creatrice: ANNA.id });
+    });
+    expect(router.state.location.hash).toBe('acces');
 
     cleanup();
     await serve([ANNA]);
@@ -287,9 +302,9 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await serve([ANNA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
     const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
-    fireEvent.click(within(views).getByRole('link', { name: 'Profil' }));
+    fireEvent.click(within(views).getByRole('link', { name: 'Compte' }));
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ onglet: 'profil', creatrice: ANNA.id });
+      expect(router.state.location.search).toEqual({ onglet: 'compte', creatrice: ANNA.id });
     });
     expect(await screen.findByText('Nom : Anna')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Renommer' })).toBeDefined();
@@ -358,19 +373,25 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
 });
 
 describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
-  it('opens from its tab in the header, the creator kept in the address', async () => {
+  it('opens as a card of Compte, the creator kept in the address', async () => {
     await serve([ANNA, BEA]);
     const router = renderAt(owner, `/creatrices?creatrice=${BEA.id}`);
     await picked('Bea');
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
-    fireEvent.click(within(views).getByRole('link', { name: 'Part de l’agence' }));
+    fireEvent.click(within(views).getByRole('link', { name: 'Compte' }));
     expect(
       await screen.findByText('À régler : relie Reveal ou règle un pourcentage pour Bea.'),
     ).toBeDefined();
-    expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: BEA.id });
-    expect(within(views).getByRole('link', { name: 'Part de l’agence' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(router.state.location.search).toEqual({ onglet: 'compte', creatrice: BEA.id });
+    expect(within(views).getByRole('link', { name: 'Compte' }).getAttribute('aria-current')).toBe('page');
+    // One page, a card per subject, in this order (ADR 0149 § 1).
+    expect([...document.querySelectorAll('.cr-account__card')].map((card) => card.id)).toEqual([
+      'acces',
+      'part',
+      'paliers',
+      'profil',
+      'telegram',
+    ]);
   });
 
   it('takes anyone else back to the persona, never to a page the server would refuse', async () => {
@@ -384,14 +405,14 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
 });
 
 describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05 lot c)', () => {
-  it('opens right after the persona, the creator kept in the address', async () => {
+  it('is the fifth of her seven tabs, the creator kept in the address (ADR 0149 § 1)', async () => {
     await serve([ANNA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
     const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
     const names = within(views)
       .getAllByRole('link')
       .map((link) => link.textContent);
-    expect(names.slice(0, 2)).toEqual(['Persona', 'Agenda']);
+    expect(names).toEqual(['Persona', 'IA', 'Médias', 'Scripts', 'Agenda', 'Alertes', 'Compte']);
     fireEvent.click(within(views).getByRole('link', { name: 'Agenda' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
@@ -399,29 +420,87 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     // The suggestions answer 404 here: the sheet says the server is silent, and still offers to propose.
     expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
+    // Her ideas of the day and what the agency asks of her are views of the tab: one segmented selector, in the
+    // address, never a second bar of tabs (ADR 0149 § 3).
+    const selector = screen.getByRole('radiogroup', { name: 'Vue de son agenda' });
+    expect(
+      within(selector)
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['Agenda', 'Idées du jour', 'Demandes']);
+    fireEvent.click(within(selector).getByRole('radio', { name: 'Idées du jour' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'agenda', vue: 'idees', creatrice: ANNA.id });
+    });
+    expect(await screen.findByText('Ses idées du jour')).toBeDefined();
+    expect(within(views).getByRole('link', { name: 'Agenda' }).getAttribute('aria-current')).toBe('page');
   });
 
-  it('opens on her agenda for an active manager, beside her ideas; the persona and the other sheets the owner’s', async () => {
+  it('opens on Médias for an active manager, with Scripts and Agenda; the other tabs the owner’s', async () => {
     await serve([ANNA]);
     const router = renderAt(manager, `/creatrices?creatrice=${ANNA.id}`);
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
+      expect(router.state.location.search).toEqual({ onglet: 'medias', creatrice: ANNA.id });
     });
-    expect(await screen.findByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
-    const sheets = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
+    const sheets = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
     expect(
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts', 'Contenu']);
+    ).toEqual(['Persona', 'Médias', 'Scripts', 'Agenda']);
+    // Her persona to read (trou béant 18): named in the address, since no tab sends a manager to Médias.
+    expect(within(sheets).getByRole('link', { name: 'Persona' }).getAttribute('href')).toContain(
+      'onglet=persona',
+    );
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Vue de ses médias' }))
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['Coffre Reveal', 'Dépôts', 'Coffre Impera']);
+    // Structures and her made-to-measure prices are the owner's; a manager reads her custom orders under « Sur mesure ».
+    router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
+    expect(
+      within(await screen.findByRole('radiogroup', { name: 'Vue de ses scripts' }))
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['Scripts', 'À copier', 'Sur mesure']);
+    router.history.push(`/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
+    await screen.findByText('Scripts envoyés par Anna');
+    // The addresses of before the seven tabs lead to their view (ADR 0149 § 5).
     router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
     expect(await screen.findByText('Ses idées du jour')).toBeDefined();
-    for (const onglet of ['pourcentage', 'acces', 'heures']) {
+    expect(router.state.location.search).toEqual({ onglet: 'agenda', vue: 'idees', creatrice: ANNA.id });
+    router.history.push(`/creatrices?onglet=contenu&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'medias', vue: 'depots', creatrice: ANNA.id });
+    });
+    for (const onglet of ['pourcentage', 'acces', 'heures', 'alertes']) {
       router.history.push(`/creatrices?onglet=${onglet}&creatrice=${ANNA.id}`);
       await waitFor(() => {
-        expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
+        expect(router.state.location.search).toEqual({ onglet: 'medias', creatrice: ANNA.id });
       });
     }
+  });
+
+  it('sends her links to Trafic, the creator kept', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, `/creatrices?onglet=liens&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/trafic');
+    });
+    expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
+  });
+
+  it('lets an active manager read her persona, never change it (trou béant 18)', async () => {
+    await serve([ANNA]);
+    const router = renderAt(manager, `/creatrices?onglet=persona&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'persona', creatrice: ANNA.id });
+    });
+    expect(
+      await screen.findByText('Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.'),
+    ).toBeDefined();
   });
 
   it('takes an operator who is not an active manager back to the persona', async () => {
@@ -434,11 +513,97 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
   });
 });
 
+describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
+  it('shows the agency’s structures as a view of Scripts, to the owner', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, `/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
+    const selector = await screen.findByRole('radiogroup', { name: 'Vue de ses scripts' });
+    expect(
+      within(selector)
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['Scripts', 'À copier', 'Structures', 'Sur mesure']);
+    fireEvent.click(within(selector).getByRole('radio', { name: 'Structures' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({
+        onglet: 'scripts',
+        vue: 'structures',
+        creatrice: ANNA.id,
+      });
+    });
+    // Inside her sheet: her name stays the page's title, no page nor header of the structures' own. The library
+    // answers 404 here, so the view says the server is silent.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getByRole('heading', { level: 1, name: 'Anna' })).toBeDefined();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Structures de script' })).toBeNull();
+  });
+
+  it('opens in « Scripts » a script picked in « À copier dans Reveal », and forgets it once « Scripts » is left', async () => {
+    await serve([ANNA]);
+    const served = vi.mocked(fetch).getMockImplementation();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url === `/v1/creators/${ANNA.id}/prepared-scripts`
+          ? Promise.resolve(
+              new Response(JSON.stringify([viewOf({ state: 'ready_to_copy' })]), { status: 200 }),
+            )
+          : (served?.(url, init) ?? Promise.resolve(new Response('{}', { status: 404 }))),
+      ),
+    );
+    const router = renderAt(owner, `/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
+    // The selector counts what waits to be copied.
+    expect(await screen.findByRole('radio', { name: 'À copier · 1' })).toBeDefined();
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'scripts', creatrice: ANNA.id });
+    });
+    // The editor, with its way back to the list.
+    expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
+    // Another tab, then « Scripts » again: the list, not that script.
+    router.history.push(`/creatrices?onglet=agenda&creatrice=${ANNA.id}`);
+    await screen.findByText('Son agenda');
+    router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
+    expect(await screen.findByRole('button', { name: /Nouveau script/u })).toBeDefined();
+  });
+
+  it('reopens her sheet from the menu on the tab left open last on this device', async () => {
+    localStorage.clear();
+    await serve([ANNA]);
+    renderAt(owner, `/creatrices?onglet=agenda&vue=idees&creatrice=${ANNA.id}`);
+    await screen.findByText('Ses idées du jour');
+    const menu = await waitFor(() => {
+      const link = document.querySelector('.nv-rail__item[data-section="/creatrices"]');
+      expect(link?.getAttribute('href')).toContain('onglet=agenda');
+      return link;
+    });
+    // The tab, not the view inside it: it opens on its first one.
+    expect(menu?.getAttribute('href')).not.toContain('vue=');
+    expect(menu?.getAttribute('href')).toContain(ANNA.id);
+  });
+
+  it('gives Trafic to the owner and to an active manager, who reads her links, and to nobody else', async () => {
+    await serve([ANNA]);
+    renderAt(manager, `/trafic?creatrice=${ANNA.id}`);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
+    expect(screen.getByRole('region', { name: 'Liens' })).toBeDefined();
+
+    cleanup();
+    await serve([ANNA]);
+    const other = renderAt(chatter, `/trafic?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(other.state.location.pathname).toBe('/aujourdhui');
+    });
+  });
+});
+
 describe('Créatrices, what a member without the list reads', () => {
   it('tells a member that no creator is entrusted to him, instead of the example', async () => {
     await serve([]);
     renderAt(operator, '/creatrices');
     expect(await screen.findByText('Aucune créatrice ne t’est confiée')).toBeDefined();
+    // The whole screen is empty: its drawing stands above the sentence.
+    expect(document.querySelector('.nv-empty__art svg')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
   });
 
@@ -460,27 +625,34 @@ describe('Créatrices, what a member without the list reads', () => {
 });
 
 describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
-  it('opens her persona in Moi, never Créatrices, and keeps a member’s Moi screens from her', async () => {
+  it('opens her Moi on her profile, her persona one tab away, never in Créatrices, and keeps a member’s Moi screens from her', async () => {
     await serve([ANNA]);
     const router = renderAt(anna, '/moi');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
-    expect(router.state.location.pathname).toBe('/moi/persona');
+    // A short profile first (recette visuelle 16/11, CRE-03): who she is in Impera, and where the rest is.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeDefined();
+    expect(router.state.location.pathname).toBe('/moi/profil');
+    expect(await screen.findByText('Dans Impera')).toBeDefined();
     const moi = screen.getByRole('navigation', { name: 'Moi' });
     expect(
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Aide', 'Préférences']);
+    cleanup();
+
+    await serve([ANNA]);
+    renderAt(anna, '/moi/persona');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
     // She reads her sheet; the agency changes it (recette CREA-01).
-    await screen.findByText(/Ta fiche/);
+    await screen.findByText(/^Ta fiche, panneau par panneau/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 
-    for (const path of ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/factures']) {
+    for (const path of ['/moi/dossier', '/moi/calendrier', '/moi/factures']) {
       await serve([ANNA]);
       const again = renderAt(anna, path);
       await waitFor(() => {
-        expect(again.state.location.pathname).toBe('/moi/persona');
+        expect(again.state.location.pathname).toBe('/moi/profil');
       });
       cleanup();
     }
@@ -554,8 +726,10 @@ describe('Créatrices, her « Mise en route » (pilotage plan W1)', () => {
     // What is to do comes before what waits on her.
     fireEvent.click(within(anna).getByRole('link', { name: 'Prochaine étape : La part de l’agence' }));
     await waitFor(() => {
-      expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: ANNA.id });
+      expect(router.state.location.search).toEqual({ onglet: 'compte', creatrice: ANNA.id });
     });
+    // On the card of the page of Compte where it is done.
+    expect(router.state.location.hash).toBe('part');
   });
 
   it('lays out every step on her sheet, the next one first', async () => {

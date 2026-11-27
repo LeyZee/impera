@@ -60,6 +60,7 @@ export function TeamNav({
           label: screenLabel('/equipe/membres'),
           ...(inMember ? { current: true } : {}),
         },
+        { to: '/equipe/annonces', label: screenLabel('/equipe/annonces') },
         ...(revealTab === null ? [] : [revealTab]),
       ]}
     />

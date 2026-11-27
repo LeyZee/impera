@@ -1,7 +1,7 @@
 import type { DesireBand } from '@impera/contracts';
 import type { Brief } from '@impera/llm';
 
-import type { Scenario } from './scenario';
+import type { CUSTOM_ORDER_EVENTS, Scenario } from './scenario';
 
 /** What the agent did with a scenario, on the same path as a real fan. */
 export interface Outcome {
@@ -21,12 +21,18 @@ export interface Outcome {
   readonly desireBand: DesireBand;
   /** What code did with a custom order (ADR 0090 § A). */
   readonly customOrder: 'none' | 'handoff' | 'reply';
+  /** What the turn on his kept order said (ADR 0159 § A.2); absent, `none`. */
+  readonly customOrderEvent?: (typeof CUSTOM_ORDER_EVENTS)[number];
   /** The id of the reply of her objection bank the voice was given, or null (ADR 0090 § B). */
   readonly objectionReply: string | null;
+  /** She teased him about the run he left, and how (Charles 20/11); absent: she did not. */
+  readonly abandonTease?: 'first' | 'again';
   /** What code decided with her scripts (ADR 0098), and the step when one goes; absent without scripts. */
   readonly script?: {
     readonly decision: 'none' | 'start' | 'send_step' | 'wait' | 'after_refusal' | 'end';
     readonly step?: { readonly script: string; readonly index: number };
+    /** Why nothing starts or goes (`no_pick`, `low_desire`, `cooldown`…): read in the report, never asserted. */
+    readonly reason?: string;
   };
   readonly bubbles: readonly string[];
   /** Hard guards that blocked her answer: it would not have left. */
@@ -34,7 +40,7 @@ export interface Outcome {
 }
 
 /** Every expectation of the scenario the outcome breaks, in French for the report; empty when it passes. */
-export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
+export function checkScenario(scenario: Pick<Scenario, 'expect'>, outcome: Outcome): string[] {
   const failures: string[] = [];
   const { brief, decision, voice } = scenario.expect;
   if (outcome.brief === undefined) return ['le cerveau n’a pas répondu'];
@@ -81,7 +87,8 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   }
   const script = outcome.script?.decision ?? 'none';
   if (decision?.script_in !== undefined && !decision.script_in.includes(script)) {
-    failures.push(`script : ${script}, attendu parmi [${decision.script_in.join(', ')}]`);
+    const why = outcome.script?.reason === undefined ? '' : ` (${outcome.script.reason})`;
+    failures.push(`script : ${script}${why}, attendu parmi [${decision.script_in.join(', ')}]`);
   }
   const step = decision?.script_step;
   const got = outcome.script?.step;
@@ -91,6 +98,14 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   }
   if (decision?.custom_order !== undefined && decision.custom_order !== outcome.customOrder) {
     failures.push(`sur-mesure : ${outcome.customOrder}, attendu ${decision.custom_order}`);
+  }
+  const teased = outcome.abandonTease ?? 'none';
+  if (decision?.abandon_tease !== undefined && decision.abandon_tease !== teased) {
+    failures.push(`pique d’abandon : ${teased}, attendue ${decision.abandon_tease}`);
+  }
+  const event = outcome.customOrderEvent ?? 'none';
+  if (decision?.custom_order_event !== undefined && decision.custom_order_event !== event) {
+    failures.push(`demande sur mesure : ${event}, attendu ${decision.custom_order_event}`);
   }
   if (decision?.objection_reply !== undefined && decision.objection_reply !== outcome.objectionReply) {
     failures.push(

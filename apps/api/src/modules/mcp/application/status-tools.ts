@@ -85,7 +85,7 @@ export function statusTools(usage: AiUsageReader, stats: StatsReader): Readonly<
         // Not the owner's nor an active manager's (ADR 0078 § 1): the same answer as the screen's refusal.
         if (read === null) throw new McpReadRefused('role_forbidden');
         return {
-          period: read.period,
+          period,
           from: read.from,
           to: read.to,
           previousFrom: read.previousFrom,

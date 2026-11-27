@@ -47,7 +47,7 @@ beforeEach(() => {
   // jsdom has no matchMedia: a reduced motion, so the lens and the icons do not play.
   vi.stubGlobal(
     'matchMedia',
-    vi.fn(() => ({ matches: true })),
+    vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
   // The screens stay on their loading state: only the shell is under test.
   vi.stubGlobal(
@@ -82,17 +82,33 @@ const tabs = (): string[] =>
   ].map((tab) => tab.getAttribute('title') ?? '');
 
 describe('the rail of each role', () => {
+  it('plays the icon of a tab on every click, the one already open too (Charles, 21/11)', async () => {
+    // Motion allowed here: the suite's default (no matchMedia in jsdom) is a reduced motion, where nothing plays.
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    renderApp(owner, '/');
+    await screen.findByText('Chatting');
+    const tab = screen.getByRole('navigation', { name: 'Navigation' }).querySelector('[data-section="/"]');
+    const icon = tab?.querySelector('svg');
+    expect(icon?.classList.contains('is-playing')).toBe(false);
+    if (tab !== null) fireEvent.click(tab);
+    expect(icon?.classList.contains('is-playing')).toBe(true);
+  });
+
   it('gives the owner his tabs in the order of ADR 0024, under Chatting and Agence', async () => {
     renderApp(owner, '/');
     await screen.findByText('Chatting');
     expect(tabs()).toEqual([
       'Dashboard',
       'Suivi',
-      'Fans',
       'Entraîner',
+      'Créatrices',
       'Équipe',
       'Paie',
-      'Créatrices',
+      'Trafic',
       'Réglages',
     ]);
     expect(screen.getByText('Agence')).toBeDefined();
@@ -181,12 +197,26 @@ describe('the rail of each role', () => {
     expect(screen.getByText('Créatrice')).toBeDefined();
   });
 
-  it('keeps a manager out of Entraîner and Réglages', async () => {
+  it('keeps a manager out of Réglages, and opens him Entraîner without her channel’s posts (ADR 0092 § 8)', async () => {
     const router = renderApp(manager, '/reglages/modeles-ia');
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Fans', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
+    expect(tabs()).toEqual([
+      'Dashboard',
+      'Suivi',
+      'Entraîner',
+      'Créatrices',
+      'Équipe',
+      'Paie',
+      'Trafic',
+      'Moi',
+    ]);
+    cleanup();
+    const canal = renderApp(manager, '/entrainer/canal');
+    await waitFor(() => {
+      expect(canal.state.location.pathname).toBe('/entrainer/playground');
+    });
   });
 });
 
@@ -206,18 +236,20 @@ describe('Réglages › Sauvegardes', () => {
     );
   });
 
-  it('is a tab of the owner, after Telegram, the pay rules and the billing (EQ-06), before Sécurité (SEC-04)', async () => {
+  it('is a line of the owner, in the group Sécurité, after Alertes and before Sécurité (SEC-04)', async () => {
     const router = renderApp(owner, '/reglages/sauvegardes');
     expect(await subTabs()).toEqual([
+      'Plateformes',
+      'Bots Telegram',
       'Modèles IA',
-      'Ventes',
       'Consommation IA',
-      'Alertes',
-      'Telegram',
+      'Agents connectés',
       'Règles de paie',
       'Facturation',
+      'Alertes',
       'Sauvegardes',
       'Sécurité',
+      'Aide',
     ]);
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
@@ -267,7 +299,7 @@ describe('a page inside an open section that is not the account’s', () => {
       [manager, '/creatrices/structures', '/creatrices'],
       [chatter, '/suivi/alertes', '/suivi'],
       [manager, '/moi/persona', '/moi/profil'],
-      [creator, '/moi/profil', '/moi/persona'],
+      [creator, '/moi/dossier', '/moi/profil'],
     ];
     for (const [user, path, landing] of cases) {
       const router = renderApp(user, path);
@@ -280,6 +312,99 @@ describe('a page inside an open section that is not the account’s', () => {
           path,
         ).toBeTruthy();
       });
+      cleanup();
+    }
+  });
+});
+
+describe('the guards of Comptes Reveal, Mes liens, Trophées and her script, through the real router', () => {
+  const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
+  const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
+  const onLeave: Me = { ...manager, team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' };
+
+  beforeEach(() => {
+    // Moi and Équipe carry a sub-nav, which watches its tabs' widths.
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  /** The account opens `path` and lands on `expected`, inside its own shell. */
+  async function landing(user: Me, path: string, expected: string): Promise<void> {
+    const router = renderApp(user, path);
+    await waitFor(() => {
+      expect(router.state.location.pathname, `${user.role} ${path}`).toBe(expected);
+    });
+    // A real screen of the account's own, never a dead end.
+    expect(await screen.findByRole('navigation', { name: 'Navigation' })).toBeDefined();
+  }
+
+  it('opens Comptes Reveal to the owner and an active manager; anyone else lands on his first tab, told why', async () => {
+    for (const user of [owner, manager]) {
+      await landing(user, '/equipe/reveal', '/equipe/reveal');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Comptes Reveal' })).toBeDefined();
+      cleanup();
+    }
+    // Équipe is not on their rail: the shell turns them away before the page's own guard is reached.
+    for (const [user, home] of [
+      [chatter, '/aujourdhui'],
+      [onLeave, '/aujourdhui'],
+      [operator, '/'],
+      [creator, '/aujourdhui'],
+    ] as const) {
+      await landing(user, '/equipe/reveal', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
+  it('keeps Mes liens hers: a member of the team lands on his profile, an account without Moi on its first tab', async () => {
+    await landing(creator, '/moi/liens', '/moi/liens');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mes liens' })).toBeDefined();
+    cleanup();
+    for (const [user, home] of [
+      [manager, '/moi/profil'],
+      [chatter, '/moi/profil'],
+      [owner, '/'],
+      [operator, '/'],
+    ] as const) {
+      await landing(user, '/moi/liens', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
+  it('opens Trophées to a chatter and to her; a manager lands on his profile, told why', async () => {
+    for (const user of [chatter, creator]) {
+      await landing(user, '/moi/trophees', '/moi/trophees');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Trophées' })).toBeDefined();
+      cleanup();
+    }
+    for (const [user, home] of [
+      [manager, '/moi/profil'],
+      [onLeave, '/moi/profil'],
+      [owner, '/'],
+    ] as const) {
+      await landing(user, '/moi/trophees', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
+  it('sends her from a script address that names no drop back to Contenu, and keeps the team out of it', async () => {
+    await landing(creator, '/contenu/script/pas-un-depot', '/contenu');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Contenu' })).toBeDefined();
+    cleanup();
+    for (const [user, home] of [
+      [owner, '/'],
+      [chatter, '/aujourdhui'],
+    ] as const) {
+      await landing(user, '/contenu/script/0192f3a0-0000-7000-8000-0000000000d1', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
       cleanup();
     }
   });
@@ -322,7 +447,12 @@ describe('« Plus » on the phone', () => {
       routeTree: root.addChildren(routes),
       history: createMemoryHistory({ initialEntries: [path] }),
     });
-    render(<RouterProvider router={router} />);
+    // The rail reads its counts (ADR 0134 § 8): a client of its own, as in the app.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
   }
 
   it('lights up when the screen shown is one of its tabs', async () => {
@@ -390,7 +520,12 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
       routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: '/suivi' })]),
       history: createMemoryHistory({ initialEntries: ['/suivi'] }),
     });
-    render(<RouterProvider router={router} />);
+    // The rail reads its counts (ADR 0134 § 8): a client of its own, as in the app.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
   }
 
   it('leaves « Plus » out when every tab fits and Moi › Préférences holds the rest (D-03)', async () => {
@@ -423,7 +558,7 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
   });
 });
 
-describe('Suivi › Historique des alertes (P4-01)', () => {
+describe('Suivi › Alertes (P4-01, ADR 0134 § 5)', () => {
   const suiviTabs = async (): Promise<{ readonly label: string; readonly current: boolean }[]> =>
     within(await screen.findByRole('navigation', { name: 'Suivi' }))
       .getAllByRole('link')
@@ -443,13 +578,15 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     renderApp(owner, '/suivi/alertes');
     expect(await suiviTabs()).toEqual([
       { label: 'Conversations', current: false },
-      { label: 'Historique des alertes', current: true },
+      { label: 'Fans', current: false },
+      { label: 'Alertes', current: true },
     ]);
     cleanup();
     renderApp(manager, '/suivi?conversation=0192f3a0-0000-7000-8000-0000000000d1');
     expect(await suiviTabs()).toEqual([
       { label: 'Conversations', current: true },
-      { label: 'Historique des alertes', current: false },
+      { label: 'Fans', current: false },
+      { label: 'Alertes', current: false },
     ]);
   });
 
@@ -466,6 +603,56 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/aujourdhui');
     });
+  });
+
+  it('opens Fans as a view of Suivi, the address it had as a section leading there (ADR 0134 §§ 5, 10)', async () => {
+    const router = renderApp(owner, '/fans');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/suivi/fans');
+    });
+    expect(await suiviTabs()).toEqual([
+      { label: 'Conversations', current: false },
+      { label: 'Fans', current: true },
+      { label: 'Alertes', current: false },
+    ]);
+    // Lit under Suivi in the rail: Fans is no tab of its own any more.
+    expect(tabs()).not.toContain('Fans');
+  });
+
+  it('keeps Fans from a chatter, on its old address too: he lands on his own Suivi', async () => {
+    const router = renderApp(chatter, '/fans');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/suivi');
+    });
+    expect(screen.queryByRole('link', { name: 'Fans' })).toBeNull();
+  });
+
+  it('sends a chatter’s Moi › Calendrier to Planning, where « Dans mon téléphone » is, and leaves a manager’s (ADR 0134, lot 1)', async () => {
+    const mine = renderApp(chatter, '/moi/calendrier');
+    await waitFor(() => {
+      expect(mine.state.location.pathname).toBe('/planning');
+    });
+    cleanup();
+    const his = renderApp(manager, '/moi/calendrier');
+    await waitFor(() => {
+      expect(his.state.location.pathname).toBe('/moi/calendrier');
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calendrier' })).toBeTruthy();
+  });
+
+  it('keeps under « Plus » the counts of the tabs it holds, for its dot (ADR 0134 § 8)', async () => {
+    renderApp(owner, '/suivi');
+    const more = await screen.findByRole('button', { name: /^Plus/u });
+    // Nothing waits in this test: the holder is there, empty, and « Plus » reads bare.
+    expect(more.querySelector('.nv-rail__under')).not.toBeNull();
+    expect(more.querySelector('.nv-rail__under .nv-count')).toBeNull();
+  });
+
+  it('closes the manager’s Agence before Moi, a tab of no family (ADR 0149 § 2)', async () => {
+    renderApp(manager, '/suivi');
+    const moi = await screen.findByRole('link', { name: 'Moi' });
+    expect(moi.previousElementSibling?.className).toBe('nv-rail__gap');
+    expect(screen.getByText('Agence').className).toBe('nv-rail__heading');
   });
 });
 
@@ -686,6 +873,13 @@ describe('the account’s security, from its menu (SEC-04)', () => {
     }
   });
 
+  it('draws his rail as one list, no gap between tabs of families without a heading (PIL-15)', async () => {
+    renderApp(operator, '/');
+    const rail = await screen.findByRole('navigation', { name: 'Navigation' });
+    expect(rail.querySelectorAll('.nv-rail__heading')).toHaveLength(0);
+    expect(rail.querySelectorAll('.nv-rail__gap')).toHaveLength(0);
+  });
+
   it('is in « Plus » on the phone', async () => {
     renderApp(operator, '/');
     fireEvent.click(await screen.findByRole('button', { name: 'Plus' }));
@@ -838,7 +1032,8 @@ describe('the width of each section without tabs', () => {
 
   const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self', creatorIds: ['c1'] };
   it.each([
-    ['/aujourdhui', 'Aujourd’hui', 'narrow', chatter],
+    // Two columns on a computer: who to talk to, his figures beside (Charles, 21/11).
+    ['/aujourdhui', 'Aujourd’hui', 'wide', chatter],
     ['/planning', 'Planning', 'narrow', chatter],
     ['/notifications', 'Notifications', 'narrow', chatter],
     ['/aide/installer', 'Installer Impera', 'narrow', chatter],
@@ -875,16 +1070,13 @@ describe('an address of Entraîner with no screen yet', () => {
     );
   });
 
-  it.each(['/entrainer/corrections', '/entrainer/tests'])(
-    'leads %s to the Playground, and says why',
-    async (path) => {
-      const router = renderApp(owner, path);
-      await waitFor(() => {
-        expect(router.state.location.pathname).toBe('/entrainer/playground');
-      });
-      expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
-    },
-  );
+  it.each(['/entrainer/tests'])('leads %s to the Playground, and says why', async (path) => {
+    const router = renderApp(owner, path);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/entrainer/playground');
+    });
+    expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
+  });
 
   it('says nothing on its own address, which opens the Playground as its first tab', async () => {
     const router = renderApp(owner, '/entrainer');
@@ -974,13 +1166,13 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
   // their own (never in the actions), and one width for every tab of a section.
   it.each([
     ['/suivi', 'Suivi', 'Conversations', 'wide', owner],
-    ['/suivi/alertes', 'Suivi', 'Historique des alertes', 'wide', owner],
+    ['/suivi/alertes', 'Suivi', 'Alertes', 'wide', owner],
     ['/entrainer/playground', 'Entraîner', 'Chatting', 'wide', owner],
     ['/entrainer/canal', 'Entraîner', 'Post du canal', 'wide', owner],
     ['/equipe/planning', 'Équipe', 'Planning', 'wide', owner],
     ['/equipe/rapports', 'Équipe', 'Rapports', 'wide', owner],
     ['/equipe/membres', 'Équipe', 'Membres', 'wide', owner],
-    // Équipe › Reveal: its tab comes with the server's counts, which this shell test never answers.
+    // Équipe › Comptes Reveal: its tab comes with the server's counts, which this shell test never answers.
     ['/paie/quinzaine', 'Paie', 'Quinzaine', 'wide', owner],
     ['/paie/releves', 'Paie', 'Historique', 'wide', owner],
     ['/paie/primes-malus', 'Paie', 'Primes et malus', 'wide', owner],
@@ -1031,10 +1223,10 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
   // Recette visuelle 16/11 (GES-04): Réglages is a list beside its section, not tabs; the header keeps the template.
   it.each([
     ['/reglages/modeles-ia', 'Modèles IA'],
-    ['/reglages/ventes', 'Ventes'],
+    ['/reglages/ventes', 'Plateformes'],
     ['/reglages/consommation-ia', 'Consommation IA'],
     ['/reglages/alertes', 'Alertes'],
-    ['/reglages/telegram', 'Telegram'],
+    ['/reglages/telegram', 'Bots Telegram'],
     ['/reglages/regles-de-paie', 'Règles de paie'],
     ['/reglages/facturation', 'Facturation'],
     ['/reglages/sauvegardes', 'Sauvegardes'],

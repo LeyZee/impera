@@ -1,0 +1,33 @@
+# Demande sur mesure vague (ADR 0159 § A.2) : elle s'y intéresse en jouant et pose UNE question légère pour comprendre, sans oui, sans prix, sans délai, sans demander de pourboire. Fan et messages fictifs (ADR 0010).
+description: Il demande « une vidéo rien que pour lui » sans rien préciser ; elle demande en jouant ce qu'il imagine, sans rien promettre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 72
+  age_confirmed: true
+history:
+  - from: fan
+    text: Ta photo d'hier m'a rendu fou
+  - from: creator
+    text: Ah ouais ? Raconte 😏
+inbound: Tu ferais une vidéo rien que pour moi ?
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: reply
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_match_any:
+      - \?
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(demain|ce soir|cette semaine|d'ici|dans \d+)\b
+      - \d+ ?(€|euros?|balles)
+      - \b(pourboire|tip)\b
+      - \b(oui je (te )?la fais|c'est d'accord|marché conclu)\b

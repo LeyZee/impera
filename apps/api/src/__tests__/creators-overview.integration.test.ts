@@ -22,6 +22,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { aMinuteAgoToday } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const PASSWORD = 'correct horse battery';
@@ -136,7 +137,8 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
     await person('operator', 'operator', [nora]);
     await person('creator', 'creator', [nora]);
 
-    // A sale a minute ago: in her fortnight, whatever the day the test runs.
+    // A sale a minute ago, or just after midnight in the first minute of a 1st or a 16th: in her fortnight, whatever the
+    // day the test runs.
     await test.admin.db.insert(schema.platformSales).values({
       id: newId(SalesLineIdSchema),
       creatorId: nora,
@@ -146,7 +148,7 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
       event: 'sale',
       saleType: 'ppv',
       status: 'paid',
-      occurredAt: new Date(Date.now() - MINUTE),
+      occurredAt: aMinuteAgoToday(),
       platformModelId: 'model_test_01',
       platformChatterId: null,
       platformFanId: 'fan_test_01',
@@ -241,7 +243,17 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
 
   it('gives a reader whose scope is his own her mode alone, and a chatter no creator (ADR 0043 § 7)', async () => {
     expect(await cards('operator')).toEqual([
-      { creatorId: nora, mode: 'copilot', sales: null, onShift: null, requests: null },
+      {
+        creatorId: nora,
+        mode: 'copilot',
+        pausedUntil: null,
+        globalStop: false,
+        hoursNow: { open: true, changesAt: null },
+        resumesAs: 'copilot',
+        sales: null,
+        onShift: null,
+        requests: null,
+      },
     ]);
     expect(await cards('chatter')).toEqual([]);
   });

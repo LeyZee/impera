@@ -2,6 +2,7 @@ import type {
   ConnectorCapabilities,
   ConversationSnapshot,
   CreatorNote,
+  CreatorProfile,
   ExternalMessage,
   ExternalRef,
   ExternalTransaction,
@@ -46,7 +47,9 @@ import {
   type RevealFetch,
 } from './client';
 import {
+  automationPattern,
   messageOf,
+  NO_AUTOMATIONS,
   ppvStatsOf,
   profileOf,
   scriptsOf,
@@ -54,6 +57,7 @@ import {
   snapshotOf,
   transactionOf,
   vaultMediaOf,
+  type Automations,
   type OwnMessages,
 } from './mapping';
 import { withAgencyBlock } from './note';
@@ -102,6 +106,10 @@ const FILE_FAILURES: Record<VaultFileFailure, ConnectorError['code']> = {
 };
 /** A cursor that never ends is a bug or a changed API: stop rather than loop. */
 const MAX_PAGES = 500;
+/** Her automations are read again past this age (ADR 0110): two calls, not one per conversation read. */
+const AUTOMATIONS_TTL_MS = 15 * 60_000;
+/** After a failed read, none are marked for this long: Reveal's window is not spent on a route that answers badly. */
+const AUTOMATIONS_FAILED_TTL_MS = 5 * 60_000;
 /**
  * `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten.
  * A watch point (spec § 5): over 20 messages written in the conversation between the attempt and its check, the
@@ -136,6 +144,7 @@ const CAPABILITIES: ConnectorCapabilities = {
   fanNoteRead: true,
   fanNoteWrite: true,
   creatorNotes: true,
+  creatorProfile: true,
   ppvStats: true,
   scripts: true,
   scriptHistory: true,
@@ -206,6 +215,8 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly lastSendIn = new Map<string, number>();
   /** Fan → conversation, as `listConversations` read them: Reveal has one conversation per fan and model. */
   private readonly conversationOfFan = new Map<string, string>();
+  /** Her automations as last read (ADR 0110), and when. */
+  private automationsRead: { readonly until: number; readonly value: Automations } | null = null;
   /**
    * Folder (`''`: the vault's root) → the links of its small pictures by media, read once and shared by the pictures
    * asked together, until `until` (ADR 0138 § 1). In memory only.
@@ -301,11 +312,12 @@ export class RevealApiConnector implements PlatformConnector {
         [['take', String(TAKE.messages)], ...(cursor === null ? [] : [['cursor', cursor] as const])],
       );
       const own = await this.ownOf(conversationRef.id, page.data);
+      const automations = await this.automations();
       for (const item of page.data) {
         if (!isAfter(item.message.createdAt, opts.since)) return messages.reverse();
         // Deleted on Reveal: never read, never answered, never shown to the agent.
         if (item.message.deletedAt !== undefined) continue;
-        messages.push(messageOf(item, conversationRef, own));
+        messages.push(messageOf(item, conversationRef, own, automations));
         if (opts.limit !== undefined && messages.length >= opts.limit) return messages.reverse();
       }
       if (!page.pageInfo.hasNextPage || page.pageInfo.endCursor === null) return messages.reverse();
@@ -522,6 +534,12 @@ export class RevealApiConnector implements PlatformConnector {
     return model.creatorNote.trim() === '' ? [] : [{ text: model.creatorNote }];
   }
 
+  /** Her bio as every subscriber reads it on her profile (ADR 0154): read only, never written. */
+  async getCreatorProfile(): Promise<CreatorProfile> {
+    const model = await this.session().get('models.get', REVEAL_ENDPOINTS['models.get'].shape, this.modelId);
+    return { bio: model.description.trim() };
+  }
+
   async getFanPpvStats(fanRef: ExternalRef): Promise<FanPpvStats> {
     const client = this.session();
     const conversationId = await this.conversationOf(fanRef);
@@ -682,6 +700,42 @@ export class RevealApiConnector implements PlatformConnector {
   private journal(): SendJournal {
     if (this.sends === null) throw new ConnectorError('fatal', 'no send journal: reveal writes refused');
     return this.sends;
+  }
+
+  /**
+   * Her openers, welcome and reminder before expiry, read on Reveal at most every 15 minutes (ADR 0110). A read that
+   * fails marks nothing for 5 minutes and never stops the messages from being read; only an expired session stops
+   * everything.
+   */
+  private async automations(): Promise<Automations> {
+    const now = this.now().getTime();
+    if (this.automationsRead !== null && now < this.automationsRead.until) {
+      return this.automationsRead.value;
+    }
+    const client = this.session();
+    try {
+      const hello = await client.get(
+        'models.sayHello',
+        REVEAL_ENDPOINTS['models.sayHello'].shape,
+        this.modelId,
+      );
+      const model = await client.get('models.get', REVEAL_ENDPOINTS['models.get'].shape, this.modelId);
+      const value: Automations = {
+        hooks: hello.enabled
+          ? hello.openers
+              .map((opener) => automationPattern(opener.fanText))
+              .filter((pattern) => pattern !== null)
+          : [],
+        welcome: automationPattern(model.welcomeMessage),
+        expirationReminder: automationPattern(model.expirationReminderMessage),
+      };
+      this.automationsRead = { until: now + AUTOMATIONS_TTL_MS, value };
+      return value;
+    } catch (error) {
+      if (error instanceof ConnectorError && error.code === 'session_expired') throw error;
+      this.automationsRead = { until: now + AUTOMATIONS_FAILED_TTL_MS, value: NO_AUTOMATIONS };
+      return NO_AUTOMATIONS;
+    }
   }
 
   /** Our own messages of a page: those whose id `connector_sends` holds, the « bot » member's name as a fallback. */

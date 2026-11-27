@@ -9,7 +9,12 @@ import { channelWriterPersona } from '../modules/agent';
 import type { AlertsModule } from '../modules/alerts';
 import { salesFeedTotals } from '../modules/connectors';
 import { latestRateOf } from '../modules/payroll';
-import { startTelegramModule, type ChannelPersonaSource, type TelegramModule } from '../modules/telegram';
+import {
+  startTelegramModule,
+  type ChannelLinksSource,
+  type ChannelPersonaSource,
+  type TelegramModule,
+} from '../modules/telegram';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -56,6 +61,8 @@ export async function wireTelegram(
       readonly gateway: Pick<LlmGateway, 'channelPost'>;
       readonly activePersona: ActiveVersion;
     };
+    /** Her redirect links where they are kept since INS-03 (ADR 0121 § 1). */
+    readonly channelLinks?: ChannelLinksSource;
   },
 ): Promise<WiredTelegram> {
   const { config, adminDb, logger, requireRole, recentLogin } = shared;
@@ -65,6 +72,7 @@ export async function wireTelegram(
       ? null
       : await startTelegramModule({
           adminDb,
+          ...(deps.channelLinks !== undefined && { channelLinks: deps.channelLinks }),
           encryptionKeys: credentialKeys,
           webOrigin: config.WEB_ORIGIN,
           onUncovered: (event) => {

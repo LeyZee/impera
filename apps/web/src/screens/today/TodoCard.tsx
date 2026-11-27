@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import type { JSX, ReactNode } from 'react';
 
 import { useBillingRegimes, useContractorFile, useContractTexts } from '@/contractors/api';
-import { fileToDos, regimeInForce, type FileToDo } from '@/contractors/model';
+import { fileToDos, profileToDo, regimeInForce, type FileToDo } from '@/contractors/model';
 import { useInvoices } from '@/invoices/api';
 import { deadlineText, kindLabel, periodText } from '@/invoices/model';
 import { reportToDos, type MyReports } from '@/reports/MyReports';
@@ -49,11 +49,15 @@ export function TodoCard({
   const accounts = new Map((list?.accounts ?? []).map((account) => [account.id, account]));
   const toDo = list === undefined ? [] : reportToDos(list, heroShiftId, now);
   const invoices = timeZone === null ? [] : (pending.data?.documents ?? []);
-  const fromFile =
-    file.data === undefined || regimes.data === undefined
+  // An empty file first, even before a regime is assigned: it is what holds his invoices back (CHA-09).
+  const empty = file.data === undefined ? null : profileToDo(file.data);
+  const fromFile = [
+    ...(empty === null ? [] : [empty]),
+    ...(file.data === undefined || regimes.data === undefined
       ? []
       : // The texts, once read, join the documents: a texts' read that fails never hides the rest.
-        fileToDos(file.data, regimeOf(file.data, regimes.data.regimes), texts.data?.texts ?? []);
+        fileToDos(file.data, regimeOf(file.data, regimes.data.regimes), texts.data?.texts ?? [])),
+  ];
   if (toDo.length + invoices.length + fromFile.length === 0) return null;
 
   let index = 0;
@@ -196,7 +200,7 @@ function FileLine({ index, toDo }: { index: number; toDo: FileToDo }): JSX.Eleme
       tone={toDo.key.startsWith('reminder-') ? 'quiet' : 'due'}
       title={toDo.title}
       sub={toDo.text}
-      go={toDo.go === 'text' ? 'Lire' : 'Déposer'}
+      go={toDo.go === 'text' ? 'Lire' : toDo.go === 'profile' ? 'Remplir' : 'Déposer'}
       to="/moi/dossier"
     />
   );

@@ -2,6 +2,7 @@ import type { AccountSecurity, OpenSession, Passkey } from '@impera/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { ExtensionLinksPanel } from './ExtensionLinksPanel';
+import { OwnersPanel } from './OwnersPanel';
 import {
   closeAccountSessions,
   closeOtherSessions,
@@ -39,25 +40,27 @@ const MUTED = 'text-sm text-[var(--nv-ink-muted)]';
 const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 
 /**
- * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
- * factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
- * (no geographic base: Charles's choice of 02/11). The owner and the managers also link here the browsers where they
- * watch Instagram (`extensionLinks`, VEI-02): the watch is theirs.
+ * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, the owners themselves
+ * (ADR 0096) and each account's second factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
+ * (no geographic base: Charles's choice of 02/11). The team links here the browsers where it uses the extension
+ * (`extensionLinks`, VEI-02, ADR 0109): `copilot` for the copilot's gestures, `watch` when the Instagram watch is theirs
+ * too, `none` for a creator.
  */
 export function SecuritySection({
   ownerId,
-  extensionLinks = false,
+  extensionLinks = 'none',
 }: {
   ownerId?: string;
-  extensionLinks?: boolean;
+  extensionLinks?: 'none' | 'copilot' | 'watch';
 }): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <SessionsPanel />
       <PasskeysPanel />
       <BackupCodesPanel />
+      {ownerId === undefined ? null : <OwnersPanel />}
       {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
-      {extensionLinks ? <ExtensionLinksPanel /> : null}
+      {extensionLinks === 'none' ? null : <ExtensionLinksPanel watches={extensionLinks === 'watch'} />}
     </div>
   );
 }
@@ -221,7 +224,8 @@ function SessionsPanel(): JSX.Element {
                 {group.current ? null : (
                   <button
                     type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm shrink-0"
+                    // The same tint as « Fermer toutes les autres » above it: both close sessions (CHA-14).
+                    className="nv-btn nv-btn--soft nv-btn--sm shrink-0"
                     disabled={busy !== null}
                     aria-label={
                       group.ids.length === 1
@@ -407,9 +411,12 @@ function PasskeysPanel(): JSX.Element {
             Ce navigateur ne sait pas créer de clé d’accès&nbsp;: ajoute-la depuis ton téléphone.
           </p>
         )}
-        <p className="text-sm text-[var(--nv-ink-faint)]">
-          Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
-        </p>
+        {/* Only once a key exists: before, there is nothing for it to say (CHA-14). */}
+        {keys === null || keys.length === 0 ? null : (
+          <p className="text-sm text-[var(--nv-ink-faint)]">
+            Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
+          </p>
+        )}
         <Outcome error={error} notice={notice} />
       </PanelSection>
     </Panel>

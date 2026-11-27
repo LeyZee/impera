@@ -137,20 +137,22 @@ export function LevelInsignia({
           />
         </>
       )}
-      <g transform={art.transform}>
-        {small
-          ? (art.small ?? art.fire).map((d, index) => <path key={index} d={d} fill={url('f')} />)
-          : art.fire.map((d, index) => (
-              <g key={index}>
-                <path className="rw-level__ember" d={d} fill="#ff2a4d" filter={url('s')} />
-                <path d={d} fill={url('f')} />
-              </g>
-            ))}
-        {small
-          ? null
-          : art.cores.map((d, index) => (
-              <path key={index} d={d} fill="#fff2a0" opacity={0.85} filter={url('s')} />
-            ))}
+      <g className="rw-level__fire">
+        <g transform={art.transform}>
+          {small
+            ? (art.small ?? art.fire).map((d, index) => <path key={index} d={d} fill={url('f')} />)
+            : art.fire.map((d, index) => (
+                <g key={index}>
+                  <path className="rw-level__ember" d={d} fill="#ff2a4d" filter={url('s')} />
+                  <path d={d} fill={url('f')} />
+                </g>
+              ))}
+          {small
+            ? null
+            : art.cores.map((d, index) => (
+                <path key={index} d={d} fill="#fff2a0" opacity={0.85} filter={url('s')} />
+              ))}
+        </g>
       </g>
       <g clipPath={url('k')}>
         <path d={GLOSS} fill="#fff" opacity={0.07} />

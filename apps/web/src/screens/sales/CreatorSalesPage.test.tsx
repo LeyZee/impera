@@ -66,13 +66,30 @@ const messages = {
 
 type Served = Record<string, { status: number; body: unknown }>;
 
+/** « Ta part » over a day with nothing, above her fans on every test of the page (CR-04). */
+const NO_EARNINGS = {
+  period: 'day',
+  from: '2026-11-03',
+  to: '2026-11-03',
+  estimated: true,
+  latest: true,
+  totals: [],
+  lines: [],
+  linesOmitted: 0,
+  refundsWithoutSale: 0,
+};
+
 function serve(routes: Served): ReturnType<typeof vi.fn> {
   const fetcher = vi.fn((url: string) => {
     const path = url.split('?')[0] ?? url;
     // « Qui sont tes fans » sits above her fans on every test of the page.
     const route =
       routes[path] ??
-      (path === '/v1/creator-space/fan-insights' ? { status: 200, body: DEMO_INSIGHTS } : undefined);
+      (path === '/v1/creator-space/fan-insights'
+        ? { status: 200, body: DEMO_INSIGHTS }
+        : path === '/v1/creator-space/earnings'
+          ? { status: 200, body: NO_EARNINGS }
+          : undefined);
     return Promise.resolve(
       route === undefined
         ? new Response('null', { status: 404 })
@@ -136,6 +153,11 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     expect(screen.getByText('vince.r')).toBeDefined();
     expect(screen.queryByRole('button', { name: /vince\.r/u })).toBeNull();
     expect(screen.getByText(/pas encore de conversation/u)).toBeDefined();
+    // A fan who unlocked nothing has no amount, not a dash (recette visuelle 16/11, CRE-02).
+    expect(document.querySelectorAll('.vt-row__amount')).toHaveLength(1);
+    expect(screen.queryByText('—')).toBeNull();
+    // No figure of hers is said yet: never a price before shares shown as what she earned.
+    expect(document.body.textContent).not.toMatch(/gagné|ta part/u);
     // Before a fan is chosen, the reading side says so on a plate of its own (recette CRE-04).
     expect(screen.getByText('Choisis un fan pour lire sa conversation.').closest('.nv-plate')).not.toBeNull();
     fireEvent.click(open);

@@ -1,10 +1,12 @@
 import {
   CreatorIdSchema,
   FanIdSchema,
+  LanguageSchema,
   PlatformAccountIdSchema,
-  type ScriptEnergy,
+  type Language,
   type SentScriptStep,
 } from '@impera/contracts';
+import { z } from 'zod';
 
 import type { AgentScriptView, ScriptHistoryView, ScriptSource } from '../modules/agent';
 import type { ConnectorsModule } from '../modules/connectors';
@@ -14,37 +16,72 @@ import type { ScriptsModule } from '../modules/scripts';
 /** A native script of hers as the `scripts` module reads it for a job. */
 type HerScript = Awaited<ReturnType<ScriptsModule['forJobs']['accountScripts']>>[number];
 
-const ENERGY: Record<ScriptEnergy, string> = {
-  soft: 'douce tout du long',
-  rising: 'qui monte',
-  intense: 'intense dès le début',
-};
-
-/** What the brain picks a script on (ADR 0098 § 6): its validated identity, in the agency's words. */
-function descriptionOf(identity: NonNullable<HerScript['identity']>): string {
-  const { ambiance, energy, setting, useWhen, avoidWhen } = identity.content;
-  return [
-    `Ambiance : ${ambiance}, ${ENERGY[energy]}.`,
-    `Décor : ${setting}.`,
-    `À utiliser quand : ${useWhen.join(' ; ')}.`,
-    ...(avoidWhen.length === 0 ? [] : [`À éviter quand : ${avoidWhen.join(' ; ')}.`]),
-  ].join('\n');
+/**
+ * The copy on Reveal still says what we prepared (ADR 0161 § 5): the same steps, one branch each, at our price and
+ * currency. Changed on Reveal after it was recognised, it is no longer offered: nothing goes at a price not ours.
+ */
+function stillOurs(script: HerScript, ours: NonNullable<HerScript['ours']>): boolean {
+  return (
+    ours.steps.length === script.steps.length &&
+    script.steps.every((step, index) => {
+      const branches = ours.steps[index]?.branches ?? [];
+      const [branch] = branches;
+      return (
+        branches.length === step.branches &&
+        branch?.priceMinor === step.priceMinor &&
+        branch.currency === step.currency
+      );
+    })
+  );
 }
 
 /**
- * A native script as the agent decides on it (ADR 0098), or `null` when it may not be offered: not proposable (the
- * gaps of P6-01, its identity not validated, a branch unset), or with a step of several branches. The branch engine
- * (ADR 0112, lot 2) reads those; until then a script with branches is never offered, whatever its settings.
+ * The language of our script and the one it is a version of (ADR 0168 § 8), read where the copy carries them: absent
+ * or unreadable, French and none (a script before its versions). Read through Zod: the fields come with the scripts'
+ * versions in other languages.
+ */
+const VersionSchema = z.object({
+  language: LanguageSchema.optional().catch(undefined),
+  versionOf: z.string().min(1).nullable().optional().catch(undefined),
+});
+
+function versionOf(ours: NonNullable<HerScript['ours']>): { language: Language; family: string } {
+  const read = VersionSchema.safeParse(ours);
+  const language = read.success ? (read.data.language ?? 'french') : 'french';
+  const source = read.success ? (read.data.versionOf ?? null) : null;
+  return { language, family: source ?? ours.preparedScriptId };
+}
+
+/**
+ * Active and with no gap of P6-01 but its identity: a recognised copy has no identity to validate, ours stands for it
+ * (ADR 0161 § 5), and no screen asks one any more (§ 2). Every other gap still keeps it from being offered.
+ */
+function playable(script: HerScript): boolean {
+  return script.active && script.gaps.every((gap) => gap === 'identity_not_validated');
+}
+
+/**
+ * A native script as the agent decides on it (ADR 0098), or `null` when it may not be offered (ADR 0161 § 4): only
+ * the recognised copy of a script we prepared, still the same on Reveal, with our description and moment (`both`
+ * giving none, so it is offered by day as by night). A native
+ * script of no script of ours is never offered, whatever identity it carries (those rows are ignored, § 5). Neither is
+ * one with another gap of P6-01, or with a step of several branches: the branch engine (ADR 0112, lot 2) reads those.
  * A step is paid when the platform prices it, offered when it sends a media for free, and a bridge when it is text.
  */
 export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
-  if (!script.proposable || script.identity?.validatedAt == null) return null;
+  const { ours } = script;
+  if (ours === null || !playable(script)) return null;
   if (script.steps.some((step) => step.branches > 1)) return null;
+  if (!stillOurs(script, ours)) return null;
   const media = script.steps.flatMap((step) => [...step.media, ...step.previewMedia]);
+  const { language, family } = versionOf(ours);
   return {
     scriptRef: script.ref,
-    moment: script.moment,
-    description: descriptionOf(script.identity),
+    language,
+    family,
+    // Day and night (ADR 0112 § 27): no moment imposed, offered at either.
+    moment: ours.moment === 'both' ? null : ours.moment,
+    description: ours.description,
     steps: script.steps.map((step) => ({
       stepRef: step.ref,
       kind: step.priceMinor > 0 ? 'paid' : step.media.length > 0 ? 'free' : 'bridge',
@@ -52,8 +89,9 @@ export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
       mediaRefs: step.media.map((each) => each.ref),
     })),
     mediaValidated: media.every((each) => each.described),
+    // Written by a human in the editor and checked against her active persona (ADR 0112 § 14).
     descriptionValidated: true,
-    // Her persona's limits are checked by the agency when it validates the identity, and by the guards on each bubble.
+    // Her persona's limits are checked on our script in the editor, and by the guards on each bubble.
     touchesLimits: false,
   };
 }
@@ -89,7 +127,7 @@ interface AgentScriptsDeps {
 
 /** The fan on the platform: his account and his platform id. A fan of another account is refused (fail closed). */
 async function platformFanOf(
-  deps: AgentScriptsDeps,
+  deps: Pick<AgentScriptsDeps, 'fans'>,
   creatorId: string,
   fanId: string,
 ): Promise<{ readonly platformAccountId: string; readonly platformFanId: string }> {
@@ -138,5 +176,16 @@ export function createLastOfferAt(
     const scripts = await deps.scripts.accountScripts(CreatorIdSchema.parse(creatorId), accountId);
     if (!scripts.some((script) => agentScriptViewOf(script) !== null)) return null;
     return deps.reads.lastOfferAt(accountId, fan.platformFanId);
+  };
+}
+
+/** When he last bought a priced bundle of hers (ADR 0128 § 1), read like `createLastOfferAt`. */
+export function createLastPurchaseAt(deps: {
+  readonly reads: Pick<ConnectorsModule['platformReads'], 'lastPurchaseAt'>;
+  readonly fans: Pick<FansModule, 'getFan'>;
+}): (creatorId: string, fanId: string) => Promise<Date | null> {
+  return async (creatorId, fanId) => {
+    const fan = await platformFanOf(deps, creatorId, fanId);
+    return deps.reads.lastPurchaseAt(PlatformAccountIdSchema.parse(fan.platformAccountId), fan.platformFanId);
   };
 }

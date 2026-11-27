@@ -4,6 +4,7 @@ Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses 
 Date : 2026-11-07
 Précise : l'ADR 0057 (connecteur Telegram, légendes, lien ajouté par le code), l'ADR 0055 § 1 et § 5 (catégorie `telegram_post`, stock et demandes), l'ADR 0020 (groupes de l'agence).
 Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
+Précisée par : l'ADR 0121 § 1 (acceptée le 16/11/2026) : les liens de redirection ont leur propre table et se règlent dans l'onglet « Liens » de la fiche de la créatrice, avec leur endroit et leur phrase d'usage ; un lien s'éteint au lieu d'être supprimé ; le canal choisit le sien parmi les liens allumés (§ 4.1 et § 6.3 ci-dessous).
 
 ## Contexte
 
@@ -74,6 +75,8 @@ Charles demande en plus :
    1. **Principal :** un média du pool et le lien vers Reveal. Le texte réagit à ce qu'on voit dans le média (« nouvelle tenue… ») et donne envie d'aller voir la suite chez elle : curiosité, proximité, ce qu'on ne voit que là-bas. Tout reste vrai, sans fausse urgence.
    2. **Engagement :** une question, une anecdote ou un sondage, avec ou sans média, et sans lien. Le sondage (§ 5.7) devient un post d'Engagement, toujours au plus un par jour.
    3. Le playground propose le choix Principal ou Engagement, pour régler les deux (§ 7).
+
+9. **La garde des lieux** (amendement du 21/11/2026, validé par le fil Bilan) : un texte public ne nomme jamais un lieu où elle vit. Le code lit sa ville et son « lieu de vie » dans sa persona active ; les mots génériques (« appartement », « région », « centre »…) sont écartés, et ce qui reste est un nom de lieu. Un texte public qui en contient un, mot entier ou expression, sans tenir compte des accents ni des majuscules, même masqué par des chiffres, est bloqué avant toute publication (code `place_named`). La garde est commune à toutes les surfaces publiques qui passent par sa fiche publique : posts du canal Telegram, réponses aux commentaires Instagram (ADR 0122 § 2), légendes de Reel (ADR 0164 § 9). Son pays n'est pas lu. Un mot dérivé d'un nom de lieu n'est pas attrapé par le code ; le prompt reste chargé de ne nommer aucun lieu.
 
 ### 6. L'écran
 

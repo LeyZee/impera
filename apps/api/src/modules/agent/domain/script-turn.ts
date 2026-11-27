@@ -37,10 +37,28 @@ export interface ScriptTurnInput extends Omit<NextScriptStepInput, 'latest'> {
   /** False on a second pass over the same message (a wait, a replay): it was already counted against the step. */
   readonly countsHisMessage: boolean;
   /**
+   * He says he just came (ADR 0156 § 6): this message neither answers nor refuses the step waiting. The evening's
+   * script is over (ADR 0158 § 42): a run with a paid step waiting ends `stalled` here, and the step he left is never
+   * recalled to him, now or later (passes 1 du 21/11, conversations 2 et 13).
+   */
+  readonly heCame?: boolean;
+  /**
    * False when something else answers this message (a trap, the cursor steering him back, a custom order, a brain
    * that failed): the run still follows his message and Reveal, but no step goes.
    */
   readonly mayAct: boolean;
+  /**
+   * When each of his messages was written, his last one included: the ones since his last purchase are counted on the
+   * run as Reveal's history leaves it, a purchase seen at this very message included (passe 2 du 26/11, « Wow » then
+   * the next step at once). Absent: `hisMessagesSinceBought` as given.
+   */
+  readonly hisMessagesAt?: readonly Date[];
+}
+
+/** His messages since the last paid step bought in the run, on the run as reconciled; undefined without one. */
+function messagesSinceBought(run: ScriptRun | null, at: readonly Date[]): number | undefined {
+  const boughtAt = run?.steps.findLast((step) => step.outcome === 'bought')?.at;
+  return boughtAt === undefined ? undefined : at.filter((sent) => sent >= boughtAt).length;
 }
 
 /** A run that changed at this message, with the events that say how. */
@@ -103,8 +121,15 @@ function afterHisMessage(
   run: ScriptRun,
   script: PlatformScriptView,
   reply: ScriptReply | null,
+  hotSession: boolean,
   at: Date,
 ): ScriptRun {
+  // He comes back once the session cooled (asleep, gone, the next day) with the paid step still waiting: the run
+  // pauses there, never a refusal of his « salut » (ADR 0156 § 1). A clear no is still one.
+  if (!hotSession && reply !== 'refused' && paidWaiting(run) !== undefined) {
+    const cooled = applyScriptRunEvent(run, script, { type: 'session_cooled', at });
+    if (cooled.ok) return cooled.run;
+  }
   if (reply === 'refused') {
     const refused = applyScriptRunEvent(run, script, { type: 'refused', at });
     if (refused.ok) return refused.run;
@@ -130,12 +155,29 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
   let run = stored;
   if (run !== null && storedScript !== null && run.status === 'open') {
     run = reconcileScriptRun(run, storedScript, history, now);
-    // Paused while he is not free (ADR 0103 § 12): his message is neither an answer to the step nor a refusal.
-    if (input.countsHisMessage && input.availability !== 'no')
-      run = afterHisMessage(run, storedScript, input.reply, now);
+    // Paused while he is not free (ADR 0103 § 12) or right after he came (ADR 0156 § 6): his message is neither an
+    // answer to the step nor a refusal.
+    if (input.countsHisMessage && input.availability !== 'no' && input.heCame !== true)
+      run = afterHisMessage(run, storedScript, input.reply, input.hotSession, now);
+    // Whether a step waits or he just bought one, the evening's script ends when he came (ADR 0156 § 6).
+    if (input.heCame === true) {
+      const over = applyScriptRunEvent(run, storedScript, { type: 'session_cooled', at: now });
+      if (over.ok) run = over.run;
+    }
   }
   const latest = run === null || storedScript === null ? null : { run, script: storedScript };
-  const decided = nextScriptStep({ ...input, latest });
+  const since =
+    input.hisMessagesAt === undefined
+      ? input.hisMessagesSinceBought
+      : messagesSinceBought(run, input.hisMessagesAt);
+  const next = nextScriptStep({
+    ...input,
+    latest,
+    ...(since !== undefined && { hisMessagesSinceBought: since }),
+  });
+  // After he came, she gives him tenderness, never the step he left (ADR 0158 § 44).
+  const decided: ScriptStepDecision =
+    input.heCame === true && next.kind === 'end' ? { kind: 'end', status: next.status } : next;
   const decision: ScriptStepDecision =
     !input.mayAct && !noStep(decided) ? { kind: 'none', reason: 'held' } : decided;
 

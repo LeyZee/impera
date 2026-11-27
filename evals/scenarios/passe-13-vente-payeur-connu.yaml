@@ -1,0 +1,159 @@
+# Passe de test du 20/11, conversation 13 : vente entière avec un payeur connu (variante de la 2). Fan, messages, scripts et prix fictifs (ADR 0010).
+# Comme la 2, mais il a déjà acheté un autre script la semaine dernière (soirée-démo, joué en entier).
+# Attendu à la lecture : elle s’en souvient, jamais le même script.
+# Code (asserté) : script déjà joué exclu ; le seul script qui peut s’ouvrir est matin-démo, dès sa première réponse comme dans la 2. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Payeur connu qui a acheté toute la soirée-démo la semaine dernière : le code ouvre l’autre script, jamais celui déjà joué, et la vente va jusqu’au bout.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+  - a adoré la soirée en nuisette la semaine dernière
+situation:
+  availability: confirmed
+  sexualized: true
+  known_hours: 240
+  age_confirmed: true
+  local_time: '22:30'
+  desire: 85
+  spent_euros: 75
+  last_offer_hours_ago: 168
+history:
+  - from: fan
+    text: J’arrête pas de penser à toi ce soir
+    minutes_ago: 6
+  - from: creator
+    text: Ah oui ? Raconte 😏
+    minutes_ago: 5
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme plus intime que la précédente.
+          media: Une courte vidéo en nuisette.
+        - kind: paid
+          price_euros: 35
+          instruction: Le présenter comme la fin de la soirée, la plus intime.
+          media: Une vidéo plus longue, la nuisette retirée.
+    - ref: matin-demo
+      moment: null
+      description: Un réveil paresseux sous la couette, joué à toute heure (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Un selfie au réveil, sous la couette.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite du réveil.
+          media: Des photos au saut du lit.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime du réveil.
+          media: Une courte vidéo sous la douche.
+  run:
+    script: soiree-demo
+    status: bought_out
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: bought
+      - index: 2
+        outcome: bought
+      - index: 3
+        outcome: bought
+    started_minutes_ago: 10080
+  history:
+    - script: soiree-demo
+      sent:
+        - 0
+        - 1
+        - 2
+        - 3
+      bought:
+        - 1
+        - 2
+        - 3
+inbound: Tu fais quoi là ?
+expect:
+  decision:
+    handoff: false
+    script_in:
+      - start
+    script_step:
+      script: matin-demo
+      index: 0
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+then:
+  - after_minutes: 3
+    inbound: Wow… ce réveil sous la couette, j’en veux plus 😍
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 6
+    event: buys_step
+    inbound: C’était fou… t’es incroyable
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 4
+    inbound: J’en veux encore
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 6
+    event: buys_step
+    inbound: Putain… je sais même pas quoi dire 🔥
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 5
+    inbound: J’ai fini… t’es dingue
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 4
+    inbound: Merci pour ce soir 🙏
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

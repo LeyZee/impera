@@ -1,0 +1,57 @@
+# Passe de test du 20/11, conversation 5 : « elle a pensé à ça ». Fan, messages, scripts et prix fictifs (ADR 0010).
+# Fan connu depuis une semaine. Tours : il annonce un entretien d’embauche (« jeudi » dans la fiche ; ici « après-demain », le jour de la semaine du run n’étant pas fixé) ; bonne nuit ; J+1 il parle d’autre chose ; le surlendemain de l’entretien il écrit « salut ».
+# Attendu à la lecture : elle lui demande d’elle-même comment s’est passé l’entretien ; aucune offre dans la même réponse.
+# Code (non asserté) : le fait daté apparaît dans la note du fan ; le rejoueur n’expose pas encore la note, à vérifier à la main. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Il annonce un entretien d’embauche puis revient deux jours après : elle pense d’elle-même à lui demander comment ça s’est passé.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Mehdi (fictif)'
+  - 29 ans, confirmé
+  - 'métier : magasinier (fictif)'
+situation:
+  known_hours: 168
+  age_confirmed: true
+  local_time: '21:30'
+history:
+  - from: creator
+    text: Et toi, quoi de neuf cette semaine ? 😊
+    minutes_ago: 4
+inbound: J’ai un entretien d’embauche après-demain matin pour un poste de chef d’équipe, je stresse un peu
+expect:
+  decision:
+    handoff: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+then:
+  - after_minutes: 4
+    inbound: Allez je vais me coucher tôt, bonne nuit
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 660
+    inbound: Coucou, j’ai enfin réparé ma voiture ce matin
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 5025
+    inbound: Salut
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

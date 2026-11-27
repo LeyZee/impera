@@ -7,6 +7,7 @@ import {
   integer,
   pgPolicy,
   pgTable,
+  primaryKey,
   text,
   unique,
   uniqueIndex,
@@ -14,7 +15,8 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
+import { closedToCreator, createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
+import { creators } from './tenancy';
 
 /**
  * The agency's team (ADR 0023, scopes ADR 0024, EQ-01): out of the creators' RLS (no `creator_id`), under a policy per account.
@@ -300,5 +302,118 @@ export const passwordResetLinks = pgTable(
       .on(t.userId)
       .where(sql`${t.usedAt} is null and ${t.revokedAt} is null`),
     index('password_reset_links_user_created_idx').on(t.userId, t.createdAt),
+  ],
+);
+
+/**
+ * The removal of an owner by the other (ADR 0096 § 2): asked, it waits 72 hours, and the owner it is about can cancel
+ * it meanwhile; past its notice the job applies it. One waiting per owner. Never deleted: the history of who asked,
+ * who cancelled and when stays. Read and written by the admin role only (RLS forced, no policy, revoked from
+ * `nirvana_app`), like the links above.
+ */
+export const ownerRemovals = pgTable(
+  'owner_removals',
+  {
+    id: id(),
+    targetUserId: text('target_user_id')
+      .notNull()
+      .references(() => user.id),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => user.id),
+    requestedAt: timestampTz('requested_at').notNull().defaultNow(),
+    effectiveAt: timestampTz('effective_at').notNull(),
+    cancelledAt: timestampTz('cancelled_at'),
+    appliedAt: timestampTz('applied_at'),
+  },
+  (t) => [
+    // The notice is the rule itself: a row that would take effect sooner cannot be written, whatever the code.
+    check('owner_removals_notice_check', sql`${t.effectiveAt} >= ${t.requestedAt} + interval '72 hours'`),
+    check('owner_removals_not_self_check', sql`${t.targetUserId} <> ${t.requestedBy}`),
+    check('owner_removals_one_end_check', sql`${t.cancelledAt} is null or ${t.appliedAt} is null`),
+    // Never applied before its notice ended.
+    check('owner_removals_applied_check', sql`${t.appliedAt} is null or ${t.appliedAt} >= ${t.effectiveAt}`),
+    uniqueIndex('owner_removals_waiting_unique')
+      .on(t.targetUserId)
+      .where(sql`${t.cancelledAt} is null and ${t.appliedAt} is null`),
+  ],
+);
+
+/**
+ * One of the creators on the session's own list (`user.creator_ids`): what a manager may address an announcement to,
+ * and what a member reads of the announcements to a creator's members.
+ */
+const onOwnList = (creatorId: AnyColumn): SQL =>
+  sql`exists (select 1 from "user" u where u.id = ${currentUser} and ${creatorId} = any(u.creator_ids))`;
+
+/**
+ * Annonces (EQ-12): the owner or an active manager writes to the whole team (`creator_id` null) or to the members of
+ * one creator, a manager only to a creator of his own list. The owner reads them all; an active manager those to the
+ * whole team, to a creator of his own list, and his own (so that he can still withdraw it when his list changes); a
+ * member reads those addressed to him while they stand. Withdrawn by the owner or by its author, never deleted nor edited:
+ * the app may only set `withdrawn_at` and `withdrawn_by` (column grant, migration). Closed to a creator's account.
+ */
+export const announcements = pgTable(
+  'announcements',
+  {
+    id: id(),
+    creatorId: uuid('creator_id').references(() => creators.id),
+    body: text('body').notNull(),
+    authorUserId: text('author_user_id')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    withdrawnAt: timestampTz('withdrawn_at'),
+    withdrawnBy: text('withdrawn_by').references(() => user.id),
+  },
+  (t) => [
+    check('announcements_body_check', sql`char_length(${t.body}) between 1 and 1000`),
+    check('announcements_withdrawn_check', sql`(${t.withdrawnAt} is null) = (${t.withdrawnBy} is null)`),
+    index('announcements_created_idx').on(t.createdAt),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${isOwner} or (${isManager} and (${t.creatorId} is null or ${onOwnList(t.creatorId)} or ${t.authorUserId} = ${currentUser})) or (${currentScope} = 'self' and ${t.withdrawnAt} is null and (${t.creatorId} is null or ${onOwnList(t.creatorId)}))`,
+    }),
+    pgPolicy('team_insert', {
+      for: 'insert',
+      withCheck: sql`${t.authorUserId} = ${currentUser} and ${t.withdrawnAt} is null and (${isOwner} or (${isManager} and (${t.creatorId} is null or ${onOwnList(t.creatorId)})))`,
+    }),
+    pgPolicy('team_withdraw', {
+      for: 'update',
+      using: sql`${readsTeam} and ${t.withdrawnAt} is null`,
+      withCheck: sql`${t.withdrawnBy} = ${currentUser} and (${isOwner} or (${isManager} and ${t.authorUserId} = ${currentUser}))`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * « Lu » (EQ-12): a member's own, once per announcement, at the moment he says it; only for an announcement he may
+ * read (the insert's check reads `announcements` under its own policy). Read by himself, the owner, and an active
+ * manager for the announcements he may read (through their policy); never changed nor deleted.
+ */
+export const announcementReads = pgTable(
+  'announcement_reads',
+  {
+    announcementId: uuid('announcement_id')
+      .notNull()
+      .references(() => announcements.id),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    readAt: timestampTz('read_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.announcementId, t.memberId] }),
+    index('announcement_reads_member_idx').on(t.memberId),
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${isOwner} or (${isManager} and exists (select 1 from announcements a where a.id = ${t.announcementId})) or exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser})`,
+    }),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${t.readAt} = now() and exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser} and m.status <> 'left') and exists (select 1 from announcements a where a.id = ${t.announcementId} and a.withdrawn_at is null)`,
+    }),
+    closedToCreator(),
   ],
 );

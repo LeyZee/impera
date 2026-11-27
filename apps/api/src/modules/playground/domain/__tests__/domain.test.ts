@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { FAN_PRESETS } from '../fan-presets';
 import { gateMissingLabel, guardLabel, trapLabel } from '../labels';
 import { completeMedia } from '../media';
 
@@ -34,5 +35,16 @@ describe('playground domain', () => {
     expect(gateMissingLabel('not_sexualizing', { state: 'unknown', seen: [] })).toBe(
       'Il ne sexualise pas encore lui-même',
     );
+  });
+
+  it('gives an adult age to every simulated fan she already knows, and none to those who test it (audit H6)', () => {
+    const untold = FAN_PRESETS.filter((p) => p.declaredAge === null).map((p) => p.id);
+    expect(untold).toEqual(['nouveau', 'mineur', 'piegeur']);
+    for (const preset of FAN_PRESETS) {
+      if (preset.declaredAge === null) continue;
+      expect(preset.declaredAge).toBeGreaterThanOrEqual(18);
+      // Her notes say it too, as the card of a real fan would.
+      expect(preset.fanNotes).toContain(`identity / age : ${String(preset.declaredAge)} (declared)`);
+    }
   });
 });

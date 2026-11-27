@@ -1,12 +1,20 @@
 import type {
   Actor,
+  FanStanding,
+  FanTier,
+  FanTiersSetting,
+  TimeWasterSetting,
+  AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
+  CopilotTrace,
+  DraftTranslation,
   CustomAlertGroupId,
   CustomAlertId,
   EventId,
   SystemAlertCode,
   AgentHours,
+  DatedRanges,
   ConversationDetail,
   ConversationEventView,
   ConversationHolder,
@@ -42,11 +50,14 @@ import type {
   MessageAuthor,
   MessageDirection,
   MessageId,
+  MessageOrigin,
   MessageView,
   Money,
+  OpenCustomOrder,
   OutboundMedia,
   PlatformAccountId,
   SafetyEvent,
+  SaleTroubleKind,
   ScriptRunId,
   ScriptRunStatus,
   ScriptStepKind,
@@ -59,8 +70,12 @@ import type {
   Platform,
 } from '@impera/contracts';
 
+import type { CustomOrderTurn } from '../../custom-orders/pure';
+
 import type { AwayStatus } from './away';
+import type { CopilotLive } from './copilot-assist';
 import type { ConversationProjection } from './projection';
+import type { ToTalkCandidate } from './to-talk';
 
 /** Ports of the `conversations` module (ADR 0002): what it needs, implemented in `infra/` or by other modules. */
 
@@ -93,6 +108,8 @@ interface NewMessage {
   readonly draftId: DraftId | null;
   /** The media the platform listed on it; empty for what we send. */
   readonly platformMedia: readonly ExternalMedia[];
+  /** Which automation of the platform wrote it, or a fan's reply to a story (ADR 0110); absent otherwise. */
+  readonly origin?: MessageOrigin;
 }
 
 export interface Draft {
@@ -102,6 +119,10 @@ export interface Draft {
   readonly bubbles: readonly string[];
   readonly finalBubbles: readonly string[] | null;
   readonly createdAt: Date;
+  /** When a chatter put it in the platform's field from the copilot panel (ADR 0086 § 4); `null` until then. */
+  readonly placedAt: Date | null;
+  /** Who placed it; `null` until then. */
+  readonly placedBy: UserId | null;
   /** What the brief learnt about the fan for this draft, written as facts once a human approves it (P3-02). */
   readonly facts: readonly DraftFact[];
   /** The step of her script the code decided with this draft (ADR 0098): it leaves after the bubbles. */
@@ -134,6 +155,8 @@ export interface DraftFact {
   /** The fan's message it was read in. */
   readonly sourceMessageId: MessageId | null;
   readonly observedAt: Date;
+  /** The person who wrote it: a chatter's note left at the hand-back, when the job says who (trou béant 17). */
+  readonly notedBy?: UserId;
 }
 
 export interface DraftDecision {
@@ -155,6 +178,11 @@ interface ConversationRepository {
   idsInMode(mode: ConversationMode): Promise<readonly ConversationId[]>;
   /** The creator's conversations in this state, the one whose fan wrote first at the head. */
   idsInState(state: ConversationState): Promise<readonly ConversationId[]>;
+  /**
+   * The conversation of the fan this platform id names on this account (ADR 0156 § 2: a sale names him, not the
+   * conversation), the one he last wrote in; `null` when no fan or no conversation of his is known.
+   */
+  idOfFan(platformAccountId: PlatformAccountId, platformFanId: string): Promise<ConversationId | null>;
   /**
    * Whether `userId` holds the conversation (EQ-13): it is routed to him, or it is in `human` and his takeover is the
    * last word on who holds it (no release nor handoff since).
@@ -180,14 +208,18 @@ export interface AwayHolds {
 
 interface MessageRepository {
   /** `false` when the platform message is already known (unique per account): ingestion is idempotent. A known outbound
-   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media. */
+   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media;
+   * a known outbound message the synced copy says paid becomes paid, never the reverse (ADR 0156 § 2). */
   insertIfNew(message: NewMessage): Promise<boolean>;
   /** Bubbles of this draft already on the platform; a retried send resumes after them. */
   countForDraft(draftId: DraftId): Promise<number>;
+  /** The texts of the messages that left for this draft, in the order they were sent (ADR 0086 § 5). */
+  textsForDraft(draftId: DraftId): Promise<readonly string[]>;
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
-  fanStats(fanId: FanId): Promise<FanStats>;
+  /** His spend and first message; his tier and last purchase from her sales register (ADR 0132, 0128) at `now`. */
+  fanStats(fanId: FanId, now: Date): Promise<FanStats>;
 }
 
 /** The voice prompt version and the model that wrote a draft: what the live rate is read by (ADR 0019). */
@@ -200,6 +232,8 @@ interface DraftRepository {
   lock(id: DraftId): Promise<Draft | null>;
   /** Drafts not yet sent nor closed (`pending`, `approved`, `edited`), oldest first. */
   openFor(conversationId: ConversationId): Promise<readonly Draft[]>;
+  /** Whether a draft already carries this idempotency key (one word after a sale, ADR 0156 § 2). */
+  existsWithKey(idempotencyKey: string): Promise<boolean>;
   /** Her answers written in this conversation since `since`, whatever became of them, and when the last one was. */
   paceSince(
     conversationId: ConversationId,
@@ -224,6 +258,10 @@ interface DraftRepository {
     facts?: readonly DraftFact[];
     /** The step of her script decided with it (ADR 0098). */
     scriptStep?: DraftScriptStep;
+    /** What the code decided with it, as the copilot panel reads it (ADR 0141 lot a). */
+    copilot?: CopilotTrace;
+    /** Its French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+    translation?: DraftTranslation;
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
   /**
@@ -261,6 +299,13 @@ interface EventWriter {
   /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
   /**
+   * Whether the team already knows no script is left for him (ADR 0150 § 9): a `scripts_exhausted` with no
+   * `script_started` since. The episode lives in his journal, never in memory.
+   */
+  scriptsExhaustedSaid(conversationId: ConversationId): Promise<boolean>;
+  /** How many times she teased him about a run he left (`script_abandon_teased`, Charles 20/11). */
+  abandonTeases(conversationId: ConversationId, scriptRunId: ScriptRunId): Promise<number>;
+  /**
    * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
    * `takeover_started` since), and the replies of her objection bank he already received.
    */
@@ -270,6 +315,14 @@ interface EventWriter {
 interface SalesState {
   readonly customOrderOpen: boolean;
   readonly usedObjectionReplies: readonly string[];
+  /** When she last answered each sale trouble (`sale_trouble`), since the last takeover; `null`: never. */
+  readonly saleTrouble: SaleTroubleSeen;
+}
+
+/** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7). */
+interface SaleTroubleSeen {
+  readonly paymentHelpAt: Date | null;
+  readonly complaintAt: Date | null;
 }
 
 interface JobOptions {
@@ -306,9 +359,19 @@ interface KillSwitches {
    * creator does not exist (nothing to change).
    */
   lockCreator(): Promise<boolean>;
-  isOn(): Promise<{ readonly global: boolean; readonly creator: boolean }>;
-  /** Stamped by the database clock once the lock is held, so the later change is always the latest row. */
-  setCreator(entry: { active: boolean; reason: string; setBy: string }): Promise<void>;
+  /** She is archived (ADR 0071 § 2): her Arrêt is the code's, never a pause. */
+  archived(): Promise<boolean>;
+  /** `creatorUntil`: her switch is a pause that lifts itself then (ADR 0148 § 1); `null` otherwise. */
+  isOn(): Promise<{
+    readonly global: boolean;
+    readonly creator: boolean;
+    readonly creatorUntil: Date | null;
+  }>;
+  /**
+   * Stamped by the database clock once the lock is held, so the later change is always the latest row. `until` makes
+   * an Arrêt a pause: on until then, off after, without another row.
+   */
+  setCreator(entry: { active: boolean; reason: string; setBy: string; until?: Date }): Promise<void>;
 }
 
 /**
@@ -366,6 +429,24 @@ export interface Transaction {
   readonly automatic: AutomaticEvidence;
   readonly audit: AuditTrail;
   readonly scriptRuns: ScriptRunRepository;
+  /** His custom order (ADR 0159), kept by the custom-orders module; absent, no store is wired. */
+  readonly customOrders?: CustomOrderJournal;
+}
+
+/** A turn that says something about his custom order. */
+export type KeptCustomOrderTurn = Exclude<CustomOrderTurn, { readonly kind: 'none' }>;
+
+/** His custom order under her tenant, in the turn's transactions (ADR 0159 § A.2): never across creators. */
+interface CustomOrderJournal {
+  /** His order still before her yes, or null. */
+  open(fanId: FanId): Promise<OpenCustomOrder | null>;
+  /** What the turn decided, kept once per message of his: the same message again changes nothing. */
+  record(entry: {
+    readonly fanId: FanId;
+    readonly inboundMessageId: string;
+    readonly turn: KeptCustomOrderTurn;
+    readonly at: Date;
+  }): Promise<void>;
 }
 
 /**
@@ -401,6 +482,10 @@ interface ScriptRunRepository {
   open(conversationId: ConversationId, run: ScriptRunState): Promise<StoredScriptRun | null>;
   /** Saves a run; `false` when it was no longer open (another turn closed it). */
   save(stored: StoredScriptRun): Promise<boolean>;
+  /** His runs that went cold (`stalled`), latest first: a run he left there makes her tease him (Charles 20/11). */
+  stalled(conversationId: ConversationId): Promise<StoredScriptRun[]>;
+  /** His ended runs where he bought nothing: her scripts he never entered (ADR 0135 § 1). */
+  unbought(conversationId: ConversationId): Promise<number>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -454,11 +539,17 @@ export interface GuardReadContext {
 }
 
 /**
- * Her hours (P3-14) and the clock they are read on (`creators.timezone`), implemented by `persona`: the defaults when
- * none is stored. `null` when she does not exist.
+ * Her hours (P3-14), her dated exceptions from her today on (ADR 0148 § 3) and the clock they are read on
+ * (`creators.timezone`), implemented by `persona`: the defaults when none is stored. `null` when she does not exist.
  */
 export interface ReplyHours {
-  of(creatorId: CreatorId): Promise<{ readonly hours: AgentHours; readonly timeZone: string } | null>;
+  of(creatorId: CreatorId): Promise<HerHours | null>;
+}
+
+export interface HerHours {
+  readonly hours: AgentHours;
+  readonly timeZone: string;
+  readonly exceptions: DatedRanges;
 }
 
 /** The fan as `conversations` needs it; implemented by the `fans` module. */
@@ -555,12 +646,22 @@ interface HistoryMessage {
    * alone (vision obligatoire). `kind` from the platform; locked when it sits behind a price.
    */
   readonly media: readonly HistoryMedia[];
+  /** Which automation of the platform wrote it, or a fan's reply to a story (ADR 0110); null otherwise. */
+  readonly origin: MessageOrigin | null;
 }
 
 interface FanStats {
   /** Paid messages (PPV bought), in minor units. */
   readonly spentMinor: number;
   readonly firstMessageAt: Date | null;
+  /** His tier from her sales register and her thresholds (`fanTierOf`); absent when it cannot be read. */
+  readonly tier?: FanTier | null;
+  /** His last purchase in her sales register (ADR 0128 § 1); `null` never; absent, not read. */
+  readonly lastPurchaseAt?: Date | null;
+  /** What he spent in her sales register, refunds out (ADR 0132 § 1); absent, not read. */
+  readonly registerSpentMinor?: number;
+  /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */
+  readonly timeWaster?: TimeWasterSetting;
 }
 
 interface FanContext extends FanStats {
@@ -584,6 +685,8 @@ export interface ProposedFact {
 }
 
 export interface ComposeInput {
+  /** He is a time-waster at this level (ADR 0135), as code read it before the AI: she writes short, busy, kind. */
+  readonly timeWaster?: 'slowed' | 'dormant';
   readonly creatorId: CreatorId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;
@@ -603,6 +706,12 @@ export interface ComposeInput {
    */
   readonly followUp?: FollowUpContext;
   /**
+   * Present for her word after a sale of his (ADR 0156 § 2): a step he bought or a tip, nothing of his to answer. The
+   * engine decides whether it goes out now (`held` with `no_reply`, and `retryAt` for her night) and writes it like a
+   * follow-up: thanks and tenderness, nothing to buy.
+   */
+  readonly aftercare?: AftercareContext;
+  /**
    * How many times she already waited on his last message (P3-11): 1 on the second pass after « attends, je
    * reviens », when she may no longer wait; absent otherwise.
    */
@@ -614,12 +723,21 @@ export interface ComposeInput {
   readonly desire?: { readonly score: number; readonly at: Date };
   /** Her hours (P3-14) as stored; absent, the defaults. They set her night and when a follow-up may go out. */
   readonly hours?: AgentHours;
+  /** Her dated exceptions (ADR 0148 § 3), from her today on: a date that has one follows its ranges alone. */
+  readonly exceptions?: DatedRanges;
   /** A custom order of his already waits for the team (ADR 0090 § A). */
   readonly customOrderOpen?: boolean;
+  /**
+   * His custom order as the custom-orders module keeps it (ADR 0159 § A.2), read in the turn's first transaction:
+   * `null`, none open. Absent, no store is wired and she answers as before (ADR 0090 § A).
+   */
+  readonly openCustomOrder?: OpenCustomOrder | null;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
+  /** His runs before `scriptRun` that went cold, and her teases about `scriptRun` when he left it (Charles 20/11). */
+  readonly scriptAbandon?: { readonly earlier: readonly ScriptRunState[]; readonly teased: number };
   /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
@@ -627,6 +745,8 @@ export interface ComposeInput {
    * help bubble already went out in this episode.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+  /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7); absent: never. */
+  readonly saleTrouble?: SaleTroubleSeen;
 }
 
 /** An event of a script run this message journals, in order (ADR 0098 § 2). */
@@ -671,6 +791,13 @@ interface ComposedDesire {
 }
 
 /** Which follow-up this is, after which silence. */
+/** The sale she thanks him for (ADR 0156 § 2). */
+interface AftercareContext {
+  readonly saleType: AfterSaleType;
+  /** When he paid, as the platform dates it. */
+  readonly occurredAt: Date;
+}
+
 export interface FollowUpContext {
   /** The index of the delay in `persona.follow_ups.delays_hours`, from 0. */
   readonly step: number;
@@ -701,11 +828,23 @@ export type ComposeResult =
       readonly alerts?: readonly ComposedAlert[];
       /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
       readonly customOrderOpened?: true;
+      /** The turn on his custom order (ADR 0159 § A.2): kept by the custom-orders store in the turn's transaction. */
+      readonly customOrderTurn?: KeptCustomOrderTurn;
+      /** A script would open for him and none is left: one `scripts_exhausted` per episode (ADR 0150 § 9). */
+      readonly scriptsExhausted?: true;
+      /** She answered a sale gone wrong: one `sale_trouble`, so that the same trouble again goes to a human. */
+      readonly saleTrouble?: SaleTroubleKind;
+      /** She teased him about the run he left: one `script_abandon_teased` on that run (Charles 20/11). */
+      readonly abandonTeased?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;
       /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
       readonly care?: ComposedCare;
+      /** What the code decided with it, kept with the draft for the copilot panel (ADR 0141 lot a). */
+      readonly copilot?: CopilotTrace;
+      /** Its French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+      readonly translation?: DraftTranslation;
     }
   | {
       readonly kind: 'held';
@@ -727,6 +866,8 @@ export type ComposeResult =
       readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
       readonly customOrderOpened?: true;
+      readonly customOrderTurn?: KeptCustomOrderTurn;
+      readonly scriptsExhausted?: true;
       /** His run moved by his message and Reveal only: no step goes without a draft. */
       readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
       readonly care?: ComposedCare;
@@ -847,6 +988,14 @@ export interface ConversationReader {
     reader: { readonly userId: UserId; readonly heldOnly: boolean },
   ): Promise<Page<ConversationSummary>>;
   /**
+   * « À qui parler maintenant » (Charles, 21/11): her conversations where a fan wrote or arrived lately, each with what
+   * he spent and his flags, and her tier thresholds. With `heldOnly`, only those the reader holds.
+   */
+  toTalkCandidates(
+    creatorId: CreatorId,
+    reader: { readonly userId: UserId; readonly heldOnly: boolean },
+  ): Promise<{ readonly candidates: readonly ToTalkCandidate[]; readonly tiers: FanTiersSetting }>;
+  /**
    * Whether that account holds the conversation (routed to it, or its takeover not ended): how a member whose scope is
    * `self` reaches it outside his access window (ADR 0025).
    */
@@ -918,13 +1067,19 @@ export interface CopilotRead {
   readonly writing: boolean;
   /** Her two switches, Créatrices › (elle) › Agent (§ 6), read from her settings; unreadable, the defaults. */
   readonly switches: CopilotSwitches;
+  /** What he spent, his tier, his last purchase (Charles, 21/11); `null` when the fan is not read. */
+  readonly standing: FanStanding | null;
   /** The latest pending draft that has bubbles, if any. */
   readonly draft: {
     readonly id: DraftId;
     readonly bubbles: readonly string[];
     readonly createdAt: Date;
     readonly placedAt: Date | null;
+    /** Its French for the team (ADR 0168 § 9); `null` without one. */
+    readonly translation: DraftTranslation | null;
   } | null;
+  /** What the code decided and what holds now, for the panel's lines (ADR 0141 lot a). */
+  readonly live: CopilotLive;
 }
 
 export interface CopilotReader {

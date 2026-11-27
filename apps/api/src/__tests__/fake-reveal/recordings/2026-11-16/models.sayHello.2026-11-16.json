@@ -1,0 +1,20 @@
+{
+  "endpoint": "models.sayHello",
+  "capturedOn": "2026-11-16",
+  "request": {
+    "method": "GET",
+    "path": "/models/:uuid_44f2010ff2/say-hello"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "enabled": true,
+      "autoReplyEnabled": false,
+      "autoReplyDelaySeconds": null,
+      "openers": [
+        { "kind": "flirt", "fanText": "texte_1 %NAME% texte_2", "replyText": null },
+        { "kind": "friendly", "fanText": "texte_3", "replyText": null }
+      ]
+    }
+  }
+}

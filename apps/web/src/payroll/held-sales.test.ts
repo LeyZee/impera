@@ -68,7 +68,7 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     const unlinked = heldSaleOf({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
     expect(heldReasonText(unlinked, null, ZONE)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre\u00a0: relie-le dans Équipe › Reveal et la vente compte seule. Sinon, écarte-la.',
+      'Son chatteur sur Reveal n’est relié à aucun membre\u00a0: relie-le dans Équipe › Comptes Reveal et la vente compte seule. Sinon, écarte-la.',
     );
     expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, ZONE)).toBe(
       'Reveal lui donne un statut qu’Impera ne connaît pas encore.',
@@ -270,7 +270,7 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     const unlinked = refund({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
     expect(heldReasonText(unlinked, null, ZONE)).toBe(
-      'Son chatteur sur Reveal n’est relié à aucun membre\u00a0: relie-le dans Équipe › Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
+      'Son chatteur sur Reveal n’est relié à aucun membre\u00a0: relie-le dans Équipe › Comptes Reveal et le remboursement se déduit seul. Sinon, écarte-le.',
     );
   });
 

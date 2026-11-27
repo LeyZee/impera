@@ -40,6 +40,25 @@ export const GUARD_CODES = [
   'no_commitment',
   // ADR 0088 § 3: a care answer (a fan in distress) that sells, meets or goes sexual.
   'care_breach',
+  // Charles 20/11: she slows down a fan who only compliments her (« tu y vas un peu fort »).
+  'unwarranted_brake',
+  // ADR 0080 § 5.9 (21/11): a public text names a place where she lives (her persona's town or « lieu de vie »).
+  'place_named',
+  // ADR 0168 § 4: she writes in a language outside the guards' coverage (`GUARDED_LANGUAGES`).
+  'language_not_covered',
+  // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
+  'minor_reference',
+  // Charles 26/11 (« go voix »): her emojis, at the end of a bubble, one kind a message (two in a flirt), never three,
+  // and not on every message. Soft: rewritten once, then her answer goes.
+  'emoji_misuse',
+  // Charles 26/11: a word of hers kept for close fans (`rules.close_only_words`), written to a fan below its tier.
+  'close_only_word',
+  // Charles 26/11: a bubble of the voice outside her form (first letter, final period, space before « ? » « ! »); soft,
+  // the code puts it right before the send.
+  'form_rule',
+  // ADR 0088 § 4 (eval pass 2, 26/11): a help or emergency number, or a listening line, the model wrote itself. The
+  // help bubble is the code's, never the model's.
+  'help_number_from_model',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

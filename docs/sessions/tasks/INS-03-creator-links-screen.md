@@ -1,5 +1,5 @@
 # INS-03 « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier
-Statut : todo
+Statut : done (fusionnée le 19/11/2026, #847 ; captures validées par Charles les 16 et 17/11)
 Phase : Instagram (ADR 0121)
 Dépend de : ADR 0121 acceptée ; l'endroit d'un lien (ADR 0120 § 3, migration partagée avec INS-02)
 Branche : task/ins-03-creator-links-screen
@@ -12,11 +12,11 @@ La créatrice ouvre « Mes liens » sur son téléphone, lit à quoi sert chaque
 ADR 0121 § 1, ADR 0120 § 3, ADR 0080 § 4, ADR 0042, `packages/contracts/src/telegram-channel.ts`, `apps/web/src/creators/telegram/`.
 
 ## À faire
-- [ ] Migration nouvelle et additive sur le lien de redirection : endroit (`NULL` pour les liens existants) et phrase d'usage (120 caractères au plus, jamais d'adresse).
-- [ ] Contrats Zod : phrase d'usage, carte de lien montrée à la créatrice (nom, endroit, phrase, adresse).
-- [ ] Agence : endroit et phrase d'usage réglables dans l'écran des liens de redirection ; un lien existant affiche « à renseigner ».
-- [ ] Créatrice : route de lecture de ses seuls liens actifs qui ont un endroit, ordre des endroits (story du jour d'abord).
-- [ ] Écran « Mes liens » téléphone d'abord : une carte par lien, bouton Copier avec retour visible, aucun chiffre.
+- [x] Migration nouvelle et additive sur le lien de redirection : endroit (`NULL` pour les liens existants) et phrase d'usage (120 caractères au plus, jamais d'adresse).
+- [x] Contrats Zod : phrase d'usage, carte de lien montrée à la créatrice (nom, endroit, phrase, adresse).
+- [x] Agence : endroit et phrase d'usage réglables dans l'écran des liens de redirection ; un lien existant affiche « à renseigner ».
+- [x] Créatrice : route de lecture de ses seuls liens actifs qui ont un endroit, ordre des endroits (story du jour d'abord).
+- [x] Écran « Mes liens » téléphone d'abord : une carte par lien, bouton Copier avec retour visible, aucun chiffre.
 - [ ] Captures Nuit/Jour, téléphone et PC, vues par Design puis par Charles avant fusion.
 
 ## Critères d'acceptation
@@ -41,3 +41,6 @@ Pour les fiches suivantes de l'ADR 0121 (à recopier à leur création) :
 Le rattachement à un lien de suivi, les paliers, l'écran « Trafic » et le récap (fiches suivantes de l'ADR 0121) ; le rappel de story.
 
 ## Notes de session
+
+- 16/11 : les liens de redirection vivent aujourd'hui dans le JSON du canal Telegram (lecture admin seule). Décidé avec le fil Bilan : table `redirect_links` dans un module à part `redirect-links` (domaine et port), lu par telegram et par le connecteur de liens via son `index.ts`. Conditions de Bilan : écritures dans la table seulement dès cette PR, JSON lu en repli une version (son vidage est une migration à part, destructive, sur le mot de Charles) ; recopie dans la migration, idempotente (`ON CONFLICT (id) DO NOTHING`, identifiants gardés) avec un test d'intégration qui la rejoue ; FORCE RLS, lecture par la créatrice sur ses lignes, écriture par le service, `GRANT SELECT … TO impera_service`, test d'isolation ; `url` en CHECK `^https://`, `placement` NULL ou dans la liste fermée, unique (creator_id, name). Numéro de migration provisoire 0221, fixé au signal.
+- Fait en local : contrats `creator-links` (cartes, phrase d'usage, ordre) et leurs tests.

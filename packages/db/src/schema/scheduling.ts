@@ -1,7 +1,9 @@
 import {
   CurrencySchema,
+  DRAFT_REASONS,
   REPORT_GAP_THRESHOLD_DEFAULT,
   SHIFT_FEEDBACK_SIGNALS_MAX,
+  SHIFT_INCIDENT_STEPS,
   SHIFT_REPORT_MAX_MINOR,
   SHIFT_REPORT_REVIEW_KINDS,
   SHIFT_REPORT_STATUSES,
@@ -201,6 +203,11 @@ export const shifts = pgTable(
     cancelledAt: timestampTz('cancelled_at'),
     /** When a person stopped it under way: it ends at that minute, and the access window closes with it. */
     stoppedAt: timestampTz('stopped_at'),
+    /**
+     * When the member took it (« Je prends mon poste », EQ-12), or `null`. Written by `check_in_own_shift` alone
+     * (migration 0231), never by a column grant; cleared by the database when the shift changes member or start.
+     */
+    checkedInAt: timestampTz('checked_in_at'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -668,6 +675,8 @@ export const shiftFeedbacks = pgTable(
     comment: text('comment'),
     incident: text('incident'),
     signals: jsonb('signals').notNull().default([]),
+    /** Why he corrected so many drafts (ADR 0170 § 1), the closed choice; null when it was not asked or left out. */
+    draftReason: text('draft_reason'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -680,6 +689,7 @@ export const shiftFeedbacks = pgTable(
       foreignColumns: [shifts.id, shifts.creatorId, shifts.platformAccountId, shifts.memberId],
     }),
     uniqueIndex('shift_feedbacks_shift_unique').on(t.shiftId),
+    enumCheck('shift_feedbacks', t.draftReason, DRAFT_REASONS),
     index('shift_feedbacks_member_period_idx').on(t.memberId, t.period),
     check('shift_feedbacks_period_check', sql`extract(day from ${t.period}) in (1, 16)`),
     check(
@@ -701,6 +711,40 @@ export const shiftFeedbacks = pgTable(
     pgPolicy('member_insert', {
       for: 'insert',
       withCheck: sql`${t.creatorId} = ${currentCreator} and ${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
+ * The follow-up of an incident of the mini feedback (trous béants n° 1, 21/11): « Vu », then « Réglé », each said once
+ * by the owner or an active manager, never on their own incident, never undone (trigger of the migration). « Réglé »
+ * without « Vu » counts as both. Read by whoever reads its feedback (its policy decides), never by the creator.
+ */
+export const shiftIncidentSteps = pgTable(
+  'shift_incident_steps',
+  {
+    shiftFeedbackId: uuid('shift_feedback_id')
+      .notNull()
+      .references(() => shiftFeedbacks.id),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    step: text('step').notNull(),
+    saidBy: text('said_by')
+      .notNull()
+      .references(() => user.id),
+    saidAt: timestampTz('said_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.shiftFeedbackId, t.step] }),
+    enumCheck('shift_incident_steps', t.step, SHIFT_INCIDENT_STEPS),
+    pgPolicy('feedback_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and exists (select 1 from shift_feedbacks f where f.id = ${t.shiftFeedbackId})`,
+    }),
+    pgPolicy('agency_insert', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and (${isOwner} or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${t.creatorId} = any(u.creator_ids)))) and ${t.saidBy} = ${currentUser} and ${t.saidAt} = now() and exists (select 1 from shift_feedbacks f where f.id = ${t.shiftFeedbackId} and f.creator_id = ${t.creatorId} and f.incident is not null and not ${isMine(sql`f.member_id`)})`,
     }),
   ],
 );

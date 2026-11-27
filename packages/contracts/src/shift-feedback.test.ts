@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  draftReasonAsked,
   PutShiftFeedbackBodySchema,
   SHIFT_FEEDBACK_ERROR_CODES,
   SHIFT_FEEDBACK_SIGNALS_MAX,
@@ -46,5 +47,37 @@ describe('mini feedback of a shift (ADR 0050 § 10)', () => {
     for (const code of SHIFT_FEEDBACK_ERROR_CODES) {
       expect(code).toMatch(/_(not_found|invalid|conflict|forbidden)$/u);
     }
+  });
+
+  it('links a signal to a fan by his conversation, or to nobody', () => {
+    const linked = { ...signal, conversationId: '0195f0c0-0000-7000-8000-0000000000bb' };
+    expect(parse({ signals: [linked] })).toBe(true);
+    expect(parse({ signals: [{ ...signal, conversationId: 'pseudo' }] })).toBe(false);
+    const parsed = PutShiftFeedbackBodySchema.parse({ ...body, signals: [signal] });
+    expect(parsed.signals[0]?.conversationId).toBeNull();
+    expect(
+      parse({
+        signals: [
+          { ...signal, category: 'agent' },
+          { ...signal, category: 'idea' },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it('takes a closed reason for the corrected drafts, or none', () => {
+    expect(parse({ nothingToReport: true, draftReason: 'too_long' })).toBe(true);
+    expect(parse({ nothingToReport: true, draftReason: 'boring' })).toBe(false);
+    expect(PutShiftFeedbackBodySchema.parse({ ...body, nothingToReport: true }).draftReason).toBeNull();
+  });
+});
+
+describe('the closed question on the drafts (ADR 0170 § 1)', () => {
+  it('is asked from five drafts changed, when they are at least 40 % of his drafts', () => {
+    expect(draftReasonAsked({ asIs: 0, edited: 4, rejected: 0 })).toBe(false);
+    expect(draftReasonAsked({ asIs: 0, edited: 3, rejected: 2 })).toBe(true);
+    expect(draftReasonAsked({ asIs: 9, edited: 14, rejected: 0 })).toBe(true);
+    expect(draftReasonAsked({ asIs: 15, edited: 10, rejected: 0 })).toBe(true);
+    expect(draftReasonAsked({ asIs: 16, edited: 10, rejected: 0 })).toBe(false);
   });
 });

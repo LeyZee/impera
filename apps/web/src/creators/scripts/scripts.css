@@ -428,6 +428,7 @@
 .sx-hand {
   gap: var(--nv-space-3);
 }
+.sx-redo__starts,
 .sx-levels {
   display: flex;
   flex-wrap: wrap;
@@ -461,25 +462,6 @@
 }
 .sx-synth .sx-correct__area {
   min-height: 0;
-}
-
-/* Her switch: one card, one line of help, the owner's alone (ADR 0083 § 9). */
-.sx-switch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-4);
-  padding: var(--nv-space-4) var(--nv-plate-pad);
-}
-.sx-switch__text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.sx-switch__title {
-  margin: 0;
-  font-weight: 650;
 }
 
 @media (max-width: 520px) {

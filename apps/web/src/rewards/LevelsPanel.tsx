@@ -58,8 +58,8 @@ const FAULT_TEXT: Record<ThresholdFault['cause'], string> = {
 
 /**
  * Paie › Objectifs › « Rangs des chatteurs » (ADR 0104 § 16): the owner sets the cumulated net that opens each rank;
- * the ranks, their names and their insignia are the game's. Honorary: no rate, tier or right hangs on a rank, and a
- * rank reached is never taken back. The owner's alone: a manager does not see the card.
+ * the ranks, their names and their insignia are the game's. Honorary: no rate, tier or right hangs on a rank. Moving
+ * the thresholds takes no rank back; a corrected net may (ADR 0118 § 5 and § 7). The owner's alone: a manager does not see the card.
  */
 export function LevelsPanel(): JSX.Element | null {
   const settings = useLevelSettings(true);
@@ -102,10 +102,8 @@ export function LevelsPanel(): JSX.Element | null {
         )}
         <p className="py-quiet">
           {thresholdsMinor.length === 0
-            ? 'Sans seuil, aucun chatteur n’a de rang. '
-            : 'Un rang sans seuil reste fermé. '}
-          Un rang est honorifique : il ne change ni un taux, ni un palier, ni la paie, et un rang atteint ne
-          se reprend pas.
+            ? 'Sans seuil, aucun nouveau rang ne s’ouvre ; un rang déjà gagné reste.'
+            : 'Un rang sans seuil reste fermé. Honorifique : ni taux, ni palier, ni paie.'}
         </p>
       </div>
       {editing ? (
@@ -189,7 +187,7 @@ function LevelsDialog({ settings, onClose }: { settings: LevelSettings; onClose:
         <p className={fault === null ? 'tm-hint' : 'tm-hint tm-hint--error'}>
           {fault !== null
             ? FAULT_TEXT[fault.cause]
-            : 'Le seuil est compris. Laisse vides les rangs du haut pour les garder fermés. Monter un seuil ne reprend pas un rang déjà atteint.'}
+            : 'Le seuil est compris. Laisse vides les rangs du haut pour les garder fermés. Monter ou vider un seuil ne reprend pas un rang déjà gagné. Un rang suit le net du chatteur : une vente remboursée ou un rapport corrigé peut le faire redescendre.'}
         </p>
         {failed ? (
           <p className="tm-warn nv-swap" role="alert">

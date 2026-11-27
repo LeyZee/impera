@@ -1,5 +1,4 @@
 import {
-  CreatorSettingsSchema,
   DropMediaKindSchema,
   JOB_MAX_ATTEMPTS,
   newId,
@@ -7,7 +6,17 @@ import {
   ScriptSlotKeySchema,
   ShotMomentSchema,
 } from '@impera/contracts';
-import { and, eq, inArray, or, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  eq,
+  inArray,
+  or,
+  schema,
+  sql,
+  withTenantJob,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 
 import type { ScriptSummaryStore } from '../../domain/ports';
 
@@ -37,22 +46,23 @@ export async function enqueueSummary(
 /** A sent script: neither being filled nor withdrawn. */
 const sent = sql`${contentDrops.category} = 'script' and ${contentDrops.state} not in ('filling', 'withdrawn')`;
 
-/** The synthesis job's reads and writes, as the owner role. */
-export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummaryStore {
+/**
+ * The synthesis job's reads and writes, in the creator of its script and under the app role (`withTenantJob`, ADR 0087
+ * lot c): a script of another creator is not found, and nothing is written for her.
+ */
+export function createDrizzleScriptSummaryStore(db: Database): ScriptSummaryStore {
   return {
-    target: (dropId) =>
-      withAdmin(adminDb, async (tx) => {
+    target: (creatorId, dropId) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         const [drop] = await tx
           .select({
             creatorId: contentDrops.creatorId,
-            settings: schema.creators.settings,
             versionId: contentRequests.structureVersionId,
             moment: contentRequests.moment,
           })
           .from(contentDrops)
-          .innerJoin(schema.creators, eq(schema.creators.id, contentDrops.creatorId))
           .innerJoin(contentRequests, eq(contentRequests.id, contentDrops.requestId))
-          .where(and(eq(contentDrops.id, dropId), sent))
+          .where(and(eq(contentDrops.id, dropId), eq(contentDrops.creatorId, creatorId), sent))
           .limit(1);
         if (drop?.versionId == null) return null;
         const files = await tx
@@ -67,6 +77,7 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           .where(
             and(
               eq(contentDropFiles.dropId, dropId),
+              eq(contentDropFiles.creatorId, creatorId),
               sql`${contentDropFiles.slotKey} is not null`,
               sql`${contentDropFiles.replacedAt} is null`,
               sql`${contentDropFiles.state} <> 'refused'`,
@@ -75,7 +86,6 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           .orderBy(contentDropFiles.position);
         return {
           creatorId: drop.creatorId,
-          describes: CreatorSettingsSchema.parse(drop.settings).describeDrops,
           versionId: drop.versionId,
           moment: ShotMomentSchema.nullable().parse(drop.moment),
           files: files.map((file) => ({
@@ -86,14 +96,15 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           })),
         };
       }),
-    summarized: (dropId, mediaHash, promptHash) =>
-      withAdmin(adminDb, async (tx) => {
+    summarized: (creatorId, dropId, mediaHash, promptHash) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         const [row] = await tx
           .select({ id: scriptDropSummaries.id })
           .from(scriptDropSummaries)
           .where(
             and(
               eq(scriptDropSummaries.dropId, dropId),
+              eq(scriptDropSummaries.creatorId, creatorId),
               eq(scriptDropSummaries.mediaHash, mediaHash),
               // A synthesis corrected by hand stands for these media whatever the prompt (SC-04 lot c5).
               or(eq(scriptDropSummaries.promptHash, promptHash), eq(scriptDropSummaries.author, 'human')),
@@ -103,7 +114,7 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
         return row !== undefined;
       }),
     save: (creatorId, dropId, summary) =>
-      withAdmin(adminDb, async (tx) => {
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         await tx
           .insert(scriptDropSummaries)
           .values({
@@ -119,9 +130,11 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           .onConflictDoNothing();
       }),
     later: (creatorId, dropId, correlationId, runAt) =>
-      withAdmin(adminDb, (tx) => enqueueSummary(tx, { creatorId, dropId, correlationId }, runAt)),
-    enqueueFor: (mediaAssetId, correlationId) =>
-      withAdmin(adminDb, async (tx) => {
+      withTenantJob(db, creatorId, 'drop_media', (tx) =>
+        enqueueSummary(tx, { creatorId, dropId, correlationId }, runAt),
+      ),
+    enqueueFor: (creatorId, mediaAssetId, correlationId) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         const drops = await tx
           .selectDistinct({ creatorId: contentDrops.creatorId, dropId: contentDrops.id })
           .from(contentDropFiles)
@@ -129,6 +142,7 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           .where(
             and(
               eq(contentDropFiles.mediaAssetId, mediaAssetId),
+              eq(contentDrops.creatorId, creatorId),
               inArray(contentDropFiles.state, ['kept', 'duplicate']),
               sql`${contentDropFiles.slotKey} is not null`,
               sql`${contentDropFiles.replacedAt} is null`,

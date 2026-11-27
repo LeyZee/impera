@@ -332,6 +332,24 @@ export const REVEAL_ENDPOINTS = {
       refundAskedTotal: z.number().int().optional(),
     }),
   },
+  /** Her openers (« Messages d'accroche », ADR 0110 § 1): the texts Reveal offers a new fan, sent under his name. */
+  'models.sayHello': {
+    method: 'GET',
+    path: '/models/:id/say-hello',
+    shape: z.strictObject({
+      enabled: z.boolean(),
+      autoReplyEnabled: z.boolean(),
+      autoReplyDelaySeconds: z.number().nullable(),
+      openers: z.array(
+        z.strictObject({
+          /** `flirt`, `friendly`, `personal` seen (2026-11-16). */
+          kind: z.string(),
+          fanText: z.string(),
+          replyText: z.string().nullable(),
+        }),
+      ),
+    }),
+  },
   'models.get': {
     method: 'GET',
     path: '/models/:id',

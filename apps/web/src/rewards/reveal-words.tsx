@@ -6,11 +6,13 @@ import { Medal } from './Medal';
 import { TROPHY_NAMES, TrophyBadge, type TrophyKind } from './TrophyBadge';
 import { tierMedals } from './metals';
 
+import { roundAmountText } from '@/payroll/model';
 import { amountText } from '@/reports/model';
 
 /*
  * What a reveal says and shows for each thing a chatter earns (ADR 0104 § 12, § 15 and § 16). A tier's bonus is the one its
- * statement's tiers give, never worked out here (§ 17); no trophy shows an amount.
+ * statement's tiers give, never worked out here (§ 17); no trophy shows an amount. A rank says the cumulated net it
+ * was earned at when the server gives it: the chatter's own figure, the one « Mon rang » already counted toward.
  */
 
 export interface RevealWords {
@@ -20,6 +22,8 @@ export interface RevealWords {
   readonly text: string;
   readonly chip?: string;
   readonly tone: 'gold' | 'neon';
+  /** A rank's insignia is forged, not turned over (`RewardReveal`). */
+  readonly forge?: number;
 }
 
 const TROPHY_TEXTS: Readonly<Record<TrophyKind, string>> = {
@@ -53,6 +57,16 @@ export function rankOfKind(kind: string): number | null {
   return match?.[1] === undefined ? null : Number(match[1]);
 }
 
+/**
+ * How high a gain stands when several are owed at once: a rank, then a tier's medal, then a trophy, then a streak.
+ * The highest gets the one ceremony; the others are named under it (Design's rule: one ceremony an arrival).
+ */
+export function heightOfKind(kind: string): number {
+  if (rankOfKind(kind) !== null) return 3;
+  if (tierOfKind(kind) !== null) return 2;
+  return kind.startsWith('streak_') ? 0 : 1;
+}
+
 const OBJECT_SIZE = 220;
 
 /**
@@ -61,13 +75,16 @@ const OBJECT_SIZE = 220;
  * without its label nor its bonus, which this screen has not read.
  */
 export function revealWordsOf(
-  item: Pick<TrophyCaseItem, 'kind'>,
+  item: Pick<TrophyCaseItem, 'kind' | 'basis'>,
   current: PayPeriod | null,
   tiers: readonly BonusTier[],
+  /** The object's side: the reveal's own by default; a small one, without its light, for « Aussi gagné ». */
+  size = OBJECT_SIZE,
 ): RevealWords | null {
+  const glow = size === OBJECT_SIZE;
   if (isTrophy(item.kind)) {
     return {
-      object: <TrophyBadge kind={item.kind} size={OBJECT_SIZE} glow />,
+      object: <TrophyBadge kind={item.kind} size={size} glow={glow} />,
       kicker: item.kind.startsWith('streak_') ? 'Série' : 'Trophée gagné',
       title: TROPHY_NAMES[item.kind],
       text: TROPHY_TEXTS[item.kind],
@@ -79,14 +96,17 @@ export function revealWordsOf(
     const name = levelName(rank);
     if (name === null) return null;
     return {
-      object: <LevelInsignia rank={rank} size={OBJECT_SIZE} glow />,
+      object: <LevelInsignia rank={rank} size={size} glow={glow} />,
       kicker: 'Nouveau rang',
       title: name,
       text:
-        rank === 1
-          ? 'Ton premier rang. Il monte avec ton net cumulé et ne redescend jamais.'
-          : 'Ton net cumulé a passé le seuil. Un rang gagné ne se perd pas.',
+        item.basis === undefined
+          ? rank === 1
+            ? 'Ton premier rang. Il suit ton net cumulé.'
+            : 'Ton net cumulé a passé le seuil.'
+          : `Ton net depuis ton arrivée vient de passer ${roundAmountText(item.basis.minor, item.basis.currency)}.`,
       tone: 'neon',
+      forge: rank,
     };
   }
   const tier = tierOfKind(item.kind);
@@ -96,7 +116,7 @@ export function revealWordsOf(
   const fallback = { metal: 'or' as const, rank: 1 };
   const medal = known === undefined ? fallback : (tierMedals(tiers).of(known.thresholdMinor) ?? fallback);
   return {
-    object: <Medal medal={medal} size={OBJECT_SIZE} glow />,
+    object: <Medal medal={medal} size={size} glow={glow} />,
     kicker: 'Palier atteint',
     title: known === undefined ? 'Palier atteint' : `Palier ${known.label}`,
     text: 'Ton net de la quinzaine a passé le seuil.',

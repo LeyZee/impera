@@ -26,11 +26,12 @@ export interface VaultRef extends VaultCandidate {
 
 /** The account's vault as the job reads it, and where the job writes, as the owner role (ADR 0113). */
 export interface VaultDescribeStore {
-  /** The account's creator and her switch of the descriptions (ADR 0083 § 9); `null` for an account unknown. */
-  account(
-    platformAccountId: string,
-  ): Promise<{ readonly creatorId: string; readonly describes: boolean } | null>;
-  /** Its media still without a file, not removed, neither a voice note nor one waiting for the agency; its scripts. */
+  /** The account's creator; `null` for an account unknown, or a creator archived. */
+  account(platformAccountId: string): Promise<{ readonly creatorId: string } | null>;
+  /**
+   * Its media the owner asked to describe and that are in the CRM (ADR 0145 § 5), still without a file, not removed,
+   * neither a voice note nor one waiting for the agency; its scripts.
+   */
   waiting(
     creatorId: string,
     platformAccountId: string,
@@ -119,9 +120,9 @@ export interface VaultDescribeRun {
   /**
    * `more`: a lot went through and media still wait, the next run is queued now. `done`: nothing more for now. `budget`:
    * the day's AI budget is spent, the run is put off an hour (ADR 0083 § 8). `models`: every vision model failed, put off
-   * a quarter of an hour. `off`: her switch is off. `unavailable`: the account cannot be read now. `unknown`: no account.
+   * a quarter of an hour. `unavailable`: the account cannot be read now. `unknown`: no account.
    */
-  readonly stop: 'more' | 'done' | 'budget' | 'models' | 'off' | 'unavailable' | 'unknown';
+  readonly stop: 'more' | 'done' | 'budget' | 'models' | 'unavailable' | 'unknown';
   readonly described: number;
   readonly linked: number;
   /** Waiting for the agency's text from now on (« À décrire par l'agence »). */
@@ -292,8 +293,8 @@ async function describeOne(
 }
 
 /**
- * `media.describe_vault` (ADR 0113 § 1, § 3, § 5), on the account's queue: a lot of the media of its vault that have no
- * file yet, in the order where scripts become proposable first. Each is read from the platform into a folder of the
+ * `media.describe_vault` (ADR 0113 § 1, § 3, ADR 0145 § 5), on the account's queue: a lot of the media of its vault
+ * the owner asked to describe, imported and without a file yet, in the order where scripts become proposable first. Each is read from the platform into a folder of the
  * job's own, fingerprinted, linked to her media of the same fingerprint without a vision call, or else described in
  * detail like a drop (ADR 0083), reduced to its picture and kept as a media born erased; the folder is removed, read or
  * not. A file we do not read waits for the agency's text; a voice note is never taken. The day's budget spent stops the
@@ -332,7 +333,6 @@ export async function describeVault(
   await sweepVaultLeftovers(deps.scratchDir, deps.now());
   const account = await deps.store.account(job.platformAccountId);
   if (account === null) return { stop: 'unknown', ...counts };
-  if (!account.describes) return { stop: 'off', ...counts };
   const full = { ...job, creatorId: account.creatorId };
   const { refs, scripts } = await deps.store.waiting(account.creatorId, job.platformAccountId);
   const order = vaultDescribeOrder(refs, scripts);

@@ -50,12 +50,16 @@ export interface PayrollTeam {
     payload?: object,
     via?: Server,
   ): Promise<LightMyRequestResponse>;
-  /** A member on both creators at 20 % from their arrival (2025-01-01 unless said), signed in. */
+  /**
+   * A member on both creators at 20 % from their arrival (2025-01-01 unless said), signed in; a manager with a share of
+   * the team's net when `teamShareBps` says so.
+   */
   addMember(
     email: string,
     displayName: string,
     teamRole?: TeamRole,
     joinedOn?: string,
+    options?: { readonly rateBps?: number; readonly teamShareBps?: number },
   ): Promise<{ readonly member: TeamMember; readonly cookie: string }>;
   /** A report of `member` for `period`, as the planning leaves it: validated unless said otherwise. */
   report(
@@ -97,7 +101,8 @@ export interface PayrollTeam {
 }
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
-const PASSWORD = 'staple battery horse';
+/** The password of every member `addMember` makes, to sign in again. */
+export const MEMBER_PASSWORD = 'staple battery horse';
 const quiet = { warn: () => undefined, error: () => undefined };
 const RefusalSchema = z.object({ error: z.object({ code: z.string(), details: z.unknown() }) });
 
@@ -171,7 +176,7 @@ export async function startPayrollTeam(superuserUrl: string, options: AppOptions
     beas,
     call,
 
-    async addMember(email, displayName, teamRole = 'chatter', joinedOn = '2025-01-01') {
+    async addMember(email, displayName, teamRole = 'chatter', joinedOn = '2025-01-01', options = {}) {
       const response = await call('POST', '/team/members', owner, {
         email,
         displayName,
@@ -182,8 +187,8 @@ export async function startPayrollTeam(superuserUrl: string, options: AppOptions
         country: 'FR',
         timeZone: 'Europe/Paris',
         joinedOn,
-        commission: { rateBps: 2_000 },
-        teamShareBps: null,
+        commission: { rateBps: options.rateBps ?? 2_000 },
+        teamShareBps: options.teamShareBps ?? null,
       });
       expect(response.statusCode, response.body).toBe(201);
       const member = TeamMemberSchema.parse(response.json());
@@ -192,9 +197,9 @@ export async function startPayrollTeam(superuserUrl: string, options: AppOptions
         userId: member.userId,
         providerId: 'credential',
         accountId: member.userId,
-        password: await context.password.hash(PASSWORD),
+        password: await context.password.hash(MEMBER_PASSWORD),
       });
-      return { member, cookie: await signIn(server, email, PASSWORD) };
+      return { member, cookie: await signIn(server, email, MEMBER_PASSWORD) };
     },
 
     async report(

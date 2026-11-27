@@ -1,4 +1,5 @@
 import {
+  AGENT_PAUSE_MAX_MS,
   BLIND_TEST_TARGET,
   ConversationIdSchema,
   DomainError,
@@ -6,13 +7,13 @@ import {
   jobKeyFor,
   MessageIdSchema,
   newId,
+  pauseEndJobKey,
   queueNameFor,
   resumeRunAt,
   type AgentMode,
   type AutomaticGate,
   type BlindTestResult,
   type LiveRateReading,
-  type MessageId,
   type ConversationId,
   type ConversationMode,
   type ConversationState,
@@ -27,6 +28,8 @@ import {
 import { safetySigns } from '../../agent';
 import {
   AgeInDoubtConflict,
+  AgentPauseConflict,
+  AgentPauseInvalid,
   AutomaticLocked,
   CreatorNotFound,
   DraftGuarded,
@@ -34,10 +37,12 @@ import {
   ScriptStepCut,
   SendBlocked,
 } from '../domain/errors';
+import { placedDraftFor, placedVerdict } from '../domain/placed-draft';
 import type {
   BubbleGuard,
   Clock,
   Conversation,
+  Draft,
   DraftVoice,
   EventMeta,
   FanDirectory,
@@ -119,6 +124,11 @@ export interface ConversationCommands {
   expireDraft(
     input: Omit<ConversationCommand, 'userId'> & { draftId: DraftId; reason: string },
   ): Promise<void>;
+  /**
+   * The window of a draft placed from the copilot panel closed (ADR 0086 § 5): what left of it decides its verdict;
+   * nothing, it expires. A draft already decided is left as it is.
+   */
+  settlePlacedDraft(input: Omit<ConversationCommand, 'userId'> & { draftId: DraftId }): Promise<void>;
   takeover(input: ConversationCommand & { reason?: string }): Promise<void>;
   /** `note`: what the chatter wants her to remember about the fan, kept as an `operator_note` fact (P3-02). */
   release(input: ConversationCommand & { note?: string }): Promise<void>;
@@ -128,11 +138,12 @@ export interface ConversationCommands {
   /**
    * The Dashboard's control (Arrêt, Copilote, Automatique) for all her conversations. Returns the mode now in
    * force: Arrêt while the global switch stays on, whatever she asked. Automatique only behind its lock (ADR 0019).
-   * `reason` names a stop that does not come from the Dashboard (her archiving, ADR 0071 § 2).
+   * `reason` names a stop that does not come from the Dashboard (her archiving, ADR 0071 § 2). `until` makes Arrêt
+   * a pause that lifts itself then (ADR 0148 § 1): the fans who wrote meanwhile are answered at its end.
    */
   setAgentMode(
-    input: Omit<ConversationCommand, 'conversationId'> & { mode: AgentMode; reason?: string },
-  ): Promise<{ mode: AgentMode; globalStop: boolean }>;
+    input: Omit<ConversationCommand, 'conversationId'> & { mode: AgentMode; reason?: string; until?: Date },
+  ): Promise<{ mode: AgentMode; globalStop: boolean; pausedUntil: string | null }>;
   /**
    * Whether Automatique may open for her now, what is missing (ADR 0019), and the live rate it was decided on:
    * what the Dashboard shows.
@@ -164,20 +175,83 @@ export interface CommandDeps {
 const NEW_FAN_MESSAGE = 'Nouveau message du fan';
 const TAKEN_OVER = 'Conversation reprise par un humain';
 const ANSWERED_ON_PLATFORM = 'Déjà répondu sur la plateforme';
+const NOTHING_SENT = 'Placé dans Reveal, rien envoyé dans les 15 minutes';
 /** The states in which his last message still waits for the agent's answer (ADR 0110 § 2). */
 const AWAITING_AGENT: readonly ConversationState[] = ['pending', 'drafting', 'awaiting_approval'];
 /** How far back the guards read what she already sent (P3-13): the conversation's last twenty messages. */
 const GUARD_HISTORY_MESSAGES = 20;
 
-/** Expires every draft still open: they answer a conversation that has moved on. */
+/**
+ * A draft placed from the copilot panel, decided by what left of it (ADR 0086 § 5): sent as it was, validated;
+ * otherwise corrected, with the text really sent. Its `live` rating is written in the same transaction, and nothing
+ * leaves after it: the chatter already sent it.
+ */
+async function settleSentByHand(
+  tx: Transaction,
+  conversation: Conversation,
+  draft: Draft,
+  sent: readonly string[],
+  meta: EventMeta,
+): Promise<Conversation> {
+  const verdict = placedVerdict(draft.bubbles, sent);
+  const isEdited = verdict.kind !== 'validated';
+  const status = isEdited ? 'edited' : 'approved';
+  const current = await appendEvent(
+    tx,
+    conversation,
+    {
+      type: isEdited ? 'draft_edited' : 'draft_approved',
+      payload: {
+        draftId: draft.id,
+        status,
+        ...(draft.placedBy !== null && { decidedBy: draft.placedBy }),
+        ...(isEdited && { editedBubbles: [...sent] }),
+        sentOnPlatform: true,
+      },
+    },
+    meta,
+  );
+  await setDraftStatus(tx, draft, status, {
+    decidedBy: draft.placedBy === null ? null : `human:${draft.placedBy}`,
+    at: meta.at,
+    ...(isEdited && { finalBubbles: sent }),
+  });
+  await setDraftStatus(tx, { ...draft, status }, 'sent');
+  await tx.drafts.rateLive(draft.id, verdict, meta.at);
+  // A human sent what the brief read about him: it becomes facts, as after an approval (P3-02).
+  if (draft.facts.length > 0)
+    await tx.jobs.enqueue(
+      'conversation.record_facts',
+      {
+        creatorId: conversation.creatorId,
+        conversationId: conversation.id,
+        correlationId: meta.correlationId,
+        source: { kind: 'draft', draftId: draft.id },
+      },
+      {},
+    );
+  return current;
+}
+
+/**
+ * Closes every draft still open: they answer a conversation that has moved on. A placed draft of which something
+ * already left is decided by it (ADR 0086 § 5); any other expires.
+ */
 async function expireOpenDrafts(
   tx: Transaction,
   conversation: Conversation,
   reason: string,
   meta: EventMeta,
+  keep: DraftId | null = null,
 ): Promise<Conversation> {
   let current = conversation;
   for (const draft of await tx.drafts.openFor(conversation.id)) {
+    if (draft.id === keep) continue;
+    const sent = draft.placedAt === null ? [] : await tx.messages.textsForDraft(draft.id);
+    if (sent.length > 0) {
+      current = await settleSentByHand(tx, current, draft, sent, meta);
+      continue;
+    }
     current = await appendEvent(
       tx,
       current,
@@ -190,14 +264,8 @@ async function expireOpenDrafts(
 }
 
 /** His messages since the last one of the creator's side carry a sign the safety net answers (a minor, self-harm). */
-async function waitingSafetySign(
-  tx: Transaction,
-  conversation: Conversation,
-  answer: MessageId,
-): Promise<boolean> {
-  const history = (await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES)).filter(
-    (message) => message.id !== answer,
-  );
+async function waitingSafetySign(tx: Transaction, conversation: Conversation): Promise<boolean> {
+  const history = await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES);
   const lastReply = history.findLastIndex((message) => message.author !== 'fan');
   return history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
 }
@@ -250,6 +318,26 @@ export function createConversationCommands({
         // the send job did not record it (a script step, a send whose answer was lost); else someone on the platform
         // wrote it.
         const author = isInbound ? 'fan' : message.author === 'ai' ? 'ai' : 'human';
+        // Answered on the platform (ADR 0110 § 2): a chatter, the creator or an automation wrote while he waited for
+        // the agent. Her open draft falls and nothing of hers goes over it, unless his words carry a sign the safety
+        // net answers, or a care episode is open (ADR 0088): then the agent's draft still reaches a human. Read before
+        // the message is stored: his words since her last one are the same.
+        const answered =
+          author === 'human' &&
+          AWAITING_AGENT.includes(conversation.state) &&
+          conversation.careSince === null &&
+          !(await waitingSafetySign(tx, conversation));
+        // Unless what he was answered with is the draft a chatter placed from the copilot panel (ADR 0086 § 5): the
+        // message is that draft, sent by hand, and what left decides its verdict. Once he is answered, its next
+        // bubbles are that draft too.
+        const byHand =
+          (answered ||
+            (author === 'human' &&
+              conversation.careSince === null &&
+              !AWAITING_AGENT.includes(conversation.state))) &&
+          message.text.trim() !== ''
+            ? placedDraftFor(await tx.drafts.openFor(conversation.id), new Date(message.createdAt))
+            : null;
         const isNew = await tx.messages.insertIfNew({
           id: messageId,
           conversationId: conversation.id,
@@ -264,7 +352,8 @@ export function createConversationCommands({
           isPaid: message.isPaid,
           platformMedia: isInbound ? message.media.slice(0, FAN_MEDIA_MAX) : message.media,
           platformCreatedAt: new Date(message.createdAt),
-          draftId: null,
+          draftId: byHand?.id ?? null,
+          ...(message.origin === undefined ? {} : { origin: message.origin }),
         });
         if (!isNew) return { conversationId: conversation.id, isNew: false };
 
@@ -273,19 +362,14 @@ export function createConversationCommands({
           correlationId: input.correlationId,
           at,
         };
-        // Answered on the platform (ADR 0110 § 2): a chatter, the creator or an automation wrote while he waited for
-        // the agent. Her open draft falls and nothing of hers goes over it, unless his words carry a sign the safety
-        // net answers, or a care episode is open (ADR 0088): then the agent's draft still reaches a human.
-        const answered =
-          author === 'human' &&
-          AWAITING_AGENT.includes(conversation.state) &&
-          conversation.careSince === null &&
-          !(await waitingSafetySign(tx, conversation, messageId));
         if (answered)
-          conversation = await expireOpenDrafts(tx, conversation, ANSWERED_ON_PLATFORM, {
-            ...meta,
-            actor: 'system',
-          });
+          conversation = await expireOpenDrafts(
+            tx,
+            conversation,
+            ANSWERED_ON_PLATFORM,
+            { ...meta, actor: 'system' },
+            byHand?.id ?? null,
+          );
         // An expired draft already put him at rest; otherwise the message itself does.
         const answersFan = answered && AWAITING_AGENT.includes(conversation.state);
         conversation = await appendEvent(
@@ -305,6 +389,15 @@ export function createConversationCommands({
           },
           meta,
         );
+        // Every bubble of the placed draft left: what left decides it now (ADR 0086 § 5); else its window does.
+        if (byHand !== null) {
+          const sent = await tx.messages.textsForDraft(byHand.id);
+          if (sent.length >= byHand.bubbles.length)
+            conversation = await settleSentByHand(tx, conversation, byHand, sent, {
+              ...meta,
+              actor: 'system',
+            });
+        }
         // Caught up (P2-02): stored and counted, but nothing reads or answers it on its own, unless his words carry a
         // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
         const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
@@ -476,6 +569,37 @@ export function createConversationCommands({
       });
     },
 
+    async settlePlacedDraft(input) {
+      await uow.inTenant(input.creatorId, async (tx) => {
+        const conversation = await lockConversation(tx, input.conversationId);
+        const draft = await tx.drafts.lock(input.draftId);
+        // Decided since (all its bubbles left, a fan's message, a takeover), or not placed: nothing to settle.
+        if (
+          draft?.conversationId !== conversation.id ||
+          draft.status !== 'pending' ||
+          draft.placedAt === null
+        )
+          return;
+        const meta: EventMeta = { actor: 'system', correlationId: input.correlationId, at: clock.now() };
+        const sent = await tx.messages.textsForDraft(draft.id);
+        if (sent.length > 0) {
+          await settleSentByHand(tx, conversation, draft, sent, meta);
+          return;
+        }
+        await appendEvent(
+          tx,
+          conversation,
+          {
+            type: 'draft_expired',
+            // The chatter kept it for himself: his message, still unread by us, stays in Reveal for him to answer.
+            payload: { draftId: draft.id, status: 'expired', reason: NOTHING_SENT },
+          },
+          meta,
+        );
+        await setDraftStatus(tx, draft, 'expired', { decidedBy: null, at: meta.at });
+      });
+    },
+
     takeover(input) {
       return uow.inTenant(input.creatorId, async (tx) => {
         const meta = humanMeta(input);
@@ -528,7 +652,12 @@ export function createConversationCommands({
               creatorId: input.creatorId,
               conversationId: conversation.id,
               correlationId: input.correlationId,
-              source: { kind: 'operator_note', note: input.note, at: meta.at.toISOString() },
+              source: {
+                kind: 'operator_note',
+                note: input.note,
+                at: meta.at.toISOString(),
+                userId: input.userId,
+              },
             },
             {},
           );
@@ -585,6 +714,11 @@ export function createConversationCommands({
     setAgentMode(input) {
       const stop = input.mode === 'stop';
       const target = input.mode === 'auto' ? 'auto' : 'copilot';
+      const until = stop ? (input.until ?? null) : null;
+      if (until !== null) {
+        const ahead = until.getTime() - clock.now().getTime();
+        if (ahead <= 0 || ahead > AGENT_PAUSE_MAX_MS) throw new AgentPauseInvalid();
+      }
       return uow.inTenant(input.creatorId, async (tx) => {
         // Two clicks in a row apply in the order they took the lock, and the later one stays the latest row.
         if (!(await tx.switches.lockCreator())) throw new CreatorNotFound();
@@ -592,11 +726,26 @@ export function createConversationCommands({
         if (input.mode === 'auto') await requireAutomaticOpen(tx, voice);
         const meta = humanMeta(input);
         const switches = await tx.switches.isOn();
-        if (switches.creator !== stop) {
+        if (until !== null) {
+          // A pause never brings a stop's end closer (Sécurité, #865): resuming has its own checks.
+          if (await tx.switches.archived()) throw new AgentPauseConflict('archived');
+          if (switches.creator && switches.creatorUntil === null) throw new AgentPauseConflict('stopped');
+          if (switches.creatorUntil !== null && until < switches.creatorUntil) {
+            throw new AgentPauseConflict('sooner');
+          }
+        }
+        // A pause turned into an Arrêt, or pushed back, is a new row too: its end changes.
+        const endChanges = stop && switches.creator && switches.creatorUntil?.getTime() !== until?.getTime();
+        if (switches.creator !== stop || endChanges) {
           const reason = stop
-            ? (input.reason ?? 'Arrêt depuis le Dashboard')
+            ? (input.reason ?? (until === null ? 'Arrêt depuis le Dashboard' : 'Pause'))
             : `Reprise en ${target === 'auto' ? 'automatique' : 'copilote'} depuis le Dashboard`;
-          await tx.switches.setCreator({ active: stop, reason, setBy: meta.actor });
+          await tx.switches.setCreator({
+            active: stop,
+            reason,
+            setBy: meta.actor,
+            ...(until === null ? {} : { until }),
+          });
           await tx.events.publish(
             input.creatorId,
             {
@@ -610,8 +759,21 @@ export function createConversationCommands({
             action: stop ? 'kill_switch.on' : 'kill_switch.off',
             entity: 'kill_switch',
             entityId: input.creatorId,
-            details: { scope: 'creator', correlationId: input.correlationId },
+            details: {
+              scope: 'creator',
+              correlationId: input.correlationId,
+              ...(until === null ? {} : { until: until.toISOString() }),
+            },
           });
+          if (until !== null) {
+            // At its end the switch reads as off by itself: one reopening answers the fans who wrote meanwhile, the
+            // longest wait first, each at her hours (respond defers what falls out of them).
+            await tx.jobs.enqueue(
+              'conversation.reopen',
+              { creatorId: input.creatorId, correlationId: input.correlationId },
+              { jobKey: pauseEndJobKey(input.creatorId), runAt: until },
+            );
+          }
         }
         if (switches.creator && !stop && !switches.global) {
           // A fan who wrote during the stop was left `pending` (respond saw the switch and did nothing): each of
@@ -649,7 +811,11 @@ export function createConversationCommands({
             await automaticSwitchedOn(tx, input, 'creator', input.creatorId, meta);
           }
         }
-        return { mode: stop || switches.global ? 'stop' : target, globalStop: switches.global };
+        return {
+          mode: stop || switches.global ? 'stop' : target,
+          globalStop: switches.global,
+          pausedUntil: until?.toISOString() ?? null,
+        };
       });
     },
 

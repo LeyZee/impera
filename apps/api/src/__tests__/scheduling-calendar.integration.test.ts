@@ -385,6 +385,47 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     expect(stopped.agency?.toFill).toHaveLength(8);
   });
 
+  it('reads a pause as the other readers do: ended, no longer Arrêt; under way, Arrêt (ADR 0148 § 1)', async () => {
+    const minutes = (count: number): Date => new Date(Date.now() + count * 60_000);
+    // The test above leaves the global switch on: lifted first, so only her pause decides.
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'global',
+      active: false,
+      reason: 'essai levé',
+      setBy: 'owner',
+    });
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'creator',
+      scopeId: ines,
+      creatorId: ines,
+      active: true,
+      activeUntil: minutes(-5),
+      reason: 'pause finie',
+      setBy: 'owner',
+      setAt: minutes(-65),
+    });
+    const ended = await calendar(owner);
+    expect(ended.agent.find((agent) => agent.creatorId === ines)?.mode).not.toBe('stop');
+    await expectSameModeAsDashboard(ended);
+
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'creator',
+      scopeId: ines,
+      creatorId: ines,
+      active: true,
+      activeUntil: minutes(60),
+      reason: 'pause en cours',
+      setBy: 'owner',
+      setAt: minutes(-1),
+    });
+    const paused = await calendar(owner);
+    expect(paused.agent.find((agent) => agent.creatorId === ines)?.mode).toBe('stop');
+    await expectSameModeAsDashboard(paused);
+  });
+
   it('refuses a window over six weeks, and a creator', async () => {
     const query = new URLSearchParams({
       from: iso(from),

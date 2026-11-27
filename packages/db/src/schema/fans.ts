@@ -1,7 +1,9 @@
+import { FAN_LANGUAGE_SOURCES, LANGUAGES } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
+import { check, index, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
-import { creatorReadsOnly, id, tenantPolicy, timestampTz } from './columns';
+import { user } from './auth';
+import { creatorReadsOnly, enumCheck, id, tenantPolicy, timestampTz } from './columns';
 import { creators, platformAccounts } from './tenancy';
 
 export const fans = pgTable(
@@ -28,10 +30,27 @@ export const fans = pgTable(
     flags: jsonb('flags').notNull().default({}),
     /** Platform-specific data (subscription…); empty for Reveal (own-platform.md). */
     platformMeta: jsonb('platform_meta').notNull().default({}),
+    /**
+     * His kept language (ADR 0168 § 3), a value of `LANGUAGES`: read by code on his messages (`detected`) or set by a
+     * person (`set`, by `language_set_by`), whom code never overwrites. Null until one is known.
+     */
+    language: text('language'),
+    languageSource: text('language_source'),
+    languageSetBy: text('language_set_by').references(() => user.id),
+    languageSetAt: timestampTz('language_set_at'),
   },
   (t) => [
     unique('fans_platform_fan_unique').on(t.platformAccountId, t.platformFanId),
+    // Lets a row of another table name his creator with him (`custom_orders`): never a fan of another creator.
+    unique('fans_id_creator_unique').on(t.id, t.creatorId),
     index('fans_creator_idx').on(t.creatorId),
+    enumCheck('fans', t.language, LANGUAGES),
+    enumCheck('fans', t.languageSource, FAN_LANGUAGE_SOURCES),
+    // Whole or absent: the language, where it comes from, when; a person's name exactly when a person set it.
+    check(
+      'fans_language_whole_check',
+      sql`(${t.language} is null and ${t.languageSource} is null and ${t.languageSetAt} is null and ${t.languageSetBy} is null) or (${t.language} is not null and ${t.languageSource} is not null and ${t.languageSetAt} is not null and (${t.languageSource} = 'set') = (${t.languageSetBy} is not null))`,
+    ),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],

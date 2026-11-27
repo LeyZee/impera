@@ -17,6 +17,8 @@ export interface StoredGain {
   readonly scopeKey: string;
   readonly earnedAt: Date;
   readonly revealedAt: Date | null;
+  /** The threshold a rank was earned at (ADR 0118 § 7); `null` on anything else and on a rank noted before it. */
+  readonly basisMinor: number | null;
 }
 
 /** A tier's `kind` in the case: `tier:<fortnight>:<threshold>`, what its gain is written once under. */
@@ -73,12 +75,15 @@ export function trophyCaseOf(
   const ranks = gains
     .filter((gain) => gain.kind === 'level')
     .toSorted((a, b) => Number(a.scopeKey) - Number(b.scopeKey));
+  // The threshold a rank was earned at is said to its owner alone, for the reveal: never on a read of someone else's.
+  const currency = progress?.currency ?? null;
   const levels: TrophyCaseItem[] = ranks.map((gain) => ({
     kind: levelItemKind(gain.scopeKey),
     family: 'level',
     earnedAt: gain.earnedAt.toISOString(),
     progress: null,
     revealedAt: gain.revealedAt?.toISOString() ?? null,
+    ...(currency === null || gain.basisMinor === null ? {} : { basis: { minor: gain.basisMinor, currency } }),
   }));
   const rank = Number(ranks.at(-1)?.scopeKey ?? 0);
   const ahead = progress === null ? null : nextStep(rank, progress.steps);

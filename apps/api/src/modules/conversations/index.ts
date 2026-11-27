@@ -4,6 +4,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createConversationCommands, type ConversationCommands } from './application/commands';
+import { createAfterSaleJob } from './application/jobs/after-sale';
 import { createFollowUpJob } from './application/jobs/follow-up';
 import { createReadCardJob } from './application/jobs/read-card';
 import { createRecordFactsJob } from './application/jobs/record-facts';
@@ -31,14 +32,18 @@ import { createDrizzleAlertHistory } from './infra/db/alert-history';
 import { createDrizzleAwayHolds } from './infra/db/away-holds';
 import { createDrizzleCopilotReader } from './infra/db/copilot-reader';
 import { createDrizzleCreatorSpaceReader } from './infra/db/creator-reader';
+import { readDraftCorrections } from './infra/db/draft-corrections';
 import { createDrizzleConversationReader } from './infra/db/reader';
-import { createDrizzleUnitOfWork } from './infra/db/unit-of-work';
+import { createDrizzleUnitOfWork, type CustomOrderStorePort } from './infra/db/unit-of-work';
 import { createAlertHistoryRoutes } from './infra/http/alert-history-routes';
 import { createCopilotRoutes, type CopilotRouteDeps } from './infra/http/copilot-routes';
 import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
+import { createDraftCorrectionsRoutes } from './infra/http/draft-corrections-routes';
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
+export { scriptRunsForTeam } from './infra/db/script-runs';
+export { conversationReadsForShifts } from './infra/db/shift-activity-reads';
 export type {
   BubbleGuard,
   CardReader,
@@ -92,7 +97,11 @@ export interface ConversationsModule extends ConversationCommands {
     /** `fans.read_card` (ADR 0085 § 7): his new messages read for his card, whoever answers him. */
     readCard(payload: JobPayload<'fans.read_card'>, logger: JobLogger): Promise<void>;
     followUp(payload: JobPayload<'conversation.follow_up'>, logger: JobLogger): Promise<void>;
+    /** `conversation.after_sale` (ADR 0156 § 2): a step he bought or a tip wakes his conversation for her word after it. */
+    afterSale(payload: JobPayload<'conversation.after_sale'>, logger: JobLogger): Promise<void>;
     reopen(payload: JobPayload<'conversation.reopen'>, logger: JobLogger): Promise<void>;
+    /** `conversation.settle_placed` (ADR 0086 § 5): a draft placed from the copilot panel, decided by what left. */
+    settlePlaced(payload: JobPayload<'conversation.settle_placed'>): Promise<void>;
     /** Each minute: what members who are no longer `active` still held is handed back (EQ-13). */
     releaseUnavailable(logger: JobLogger): Promise<void>;
   };
@@ -132,6 +141,11 @@ export interface ConversationsDeps {
    * in, and the read of a conversation none of them holds yet. Without them, `/v1/copilot` is not mounted.
    */
   readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds' | 'askRead'>;
+  /**
+   * His custom order kept by the `custom-orders` module (ADR 0159 § A.2), in the turn's transactions; without it, the
+   * agent answers a custom request as before (ADR 0090 § A).
+   */
+  readonly customOrders?: CustomOrderStorePort;
   readonly clock?: Clock;
 }
 
@@ -142,7 +156,9 @@ const noMediaDescriptions: MediaDescriptions = { of: () => Promise.resolve(new M
 const systemClock: Clock = { now: () => new Date() };
 
 export function createConversationsModule(deps: ConversationsDeps): ConversationsModule {
-  const uow = createDrizzleUnitOfWork(deps.db);
+  const uow = createDrizzleUnitOfWork(deps.db, {
+    ...(deps.customOrders !== undefined && { customOrders: deps.customOrders }),
+  });
   const clock = deps.clock ?? systemClock;
   const commands = createConversationCommands({
     uow,
@@ -172,6 +188,11 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         createDrizzleAlertHistory(deps.db),
         deps.alertNames ?? noAlertNames,
         deps.requireRole,
+      )(app, options);
+      await createDraftCorrectionsRoutes(
+        (creatorId, since) => readDraftCorrections(deps.db, creatorId, since),
+        deps.requireRole,
+        clock,
       )(app, options);
       if (deps.copilot !== undefined)
         await createCopilotRoutes({
@@ -218,7 +239,15 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         ...(deps.followUps === undefined ? {} : { followUps: deps.followUps }),
         ...(deps.replyHours === undefined ? {} : { replyHours: deps.replyHours }),
       }),
+      afterSale: createAfterSaleJob({
+        uow,
+        clock,
+        fans: deps.fans,
+        ...(deps.composer === undefined ? {} : { composer: deps.composer }),
+        ...(deps.replyHours === undefined ? {} : { replyHours: deps.replyHours }),
+      }),
       reopen: createReopenJob({ uow, clock }),
+      settlePlaced: (payload) => commands.settlePlacedDraft(payload),
       releaseUnavailable: createReleaseUnavailableJob({
         uow,
         clock,

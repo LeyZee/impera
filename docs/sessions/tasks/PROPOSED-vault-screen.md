@@ -19,6 +19,7 @@ Trois lots, une PR chacun : (a) médiathèque, (b) composition, (c) relecture IA
 - [ ] Relire un script écrit par l'IA : garder, retoucher, refuser ; « Créer dans Reveal ».
 - [ ] Interrupteur « création sans relecture » par créatrice, propriétaire seul, dans Créatrices › Scripts, avec la mesure gardé / retouché / refusé à la manière de 0086 (remarque Médias sur 0100, point 5).
 - [ ] Rien pour une créatrice archivée.
+- [x] Avenant du 20/11 à l'ADR 0145 § 5 (demande de Charles) : le coffre ne montre que ce qui est dans Impera ; « Synchroniser » ouvre « Choisir dans Reveal » (dossiers en cartes, cocher entier ou média par média, « Importer ») ; « Retirer d'Impera » confirmé ; le flou suit le menu partout. Lot de captures `coffre-choisir-1`.
 
 ## Critères d'acceptation
 - Tests de l'app web sur les états (à décrire, à valider, validé, flux illisible) ; captures Nuit/Jour, PC/téléphone avant fusion.

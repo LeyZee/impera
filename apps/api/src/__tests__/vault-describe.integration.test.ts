@@ -52,6 +52,9 @@ const DESCRIBED: DropMediaDescription = {
 };
 
 const vision = { calls: 0, budget: false };
+/** The owner whose confirmed request writes `vault_describe_requests` (invented), and that gesture's key. */
+const owner = 'owner_vault_test';
+const OWNER_KEY = '0195a3f0-0000-7000-8000-000000000001';
 const dropVision: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'> = {
   promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
   describeDrop: (input) => {
@@ -98,10 +101,11 @@ const storage: DropStorage = {
 };
 
 /**
- * `media.describe_vault` on FakeReveal's invented vault (ADR 0113), through the real connector, the real tables and the
- * worker: queued behind a vault sync, each photo and video read, described once per fingerprint by a stub vision, kept
- * born erased with its picture, the platform's text a row of its own; a spent budget stops the run and the hour's
- * catch-up resumes it without a double; the base refuses an empty key anywhere else.
+ * `media.describe_vault` on FakeReveal's invented vault (ADR 0113, ADR 0145 § 5), through the real connector, the real
+ * tables and the worker: queued behind a vault sync, it takes only what the owner asked and ticked into the CRM; each
+ * photo and video read, described once per fingerprint by a stub vision, kept born erased with its picture, the
+ * platform's text a row of its own; a spent budget stops the run and puts it off; the base refuses an empty key
+ * anywhere else.
  */
 describe('vault description on FakeReveal (ADR 0113)', () => {
   let test: TestDb;
@@ -121,7 +125,6 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
       pgPool: test.admin.pool,
       taskList: {
         'media.describe_vault': app.tasks['media.describe_vault'],
-        'media.describe_vault_backlog': app.tasks['media.describe_vault_backlog'],
       },
     });
   const queued = async () =>
@@ -145,6 +148,39 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
       })
       .from(schema.mediaPlatformRefs)
       .where(eq(schema.mediaPlatformRefs.platformAccountId, accountId));
+
+  // Each stage brings her vault there from wherever the tests before left it, so that any test also runs alone (`-t`).
+  /** Every photo and video of hers asked, as the owner's confirmed request writes it; replayable. */
+  const asked = () =>
+    test.admin.db.execute(sql`
+      insert into vault_describe_requests (id, creator_id, platform_account_id, platform_media_id, asked_key, asked_by)
+      select gen_random_uuid(), r.creator_id, r.platform_account_id, r.platform_media_id, ${OWNER_KEY}::uuid, ${owner}
+        from media_platform_refs r
+       where r.platform_account_id = ${accountId} and r.kind <> 'audio'
+      on conflict do nothing`);
+  /** Each folder of hers ticked whole into the CRM; replayable. */
+  const imported = () =>
+    test.admin.db.execute(sql`
+      insert into vault_import_choices (id, creator_id, platform_account_id, scope, folder_ref, imported, chosen_by)
+      select gen_random_uuid(), creator_id, platform_account_id, 'folder', folder_ref, true, ${owner}
+        from (select distinct creator_id, platform_account_id, folder_ref from media_platform_refs
+               where platform_account_id = ${accountId}) f
+      on conflict do nothing`);
+  /** Synced, asked and imported: the next sync's run has work. */
+  const ready = async () => {
+    await sync();
+    await asked();
+    await imported();
+    await sync();
+  };
+
+  /** Runs her queued description to its end, brought forward as the hour would bring a run the budget put off. */
+  const drain = async () => {
+    await test.admin.db.execute(
+      sql`update graphile_worker._private_jobs set run_at = now() where key = ${vaultDescribeJobKey(accountId)}`,
+    );
+    for (let lot = 0; lot < 10 && (await queued()).length > 0; lot++) await work();
+  };
 
   beforeAll(async () => {
     fake = createFakeReveal();
@@ -175,9 +211,8 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
       nameKey: 'nora',
       displayName: 'Nora',
       timezone: 'Europe/Paris',
-      // Her switch of the descriptions (ADR 0083 § 9): on, or nothing is described.
-      settings: { describeDrops: true },
     });
+    await test.admin.db.insert(schema.user).values({ id: owner, name: 'Owner', email: 'owner@example.test' });
     accountId = newId(PlatformAccountIdSchema);
     await test.admin.db.insert(schema.platformAccounts).values({
       id: accountId,
@@ -235,7 +270,25 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
     expect(jobs[0]?.queue).toBe(`account:${accountId}`);
   });
 
+  it('describes nothing she did not ask, nor what she asked but did not import (ADR 0145 § 5)', async () => {
+    await sync();
+    await work();
+    expect(vision.calls).toBe(0);
+    expect(await queued()).toHaveLength(0);
+    // Every photo and video asked; nothing ticked into the CRM yet.
+    await asked();
+    await sync();
+    await work();
+    expect(vision.calls).toBe(0);
+    expect((await refs()).every((ref) => ref.asset === null)).toBe(true);
+    // Each folder of hers ticked whole: the next sync's run finds them.
+    await imported();
+    await sync();
+    expect(await queued()).toHaveLength(1);
+  });
+
   it('stops at the spent budget, keeps nothing, and is put off an hour', async () => {
+    await ready();
     vision.budget = true;
     const before = Date.now();
     await work();
@@ -249,11 +302,9 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
   });
 
   it('describes each fingerprint once, keeps it born erased with its picture, and links every other media', async () => {
-    // The hour's catch-up: a run already waiting keeps its time, so the test brings it forward as the hour would.
-    await test.admin.db.execute(
-      sql`update graphile_worker._private_jobs set run_at = now() where key = ${vaultDescribeJobKey(accountId)}`,
-    );
-    for (let lot = 0; lot < 10 && (await queued()).length > 0; lot++) await work();
+    await ready();
+    // A run put off by the budget keeps its time: the test brings it forward as the hour would.
+    await drain();
 
     const all = await refs();
     const voice = all.find((ref) => ref.id === 'vault_voice');
@@ -301,27 +352,30 @@ describe('vault description on FakeReveal (ADR 0113)', () => {
     ]);
   });
 
-  it('takes nothing again: a later sync and the hour’s catch-up describe nothing more', async () => {
+  it('takes nothing again, and nothing of itself: a later sync describes only what is asked and imported', async () => {
+    // Her vault described first (by the test above, or here when this one runs alone).
+    await ready();
+    await drain();
     const calls = vision.calls;
     await sync();
     for (let lot = 0; lot < 3 && (await queued()).length > 0; lot++) await work();
-    // A photo at the vault's root is never described (Charles, 16/11): the hour's catch-up
-    // queues nothing for it.
+    expect(vision.calls).toBe(calls);
+    // A photo at the vault's root, asked, but the root is not ticked: never described.
     await test.admin.db.execute(sql`
       insert into media_platform_refs
         (id, creator_id, platform, platform_account_id, platform_media_id, kind, folder_ref, folder_position,
          platform_created_at, last_synced_at)
       values (gen_random_uuid(), ${creatorId}, 'reveal', ${accountId}, 'vault_root_loose', 'image', null, 0,
               '2027-01-01T00:00:50.000Z', now())`);
+    await test.admin.db.execute(sql`
+      insert into vault_describe_requests (id, creator_id, platform_account_id, platform_media_id, asked_key, asked_by)
+      values (gen_random_uuid(), ${creatorId}, ${accountId}, 'vault_root_loose', ${OWNER_KEY}::uuid, ${owner})`);
     await test.admin.db.execute(
-      sql`select public.enqueue_job(task => 'media.describe_vault_backlog', payload => '{}'::jsonb)`,
+      sql`select public.enqueue_job(task => 'media.describe_vault',
+            payload => ${JSON.stringify({ creatorId, platformAccountId: accountId, correlationId: 'test' })}::jsonb)`,
     );
-    // The catch-up alone: a run it queued would wait here.
-    await runOnce({
-      pgPool: test.admin.pool,
-      taskList: { 'media.describe_vault_backlog': app.tasks['media.describe_vault_backlog'] },
-    });
-    expect(await queued()).toHaveLength(0);
+    for (let lot = 0; lot < 3 && (await queued()).length > 0; lot++) await work();
+    await work();
     expect(vision.calls).toBe(calls);
     expect((await refs()).find((ref) => ref.id === 'vault_root_loose')).toMatchObject({
       asset: null,

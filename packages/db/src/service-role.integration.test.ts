@@ -35,6 +35,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   content_ideas: ['update'],
   content_requests: ['insert'],
   contractor_document_purges: ['insert'],
+  // Plus the draft it refreshes (plan, computed_at, updated_at, ADR 0140 § 2): a column right, not a table's.
+  creator_weeks: ['insert'],
   creators: ['update'],
   domain_events: ['insert'],
   exchange_rates: ['insert'],
@@ -47,22 +49,32 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   invoice_pdf_copies: ['insert'],
   invoice_pdfs: ['insert'],
   invoices: ['insert'],
+  // The owner's gesture keeps, replaces or removes the agency's key of the redirect service (ADR 0120 § 3).
+  link_service_credentials: ['insert', 'update', 'delete'],
   llm_calls: ['insert'],
   media_assets: ['insert', 'update'],
   media_descriptions: ['insert'],
+  // Plus two columns, its end (cancelled_at, applied_at, ADR 0096 § 2): a column right, not a table's.
+  owner_removals: ['insert'],
   passkey: ['update', 'delete'],
   password_reset_links: ['insert', 'update'],
   pay_period_blocks: ['insert', 'update', 'delete'],
   pay_periods: ['insert'],
-  platform_chatter_daily_stats: ['insert', 'update'],
-  platform_daily_stats: ['insert', 'update'],
   platform_script_step_media: ['insert', 'delete'],
+  // The import keeps the platform's totals of a step each day, the same day written over (ADR 0129 § 12).
+  platform_script_step_daily: ['insert', 'update'],
   script_identities: ['insert'],
   platform_script_steps: ['insert', 'delete'],
+  // The recognition passes the agency's order and conditions to the native script a copy became (ADR 0112 § 23).
+  platform_script_branches: ['insert'],
   platform_scripts: ['insert', 'update'],
+  // The import marks a script in preparation it recognised (ADR 0112 § 23): never creates nor deletes one.
+  prepared_scripts: ['update'],
   provider_credentials: ['insert', 'update', 'delete'],
   push_server_keys: ['insert'],
   push_subscriptions: ['insert', 'update'],
+  redirect_links: ['insert', 'update'],
+  // Plus one column the job dates when it takes a gain back (taken_back_at, ADR 0118): a column right, not a table's.
   reward_gains: ['insert'],
   reward_streaks: ['insert', 'update'],
   sales_feed_chatter_reviews: ['insert', 'update'],
@@ -98,8 +110,11 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   worker_heartbeats: ['insert', 'update', 'delete'],
 };
 
-/** Tables the service role does not even read. None today: a migration that closes one names it here. */
-const CLOSED: readonly string[] = [];
+/**
+ * Tables the service role does not even read: a migration that closes one names it here. The revenue objectives
+ * (ADR 0092 § 6) are read by no job and never reach the MCP.
+ */
+const CLOSED: readonly string[] = ['creator_revenue_objectives'];
 
 describe('the service role (ADR 0087): rows only, where a migration opened them', () => {
   let test: TestDb;

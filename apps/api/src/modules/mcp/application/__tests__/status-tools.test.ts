@@ -73,6 +73,7 @@ const usage = AiUsageSchema.parse({
   lastCallAt: '2026-11-14T09:58:00.000Z',
   credits: [],
   voice: null,
+  forecast: null,
 });
 
 const noStats: StatsReader = { agencyInsights: () => Promise.reject(new Error('not read here')) };
@@ -110,10 +111,13 @@ const subscriberFigures = {
 };
 const insights: AgencyInsights = AgencyInsightsSchema.parse({
   period: 'week',
+  span: { unit: 'rolling', partial: false, end: '2026-11-16', compare: 'previous', today: '2026-11-16' },
   from: '2026-11-10',
   to: '2026-11-16',
   previousFrom: '2026-11-03',
   previousTo: '2026-11-09',
+  registerSince: '2026-10-01',
+  previousDays: [],
   creators: [
     { creatorId: ines, name: 'Inès Inventée' },
     { creatorId: mara, name: 'Mara Inventée' },
@@ -126,6 +130,8 @@ const insights: AgencyInsights = AgencyInsightsSchema.parse({
     {
       day: '2026-11-16',
       revenueMinor: 3_000,
+      agencyMinor: 700_007,
+      creatorMinor: 700_008,
       byCreator: [{ creatorId: ines, revenueMinor: 3_000 }],
       byKind: [{ kind: 'ppv', revenueMinor: 3_000 }],
     },
@@ -146,7 +152,28 @@ const insights: AgencyInsights = AgencyInsightsSchema.parse({
   ),
   hourly: [],
   fans: { paying: 9, previousPaying: 7, newPaying: 2, topTenShare: 85, averagePerPayingMinor: 5_555 },
+  // A refund and the chatter of its sale (ADR 0092 § 4): the screen's alone, never the MCP's (ADR 0144).
+  refundList: [
+    {
+      refundedAt: '2026-11-16T09:00:00.000Z',
+      creatorId: ines,
+      kind: 'ppv',
+      amountMinor: 777_001,
+      seller: { kind: 'member', memberId: newId(TeamMemberIdSchema), name: 'Chatteur Remboursé' },
+      delayDays: 3,
+    },
+  ],
   refundsWithoutSale: 0,
+  // The month's objectives (ADR 0092 § 6): internal, never the MCP's.
+  objectives: {
+    month: '2026-11-01',
+    daysGone: 16,
+    days: 30,
+    creators: [{ creatorId: ines, objectiveMinor: 888_001, revenueMinor: 50_000, projectedMinor: 93_750 }],
+    objectiveMinor: 888_001,
+    revenueMinor: 50_000,
+    projectedMinor: 93_750,
+  },
   timeZone: 'Europe/Paris',
   dollarsLeftOut: false,
   subscribers: {
@@ -217,10 +244,16 @@ describe('stats_get (ADR 0026 § 5, ADR 0078, decision A of 14/11)', () => {
       'sellers',
       'seller',
       'memberId',
+      'refundList',
+      'delayDays',
+      'objectives',
+      'objectiveMinor',
     ])
       expect(text).not.toContain(`"${key}"`);
     expect(text).not.toContain('Chatteur Inventé');
-    for (const amount of [...SHARES, ...SELLER, 910_005]) expect(numbersIn(out)).not.toContain(amount);
+    expect(text).not.toContain('Chatteur Remboursé');
+    for (const amount of [...SHARES, 700_007, 700_008, ...SELLER, 910_005, 777_001, 888_001])
+      expect(numbersIn(out)).not.toContain(amount);
   });
 
   it('reads every creator for the owner', async () => {

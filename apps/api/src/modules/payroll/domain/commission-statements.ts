@@ -216,6 +216,16 @@ export function commissionOfGross(input: {
   return mulDivRound(netMinor, input.commissionRateBps, BPS);
 }
 
+/**
+ * The platform's net of a gross declared, in the currency declared: without VAT, then without the platform's
+ * commission, each rounded as a statement's line rounds them. For the game's net of a validated report (ADR 0118).
+ */
+export const platformNetOfGross = (input: {
+  readonly grossMinor: number;
+  readonly vatBps: number;
+  readonly platformFeeBps: number;
+}): number => netOf(input.grossMinor, RATE_SCALE, input).netMinor;
+
 /** Of two tiers, the higher; on the same step, the larger bonus, so that the order they come in never matters. */
 const higher = (step: number, bonus: number, than: { step: number; bonus: number } | null): boolean =>
   than === null || step > than.step || (step === than.step && bonus > than.bonus);

@@ -128,6 +128,8 @@
  */
 .rw-reveal {
   --rw-tone: #f0c46a;
+  /* The one ink of the night stage; what is quieter on it is mixed from it. */
+  --rw-ink: #f6eef1;
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -135,7 +137,7 @@
   place-items: center;
   padding: var(--nv-space-5);
   overflow: hidden;
-  color: #f6eef1;
+  color: var(--rw-ink);
   /* The same night stage in Day: nothing of the screen behind reads through, and the glow fades to the edges. */
   background:
     radial-gradient(
@@ -160,7 +162,8 @@
 }
 .rw-reveal__object {
   position: relative;
-  width: min(248px, 60vw);
+  /* Larger on a computer, where the stage is wide (Design, 16/11). */
+  width: clamp(min(248px, 60vw), 26vw, 340px);
   aspect-ratio: 1;
   margin-bottom: 18px;
   perspective: 900px;
@@ -227,10 +230,9 @@
 }
 .rw-reveal__kicker {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: #f0c46a;
   animation: rw-rise 450ms ease-out 500ms both;
 }
@@ -270,6 +272,76 @@
   font-size: 14px;
   font-weight: 500;
   animation: rw-rise 450ms ease-out 1100ms both;
+}
+/* « Aussi gagné »: what else was earned since the last visit, small and by name, on the axis of the sentence. No
+   ground, no card, no colour but the objects' own; each fades in after the ceremony, 60 ms apart, and nothing
+   more (with « réduire les animations » they are there at once, as the rest of the reveal). */
+.rw-reveal__also {
+  /* The reveal is dark in both themes: its inks are its own, mixed from the stage's one. */
+  --rw-also-ink: color-mix(in srgb, var(--rw-ink) 78%, transparent);
+  --rw-also-faint: color-mix(in srgb, var(--rw-ink) 55%, transparent);
+  --rw-also-line: color-mix(in srgb, var(--rw-ink) 28%, transparent);
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.rw-reveal__alsosaid {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.rw-reveal__alsohead {
+  color: var(--rw-also-faint);
+  animation: rw-fade 300ms ease-out 1500ms both;
+}
+.rw-reveal__alsolist {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0 var(--nv-space-4);
+  list-style: none;
+  /* Every gain has a column of the same width, « +N » too: the objects stand at equal distances and the row is
+     centred whatever the names are. A name is cut only when it is wider than its column. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 116px);
+  justify-content: center;
+  gap: var(--nv-space-3);
+}
+.rw-reveal__alsoitem {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: rw-fade 300ms ease-out calc(1560ms + var(--nv-i, 0) * 60ms) both;
+}
+.rw-reveal__alsoobject {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+.rw-reveal__alsoobject[data-more='true'] {
+  box-sizing: border-box;
+  border: 1px solid var(--rw-also-line);
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rw-also-ink);
+}
+.rw-reveal__alsoname {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--rw-also-ink);
 }
 .rw-reveal__close {
   margin-top: 26px;
@@ -357,10 +429,197 @@
     width: 0;
   }
 }
+
+/*
+ * A rank is forged, not turned over (Charles, 16/11): the cold medallion, embers drawn into its heart, a flash as it
+ * lights at 900 ms (`FORGE_STRIKE` in forge-sound.ts), its fire rising, then the reveal's light and words, a beat
+ * later than for a medal. Settled within 2.5 s. Transform and opacity only.
+ */
+/* The forge's colours, named once: fixed like the gold of an earned object. */
+.rw-reveal {
+  --rw-forge-heat: #ffd27a;
+  --rw-forge-fire: #ff6a3a;
+  --rw-forge-spark: #fff4cc;
+  --rw-forge-gold: #ffc25a;
+  --rw-forge-trail: rgb(255 110 60 / 0.5);
+  --rw-forge-white: #fff;
+  --rw-forge-glare: rgb(255 200 96 / 0.75);
+}
+.rw-forge__cold,
+.rw-forge__core,
+.rw-forge__ember,
+.rw-forge__flash {
+  opacity: 0;
+  pointer-events: none;
+}
+.rw-reveal__art.rw-forge__cold {
+  animation: rw-forge-cold 1050ms ease-out both;
+}
+.rw-forge__core {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--rw-forge-heat) 0, var(--rw-forge-fire) 30%, transparent 68%);
+  animation: rw-forge-core 500ms ease-in 380ms both;
+}
+.rw-forge__ember {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* A head and a short trail: the head leads towards the heart. */
+  width: calc(var(--_s) * 4);
+  height: var(--_s);
+  margin: calc(var(--_s) / -2) 0 0 calc(var(--_s) / -2);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--rw-forge-spark) 0,
+    var(--rw-forge-gold) 22%,
+    var(--rw-forge-trail) 45%,
+    transparent 100%
+  );
+  transform-origin: calc(var(--_s) / 2) 50%;
+  filter: drop-shadow(0 0 6px var(--rw-forge-fire));
+  animation: rw-forge-ember 420ms cubic-bezier(0.55, 0, 1, 0.45) var(--_d) both;
+}
+.rw-forge__flash {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--rw-forge-white) 0,
+    var(--rw-forge-spark) 16%,
+    var(--rw-forge-glare) 34%,
+    transparent 60%
+  );
+  mix-blend-mode: screen;
+  animation: rw-forge-flash 120ms ease-out 880ms forwards;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__art:not(.rw-forge__cold) {
+  animation: rw-forge-lit 700ms var(--nv-ease-out) 850ms both;
+}
+.rw-reveal[data-forge='true'] .rw-level__fire {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: rw-forge-fire 650ms cubic-bezier(0.2, 1.3, 0.4, 1) 880ms both;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__halo {
+  animation-duration: 1500ms;
+  animation-delay: 950ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__rays {
+  animation-duration: 1500ms;
+  animation-delay: 950ms;
+}
+/* Hidden until their turn: the ring and the sparks start from full light, which must not wait on screen. */
+.rw-reveal[data-forge='true'] .rw-reveal__ring,
+.rw-reveal[data-forge='true'] .rw-reveal__spark {
+  animation-fill-mode: forwards;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__ring {
+  animation-delay: 1050ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__ring[data-late='true'] {
+  animation-delay: 1190ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__spark {
+  animation-delay: calc(var(--_d) + 850ms);
+}
+.rw-reveal[data-forge='true'] .rw-reveal__kicker {
+  animation-delay: 1350ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__title {
+  animation-delay: 1470ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__rule {
+  animation-delay: 1650ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__text {
+  animation-delay: 1770ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__chip,
+.rw-reveal[data-forge='true'] .rw-reveal__close {
+  animation-delay: 1950ms;
+}
+@keyframes rw-forge-cold {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes rw-forge-core {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  85% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+@keyframes rw-forge-ember {
+  0% {
+    opacity: 0;
+    transform: translate(var(--_x), var(--_y)) rotate(var(--_a)) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(var(--_a)) scale(0.8);
+  }
+}
+@keyframes rw-forge-flash {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+@keyframes rw-forge-lit {
+  0% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  15% {
+    opacity: 1;
+  }
+}
+@keyframes rw-forge-fire {
+  0% {
+    transform: scale(0.3, 0.1);
+  }
+}
+/* « Réduire les animations »: the settled picture after a short fade, nothing moves (Design, 16/11). */
 @media (prefers-reduced-motion: reduce) {
-  .rw-reveal,
-  .rw-reveal * {
+  .rw-reveal *,
+  .rw-reveal[data-forge='true'] * {
     animation: none !important;
+  }
+  .rw-reveal {
+    animation: rw-fade 150ms ease-out both !important;
   }
 }
 
@@ -443,6 +702,29 @@
   }
 }
 
+/* ───────────── Jauge du jeu ───────────── */
+
+/* The fill slides in under the track's own round ends: transform only, once, from the value last shown
+   (`GameGauge`). Its round tip keeps its shape all the way, which a scale would crush. */
+.rw-gauge {
+  overflow: hidden;
+}
+.rw-gauge .nv-gauge__fill {
+  width: 100%;
+  transform: translateX(calc(var(--rw-gauge-at, 0%) - 100%));
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.rw-gauge[data-moving='true'] .nv-gauge__fill {
+  transition:
+    transform var(--nv-dur-progress) var(--nv-ease-out),
+    background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-gauge[data-moving='true'] .nv-gauge__fill {
+    transition: none;
+  }
+}
+
 /* ───────────── Défi du shift (ADR 0104 § 14) ───────────── */
 
 /* The way to the target is a progress: its blue, as the way to a tier. */
@@ -522,6 +804,809 @@
   color: var(--nv-ink);
 }
 
+/* ───────────── Ma progression, sur Aujourd'hui (ADR 0134, ADR 0104 § 19) ─────────────
+   A game's card: the bar fills on arrival, a light runs along it, the steps passed are lit, the goals within reach
+   come one after the other. Everything is still, and in place, with « Réduire les animations ». */
+
+.rw-quest {
+  /* The fire of the bar towards the next rank: embers, flame, its hot heart, its core. */
+  --rw-fire-deep: #b3261a;
+  --rw-fire-mid: #ff6a1f;
+  --rw-fire-hot: #ffb638;
+  --rw-fire-core: #fff1c4;
+  --rw-fire-glow: color-mix(in srgb, var(--rw-fire-mid) 55%, transparent);
+  /* Everything that advances on this card burns with the same fire as the rank's insignia. */
+  --rw-quest-ink: var(--rw-fire-mid);
+  --rw-quest-glow: color-mix(in srgb, var(--rw-quest-ink) 45%, transparent);
+  --rw-quest-soft: color-mix(in srgb, var(--rw-quest-ink) 14%, transparent);
+  /* One row of tongues, cut out of the gradient behind it. */
+  --rw-fire-tongues: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 24' preserveAspectRatio='none'%3E%3Cpath d='M0 24V17c2-1 3-4 3-7 0-2 1-4 2-6 0 4 4 6 5 11 1-4 0-9 4-14 0 5 5 8 5 14 2-2 2-6 4-9 1 4 4 6 4 10 1-3 1-8 4-12 1 5 4 8 5 13 1-2 1-4 2-6 2 3 2 5 2 8v8z'/%3E%3C/svg%3E");
+}
+.rw-quest__body {
+  display: grid;
+  gap: var(--nv-space-4);
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+.rw-quest__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
+}
+.rw-quest__insignia {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rw-quest__who {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.rw-quest__name {
+  margin: 0;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-title-1);
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-quest__line,
+.rw-quest__streak {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.rw-quest__line b,
+.rw-quest__streak b {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-quest__streak {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+}
+.rw-quest__streak svg {
+  width: 14px;
+  height: 14px;
+  fill: var(--nv-neon);
+  transform-origin: 50% 90%;
+  animation: rw-quest-flame var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-flame {
+  to {
+    transform: scale(1.12) rotate(-3deg);
+  }
+}
+.rw-quest__go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  transition: color var(--nv-dur-fast);
+}
+.rw-quest__go svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+
+/* The way to the next rank. */
+.rw-quest__way {
+  display: grid;
+  gap: 8px;
+}
+.rw-quest__figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.rw-quest__reach {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.rw-quest__towards {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-quest__track {
+  /* Room for the flames above the bar. */
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rw-quest__track .rw-quest__bar {
+  flex: 1;
+}
+.rw-quest__end {
+  flex: none;
+  display: grid;
+  place-items: center;
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rw-quest__percent {
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  line-height: 1;
+  color: var(--nv-ink);
+}
+.rw-quest__gain {
+  padding: 3px 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rw-quest-soft);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink);
+  animation: rw-quest-pop var(--nv-dur-slow) var(--nv-ease-spring) both;
+  animation-delay: var(--nv-dur-data);
+}
+@keyframes rw-quest-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+.rw-quest__bar {
+  position: relative;
+  height: 14px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.rw-quest__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--rw-quest-at, 0%);
+  min-width: 14px;
+  overflow: hidden;
+  border-radius: inherit;
+  /* Embers that run towards the head, over the fire itself, hotter as it goes. */
+  background:
+    repeating-linear-gradient(
+        110deg,
+        transparent 0 14px,
+        color-mix(in srgb, var(--rw-fire-core) 38%, transparent) 20px,
+        transparent 26px 40px
+      )
+      0 0 / 80px 100%,
+    linear-gradient(90deg, var(--rw-fire-deep) 0%, var(--rw-fire-mid) 55%, var(--rw-fire-hot) 100%);
+  box-shadow: 0 0 14px var(--rw-fire-glow);
+  transition: width var(--nv-dur-data) var(--nv-ease-out);
+  animation:
+    rw-quest-embers calc(var(--nv-dur-breathe) * 1.5) linear infinite,
+    rw-quest-heat var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-embers {
+  to {
+    background-position:
+      80px 0,
+      0 0;
+  }
+}
+@keyframes rw-quest-heat {
+  to {
+    box-shadow: 0 0 22px 2px var(--rw-fire-glow);
+  }
+}
+/* The light that runs along the bar once it has arrived, and again under the pointer. */
+.rw-quest__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--rw-fire-core) 75%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: rw-quest-shine var(--nv-dur-data) var(--nv-ease-in-out) both;
+  animation-delay: var(--nv-dur-data);
+}
+@keyframes rw-quest-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+/* The flames: they stand on the bar, as long as it is, and move with it. Decoration only: the figure and the words
+   beside it say everything (ADR 0104 § 19). */
+.rw-quest__fire {
+  position: absolute;
+  left: 0;
+  bottom: 50%;
+  width: var(--rw-quest-at, 0%);
+  min-width: 14px;
+  height: 22px;
+  pointer-events: none;
+  transition: width var(--nv-dur-data) var(--nv-ease-out);
+}
+/* The flames trail behind the head and die out: the fire is where the progress is being made. */
+.rw-quest__trail {
+  position: absolute;
+  inset: 0 2px 0 auto;
+  width: min(100%, 190px);
+  mask: linear-gradient(90deg, transparent 0%, black 85%);
+  filter: blur(0.6px);
+}
+.rw-quest__trail i {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--rw-fire-mid) 20%, var(--rw-fire-hot) 60%, transparent 100%);
+  mask: var(--rw-fire-tongues) 100% 100% / 44px 100% repeat-x;
+  transform-origin: 100% 100%;
+  animation: rw-quest-tongues calc(var(--nv-dur-breathe) * 0.5) var(--nv-ease-in-out) infinite alternate;
+}
+.rw-quest__trail i + i {
+  background: linear-gradient(to top, var(--rw-fire-hot) 20%, var(--rw-fire-core) 60%, transparent 95%);
+  mask-size: 31px 62%;
+  opacity: 0.85;
+  animation-duration: calc(var(--nv-dur-breathe) * 0.32);
+  animation-direction: alternate-reverse;
+}
+@keyframes rw-quest-tongues {
+  from {
+    mask-position: 100% 100%;
+    transform: scaleY(0.7) skewX(-4deg);
+  }
+  to {
+    mask-position: calc(100% - 14px) 100%;
+    transform: scaleY(1.1) skewX(-10deg);
+  }
+}
+/* The flame at the head of the bar, where the progress is being made. */
+.rw-quest__torch {
+  position: absolute;
+  right: -13px;
+  bottom: -9px;
+  width: 30px;
+  height: 30px;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px var(--rw-fire-glow));
+  transform-origin: 50% 85%;
+  animation: rw-quest-torch calc(var(--nv-dur-breathe) * 0.35) var(--nv-ease-in-out) infinite alternate;
+}
+.rw-quest__torch path {
+  fill: var(--rw-fire-mid);
+}
+.rw-quest__torch path + path {
+  fill: var(--rw-fire-core);
+}
+@keyframes rw-quest-torch {
+  from {
+    transform: scale(0.94, 0.9) rotate(-4deg);
+  }
+  to {
+    transform: scale(1.04, 1.14) rotate(3deg);
+  }
+}
+/* Sparks leaving the flame. */
+.rw-quest__fire b {
+  position: absolute;
+  right: -2px;
+  bottom: 14px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rw-fire-hot);
+  opacity: 0;
+  animation: rw-quest-spark calc(var(--nv-dur-breathe) * 0.9) var(--nv-ease-out) infinite;
+}
+.rw-quest__fire b + b {
+  --_x: 9px;
+  animation-delay: calc(var(--nv-dur-breathe) * 0.3);
+}
+.rw-quest__fire b + b + b {
+  --_x: -4px;
+  animation-delay: calc(var(--nv-dur-breathe) * 0.6);
+}
+@keyframes rw-quest-spark {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--_x, -10px), -24px) scale(0.3);
+  }
+}
+.rw-quest__mark {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--nv-ink-faint);
+  opacity: 0.5;
+}
+.rw-quest__mark[data-passed='true'] {
+  background: var(--nv-surface-raised);
+  opacity: 0.7;
+}
+
+/* The goals within reach. */
+.rw-quest__goals {
+  display: grid;
+  gap: 8px;
+}
+.rw-quest__label {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.rw-quest__goals ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+.rw-quest__goal {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  transition:
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    background var(--nv-dur-fast);
+}
+.rw-quest__goal > svg {
+  flex: none;
+  color: var(--nv-ink-muted);
+  transition: color var(--nv-dur-base);
+}
+/* The trophy about to be won is already warm. */
+.rw-quest__goal[data-near='true'] > svg {
+  color: var(--rw-fire-mid);
+  filter: drop-shadow(0 0 5px var(--rw-fire-glow));
+}
+.rw-quest__goal[data-near='true'] {
+  background: var(--rw-quest-soft);
+  box-shadow: inset 0 0 0 1px var(--rw-quest-glow);
+}
+.rw-quest__goal-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.rw-quest__goal-name {
+  display: flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-quest__near {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--nv-radius-full);
+  background: linear-gradient(90deg, var(--rw-fire-deep), var(--rw-fire-mid));
+  font-size: 11px;
+  color: var(--rw-fire-core);
+  animation: rw-quest-near var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-near {
+  to {
+    box-shadow: 0 0 10px var(--rw-quest-glow);
+  }
+}
+.rw-quest__goal-way {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.rw-quest__mini,
+.rw-quest__steps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+.rw-quest__mini {
+  overflow: hidden;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+}
+.rw-quest__mini i {
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--rw-fire-deep), var(--rw-fire-mid) 60%, var(--rw-fire-hot));
+  transform-origin: left;
+  animation: rw-quest-grow var(--nv-dur-progress) var(--nv-ease-out) both;
+  animation-delay: var(--nv-dur-slow);
+}
+@keyframes rw-quest-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.rw-quest__steps i {
+  flex: 1;
+  max-width: 28px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+}
+.rw-quest__steps i[data-done='true'] {
+  background: linear-gradient(90deg, var(--rw-fire-mid), var(--rw-fire-hot));
+  animation: rw-quest-step var(--nv-dur-base) var(--nv-ease-spring) both;
+  animation-delay: calc(var(--nv-dur-slow) + var(--_i, 0) * 70ms);
+}
+@keyframes rw-quest-step {
+  from {
+    opacity: 0.2;
+    transform: scaleY(0.4);
+  }
+}
+.rw-quest__goal-what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rw-quest__left {
+  flex: none;
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__insignia {
+    transform: scale(1.08) rotate(-5deg);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__go {
+    color: var(--nv-ink);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__end {
+    transform: scale(1.12);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__go svg {
+    transform: translateX(3px);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fill::after {
+    animation: rw-quest-shine-again var(--nv-dur-data) var(--nv-ease-in-out);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal[data-near='true'] {
+    transform: translateY(-2px);
+  }
+}
+@keyframes rw-quest-shine-again {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+/* ── The finish: what makes the card a game's. Decoration only, all of it stops with « Réduire les animations ». ── */
+
+/* The light under the pointer, and the embers that rise while it is on the card. */
+.rw-quest__body {
+  position: relative;
+}
+.rw-quest__spot {
+  position: absolute;
+  inset: calc(var(--nv-plate-pad) * -3) calc(var(--nv-plate-pad) * -1) 0;
+  pointer-events: none;
+  background: radial-gradient(
+    260px circle at var(--rw-quest-x, 50%) var(--rw-quest-y, 50%),
+    color-mix(in srgb, var(--rw-fire-mid) 16%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--nv-dur-slow);
+}
+.rw-quest__embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--nv-dur-slow);
+}
+.rw-quest__embers i {
+  position: absolute;
+  bottom: -6px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rw-fire-hot);
+  box-shadow: 0 0 6px var(--rw-fire-mid);
+  animation: rw-quest-ember calc(var(--nv-dur-ceremony) + var(--_i, 0) * 260ms) linear infinite;
+  animation-delay: calc(var(--_i, 0) * -410ms);
+  animation-play-state: paused;
+}
+@keyframes rw-quest-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1);
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc((var(--_i, 0) - 3) * 9px), -190px) scale(0.3);
+  }
+}
+
+/* The rank: it lands with a spring, a ring leaves it, a slow fire turns behind it. */
+.rw-quest__insignia {
+  position: relative;
+  animation: rw-quest-land var(--nv-dur-morph) var(--nv-ease-spring-bouncy) both;
+}
+.rw-quest__insignia > svg {
+  position: relative;
+}
+@keyframes rw-quest-land {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-18deg);
+  }
+}
+.rw-quest__insignia::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--rw-fire-hot);
+  opacity: 0;
+  animation: rw-quest-ring var(--nv-dur-data) var(--nv-ease-out) var(--nv-dur-base) both;
+}
+@keyframes rw-quest-ring {
+  from {
+    opacity: 0.8;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+.rw-quest__halo {
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    var(--rw-fire-hot) 18%,
+    transparent 38%,
+    var(--rw-fire-mid) 62%,
+    transparent 82%
+  );
+  filter: blur(9px);
+  opacity: 0.45;
+  transition: opacity var(--nv-dur-slow);
+  animation: rw-quest-turn calc(var(--nv-dur-ambient) / 2) linear infinite;
+}
+@keyframes rw-quest-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* The figure burns like the bar it reads. */
+.rw-quest__percent {
+  background: linear-gradient(100deg, var(--rw-fire-deep), var(--rw-fire-mid) 70%, var(--rw-fire-hot));
+  background-clip: text;
+  color: transparent;
+}
+
+/* The fire takes: the flames rise once the bar has started, the flame at its head springs up. */
+.rw-quest__fire {
+  transform-origin: 50% 100%;
+  transition:
+    width var(--nv-dur-data) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rw-quest__trail {
+  animation: rw-quest-take var(--nv-dur-progress) var(--nv-ease-out) var(--nv-dur-fast) both;
+}
+@keyframes rw-quest-take {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+    transform-origin: 50% 100%;
+  }
+}
+
+/* A step the fire crosses on this arrival flashes as it is reached. */
+.rw-quest__mark[data-crossed='true'] {
+  animation: rw-quest-cross var(--nv-dur-slow) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-dur-data) * var(--_d, 0) * 0.55);
+}
+@keyframes rw-quest-cross {
+  0% {
+    background: var(--nv-ink-faint);
+    opacity: 0.5;
+  }
+  35% {
+    background: var(--rw-fire-core);
+    opacity: 1;
+    transform: scale(2.4, 2.2);
+    box-shadow: 0 0 14px 3px var(--rw-fire-hot);
+  }
+}
+
+/* The rank ahead calls: a ring breathes around it. */
+.rw-quest__end {
+  position: relative;
+  border-radius: var(--nv-radius-full);
+}
+.rw-quest__end::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1.5px var(--rw-fire-glow);
+  animation: rw-quest-call var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-call {
+  from {
+    opacity: 0.2;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 0.9;
+    transform: scale(1.1);
+  }
+}
+
+/* The goal about to be reached: a light runs round its edge. */
+.rw-quest__goal {
+  position: relative;
+}
+.rw-quest__goal[data-near='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, var(--rw-fire-core) 50%, transparent 65%) 130% 0 / 300%
+    100% no-repeat;
+  mask:
+    linear-gradient(black, black) content-box exclude,
+    linear-gradient(black, black);
+  animation: rw-quest-edge calc(var(--nv-dur-ceremony) * 1.2) var(--nv-ease-in-out) infinite;
+}
+@keyframes rw-quest-edge {
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@media (hover: hover) {
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__spot,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__embers {
+    opacity: 1;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__embers i {
+    animation-play-state: running;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__halo {
+    opacity: 0.9;
+  }
+  /* The fire flares under the pointer. */
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fire {
+    transform: scaleY(1.45);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fill {
+    box-shadow: 0 0 26px 4px var(--rw-fire-glow);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fire b {
+    animation-duration: calc(var(--nv-dur-breathe) * 0.5);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__end {
+    transform: scale(1.2) rotate(8deg);
+    color: var(--rw-fire-mid);
+    filter: drop-shadow(0 0 8px var(--rw-fire-glow));
+  }
+  /* The goals rise one after the other, the nearest first. */
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal {
+    transform: translateY(-3px);
+    transition-delay: calc((var(--nv-i, 2) - 2) * 60ms);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal > svg {
+    color: var(--rw-fire-mid);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-quest__spot,
+  .rw-quest__embers,
+  .rw-quest__insignia::after,
+  .rw-quest__end::after,
+  .rw-quest__goal[data-near='true']::after {
+    display: none;
+  }
+  .rw-quest__insignia,
+  .rw-quest__halo,
+  .rw-quest__trail,
+  .rw-quest__mark[data-crossed='true'] {
+    animation: none;
+  }
+  .rw-quest__fire {
+    transition: none;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fire,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal {
+    transform: none;
+  }
+}
+@media (max-width: 520px) {
+  .rw-quest__name {
+    font-size: var(--nv-text-title-2);
+  }
+  /* The words leave; the arrow alone says the card opens. */
+  .rw-quest__go {
+    font-size: 0;
+    gap: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-quest__fill,
+  .rw-quest__insignia,
+  .rw-quest__end,
+  .rw-quest__goal,
+  .rw-quest__go svg {
+    transition: none;
+  }
+  .rw-quest__fill::after,
+  .rw-quest__streak svg,
+  .rw-quest__gain,
+  .rw-quest__near,
+  .rw-quest__mini i,
+  .rw-quest__steps i[data-done='true'] {
+    animation: none;
+  }
+  .rw-quest__fill::after,
+  .rw-quest__fire b {
+    display: none;
+  }
+  .rw-quest__fill,
+  .rw-quest__trail i,
+  .rw-quest__torch {
+    animation: none;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__insignia,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__end,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal[data-near='true'] {
+    transform: none;
+  }
+}
+
 /* ───────────── Rangs des chatteurs, réglage du propriétaire ───────────── */
 
 .rw-levels__list {
@@ -580,54 +1665,99 @@
 
 /* ───────────── Jeu, sur la fiche d'un membre (ADR 0104 § 20) ───────────── */
 
-.rw-member__facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--nv-space-3);
-  margin: var(--nv-space-3) 0;
-}
-/* On a phone three facts do not fit side by side: one under the other, none left alone on its line. */
-@media (max-width: 480px) {
-  .rw-member__facts {
-    grid-template-columns: 1fr;
-  }
-}
-.rw-member__facts dt {
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.rw-member__facts dd {
-  margin: 2px 0 0;
-  font-weight: 600;
-  color: var(--nv-ink);
-}
+/* The member's game on their file: the rank first and large, two figures side by side, the trophies last. */
 .rw-member__rank {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--nv-space-3);
+  margin: var(--nv-space-3) 0;
 }
-.rw-member__trophies {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nv-space-2) var(--nv-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--nv-text-callout);
-  color: var(--nv-ink);
-}
-.rw-member__trophies li {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
+.rw-member__eyebrow,
+.rw-member__facts dt,
 .rw-member__label {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+.rw-member__name {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-size: var(--nv-text-title-1);
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-member__name[data-none='true'] {
+  font-family: inherit;
+  font-size: var(--nv-text-body);
+  font-weight: 400;
+  line-height: inherit;
+  color: var(--nv-ink-muted);
+}
+.rw-member__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+  margin: 0 0 var(--nv-space-4);
+}
+.rw-member__facts > div {
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+.rw-member__facts dd {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+.rw-member__figure {
+  font-size: var(--nv-text-title-2);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-member__figure[data-zero='true'] {
+  font-weight: 400;
+  color: var(--nv-ink-muted);
+}
+.rw-member__unit {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-member__best {
+  display: block;
+}
+.rw-member__label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--nv-space-2);
+}
+.rw-member__trophies {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--nv-space-3) var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink);
+}
+.rw-member__trophies li {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .rw-member__trophies {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .rw-member__none {
   margin: 0;
+}
+.rw-member__foot {
+  margin: var(--nv-space-4) 0 0;
 }
 
 /* A creator's streak medal (ADR 0107 § 1): her days engraved in Arabic numerals, heavier than a trophy's digits. */

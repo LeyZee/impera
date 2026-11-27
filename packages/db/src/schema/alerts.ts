@@ -3,6 +3,11 @@ import {
   CUSTOM_ALERT_KEYWORDS_MAX,
   CUSTOM_ALERT_NAME_MAX,
   CUSTOM_ALERT_PHRASE_MAX,
+  CREATOR_ALERT_CODES,
+  CREATOR_ALERT_MODES,
+  CREATOR_ALERT_ROLES,
+  CHATTER_CLOSED_CREATOR_ALERTS,
+  LOCKED_CREATOR_ALERTS,
   SYSTEM_ALERT_CODES,
 } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
@@ -124,6 +129,42 @@ export const systemAlertSettings = pgTable(
     primaryKey({ name: 'system_alert_settings_pkey', columns: [t.creatorId, t.code] }),
     enumCheck('system_alert_settings', t.code, SYSTEM_ALERT_CODES),
     check('system_alert_settings_keyword_check', sql`${t.code} <> 'keyword' or ${t.enabled}`),
+    tenantPolicy(t.creatorId),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * Who each alert of hers reaches, by role (ADR 0150): one row per creator, alert and role, the owner's alone to write.
+ * No row: the defaults of the code (`CREATOR_ALERT_DEFAULTS`). A locked alert never holds a row other than `deliver`.
+ */
+export const creatorAlertRoutes = pgTable(
+  'creator_alert_routes',
+  {
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    alertCode: enumText('alert_code').notNull(),
+    role: enumText('role').notNull(),
+    mode: enumText('mode').notNull(),
+    /** Kept when the account is removed: the choice stays, its author is forgotten (as the neighbouring tables). */
+    updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'creator_alert_routes_pkey', columns: [t.creatorId, t.alertCode, t.role] }),
+    enumCheck('creator_alert_routes', t.alertCode, CREATOR_ALERT_CODES),
+    enumCheck('creator_alert_routes', t.role, CREATOR_ALERT_ROLES),
+    enumCheck('creator_alert_routes', t.mode, CREATOR_ALERT_MODES),
+    check(
+      'creator_alert_routes_locked_check',
+      sql`${t.alertCode} not in (${sql.raw(LOCKED_CREATOR_ALERTS.map((code) => `'${code}'`).join(', '))}) or ${t.mode} = 'deliver'`,
+    ),
+    // Never to a chatter (ADR 0094 § 3): the steering alerts keep « chatteur en shift » on `off`.
+    check(
+      'creator_alert_routes_chatters_closed_check',
+      sql`${t.alertCode} not in (${sql.raw(CHATTER_CLOSED_CREATOR_ALERTS.map((code) => `'${code}'`).join(', '))}) or ${t.role} <> 'chatter_on_shift' or ${t.mode} = 'off'`,
+    ),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],

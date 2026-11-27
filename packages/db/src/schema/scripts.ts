@@ -7,6 +7,7 @@ import {
   PLATFORM_SCRIPT_STEP_MEDIA_MAX,
   PLATFORM_SCRIPT_STEP_TEXT_MAX,
   PLATFORM_SCRIPT_STEPS_MAX,
+  PREPARED_SCRIPT_STATES,
   SCRIPT_IDENTITY_AUTHORS,
   PlatformScriptMomentSchema,
   SCRIPT_CADENCE_DEFAULT_DAYS,
@@ -21,6 +22,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -395,10 +397,59 @@ export const platformScriptStepMedia = pgTable(
 );
 
 /**
+ * The platform's totals of a step, one row a day (ADR 0129 § 12): its sends, its packs paid and what they brought since
+ * the step exists, every seller together, as each import of her scripts reads them (`scripts.import_platform_scripts`,
+ * as the service role). The day is the platform's (Reveal's zone); a later read of the same day writes over it, the
+ * platform's last word. A period reads as the difference between two days. Keyed by the step's own id on the account,
+ * so that a step rewritten by the import keeps its days. Read by the agency like her scripts; closed to her account.
+ */
+export const platformScriptStepDaily = pgTable(
+  'platform_script_step_daily',
+  {
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    /** The step as the platform names it (`platform_script_steps.platform_step_ref`). */
+    platformStepRef: text('platform_step_ref').notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    sent: integer('sent').notNull(),
+    purchased: integer('purchased').notNull(),
+    /** Minor units, VAT included, as the platform shows it. */
+    paidMinor: integer('paid_minor').notNull(),
+    currency: enumText('currency').notNull(),
+    readAt: timestampTz('read_at').notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'platform_script_step_daily_pkey',
+      columns: [t.platformAccountId, t.platformStepRef, t.day],
+    }),
+    index('platform_script_step_daily_creator_day_idx').on(t.creatorId, t.day),
+    check(
+      'platform_script_step_daily_counts_check',
+      sql`${t.sent} >= 0 and ${t.purchased} >= 0 and ${t.paidMinor} >= 0`,
+    ),
+    check(
+      'platform_script_step_daily_ref_check',
+      sql`char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
+    enumCheck('platform_script_step_daily', t.currency, CurrencySchema.options),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
  * A native script's identity (SC-04 lot c8, ADR 0056 § 6): what it is and when it fits (`ScriptIdentityContent`), for
  * the version of the script it was written from (`input_hash`: its steps' names and texts, their media and the
- * validated description of each, never a price). Written by the brain (`scripts.identify_platform_script`, as the
- * service role) or by hand by the agency, a new row each time, validated once by a person and never changed after
+ * validated description of each, never a price). Written by the brain (a job retired on 21/11/2026, ADR 0161 § 5)
+ * or by hand by the agency, a new row each time, validated once by a person and never changed after
  * (`script_identities_kept`). Under her RLS and the team's scopes, closed to her account; the brain never writes over a
  * validated identity of the same version.
  */
@@ -518,6 +569,75 @@ export const platformScriptBranches = pgTable(
     pgPolicy('team_clear', {
       for: 'delete',
       using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * Scripts in preparation (ADR 0112 §§ 20-23, « script en préparation »): written in Impera's editor, not at Reveal yet,
+ * never offered nor sent. `content` is `PreparedScriptContentSchema`, read through it; `revision` rises with each save,
+ * and a save names the one it was made on. Written by the owner and the active managers of her list, under her RLS,
+ * closed to her account; never deleted. The import that recognises it (§ 23) marks it `matched` as the service role.
+ */
+export const preparedScripts = pgTable(
+  'prepared_scripts',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    /** The Reveal account it is to be copied into. */
+    platformAccountId: uuid('platform_account_id').notNull(),
+    state: enumText('state').notNull().default('editing'),
+    revision: integer('revision').notNull().default(1),
+    content: jsonb('content').notNull(),
+    /** The native script it became; set with `matched` only. */
+    matchedPlatformScriptId: uuid('matched_platform_script_id'),
+    matchedAt: timestampTz('matched_at'),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'prepared_scripts_account_creator_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    foreignKey({
+      name: 'prepared_scripts_matched_creator_fk',
+      columns: [t.matchedPlatformScriptId, t.creatorId],
+      foreignColumns: [platformScripts.id, platformScripts.creatorId],
+    }),
+    index('prepared_scripts_creator_idx').on(t.creatorId, t.updatedAt),
+    enumCheck('prepared_scripts', t.state, PREPARED_SCRIPT_STATES),
+    check('prepared_scripts_revision_check', sql`${t.revision} >= 1`),
+    check(
+      'prepared_scripts_matched_check',
+      sql`(${t.state} = 'matched') = (${t.matchedPlatformScriptId} is not null and ${t.matchedAt} is not null)`,
+    ),
+    check(
+      'prepared_scripts_content_check',
+      sql`jsonb_typeof(${t.content}) = 'object' and jsonb_typeof(${t.content}->'steps') = 'array'`,
+    ),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    pgPolicy('team_write', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.createdBy} = ${currentUser} and ${t.updatedBy} = ${currentUser} and ${t.state} = 'editing'`,
+    }),
+    pgPolicy('team_update', {
+      for: 'update',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.state} <> 'matched'`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.updatedBy} = ${currentUser} and ${t.state} <> 'matched'`,
     }),
     closedToCreator(),
   ],

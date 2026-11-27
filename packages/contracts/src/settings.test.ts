@@ -8,10 +8,13 @@ describe('CreatorSettings', () => {
       llm: { roles: {}, contextBudgetTokens: 12_000 },
       autoApproveCategories: [],
       retention: { factMonthsAfterLastContact: 12, fanMediaDays: 30 },
-      // Off until the agency has checked the vision model on her real media (ADR 0083 § 9).
-      describeDrops: false,
       copilot: { fanCard: true, drafts: false },
+      fanTiers: { goodFromMinor: 5_000, veryGoodFromMinor: 20_000, whaleFromMinor: 50_000 },
     });
+  });
+
+  it('ignores the retired switch of the descriptions (ADR 0145 § 5, 17/11): a drop is described on arrival', () => {
+    expect(CreatorSettingsSchema.parse({ describeDrops: true })).not.toHaveProperty('describeDrops');
   });
 
   it('keeps an override and ignores the retired identity policy (ADR 0021)', () => {

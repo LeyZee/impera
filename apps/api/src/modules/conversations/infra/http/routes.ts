@@ -21,6 +21,7 @@ import {
   CloseCareBodySchema,
   ReleaseBodySchema,
   TakeoverBodySchema,
+  ToTalkSchema,
   UserIdSchema,
   type CreatorId,
   type CurrentUser,
@@ -121,6 +122,13 @@ export function createConversationRoutes(
         const page = await reads.list(viewerAt(request), creatorId, { limit, cursor });
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
+    );
+
+    // « À qui parler maintenant » (accueil du chatteur, Charles 21/11). Before `/conversations/:id`, which it is not.
+    app.get(
+      '/conversations/to-talk',
+      { ...read, schema: { querystring: CreatorQuerySchema, response: { 200: ToTalkSchema } } },
+      async (request) => reads.toTalk(viewerAt(request), request.query.creatorId, new Date()),
     );
 
     app.get(
@@ -354,10 +362,16 @@ export function createConversationRoutes(
       '/agent/mode',
       { ...act, schema: { body: SetAgentModeBodySchema, response: { 200: AgentModeResultSchema } } },
       async (request, reply) => {
-        const { creatorId, mode } = request.body;
+        const { creatorId, mode, until } = request.body;
         const { userId } = actorFor(request, creatorId);
         await confirmAutomatic(request, reply, mode);
-        return commands.setAgentMode({ creatorId, userId, mode, correlationId: request.id });
+        return commands.setAgentMode({
+          creatorId,
+          userId,
+          mode,
+          correlationId: request.id,
+          ...(until === undefined ? {} : { until: new Date(until) }),
+        });
       },
     );
 

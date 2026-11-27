@@ -2,6 +2,7 @@ import { placeTabBarLens } from '@impera/design-system';
 import { Link, useRouterState, type LinkProps } from '@tanstack/react-router';
 import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
+import { GuidesBeside } from '@/help/beside';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/shell/states';
 
@@ -64,6 +65,7 @@ export function PageHeader({
       </div>
       {actions === undefined ? null : <div className="nv-page__actions">{actions}</div>}
       {tabs === undefined ? null : <div className="nv-page__tabs">{tabs}</div>}
+      <GuidesBeside />
     </header>
   );
 }
@@ -241,7 +243,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     }
     placeStill(nav, from, thumb);
     placeTabBarLens(nav, active, thumb);
-    // `tabs` too: a tab that arrives after the server's answer (Équipe › Reveal) can be the lit one, and the glass is
+    // `tabs` too: a tab that arrives after the server's answer (Équipe › Comptes Reveal) can be the lit one, and the glass is
     // placed once it is there (recette 11/11, GES-04).
   }, [pathname, lit, label, tabs]);
 

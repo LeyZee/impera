@@ -4,6 +4,8 @@ import {
   ConversationModeSchema,
   ConversationStateSchema,
   CurrencySchema,
+  FAN_NEW_DAYS,
+  FanFlagsSchema,
   DESIRE_POINTS_MAX,
   desireBandOf,
   desireNow,
@@ -37,12 +39,38 @@ import {
 import { z } from 'zod';
 
 import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '../../domain/ports';
+import type { ToTalkCandidate } from '../../domain/to-talk';
 
+import { paidTables, spentOf, tiersAndRate } from './fan-standing';
 import { heldBy, holderFor } from './holds';
 import { openedLately, writeOpening } from './openings';
 import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toStoredEvent } from './rows';
 
 const SwitchRowsSchema = z.array(z.object({ active: z.boolean() }));
+
+/** How far back « À qui parler » reads: a whale quiet two months is still worth a word. */
+const TO_TALK_LOOKBACK_DAYS = 60;
+/** A bound on the rows read, the most recent first: the groups keep five each. */
+const TO_TALK_ROWS_MAX = 2000;
+const when = z
+  .union([z.string(), z.date()])
+  .nullable()
+  .transform((value) => (value === null ? null : value instanceof Date ? value : new Date(value)));
+const ToTalkRowsSchema = z.array(
+  z.object({
+    conversation_id: z.string(),
+    fan_id: z.string(),
+    display_name: z.string(),
+    first_seen_at: when.pipe(z.date()),
+    flags: z.unknown(),
+    last_inbound_at: when,
+    last_outbound_at: when,
+    eur_minor: z.coerce.number().int(),
+    usd_minor: z.coerce.number().int(),
+    last_purchase_at: when,
+    held_by: z.string().nullable(),
+  }),
+);
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 /** The states where the agent answers him again after a failed send; once a human holds it or it rests, it is theirs. */
@@ -180,7 +208,7 @@ export function createDrizzleConversationReader(
     sendingStopped: (creatorId) =>
       withTenant(db, creatorId, async (tx) => {
         const switches = await tx.execute(sql`
-          select distinct on (scope, scope_id) active
+          select distinct on (scope, scope_id) (active and (active_until is null or active_until > now())) as active
           from kill_switches
           where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
           order by scope, scope_id, set_at desc`);
@@ -206,6 +234,53 @@ export function createDrizzleConversationReader(
           encodeCursor(last.cursorAt, last.summary.id),
         );
         return { items: items.map((row) => row.summary), nextCursor };
+      }),
+
+    toTalkCandidates: (creatorId, { userId, heldOnly }) =>
+      withTenant(db, creatorId, async (tx) => {
+        const now = clock.now();
+        // What he paid, as « Fans » reads it (ADR 0124): shared with the extension's panel.
+        const result = await tx.execute(sql`
+          with ${paidTables(creatorId)}
+          select conversations.id as conversation_id, conversations.fan_id, f.display_name, f.first_seen_at, f.flags,
+                 -- On the platform's clock as the list reads it; Impera's own time before a message is kept.
+                 coalesce((select max(m.platform_created_at) from messages m
+                   where m.conversation_id = conversations.id and m.direction = 'inbound'),
+                   conversations.last_inbound_at) as last_inbound_at,
+                 conversations.last_outbound_at,
+                 coalesce(p.eur_minor, 0) as eur_minor, coalesce(p.usd_minor, 0) as usd_minor,
+                 p.last_purchase_at,
+                 ${holderFor(sql`${userId}`)} as held_by
+          from conversations
+          join fans f on f.id = conversations.fan_id
+          left join paid p on p.account = f.platform_account_id and p.fan = f.platform_fan_id
+          where conversations.creator_id = ${creatorId}::uuid
+            and (conversations.updated_at > ${now.toISOString()}::timestamptz - make_interval(days => ${TO_TALK_LOOKBACK_DAYS})
+                 or f.first_seen_at > ${now.toISOString()}::timestamptz - make_interval(days => ${FAN_NEW_DAYS}))
+            ${heldOnly ? sql`and ${heldBy(sql`${userId}`)}` : sql``}
+          order by conversations.updated_at desc
+          limit ${TO_TALK_ROWS_MAX}`);
+        const { tiers, rateMicros } = await tiersAndRate(tx, creatorId);
+        const candidates = ToTalkRowsSchema.parse(result.rows).map((row): ToTalkCandidate => {
+          const flags = FanFlagsSchema.safeParse(row.flags);
+          const f = flags.success ? flags.data : {};
+          return {
+            conversationId: ConversationIdSchema.parse(row.conversation_id),
+            fanId: FanIdSchema.parse(row.fan_id),
+            fanDisplayName: row.display_name,
+            fanSince: row.first_seen_at,
+            lastInboundAt: row.last_inbound_at,
+            lastOutboundAt: row.last_outbound_at,
+            spentMinor: spentOf(row.eur_minor, row.usd_minor, rateMicros),
+            lastPurchaseAt: row.last_purchase_at,
+            heldByOther: row.held_by === 'other',
+            // A flag that no longer reads holds him as a doubt would: never listed by mistake.
+            ageDisputed: !flags.success || f.ageDisputed !== undefined,
+            doNotContact: f.doNotContact === true,
+            noFollowUp: f.salesFrozen !== undefined || f.fragile === true,
+          };
+        });
+        return { candidates, tiers };
       }),
 
     isHeldBy: (creatorId, id, userId) =>

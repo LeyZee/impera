@@ -3,15 +3,27 @@ import {
   CreatorIdSchema,
   WatchSessionIdSchema,
   type CreatorId,
+  type PlatformAccountId,
   type TrendReadingsBatch,
 } from '@impera/contracts';
 import { browser, type Browser } from 'wxt/browser';
+import { z } from 'zod';
 
 import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
-import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
+import { storedOrigin } from '../lib/crm-origin-store';
 import { fetchSyncableAccounts, sendSession } from '../lib/reveal/api';
+import { syncAtOpening, type AutoSynced } from '../lib/reveal/auto';
 import { REVEAL_API_PATTERN } from '../lib/reveal/capture';
-import { captureSession, syncReveal, type RequestTap, type SeenRequest } from '../lib/reveal/sync';
+import {
+  GIVE_UP_AFTER_MS,
+  SETTLE_MS,
+  captureSession,
+  readReveal,
+  sendHeld,
+  sessionHold,
+  type RequestTap,
+  type SeenRequest,
+} from '../lib/reveal/sync';
 import { placeOf } from '../lib/tab';
 import { fetchMarkableCreators, sendCaptures, sendReadings } from '../lib/watch/api';
 import { captureMarked } from '../lib/watch/captures';
@@ -28,7 +40,7 @@ import {
   type Marked,
   type OnScreen,
   type RevealAccounts,
-  type RevealSynced,
+  type RevealRead,
   type SeenPost,
   type ToReader,
   type WatchStatus,
@@ -55,7 +67,11 @@ import { injectInto, instagramAllowed, syncWatchScript } from '../lib/watch/watc
  */
 
 const STATE_KEY = 'watch';
-const ADDRESS_KEY = 'crmOrigin';
+/** The model of each Reveal account's last sync, to check the next one against: an id, never a session. */
+const MODELS_KEY = 'revealModels';
+const ModelsSchema = z.record(z.string(), z.string());
+/** The popup's port: when it closes, a session it held is forgotten. */
+const POPUP_PORT = 'popup';
 const FLUSH_ALARM = 'watch-flush';
 const MENU_PARENT = 'watch-mark';
 const MENU_PREFIX = 'watch-mark:';
@@ -87,11 +103,8 @@ export default defineBackground(() => {
   }
   const readState = (): Promise<WatchState> => withState((state) => [state, state]);
 
-  async function crmOrigin(): Promise<string> {
-    const stored: Record<string, unknown> = await browser.storage.local.get(ADDRESS_KEY).catch(() => ({}));
-    const value = stored[ADDRESS_KEY];
-    return typeof value === 'string' ? (crmOriginOf(value) ?? DEFAULT_CRM_ADDRESS) : DEFAULT_CRM_ADDRESS;
-  }
+  // The popup's address, or the built-in one of a hosted build (ADR 0067, second amendement), or this computer's.
+  const crmOrigin = storedOrigin;
 
   /* ---- The reader in a tab ---- */
 
@@ -166,7 +179,8 @@ export default defineBackground(() => {
     let outcome: 'sent' | 'kept' | 'revoked' = 'sent';
     for (const batch of batches) {
       const sent = await sendReadings(origin, token, batch);
-      if (sent.kind === 'unreachable') {
+      // A CRM counting too many tries (429) keeps the batch too: it is sent again with the next flush.
+      if (sent.kind === 'unreachable' || sent.kind === 'busy') {
         unsent.push(batch);
         outcome = 'kept';
       } else if (sent.kind === 'revoked') {
@@ -326,6 +340,18 @@ export default defineBackground(() => {
 
   /* ---- The owner's « Sync » of a Reveal session (P2-01) ---- */
 
+  /**
+   * The model the CRM keeps for this account (`modelId`, the session's owner), asked at each reading: the tab is then
+   * read for that creator. Null before the first « Sync », or when the CRM does not answer.
+   */
+  async function crmModel(accountId: PlatformAccountId): Promise<string | null> {
+    const token = await readLink();
+    if (token === null) return null;
+    const answer = await fetchSyncableAccounts(await crmOrigin(), token).catch(() => null);
+    if (answer?.kind !== 'ok') return null;
+    return answer.value.accounts.find((account) => account.id === accountId)?.modelId ?? null;
+  }
+
   async function revealAccounts(): Promise<RevealAccounts> {
     const token = await readLink();
     if (token === null) return { state: 'none', accounts: [] };
@@ -341,6 +367,8 @@ export default defineBackground(() => {
               creatorName,
               sessionState,
               sessionUpdatedAt,
+              // The CRM does not list the end of a session yet: the card says it after a « Sync » only.
+              sessionExpiresAt: null,
             }),
           ),
         };
@@ -352,6 +380,8 @@ export default defineBackground(() => {
           state: answer.code === CONNECTOR_LINK_FORBIDDEN ? 'not-owner' : 'unreachable',
           accounts: [],
         };
+      case 'busy':
+        return { state: 'busy', accounts: [] };
       case 'unreachable':
         return { state: 'unreachable', accounts: [] };
     }
@@ -363,7 +393,11 @@ export default defineBackground(() => {
   const revealTap: RequestTap = {
     listen: (tabId, listener) => {
       const registered: Heard = (details) => {
-        listener({ url: details.url, requestHeaders: details.requestHeaders ?? [] });
+        listener({
+          url: details.url,
+          requestHeaders: details.requestHeaders ?? [],
+          frameId: details.frameId,
+        });
         return undefined;
       };
       heard.set(listener, registered);
@@ -381,6 +415,88 @@ export default defineBackground(() => {
       void browser.tabs.reload(tabId).catch(() => undefined);
     },
   };
+
+  /** The session read and not sent yet: this worker's memory alone (lib/reveal/sync.ts). */
+  const held = sessionHold();
+
+  /**
+   * The sync at the opening (ADR 0147 § 3): the main frame of that tab only, never reloaded, and the listening ends as
+   * soon as the tab closes or another one comes to the front.
+   */
+  async function syncAtOpeningOf(tabId: number): Promise<AutoSynced> {
+    const tab = await browser.tabs.get(tabId).catch(() => null);
+    if (tab?.active !== true || placeOf(tab.url, '') !== 'reveal') return { state: 'idle' };
+    const leave = new AbortController();
+    const left = (): void => {
+      leave.abort();
+    };
+    const activated = (info: { tabId: number }): void => {
+      if (info.tabId !== tabId) left();
+    };
+    const removed = (closed: number): void => {
+      if (closed === tabId) left();
+    };
+    browser.tabs.onActivated.addListener(activated);
+    browser.tabs.onRemoved.addListener(removed);
+    // Each listener of the capture, as registered: its main-frame filter, so that `stop` removes the right one.
+    const filtered = new Map<(request: SeenRequest) => void, (request: SeenRequest) => void>();
+    const mainFrame: RequestTap = {
+      listen: (id, listener) => {
+        const only = (request: SeenRequest): void => {
+          if (request.frameId === 0) listener(request);
+        };
+        filtered.set(listener, only);
+        revealTap.listen(id, only);
+      },
+      stop: (listener) => {
+        const only = filtered.get(listener);
+        filtered.delete(listener);
+        if (only !== undefined) revealTap.stop(only);
+      },
+      // Never at the opening: reloading stays the click's (§ 3).
+      reload: () => undefined,
+    };
+    try {
+      return await syncAtOpening({
+        readLink,
+        origin: crmOrigin,
+        accounts: fetchSyncableAccounts,
+        capture: (expected) =>
+          captureSession(
+            mainFrame,
+            tabId,
+            expected,
+            { userAgent: navigator.userAgent, now: () => new Date() },
+            { nudgeMs: GIVE_UP_AFTER_MS, waitMs: GIVE_UP_AFTER_MS, settleMs: SETTLE_MS },
+            leave.signal,
+          ),
+        send: (origin, token, accountId, session, trigger) =>
+          sendSession(origin, token, accountId, session, fetch, trigger),
+        markRevoked,
+        remember: async (accountId, modelId) => {
+          await browser.storage.local.set({
+            [MODELS_KEY]: { ...(await revealModels()), [accountId]: modelId },
+          });
+        },
+      });
+    } finally {
+      browser.tabs.onActivated.removeListener(activated);
+      browser.tabs.onRemoved.removeListener(removed);
+    }
+  }
+
+  async function revealModels(): Promise<Readonly<Record<string, string>>> {
+    const stored: Record<string, unknown> = await browser.storage.local.get(MODELS_KEY).catch(() => ({}));
+    return ModelsSchema.safeParse(stored[MODELS_KEY]).data ?? {};
+  }
+
+  // The popup closes: what it held is forgotten, sent or not.
+  browser.runtime.onConnect.addListener((port) => {
+    if (port.name !== POPUP_PORT || port.sender?.id !== browser.runtime.id) return;
+    port.onDisconnect.addListener(() => {
+      held.drop();
+    });
+  });
 
   async function fromPopup(message: FromPopup): Promise<unknown> {
     switch (message.type) {
@@ -420,35 +536,61 @@ export default defineBackground(() => {
         const answer = await fetchMarkableCreators(await crmOrigin(), trimmed);
         if (answer.kind === 'revoked' || answer.kind === 'refused')
           return { state: 'refused' } satisfies LinkSaved;
-        if (answer.kind === 'unreachable') return { state: 'unreachable' } satisfies LinkSaved;
+        if (answer.kind === 'busy' || answer.kind === 'unreachable')
+          return { state: answer.kind } satisfies LinkSaved;
         await saveLink(trimmed);
         await rebuildMenu(answer.value.items);
         return { state: 'linked' } satisfies LinkSaved;
       }
       case 'popup/unlink':
         await forgetLink();
+        // The models of past syncs go with the link that made them (avis de Sécurité sur #841).
+        await browser.storage.local.remove(MODELS_KEY);
         return { ok: true };
       case 'popup/reveal-accounts':
         return revealAccounts();
-      case 'popup/reveal-sync': {
+      case 'popup/link-state':
+        return { link: await linkState() };
+      case 'popup/reveal-read': {
         const tab = await browser.tabs.get(message.tabId).catch(() => null);
         // Only from a Reveal tab: its requests are the ones read.
-        if (placeOf(tab?.url, '') !== 'reveal') return { state: 'no-session' } satisfies RevealSynced;
-        return syncReveal(
+        if (placeOf(tab?.url, '') !== 'reveal') return { state: 'no-session' } satisfies RevealRead;
+        return readReveal(
+          {
+            readLink,
+            capture: (expected) =>
+              captureSession(revealTap, message.tabId, expected, {
+                userAgent: navigator.userAgent,
+                now: () => new Date(),
+              }),
+            expectedModel: async (accountId) =>
+              (await crmModel(accountId)) ?? (await revealModels())[accountId] ?? null,
+          },
+          held,
+          message.accountId,
+        );
+      }
+      case 'popup/reveal-send':
+        return sendHeld(
           {
             readLink,
             markRevoked,
             origin: crmOrigin,
-            capture: () =>
-              captureSession(revealTap, message.tabId, {
-                userAgent: navigator.userAgent,
-                now: () => new Date(),
-              }),
             send: sendSession,
+            remember: async (accountId, modelId) => {
+              await browser.storage.local.set({
+                [MODELS_KEY]: { ...(await revealModels()), [accountId]: modelId },
+              });
+            },
           },
+          held,
           message.accountId,
         );
-      }
+      case 'popup/reveal-cancel':
+        held.drop();
+        return { ok: true };
+      case 'popup/reveal-auto':
+        return syncAtOpeningOf(message.tabId);
     }
   }
 

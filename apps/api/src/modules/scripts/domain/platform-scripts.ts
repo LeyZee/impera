@@ -222,8 +222,12 @@ export interface StepMediaState {
   readonly kind: MediaSlotKind;
   /** Listed by the last sync of the vault, and not removed since. */
   readonly inVault: boolean;
+  /** Chosen for the CRM (ADR 0145 § 5): a media of the vault not imported does not exist for the agent. */
+  readonly imported: boolean;
   /** Its media has a description a human validated (ADR 0083, ADR 0030 § 3); `false` while its file is not read. */
   readonly described: boolean;
+  /** Offered once (ADR 0145 § 2): sent for free by the platform, or out in a drop that leaves for free. */
+  readonly offered: boolean;
 }
 
 /** Why a native script cannot be offered for sale yet. */
@@ -231,23 +235,84 @@ export type PlatformScriptGap = (typeof PLATFORM_SCRIPT_GAPS)[number];
 
 /**
  * What keeps a native script from being proposable (P6-01, ADR 0099 § 1, remark Médias 6): a media of a step (sold or
- * preview) absent from the vault makes its step incomplete; a photo or a video not described with a validated
+ * preview) absent from the vault makes its step incomplete; one in the vault but not imported into the CRM (ADR 0145
+ * § 5) keeps it from being offered; a photo or a video not described with a validated
  * description (a voice note is never described: ADR 0083 § 2); the identity of its current version (SC-04 c8) not
  * validated; what its branches lack (`branchGaps`, ADR 0112); a step with a « Tarif réduit » set on the platform, never
- * sold at (recette 16/11, Charles: blocked and said, as a changed price). Empty: it may be offered, when it is active.
+ * sold at (recette 16/11, Charles: blocked and said, as a changed price); a paid step that sells a media once offered
+ * (ADR 0145 § 2, Charles: « un média offert n'est jamais revendu »). Empty: it may be offered, when it is active.
  */
 export function platformScriptGaps(
-  steps: readonly { readonly discounted: boolean; readonly media: readonly StepMediaState[] }[],
+  steps: readonly {
+    readonly discounted: boolean;
+    /** Priced by the platform: its sold media are paid for. */
+    readonly paid: boolean;
+    /** Every media of the step, sold and preview. */
+    readonly media: readonly StepMediaState[];
+    /** The media it sells. */
+    readonly sold: readonly StepMediaState[];
+  }[],
   identityValidated: boolean,
   branches: readonly PlatformScriptGap[],
 ): PlatformScriptGap[] {
   const media = steps.flatMap((step) => step.media);
   const gaps: PlatformScriptGap[] = [];
   if (media.some((each) => !each.inVault)) gaps.push('media_absent');
+  if (media.some((each) => each.inVault && !each.imported)) gaps.push('media_not_imported');
   if (media.some((each) => each.inVault && each.kind !== 'audio' && !each.described))
     gaps.push('media_not_described');
   if (!identityValidated) gaps.push('identity_not_validated');
   gaps.push(...branches);
   if (steps.some((step) => step.discounted)) gaps.push('step_discounted');
+  if (steps.some((step) => step.paid && step.sold.some((each) => each.inVault && each.offered)))
+    gaps.push('media_offered');
   return gaps;
+}
+
+/** What the agency names to validate, against the descriptions a script's media are shown with now. */
+export type DescriptionRefusal = 'stale' | 'alone';
+
+/**
+ * Whether these descriptions can be validated together (ADR 0030 § 3, ADR 0083 § 3 to 5): each the one a media of the
+ * script is shown with now (`stale` otherwise: a newer one came, or the media left the script), and one that waits for
+ * a person for a reason only alone, never under « Tout valider ».
+ */
+export function descriptionRefusal(
+  named: readonly string[],
+  shown: ReadonlyMap<string, { readonly reviewReasons: readonly string[]; readonly validated: boolean }>,
+): DescriptionRefusal | null {
+  if (named.some((id) => !shown.has(id))) return 'stale';
+  if (
+    named.length > 1 &&
+    named.some((id) => {
+      const row = shown.get(id);
+      return row !== undefined && !row.validated && row.reviewReasons.length > 0;
+    })
+  )
+    return 'alone';
+  return null;
+}
+
+/** The platform's totals of one step (ADR 0129 § 12), by its own id on the account, as the import reads them. */
+export interface StepTotals {
+  readonly platformStepRef: string;
+  readonly sent: number;
+  readonly purchased: number;
+  readonly paidMinor: number;
+  readonly currency: Currency;
+}
+
+/**
+ * The totals of every step the platform listed (ADR 0129 § 12), a step once: a script out of the base's bounds keeps
+ * its totals all the same, and a step without any (the platform gave none) has no row. A ref longer than the base keeps
+ * is left out.
+ */
+export function stepTotalsOf(listed: readonly PlatformScript[]): StepTotals[] {
+  const byRef = new Map<string, StepTotals>();
+  for (const script of listed)
+    for (const step of script.steps) {
+      if (step.totals === undefined || step.ref.id.length > PLATFORM_SCRIPT_REF_MAX) continue;
+      byRef.set(step.ref.id, { platformStepRef: step.ref.id, ...step.totals, currency: step.currency });
+    }
+  return [...byRef.values()];
 }

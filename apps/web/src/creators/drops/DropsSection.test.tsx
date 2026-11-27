@@ -49,13 +49,12 @@ function serve(routes: Record<string, (body: unknown) => Reply>): { method: stri
 }
 
 const CONTENT = `GET /creators/${CREATOR}/content`;
-const SWITCH = `/creators/${CREATOR}/drop-descriptions`;
 const CONFIRM = `POST /creators/${CREATOR}/drops/${SEANCE.id}/export/confirm`;
 
-function show(isOwner = false): void {
+function show(): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <DropsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" isOwner={isOwner} />
+      <DropsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" />
     </QueryClientProvider>,
   );
 }
@@ -67,7 +66,9 @@ afterEach(() => {
 
 describe('Créatrices › Contenu (recette créatrice 1 et 6)', () => {
   it('shows her séance, never her script, with its archive to download and « Publié sur Reveal »', async () => {
-    serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE, SCRIPT] } }) });
+    serve({
+      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE, SCRIPT], redone: [] } }),
+    });
     show();
     const card = await screen.findByRole('listitem', { name: 'Feed · Séance boudoir' });
     expect(within(card).getByText('À publier')).toBeDefined();
@@ -83,7 +84,7 @@ describe('Créatrices › Contenu (recette créatrice 1 et 6)', () => {
   it('confirms it out once, in a dialog that says the originals go in 30 days', async () => {
     let drops = [SEANCE];
     const calls = serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [], drops } }),
+      [CONTENT]: () => ({ status: 200, body: { requests: [], drops, redone: [] } }),
       [CONFIRM]: () => {
         drops = [PUBLISHED];
         return { status: 200, body: PUBLISHED };
@@ -116,7 +117,7 @@ describe('Créatrices › Contenu (recette créatrice 1 et 6)', () => {
     ] as const;
     const review: DropDescriptionsReview = { ...reviewOf(SEANCE.id, files), steps: [], summary: null };
     serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE] } }),
+      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE], redone: [] } }),
       [`GET /creators/${CREATOR}/drops/${SEANCE.id}/descriptions`]: () => ({ status: 200, body: review }),
     });
     show();
@@ -129,41 +130,84 @@ describe('Créatrices › Contenu (recette créatrice 1 et 6)', () => {
     expect(within(region).getAllByText(/Photo inventée/u)).toHaveLength(3);
   });
 
-  it('gives the owner alone her switch; turned on, it says so (recette créatrice 6)', async () => {
-    let on = false;
-    const calls = serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE] } }),
-      [`GET ${SWITCH}`]: () => ({ status: 200, body: { on } }),
-      [`PUT ${SWITCH}`]: () => {
-        on = true;
-        return { status: 200, body: { on } };
+  it('sends a drop back « À refaire » with a sentence for her, never one already out (trou 7 du 21/11)', async () => {
+    let drops = [SEANCE];
+    const sent: unknown[] = [];
+    serve({
+      [CONTENT]: () => ({ status: 200, body: { requests: [], drops, redone: [] } }),
+      [`POST /creators/${CREATOR}/drops/${SEANCE.id}/redo`]: (body) => {
+        sent.push(body);
+        drops = [];
+        return { status: 204 };
       },
     });
-    show(true);
-    const toggle = await screen.findByRole('switch', { name: 'Descriptions par l’IA' });
-    if (!(toggle instanceof HTMLInputElement)) throw new Error('the switch is an input');
-    await waitFor(() => {
-      expect(toggle.disabled).toBe(false);
+    show();
+    const card = await screen.findByRole('listitem', { name: 'Feed · Séance boudoir' });
+    fireEvent.click(within(card).getByRole('button', { name: 'À refaire' }));
+    const dialog = await screen.findByRole('dialog', { name: 'À refaire ?' });
+    expect(within(dialog).getByText(/Lina voit ta phrase sur sa carte/u)).toBeDefined();
+    expect(within(dialog).getByText(/Ses fichiers de ce dépôt partent dans l’heure/u)).toBeDefined();
+    const send = within(dialog).getByRole('button', { name: 'Lui demander de refaire' });
+    expect(send.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'C’est flou, refais-la plus nette' }));
+    fireEvent.change(within(dialog).getByLabelText('Ce qu’elle doit refaire'), {
+      target: { value: '  C’est flou, refais-la plus nette, au salon  ' },
     });
-    expect(toggle.checked).toBe(false);
-    expect(screen.getByText(/Éteint : ses médias ne sont pas décrits/u)).toBeDefined();
-    fireEvent.click(toggle);
+    fireEvent.click(send);
     await waitFor(() => {
-      expect(toggle.checked).toBe(true);
+      expect(screen.queryByRole('dialog')).toBeNull();
     });
-    expect(screen.getByText(/Chaque photo et vidéo de Lina est décrite/u)).toBeDefined();
-    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
-    cleanup();
-    const asManager = serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE] } }) });
-    show(false);
+    expect(sent).toEqual([{ sentence: 'C’est flou, refais-la plus nette, au salon' }]);
+    expect(await screen.findByText('Aucun dépôt')).toBeDefined();
+  });
+
+  it('says why the drop was not sent back, and keeps the dialog open', async () => {
+    serve({
+      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE], redone: [] } }),
+      [`POST /creators/${CREATOR}/drops/${SEANCE.id}/redo`]: () => ({
+        status: 409,
+        body: {
+          error: {
+            code: 'content_drop_settled_conflict',
+            message: 'Déjà publié',
+            details: {},
+            requestId: 'r1',
+          },
+        },
+      }),
+    });
+    show();
+    const card = await screen.findByRole('listitem', { name: 'Feed · Séance boudoir' });
+    fireEvent.click(within(card).getByRole('button', { name: 'À refaire' }));
+    const dialog = await screen.findByRole('dialog', { name: 'À refaire ?' });
+    fireEvent.change(within(dialog).getByLabelText('Ce qu’elle doit refaire'), {
+      target: { value: 'Trop sombre' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lui demander de refaire' }));
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Ce dépôt est déjà publié : il ne se refait plus d’ici.',
+    );
+  });
+
+  it('offers no « À refaire » on a drop already out', async () => {
+    serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [PUBLISHED], redone: [] } }) });
+    show();
+    const card = await screen.findByRole('listitem', { name: 'Feed · Séance boudoir' });
+    expect(within(card).queryByRole('button', { name: 'À refaire' })).toBeNull();
+  });
+
+  it('holds no switch of the descriptions, for the owner nor a manager (ADR 0145 § 5, 17/11)', async () => {
+    serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE], redone: [] } }) });
+    show();
     await screen.findByRole('listitem', { name: 'Feed · Séance boudoir' });
     expect(screen.queryByRole('switch')).toBeNull();
-    expect(asManager.some((call) => call.path === SWITCH)).toBe(false);
   });
 
   it('says when she has dropped nothing but scripts', async () => {
-    serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SCRIPT] } }) });
+    serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SCRIPT], redone: [] } }) });
     show();
     expect(await screen.findByText('Aucun dépôt')).toBeDefined();
+    expect(document.querySelector('.nv-empty__art svg')).not.toBeNull();
   });
 });

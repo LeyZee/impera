@@ -13,7 +13,6 @@ export const CRM_SECTIONS = [
   '/aujourdhui',
   '/agenda',
   '/suivi',
-  '/fans',
   '/entrainer',
   '/planning',
   '/commissions',
@@ -21,6 +20,7 @@ export const CRM_SECTIONS = [
   '/contenu',
   '/equipe',
   '/paie',
+  '/trafic',
   '/creatrices',
   '/moi',
   '/reglages',
@@ -33,7 +33,6 @@ export const CRM_SECTION_LABELS: Readonly<Record<CrmSection, string>> = {
   '/aujourdhui': 'Aujourd’hui',
   '/agenda': 'Agenda',
   '/suivi': 'Suivi',
-  '/fans': 'Fans',
   '/entrainer': 'Entraîner',
   '/planning': 'Planning',
   '/commissions': 'Commissions',
@@ -41,6 +40,7 @@ export const CRM_SECTION_LABELS: Readonly<Record<CrmSection, string>> = {
   '/contenu': 'Contenu',
   '/equipe': 'Équipe',
   '/paie': 'Paie',
+  '/trafic': 'Trafic',
   '/creatrices': 'Créatrices',
   '/moi': 'Moi',
   '/reglages': 'Réglages',
@@ -69,31 +69,36 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
   owner: {
     sections: [
       ['/', null],
+      // Every fan of a creator (ADR 0124 § 4) is a sub-tab of Suivi, no section of its own (ADR 0134 § 5).
       ['/suivi', 'chatting'],
-      // Every fan of a creator, for the agency (ADR 0124 § 4): the owner's and an active manager's.
-      ['/fans', 'chatting'],
       ['/entrainer', 'chatting'],
+      // Créatrices first: her sheet holds her scripts and her vault, two clicks away (ADR 0149 § 2).
+      ['/creatrices', 'agency'],
       ['/equipe', 'agency'],
       ['/paie', 'agency'],
-      ['/creatrices', 'agency'],
+      // What brings fans: her redirect links first (ADR 0134 § 5, ADR 0149 § 2), out of her sheet's seven tabs.
+      ['/trafic', 'agency'],
     ],
     settings: true,
-    phone: ['/', '/suivi', '/equipe', '/paie'],
+    phone: ['/', '/suivi', '/creatrices', '/equipe'],
     shortcuts: ['/', '/suivi', '/equipe', '/creatrices'],
   },
   manager: {
     sections: [
       ['/', null],
-      ['/suivi', null],
-      ['/fans', null],
-      ['/equipe', null],
-      ['/paie', null],
-      // Her agenda alone (CR-05 lot c, Charles, 05/11): the other sheets of Créatrices stay the owner's.
-      ['/creatrices', null],
+      ['/suivi', 'chatting'],
+      // The Playground, on the creators of his list: he notes and corrects, the owner files (ADR 0092 § 8).
+      ['/entrainer', 'chatting'],
+      // The tabs of her sheet a manager may open (ADR 0149 § 1); the others stay the owner's.
+      ['/creatrices', 'agency'],
+      ['/equipe', 'agency'],
+      ['/paie', 'agency'],
+      // The agency's screen, the owner's and the manager's (ADR 0121 § 4): a manager reads her links there.
+      ['/trafic', 'agency'],
       ['/moi', null],
     ],
     settings: false,
-    phone: ['/', '/suivi', '/equipe', '/paie'],
+    phone: ['/', '/suivi', '/creatrices', '/equipe'],
     shortcuts: ['/', '/suivi', '/equipe', '/paie'],
   },
   chatter: {

@@ -1,6 +1,7 @@
 import {
   payPeriodLastDay,
   CUSTOM_ALERT_TOPIC,
+  OWNER_REMOVAL_NOTICE_HOURS,
   SYSTEM_ALERT_LABELS,
   SYSTEM_ALERT_TOPICS,
   type AlertRef,
@@ -65,6 +66,7 @@ export const SCANNED_EVENT_TYPES = [
   'agency_share_mismatch',
   'agency_share_changed',
   'sales_feed_signal',
+  'account_uncovered',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -90,6 +92,7 @@ const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
   identity_doubt: 'Le fan doute de parler vraiment à la créatrice.',
   persona_inactive: 'La créatrice n’a pas de persona active : l’agent n’écrit rien.',
   custom_order: 'Le fan demande quelque chose fait pour lui : un humain prend la commande.',
+  sale_trouble: 'Une vente coince encore (paiement ou plainte après achat) : un humain doit répondre.',
 };
 
 /**
@@ -224,6 +227,26 @@ const periodText = (period: PayPeriod): string => {
   const first = period.endsWith('-01') ? '1er' : '16';
   return `la quinzaine du ${first} au ${String(Number(last.slice(8)))} ${month}`;
 };
+
+/** « de 14 h à 20 h », or « de 22 h 30 à 4 h », on the planning's clock. */
+function slotText(slot: {
+  readonly slotStartsAt: string;
+  readonly slotEndsAt: string;
+  readonly timeZone: string;
+}): string {
+  const clock = (at: string): string => {
+    const parts = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: slot.timeZone,
+      hour: 'numeric',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(at));
+    const hour = String(Number(parts.find((part) => part.type === 'hour')?.value ?? '0'));
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+    return minute === '00' ? `${hour} h` : `${hour} h ${minute}`;
+  };
+  return `de ${clock(slot.slotStartsAt)} à ${clock(slot.slotEndsAt)}`;
+}
 
 const countText = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
@@ -394,6 +417,26 @@ function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'lin
     case 'passkey_new_sign_in':
       return {
         body: `Connexion au compte propriétaire avec une clé d’accès jamais utilisée${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si ce n’est pas le propriétaire, retire ses clés et ferme ses sessions.`,
+        link: SECURITY_LINK,
+      };
+    case 'owner_added':
+      return {
+        body: 'Un membre de l’équipe vient de devenir propriétaire (deux au plus). Si ce n’est pas voulu, l’autre propriétaire peut demander son retrait dans Réglages › Sécurité.',
+        link: SECURITY_LINK,
+      };
+    case 'owner_removal_requested':
+      return {
+        body: `Un propriétaire a demandé le retrait de l’autre : il prend effet dans ${String(OWNER_REMOVAL_NOTICE_HOURS)} h. Le propriétaire visé peut l’annuler d’ici là dans Réglages › Sécurité.`,
+        link: SECURITY_LINK,
+      };
+    case 'owner_removal_cancelled':
+      return {
+        body: 'Le propriétaire visé a annulé le retrait qui attendait : il y a toujours deux propriétaires.',
+        link: SECURITY_LINK,
+      };
+    case 'owner_removed':
+      return {
+        body: 'Le préavis est passé sans annulation : un compte n’est plus propriétaire, ses sessions sont fermées.',
         link: SECURITY_LINK,
       };
     case 'persona_activated':
@@ -796,6 +839,18 @@ export function classify(
           label: 'Ouvrir la part de l’agence',
           path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
         },
+      };
+    // Important to the groups for all (ADR 0094 § 3): never to a chatter nor to her; once per account and créneau.
+    case 'account_uncovered':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        allCreatorsOnly: true,
+        oncePerThread: true,
+        threadKey: `account_uncovered:${signal.platformAccountId}:${signal.slotStartsAt}`,
+        title: 'Important',
+        body: `Compte sans personne chez ${PLATFORM_NAMES[signal.platform]} : le créneau ${slotText(signal)} a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.`,
+        link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
       };
     case 'connection_down':
       return {

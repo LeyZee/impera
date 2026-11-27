@@ -1,7 +1,7 @@
 import { PayPeriodSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { gainsOf, reportOf, type GamePay, type GameShift } from '../gains';
+import { gainsOf, reportOf, takenBackOf, type GamePay, type GameShift, type HeldGain } from '../gains';
 import { levelSteps } from '../levels';
 
 const ZONE = 'Europe/Paris';
@@ -95,5 +95,114 @@ describe('gainsOf (ADR 0104 § 12 and § 15)', () => {
     expect(kinds({ ...NO_PAY, cumulatedNetMinor: 99_999 })).toEqual([]);
     expect(kinds({ ...NO_PAY, cumulatedNetMinor: 500_000 })).toEqual(['level:1', 'level:2']);
     expect(kinds({ ...NO_PAY, cumulatedNetMinor: 9_000_000 }, [], [])).toEqual([]);
+  });
+});
+
+describe('takenBackOf (ADR 0118 § 5 and § 7)', () => {
+  const held = (kind: HeldGain['kind'], scopeKey = '', basisMinor: number | null = null): HeldGain => ({
+    kind,
+    scopeKey,
+    basisMinor,
+  });
+  const earnedWith = (pay: GamePay, steps = STEPS) =>
+    gainsOf({ pay, shifts: [], now: NOW, agencyZone: ZONE, levelSteps: steps }).gains;
+  const keys = (gains: readonly HeldGain[]) =>
+    gains.map((gain) => (gain.scopeKey === '' ? gain.kind : `${gain.kind}:${gain.scopeKey}`));
+
+  it('takes nothing back while the facts still give every gain held', () => {
+    const pay = { ...NO_PAY, sales: 2, dayNetsMinor: [1_000, 2_000], cumulatedNetMinor: 120_000 };
+    expect(
+      takenBackOf({
+        held: [held('first_sale'), held('day_record'), held('level', '1', 100_000)],
+        earned: earnedWith(pay),
+        cumulatedNetMinor: pay.cumulatedNetMinor,
+      }),
+    ).toEqual([]);
+  });
+
+  it('takes back the trophies of a net and the tier that the corrected net no longer gives', () => {
+    const period = PayPeriodSchema.parse('2026-11-01');
+    const all = [
+      held('first_sale'),
+      held('day_record'),
+      held('fortnight_record'),
+      held('tier', `${period}:50000`),
+    ];
+    expect(keys(takenBackOf({ held: all, earned: earnedWith(NO_PAY), cumulatedNetMinor: 0 }))).toEqual([
+      'first_sale',
+      'day_record',
+      'fortnight_record',
+      `tier:${period}:50000`,
+    ]);
+    // The tier its statement still reaches stays, whatever else left.
+    const pay = { ...NO_PAY, tiers: [{ period, thresholdMinor: 50_000 }] };
+    expect(keys(takenBackOf({ held: all, earned: earnedWith(pay), cumulatedNetMinor: 0 }))).not.toContain(
+      `tier:${period}:50000`,
+    );
+  });
+
+  it('never takes back what rewards regularity, even with no fact left', () => {
+    const regular = [
+      held('fortnight_on_time'),
+      held('streak_5'),
+      held('streak_10'),
+      held('streak_25'),
+      held('ten_ppv_shift'),
+    ];
+    expect(takenBackOf({ held: regular, earned: [], cumulatedNetMinor: 0 })).toEqual([]);
+  });
+
+  it('takes a rank back when the net falls under the threshold it was reached at: a rank can come down', () => {
+    const pay = { ...NO_PAY, cumulatedNetMinor: 99_999 };
+    const ranks = [held('level', '1', 100_000), held('level', '2', 500_000)];
+    expect(
+      keys(takenBackOf({ held: ranks, earned: earnedWith(pay), cumulatedNetMinor: pay.cumulatedNetMinor })),
+    ).toEqual(['level:1', 'level:2']);
+    const between = { ...NO_PAY, cumulatedNetMinor: 300_000 };
+    expect(
+      keys(
+        takenBackOf({
+          held: ranks,
+          earned: earnedWith(between),
+          cumulatedNetMinor: between.cumulatedNetMinor,
+        }),
+      ),
+    ).toEqual(['level:2']);
+  });
+
+  it('keeps a rank when only the thresholds moved: raised, emptied, or lowered under a net that fell', () => {
+    const rank = [held('level', '1', 100_000)];
+    const pay = { ...NO_PAY, cumulatedNetMinor: 150_000 };
+    // Raised above a net that did not move.
+    expect(
+      takenBackOf({ held: rank, earned: earnedWith(pay, levelSteps([900_000])), cumulatedNetMinor: 150_000 }),
+    ).toEqual([]);
+    // Emptied.
+    expect(takenBackOf({ held: rank, earned: earnedWith(pay, []), cumulatedNetMinor: 150_000 })).toEqual([]);
+    // Lowered: the net fell under the old threshold, today's still gives the rank.
+    const fallen = { ...NO_PAY, cumulatedNetMinor: 60_000 };
+    expect(
+      takenBackOf({
+        held: rank,
+        earned: earnedWith(fallen, levelSteps([50_000])),
+        cumulatedNetMinor: 60_000,
+      }),
+    ).toEqual([]);
+  });
+
+  it('takes back a rank whose net fell under its threshold even once the thresholds are emptied', () => {
+    expect(
+      keys(takenBackOf({ held: [held('level', '1', 100_000)], earned: [], cumulatedNetMinor: 40_000 })),
+    ).toEqual(['level:1']);
+  });
+
+  it('keeps a rank noted before its threshold was kept', () => {
+    expect(takenBackOf({ held: [held('level', '1', null)], earned: [], cumulatedNetMinor: 0 })).toEqual([]);
+  });
+
+  it('notes with a rank the threshold it is reached at', () => {
+    expect(earnedWith({ ...NO_PAY, cumulatedNetMinor: 100_000 })).toEqual([
+      { kind: 'level', scopeKey: '1', basisMinor: 100_000 },
+    ]);
   });
 });

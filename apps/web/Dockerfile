@@ -18,9 +18,17 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
     pnpm install --prefer-offline --frozen-lockfile --filter impera --filter "@impera/web..." --filter "@impera/extension..."
-RUN pnpm turbo run build --filter=@impera/web
+# The CRM's official address, from the deployment's configuration (ADR 0067, second amendement): the extension is built
+# with it and granted that site alone, and the guide then drops its link step. Never written here nor in any file of the
+# repository; empty, nothing changes. The extension's build refuses anything but https://<name>.
+ARG EXTENSION_CRM_ORIGIN=""
+# The CRM's own address: when both are given, the extension's build checks they name the same site.
+ARG WEB_ORIGIN=""
+# The commit the bundle is built from (OPS-18): the release its error reports carry, the API's own. `dev` when empty.
+ARG RELEASE=""
+RUN VITE_EXTENSION_CRM_ORIGIN="$EXTENSION_CRM_ORIGIN" VITE_RELEASE="$RELEASE" pnpm turbo run build --filter=@impera/web
 # The extension the team downloads from the guide (/aide/extension, ADR 0067): built with the CRM, so both ship together.
-RUN pnpm --filter @impera/extension zip \
+RUN EXTENSION_CRM_ORIGIN="$EXTENSION_CRM_ORIGIN" WEB_ORIGIN="$WEB_ORIGIN" pnpm --filter @impera/extension zip \
  && mkdir -p apps/web/dist/extension \
  && cp apps/extension/.output/impera.zip apps/web/dist/extension/impera.zip
 

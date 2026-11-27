@@ -25,6 +25,8 @@ let answer: { status: number; body: unknown };
 let pdfAnswer: { status: number; type: string; body: string };
 /** How many times the PDF route was read. */
 let pdfReads = 0;
+/** The team's answer to the reader: his own row, or nothing read (`null`). */
+let team: unknown = null;
 const writes: { path: string; body: unknown }[] = [];
 const reads: string[] = [];
 
@@ -81,6 +83,8 @@ function serve(): void {
           );
         case '/v1/scheduling/settings':
           return json(SCHEDULING_SETTINGS);
+        case '/v1/team/members':
+          return team === null ? json(null, 404) : json(team);
         default:
           return json({ items: [], nextCursor: null });
       }
@@ -147,6 +151,7 @@ beforeEach(() => {
   answer = { status: 200, body: acceptanceView(PENDING, 'accepted') };
   pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
   pdfReads = 0;
+  team = null;
   writes.length = 0;
   reads.length = 0;
   serve();
@@ -345,6 +350,18 @@ describe('Commissions › Factures', () => {
     expect(reads).toHaveLength(10);
     expect(reads.at(-1)).toBe('?from=2016-10-29&to=2017-10-29');
     expect(screen.getByText('Aucun document entre le 29 octobre 2016 et le 2 novembre 2022.')).toBeTruthy();
+  });
+
+  it('offers no older year than the one he joined in (CHA-18)', async () => {
+    // Théo joined on 1 September 2026: the year read, from 5 November 2025, already holds his arrival.
+    team = { members: [THEO] };
+    years = new Map();
+    renderPage();
+    expect(await screen.findByText('Pas encore de facture.')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Plus anciennes' })).toBeNull();
+    });
+    expect(screen.queryByText(/dix/u)).toBeNull();
   });
 
   it('says a year without a document by its days, never « none at all », and a server that does not answer', async () => {

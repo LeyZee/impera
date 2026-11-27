@@ -37,6 +37,7 @@ export function payInputReadsOf(modules: {
     validatedReportsScoped: scheduling.pay.validatedReportsScoped,
     reportsAwaitingReviewScoped: scheduling.pay.reportsAwaitingReviewScoped,
     agencyTimeZone: scheduling.pay.agencyTimeZone,
+    ownValidatedShifts: scheduling.game.ownValidatedShifts,
     members: team.pay.members,
     creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
     sales: {
@@ -73,6 +74,7 @@ export function wirePayroll(
     adminDb,
     reads: payInputReadsOf({ scheduling, team, persona }),
     shiftFacts: scheduling.pay.shiftFacts,
+    endedShifts: scheduling.pay.endedShifts,
     rateJobSince: deps.rateJobSince,
     payouts: payoutGate,
     afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },

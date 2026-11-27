@@ -23,8 +23,10 @@ import {
 } from './model';
 import './agency-agenda.css';
 
+import { ProgressBand } from '@/creators/progress/ProgressBand';
 import { ReelBriefFields } from '@/creators/reel/ReelBriefFields';
 import { emptyReelDraft, reelBriefOf, reelProblems, type ReelDraft } from '@/creators/reel/model';
+import { WeekPlanPanel } from '@/creators/week/WeekPlanPanel';
 import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, cityOf, dayOf, mondayOf, readerZone, weekdayOf, weekLabel } from '@/scheduling/time';
 import {
@@ -55,10 +57,13 @@ export function AgendaSection({
   creatorId,
   creatorName,
   timezone,
+  canValidate = false,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
+  /** The owner validates her week of shooting (ADR 0140 § 3); a manager reads it. */
+  canValidate?: boolean;
 }): JSX.Element {
   const today = dayOf(new Date(), timezone);
   const thisWeek = mondayOf(today);
@@ -160,6 +165,15 @@ export function AgendaSection({
           {notice}
         </p>
       )}
+      {/* Where she is, day by day and in her week, before what the agency plans next (trous béants n° 11). */}
+      <ProgressBand creatorId={creatorId} week={week} />
+      <WeekPlanPanel
+        creatorId={creatorId}
+        creatorName={creatorName}
+        timezone={timezone}
+        week={week}
+        canValidate={canValidate}
+      />
       {list()}
       {proposing ? (
         <ProposeDialog

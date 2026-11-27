@@ -12,7 +12,13 @@ import {
 import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
-import { refundsOfDay, salesTotals, type TotalsLine } from '../../domain/sales-totals';
+import {
+  refundsListed,
+  refundsOfDay,
+  salesTotals,
+  type RefundListed,
+  type TotalsLine,
+} from '../../domain/sales-totals';
 
 import { lineChatter } from './line-chatter';
 import { sellerOf } from './seller';
@@ -143,6 +149,39 @@ export const salesFeedTotals = {
         return { ...lineOf(parsed), saleOccurredAt: parsed.sale_occurred_at };
       }),
       query.day,
+    );
+  },
+
+  /**
+   * The refunds the totals of `from` to `to` take off, one by one (ADR 0092 § 4, the agency's list): each on its sale's
+   * day, or on its own when the sale is not in the register, with its sale's instant and seller. The latest first. In
+   * the caller's transaction, as `totalsOf`: the Dashboard reads it under the creator's tenant.
+   */
+  refundListOf: async (tx: Transaction, query: SalesTotalsQuery): Promise<RefundListed[]> => {
+    // The bounds of `totalsOf`, a day padded on each side for the zones: `refundsListed` keeps the days exactly.
+    const start = new Date(Date.parse(`${query.from}T00:00:00Z`) - DAY_MS);
+    const end = new Date(Date.parse(`${query.to}T00:00:00Z`) + 2 * DAY_MS);
+    const saleAt = sql`coalesce(s.occurred_at, l.occurred_at)`;
+    const result = await tx.execute(sql`
+      select l.platform, l.platform_sale_id, l.event, l.sale_type, l.platform_account_id, l.occurred_at, l.currency,
+             l.gross_incl_vat_minor, l.gross_excl_vat_minor, l.net_minor, l.agency_minor, l.creator_minor,
+             ${lineChatter} as platform_chatter_id, c.kind, c.member_id, s.occurred_at as sale_occurred_at
+        from platform_sales l
+        left join platform_sales s
+          on s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
+             and s.creator_id = l.creator_id
+        left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = ${lineChatter}
+       where l.creator_id = ${query.creatorId}
+         and l.event = 'refund'
+         and l.occurred_at >= ${start}
+         and ${saleAt} >= ${start}
+         and ${saleAt} < ${end}`);
+    return refundsListed(
+      result.rows.map((row) => {
+        const parsed = RefundRowSchema.parse(row);
+        return { ...lineOf(parsed), saleOccurredAt: parsed.sale_occurred_at };
+      }),
+      { from: query.from, to: query.to },
     );
   },
 

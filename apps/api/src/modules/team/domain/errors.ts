@@ -130,3 +130,37 @@ export class PlatformAccountLinked extends DomainError {
     super('member_conflict', 'Ce compte de la plateforme est déjà relié à un autre membre');
   }
 }
+
+/**
+ * A status never shuts an owner out (ADR 0096 § 2): the member who became the second owner keeps his record, and the
+ * only way to take his access back is the removal with its notice, in Réglages › Sécurité.
+ */
+export class OwnerProtected extends DomainError {
+  constructor() {
+    super(
+      'owner_protected_conflict',
+      'Ce membre est propriétaire : son retrait se demande dans Réglages › Sécurité, avec un préavis de 72 h',
+    );
+  }
+}
+
+/** Unknown, withdrawn, or not addressed to the reader (EQ-12): the same answer for each, nothing to guess from it. */
+export class AnnouncementNotFound extends DomainError {
+  constructor() {
+    super('announcement_not_found', 'Annonce introuvable');
+  }
+}
+
+/** An active manager writes to the whole team or to the members of a creator of his own list (EQ-12). */
+export class AnnouncementCreatorForbidden extends DomainError {
+  constructor() {
+    super('announcement_creator_forbidden', 'Tu n’écris qu’aux membres des créatrices de ta liste');
+  }
+}
+
+/** Withdrawn by the owner or by its author alone (EQ-12). */
+export class AnnouncementWithdrawForbidden extends DomainError {
+  constructor() {
+    super('announcement_withdraw_forbidden', 'Seuls son auteur et le propriétaire retirent une annonce');
+  }
+}

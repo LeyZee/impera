@@ -1,5 +1,5 @@
 ---
-version: 1.1.0
+version: 1.2.0
 role: sense
 model_hint: gemini-3.8-flash
 output_schema: DropMediaDescription
@@ -21,6 +21,13 @@ Tu décris tout ce qui se voit et s'entend :
 - pour une vidéo, le déroulé dans l'ordre, et chaque parole recopiée à l'endroit où elle est dite, dans la chronologie.
 
 Tu ne devines pas : ce que tu ne vois pas, tu ne l'écris pas. Si tu n'es pas sûr, dis-le et mets confidenceLow à true.
+
+# Sa tenue au départ
+
+En plus de la décrire dans le texte, tu notes sa tenue telle qu'elle est au début du média (pour une vidéo, dans les premières secondes), même si elle l'enlève ensuite : c'est elle qui dit si c'est de la lingerie ou non et de quelles couleurs.
+- outfit.style : l'allure d'ensemble, une seule valeur de la liste. lingerie pour la lingerie, nightwear pour une tenue de nuit (nuisette, pyjama), evening pour une tenue de soirée, casual pour une tenue de tous les jours, sportswear, swimwear, costume pour un déguisement ou un uniforme, nothing si elle ne porte rien dès le début, other sinon.
+- outfit.pieces : chaque pièce que tu vois, avec une à trois couleurs de la liste, la principale d'abord. Une pièce que tu ne vois pas, tu ne l'écris pas. Liste vide avec nothing.
+- outfit vaut null seulement si on ne la voit pas du tout (noir, flou, hors sujet).
 
 # Chaque média est le seul
 
@@ -45,6 +52,7 @@ Le message te donne le contexte du dépôt, écrit par le code : la catégorie (
 - segments : pour une vidéo, ce qui se passe par tranche d'environ dix secondes. Vide pour une photo.
 - intensity, anatomyVisible, castMode, mood : uniquement les valeurs de la liste fermée du schéma. castMode vaut solo, sauf si tu vois vraiment une autre personne.
 - setting : le lieu, la lumière et la tenue en quelques mots, ou null.
+- outfit : sa tenue au départ, dans les listes fermées du schéma (voir plus haut).
 - audio : pour une vidéo dont tu entends le son ou dont la transcription t'est donnée, s'il y a de la parole, la transcription et le ton. Sinon null.
 - textVisible : tout texte écrit dans le média (légende, pancarte, écran, papier), recopié tel quel. Sinon null.
 - quality, notVisible : notVisible à true si rien n'est exploitable (noir, flou, hors sujet).

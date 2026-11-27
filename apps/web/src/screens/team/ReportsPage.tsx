@@ -7,8 +7,10 @@ import {
   type ShiftReport,
   type ShiftReportList,
 } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
+import { FeedbacksPanel, IncidentsCard } from './ShiftFeedbackCards';
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
 
@@ -52,9 +54,10 @@ import '@/scheduling/scheduling.css';
 import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
+import { useTeamImportCounts } from '@/settings/sales-feed/api';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
-import { Failure } from '@/shell/states';
+import { Empty, Failure } from '@/shell/states';
 
 /** The correction panel the agency opens on a validated report, for its shift. */
 interface Correcting {
@@ -143,19 +146,25 @@ export function ReportsPage({
 
   const waiting = (open.data?.reports ?? []).filter((one) => one.status === 'submitted');
   // A gap with the platform waits for its member (ADR 0073 § 5): out of the selection until it is answered.
-  const chosen = waiting.filter(
-    (one) => selected.has(one.id) && one.canReview && !held.has(one.id) && !gapWaits(one, now),
-  );
+  // What the reader may validate now: his to review, not held, its gap no longer waiting for its member.
+  const reviewable = waiting.filter((one) => one.canReview && !held.has(one.id) && !gapWaits(one, now));
+  const chosen = reviewable.filter((one) => selected.has(one.id));
+  // « Tout valider » never takes a report whose check found a gap: those are read and ticked one by one (relecture
+  // Équipe of #858).
+  const plain = reviewable.filter((one) => !hasGap(one));
+  // Reveal's team opens to the owner and an active manager (ADR 0076): « Relier » leads there only for them.
+  const canLink = useTeamImportCounts('reveal').data !== undefined;
 
-  const validate = (): void => {
-    if (chosen.length === 0) return;
-    const batch = chosen.map((one) => ({ id: one.id, version: one.version }));
+  /** Validates `picked`, held five seconds; « Annuler » gives back the selection there was (`before`). */
+  const validate = (picked: readonly ShiftReport[], before: ReadonlySet<string>): void => {
+    if (picked.length === 0) return;
+    const batch = picked.map((one) => ({ id: one.id, version: one.version }));
     const ids: ReadonlySet<string> = new Set(batch.map((one) => one.id));
     const count = batch.length;
-    const sums = periodSums(chosen)
+    const sums = periodSums(picked)
       .map((sum) => amountText(sum.waitingMinor, sum.currency))
       .join(' · ');
-    const whose = whoseOf(chosen, namesOf(open.data), zone);
+    const whose = whoseOf(picked, namesOf(open.data), zone);
     // Held with any validation still held or on its way; released alone, whatever the others do.
     setHeld((before) => new Set([...before, ...ids]));
     setSelected(new Set());
@@ -168,7 +177,7 @@ export function ReportsPage({
         text: sums,
         onCancel: () => {
           release();
-          setSelected(ids);
+          setSelected(before);
         },
       },
       async (): Promise<HoldResult> => {
@@ -220,6 +229,23 @@ export function ReportsPage({
         title={screenLabel('/equipe/rapports')}
         lead="Les rapports de fin de shift : valide-les en lot, renvoie-en un avec un mot."
         tabs={<TeamNav />}
+        // The screen's action in sight before anything is ticked; once some are, « Valider (N) » at the foot of the
+        // list takes over, the one neon of the page (recette visuelle 16/11, GES-25; EQ-26).
+        {...(chosen.length > 0 || plain.length === 0
+          ? {}
+          : {
+              actions: (
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--neon"
+                  onClick={() => {
+                    validate(plain, new Set());
+                  }}
+                >
+                  Tout valider ({plain.length})
+                </button>
+              ),
+            })}
       />
       {down ? (
         <Failure
@@ -231,6 +257,8 @@ export function ReportsPage({
         />
       ) : null}
       <div className="rp-board">
+        {/* The incidents of the mini feedback still open, before anything else (trous béants n° 1). */}
+        <IncidentsCard zone={zone} />
         <ToValidate
           list={open.data}
           isError={open.isError}
@@ -256,8 +284,11 @@ export function ReportsPage({
           now={now}
           zone={zone}
           nudging={nudging}
+          canLink={canLink}
           onSelect={setSelected}
-          onValidate={validate}
+          onValidate={() => {
+            validate(chosen, new Set(chosen.map((one) => one.id)));
+          }}
         />
         <PeriodPanel
           period={period}
@@ -280,6 +311,7 @@ export function ReportsPage({
             setCorrecting({ shiftId: line.shift.id, memberName, draft: emptyCorrection() });
           }}
         />
+        <FeedbacksPanel period={period} zone={zone} />
       </div>
       {correcting === null ? null : (
         <ReportPanel
@@ -369,6 +401,7 @@ function ToValidate({
   now,
   zone,
   nudging,
+  canLink,
   onSelect,
   onValidate,
 }: {
@@ -396,6 +429,8 @@ function ToValidate({
   now: Date;
   zone: string;
   nudging: Nudging;
+  /** The reader may open Équipe › Comptes Reveal, where a member is linked to his platform account. */
+  canLink: boolean;
   onSelect: (next: ReadonlySet<string>) => void;
   onValidate: () => void;
 }): JSX.Element | null {
@@ -438,6 +473,9 @@ function ToValidate({
   // waits for a validation by itself that cannot come (recette EQP-05, « ok ligne-aucune-vente »).
   const reports = waiting.filter((one) => one.correctsId === null);
   const unread = reports.length > 0 && reports.every((one) => one.check === null);
+  // The members whose reports nothing compares, being linked to no chatter of the platform: said once above the list,
+  // never on each of their lines (recette visuelle 16/11, GES-25).
+  const unlinked = unlinkedLines(waiting, names);
   const sentBack = list.reports.filter((one) => one.status === 'rejected');
   const ordered = waiting.toSorted((a, b) =>
     (names.shifts.get(a.shiftId)?.startsAt ?? '').localeCompare(names.shifts.get(b.shiftId)?.startsAt ?? ''),
@@ -446,27 +484,39 @@ function ToValidate({
   return (
     <Panel className="rp-validate nv-enter" eyebrow="À valider">
       <div className="rp-sec">
-        <div className="rp-validate__top">
-          <p className="rp-validate__count">
-            <span className="rp-validate__num nv-num">{waiting.length}</span>
-            <span className="rp-validate__what">
-              {waiting.length === 0
-                ? 'Rien à valider'
-                : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
-            </span>
-          </p>
-          {sums.length === 0 ? null : (
-            <p className="rp-validate__sum nv-num">
-              {sums.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' · ')}
+        {waiting.length === 0 ? null : (
+          <div className="rp-validate__top">
+            <p className="rp-validate__count">
+              <span className="rp-validate__num nv-num">{waiting.length}</span>
+              <span className="rp-validate__what">
+                {waiting.length === 0
+                  ? 'Rien à valider'
+                  : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
+              </span>
             </p>
-          )}
-        </div>
+            {sums.length === 0 ? null : (
+              <p className="rp-validate__sum nv-num">
+                {sums.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' · ')} déclarés
+              </p>
+            )}
+          </div>
+        )}
         {unread ? (
           <p className="rp-validate__unread">
             Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se
             valide à la main.
           </p>
         ) : null}
+        {unlinked.map((line) => (
+          <div key={line.platform} className="sc-inline-warn rp-validate__unlinked">
+            <p className="rp-validate__unread">{line.text}</p>
+            {canLink ? (
+              <Link to="/equipe/reveal" className="nv-btn nv-btn--plain nv-btn--sm">
+                Relier
+              </Link>
+            ) : null}
+          </div>
+        ))}
 
         {lateError ? (
           <div className="sc-inline-warn nv-swap">
@@ -490,9 +540,9 @@ function ToValidate({
         ) : null}
 
         {waiting.length === 0 ? (
-          <p className="rp-mine__empty">
+          <Empty title="Rien à valider">
             Tout est validé. Un rapport arrive ici dès qu’un membre le fait, à la fin de son shift.
-          </p>
+          </Empty>
         ) : (
           <>
             {reviewable.length === 0 ? null : (
@@ -743,6 +793,8 @@ function ReviewCheck({
   const { check } = report;
   if (check === null) return null;
   const { currency } = report.amount;
+  // Said once above the list for all his reports (GES-25).
+  if (check.state === 'unavailable' && check.reason === 'chatter_unlinked') return null;
   if (check.state === 'unavailable') {
     return <p className="rp-review__check">{uncheckedText(check.reason, platform, true)}</p>;
   }
@@ -781,6 +833,32 @@ function ReviewCheck({
       ) : null}
     </>
   );
+}
+
+/**
+ * « 2 membres ne sont pas reliés à Reveal : leurs rapports ne sont pas comparés. », one line a platform, for the
+ * waiting reports whose member is linked to no chatter of it (ADR 0073 § 7).
+ */
+function unlinkedLines(
+  waiting: readonly ShiftReport[],
+  names: ReturnType<typeof namesOf>,
+): { platform: string; text: string }[] {
+  const byPlatform = new Map<string, Set<string>>();
+  for (const report of waiting) {
+    if (report.check?.state !== 'unavailable' || report.check.reason !== 'chatter_unlinked') continue;
+    const account = names.accounts.get(report.platformAccountId);
+    const platform = account === undefined ? 'la plateforme' : platformName(account.platform);
+    const members = byPlatform.get(platform) ?? new Set<string>();
+    members.add(report.memberId);
+    byPlatform.set(platform, members);
+  }
+  return [...byPlatform].map(([platform, members]) => ({
+    platform,
+    text:
+      members.size === 1
+        ? `1 membre n’est pas relié à ${platform} : ses rapports ne sont pas comparés.`
+        : `${String(members.size)} membres ne sont pas reliés à ${platform} : leurs rapports ne sont pas comparés.`,
+  }));
 }
 
 /** « jusqu’à 23:00 » the same day, « jusqu’au 8 nov. à 23:00 » another. */

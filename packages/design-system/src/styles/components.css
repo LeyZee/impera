@@ -649,8 +649,8 @@
 }
 .nv-switch:checked,
 .nv-switch[data-state='checked'] {
-  background: var(--nv-neon-solid);
-  box-shadow: var(--nv-shadow-neon-soft);
+  background: var(--nv-switch-on);
+  box-shadow: var(--nv-shadow-switch-on);
 }
 .nv-switch:checked::before,
 .nv-switch[data-state='checked']::before {
@@ -720,6 +720,20 @@
 }
 .nv-check:checked::after {
   transform: rotate(-45deg) scale(1);
+}
+/* Some of what it stands for, not all (a folder with some of its media only): a dash, on the ink of a tick. */
+.nv-check:indeterminate {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+.nv-check:indeterminate::after {
+  width: 10px;
+  height: 0;
+  margin-top: 0;
+  border-left: 0;
+  border-bottom: 2px solid var(--nv-void);
+  border-radius: 1px;
+  transform: none;
 }
 .nv-check:focus-visible {
   outline: 2px solid var(--nv-focus);
@@ -1212,11 +1226,12 @@
   caret-color: var(--nv-neon);
   transition: box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
+/* The field one writes in keeps its plate: a fine edge of ink and a soft halo say where the caret is, without the
+   heavy dark frame on a grey fill it wore before (Charles, 21/11). The edge holds 3:1 on the plate (contrast test). */
 .nv-field__control:focus {
-  background: var(--nv-select);
   box-shadow:
-    inset 0 0 0 1px var(--nv-plate-edge),
-    var(--nv-shadow-focus);
+    inset 0 0 0 1.5px color-mix(in srgb, var(--nv-ink) 50%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--nv-ink) 9%, transparent);
 }
 .nv-field__control::placeholder {
   color: var(--nv-ink-faint);
@@ -1308,6 +1323,79 @@
   outline-offset: -1px;
   color: var(--nv-ink-muted);
 }
+/* Tinted by its category (--_c: a content, series or state colour): a faint fill and a full dot of that colour, the
+   words in ink so they read on any tint. The 16 % is held by the contrast test. */
+.nv-tag--tint {
+  background: color-mix(in srgb, var(--_c, var(--nv-ink-faint)) 16%, transparent);
+  color: var(--nv-ink);
+}
+.nv-tag--tint::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c, var(--nv-ink-faint));
+}
+/* ───────────── Note: a sentence set apart inside a card ─────────────
+   <p class="nv-note">: something to know, on a quiet ground. --warn: something she or the team must do or mind, tinted
+   amber; --danger: what must never be done, tinted red. The words stay in ink; a title inside (`nv-note__title`) carries
+   the tone on a dot. Never a bar on its side. */
+.nv-note {
+  --_c: transparent;
+  display: grid;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+}
+.nv-note--warn {
+  --_c: var(--nv-warning);
+}
+.nv-note--danger {
+  --_c: var(--nv-danger);
+}
+.nv-note--warn,
+.nv-note--danger {
+  background: color-mix(in srgb, var(--_c) 12%, transparent);
+}
+.nv-note__title {
+  margin: 0;
+  font-weight: 650;
+}
+/* The tone on a dot before the title, as the tinted tag does: red on its own tint does not hold 4.5:1 in Jour. */
+:is(.nv-note--warn, .nv-note--danger) > .nv-note__title::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+  vertical-align: 1px;
+}
+
+/* The same pill where it is read at arm's length (the copilot's fan card): 26 px, footnote text, a larger dot. */
+.nv-tag--lg {
+  gap: 6px;
+  height: auto;
+  min-height: var(--nv-pill-info-lg);
+  padding: 3px 10px;
+  box-sizing: border-box;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 500;
+  white-space: normal;
+}
+.nv-tag--lg.nv-tag--tint::before {
+  width: 7px;
+  height: 7px;
+}
 /* A counter (what waits behind a tab, unread messages, a rank): 18 px, 11 px figures, ink on a quiet fill. Never an
    alarm by itself: a screen that needs the amber or the red says so with a modifier of its own (COH-08). */
 .nv-count {
@@ -1380,7 +1468,16 @@
 .nv-stat__spark .nv-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: nv-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
+  animation: nv-stat-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
+}
+/* The sparkline is stretched to the tile (preserveAspectRatio="none") with a non-scaling stroke, and the browser
+   then measures the dash on screen: a dash of 1 stops at the viewBox's own width, short of the edge of any wider
+   tile. The draw therefore ends on a pattern with no gap, which is a whole line at every width. */
+@keyframes nv-stat-draw {
+  to {
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
+  }
 }
 /* The one stat that matters most on the screen: lit by the neon, like the single neon button. */
 .nv-stat--hero {
@@ -1769,6 +1866,303 @@
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
 
+/* ───────────── Guide: a hard gesture, folded beside its screen and in Moi › Aide ─────────────
+   <details class="nv-guide" style="--_c: var(--nv-content-5)">: one colour per page (the person's), carried by the
+   icon tile, the tint behind the step numbers and the open guide's rim; every word and figure stays in ink, so the
+   colour never carries small text (contrast test: nv-guide). Steps say what to do, then « Tu dois voir » what proves
+   it; « À savoir » on a tile, « Jamais » in the danger colour, « Si ça coince » in amber. « Essentiel » and the chips
+   are nv-tag nv-tag--tint. Validated by Charles, 21/11. */
+.nv-guide {
+  --_c: var(--nv-ink);
+  border-radius: var(--nv-radius-lg);
+  border: 1px solid var(--nv-plate-edge);
+  background: var(--nv-plate);
+  overflow: clip;
+  interpolate-size: allow-keywords;
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
+  transition: border-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide:hover {
+  border-color: color-mix(in srgb, var(--_c) 35%, var(--nv-plate-edge));
+}
+.nv-guide[open] {
+  border-color: color-mix(in srgb, var(--_c) 40%, transparent);
+}
+.nv-guide > summary {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto 28px;
+  gap: 14px;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 16px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide > summary::-webkit-details-marker {
+  display: none;
+}
+.nv-guide > summary:hover {
+  background: var(--nv-glass-fill);
+}
+.nv-guide > summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.nv-guide__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--_c);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 26%, transparent);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__icon svg {
+  width: 21px;
+  height: 21px;
+}
+.nv-guide > summary:hover .nv-guide__icon {
+  transform: rotate(-8deg) scale(1.08);
+}
+.nv-guide[open] .nv-guide__icon {
+  background: var(--_c);
+  color: var(--nv-void);
+  box-shadow: none;
+}
+.nv-guide__head {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.nv-guide__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+}
+.nv-guide__sum {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* « Essentiel »: an nv-tag nv-tag--tint in gold whose dot is a star, the only gold of the page. */
+.nv-guide__key::before {
+  content: none;
+}
+.nv-guide__key svg {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  color: var(--_c);
+}
+.nv-guide__time {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+.nv-guide__chev {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--nv-glass-fill);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__chev::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.7px solid var(--nv-ink-muted);
+  border-bottom: 1.7px solid var(--nv-ink-muted);
+  transform: rotate(45deg);
+}
+.nv-guide[open] .nv-guide__chev {
+  transform: rotate(180deg);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+}
+.nv-guide[open] .nv-guide__chev::after {
+  border-color: var(--nv-ink);
+}
+.nv-guide::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size var(--nv-dur-base) var(--nv-ease-out),
+    content-visibility var(--nv-dur-base) allow-discrete;
+}
+.nv-guide[open]::details-content {
+  block-size: auto;
+}
+.nv-guide__body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 20px 22px 72px;
+}
+.nv-guide[open] .nv-guide__body > * {
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(n + 4) {
+  animation-delay: 180ms;
+}
+.nv-guide__why {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+}
+.nv-guide__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The steps: numbered in the page's colour, linked by a thread; each proves itself with « Tu dois voir ». */
+.nv-guide__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  counter-reset: nv-guide-step;
+}
+.nv-guide__steps > li {
+  counter-increment: nv-guide-step;
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: var(--nv-radius-sm);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__steps > li:hover {
+  background: var(--nv-glass-fill);
+}
+.nv-guide__steps > li::before {
+  content: counter(nv-guide-step);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 45%, transparent);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-guide__steps > li:hover::before {
+  transform: scale(1.08);
+}
+.nv-guide__steps > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 40px;
+  bottom: -6px;
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--_c) 22%, transparent);
+}
+.nv-guide__do {
+  font-weight: 600;
+}
+.nv-guide__see {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* « Tu dois voir : » steps back, so the proof stands out. */
+.nv-guide__see-label {
+  color: var(--nv-ink-faint);
+}
+.nv-guide__box {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.nv-guide__box h4 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.nv-guide__box ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.nv-guide__box--never {
+  background: color-mix(in srgb, var(--nv-danger) 9%, transparent);
+}
+.nv-guide__box--never h4 {
+  color: var(--nv-danger);
+}
+.nv-guide__box--stuck {
+  background: color-mix(in srgb, var(--nv-warning) 11%, transparent);
+}
+.nv-guide__box--stuck h4 {
+  color: var(--nv-warning);
+}
+@media (max-width: 560px) {
+  .nv-guide > summary {
+    grid-template-columns: 42px minmax(0, 1fr) 28px;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .nv-guide__time {
+    display: none;
+  }
+  .nv-guide__body {
+    padding: 4px 16px 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-guide,
+  .nv-guide[open] .nv-guide__body > * {
+    animation: none;
+  }
+  .nv-guide::details-content {
+    transition: none;
+  }
+  .nv-guide > summary:hover .nv-guide__icon,
+  .nv-guide__steps > li:hover::before {
+    transform: none;
+  }
+}
+
 /* ───────────── Charts ───────────── */
 
 /* A chart is drawn, never just shown: the line draws in (pathLength="1"), the area fades in after it,
@@ -1967,6 +2361,475 @@
 @keyframes nv-chart-grow {
   from {
     transform: scaleY(0);
+  }
+}
+
+/* ───────────── Shared figures: donut, breakdown, key, meter, spark ─────────────
+   One drawing per kind of figure, on every screen (Charles, 21/11): the Dashboard's, promoted. A screen sets a
+   colour (`--_c`), a size or a column list; it never redraws the piece nor its motion. */
+
+/* Donut: a whole cut in slices, each drawn in after the other; the lit slice comes out, the others step back.
+   `donutArcs` gives each arc its `--_dash` and its offset; the middle says the total, or the lit slice. */
+.nv-donut {
+  position: relative;
+  flex: none;
+  width: var(--nv-donut-size, 148px);
+  height: var(--nv-donut-size, 148px);
+}
+.nv-donut svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.nv-donut__track,
+.nv-donut__arc {
+  fill: none;
+  stroke-width: 14;
+}
+.nv-donut__track {
+  stroke: var(--nv-fill-track);
+}
+.nv-donut__arc {
+  stroke: var(--_c);
+  stroke-dasharray: 0 999;
+  cursor: pointer;
+  transform-box: view-box;
+  transform-origin: 66px 66px;
+  animation: nv-donut var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
+  transition:
+    stroke-width var(--nv-dur-base) var(--nv-ease-spring),
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    opacity var(--nv-dur-fast),
+    filter var(--nv-dur-base);
+}
+@keyframes nv-donut {
+  to {
+    stroke-dasharray: var(--_dash);
+  }
+}
+.nv-donut.is-lit .nv-donut__arc {
+  opacity: 0.35;
+}
+.nv-donut.is-lit .nv-donut__arc.is-on {
+  opacity: 1;
+  stroke-width: 20;
+  /* The slice comes out of the ring, a little bigger and lit with its own colour (recette du 07/11). */
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
+}
+/* One share alone against its track: a round end, nothing to light. */
+.nv-donut--solo .nv-donut__arc {
+  stroke-linecap: round;
+  cursor: default;
+}
+.nv-donut__middle {
+  position: absolute;
+  inset: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.nv-donut__value {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+/* « 1 234,56 € » keeps its cents inside the ring: a long total takes a smaller size (ADM-05). */
+.nv-donut__value.is-long {
+  font-size: var(--nv-text-headline);
+}
+.nv-donut__sub {
+  margin-top: 2px;
+  font-size: var(--nv-text-caption);
+  line-height: 1.15;
+  color: var(--nv-ink-faint);
+}
+
+/* A donut beside its breakdown; on a phone the donut on top, centred, the rows the full width under it. */
+.nv-donut-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+@media (max-width: 720px) {
+  .nv-donut-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .nv-donut-row > .nv-donut {
+    align-self: center;
+  }
+}
+
+/* Key: a small round swatch in the series colour, never a bar on a side. `nv-keys` lines several up. */
+.nv-key {
+  flex: none;
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+}
+.nv-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.nv-keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Breakdown: the legend of a donut, one row per slice (key, label, value, share, change), lit with its slice.
+   A screen with fewer columns sets `--nv-breakdown-cols`; the cells follow the order they are written in. */
+.nv-breakdown {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-breakdown__row {
+  display: grid;
+  grid-template-columns: var(--nv-breakdown-cols, auto minmax(0, 1fr) auto auto 52px);
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: transparent;
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast),
+    color var(--nv-dur-fast);
+}
+.nv-breakdown__row > .nv-key {
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.nv-breakdown__row > .nv-delta {
+  justify-self: end;
+  height: 18px;
+}
+.nv-breakdown__row:hover,
+.nv-breakdown__row.is-on {
+  background: var(--nv-select);
+  color: var(--nv-ink);
+}
+.nv-breakdown__row.is-on > .nv-key {
+  transform: scale(1.35);
+}
+.nv-breakdown__row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.nv-breakdown__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nv-breakdown__value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+  white-space: nowrap;
+}
+.nv-breakdown__share {
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 720px) {
+  /* A legend row is a target too: 44px to the finger (ADM-22). */
+  .nv-breakdown__row {
+    min-height: 44px;
+  }
+}
+
+/* Meter: how far along, on a track. `--_w` is the width reached, `--_c` the colour (the data's ink by default);
+   it widens from its start in the rhythm of the figures. A budget that can run over takes `nv-gauge`. */
+.nv-meter {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.nv-meter > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--_w);
+  border-radius: var(--nv-radius-full);
+  background: var(--_c, var(--nv-data-1));
+  transform-origin: left;
+  animation: nv-widen var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
+}
+/* The objective on the same track: a thin line across it, a little taller than the track so it reads over the fill. */
+.nv-meter:has(.nv-meter__mark) {
+  overflow: visible;
+}
+.nv-meter__mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--_m);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+}
+@keyframes nv-widen {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Spark: the small curve at a tile's foot. 1.5px, no axis nor point, a 12 % fill at most, drawn left to right by a
+   clip (a dash is counted on screen under a non-scaling stroke). The trend's colour: `--up`, `--down`. */
+.nv-spark {
+  --_c: var(--nv-trend-up);
+  display: block;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+  clip-path: inset(-2px 100% -2px -2px);
+  animation: nv-spark var(--nv-dur-progress) var(--nv-ease-out) 260ms forwards;
+}
+.nv-spark--down {
+  --_c: var(--nv-trend-down);
+}
+.nv-spark__line {
+  fill: none;
+  stroke: var(--_c);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nv-spark__area {
+  stroke: none;
+}
+.nv-spark__fill-top {
+  stop-color: var(--_c);
+  stop-opacity: 0.12;
+}
+.nv-spark__fill-bottom {
+  stop-color: var(--_c);
+  stop-opacity: 0;
+}
+@keyframes nv-spark {
+  to {
+    clip-path: inset(-4px -4px -4px -4px);
+  }
+}
+
+/* Columns: a series in time, one column per step, stacked bottom to top in the legend's order. `--_n` on
+   `__bars` is the count; a part takes `--_h` (its share of the plot's top) and `--_c`. The column under the pointer,
+   the finger or the keyboard swells and the others step back. `__mark` is a reference line (an objective, an
+   average) at `--_y`; `--hatched` says a part is of another nature than the plain one (forecast, covered, under
+   way). The plot is 220px high with a 52px axis, 180px and 40px on a phone. */
+.nv-cols {
+  position: relative;
+  height: var(--nv-cols-height, 220px);
+  padding-left: 52px;
+}
+.nv-cols__grid {
+  position: absolute;
+  inset: 0 0 22px 52px;
+  pointer-events: none;
+}
+.nv-cols__grid span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--_y);
+  border-top: 1px solid var(--nv-plate-edge);
+}
+.nv-cols__grid .nv-cols__mark {
+  border-top: 1px dashed var(--nv-ink-faint);
+}
+.nv-cols__grid i {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: -8px;
+  font-style: normal;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--nv-ink-faint);
+}
+.nv-cols__bars {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--_n), minmax(0, 1fr));
+  /* A gap that shrinks with the columns: a bar keeps three quarters of its slot, whatever the width. */
+  column-gap: min(10px, calc(25% / var(--_n)));
+  height: 100%;
+}
+.nv-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+.nv-col:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+/* A column takes the finger over half the gap on each side: 44px wide on a phone's week (ADM-22). */
+.nv-col::after {
+  content: '';
+  position: absolute;
+  inset: 0 -5px;
+}
+.nv-col__stack {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  border-radius: var(--nv-radius-xs);
+  transform-origin: bottom;
+  transition:
+    background var(--nv-dur-fast),
+    opacity var(--nv-dur-fast),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+/* The column under the pointer swells, the others step back: the eye lands on the day read (recette du 07/11). */
+.nv-col:hover .nv-col__stack,
+.nv-col:focus-visible .nv-col__stack {
+  background: var(--nv-select);
+  transform: scaleX(1.16);
+}
+.nv-cols__bars:has(.nv-col:hover, .nv-col:focus-visible) .nv-col:not(:hover, :focus-visible) .nv-col__stack {
+  opacity: 0.45;
+}
+/* A finger has no hover: the tapped column, focused, swells the same way. */
+@media (hover: none) {
+  .nv-col:focus .nv-col__stack {
+    background: var(--nv-select);
+    transform: scaleX(1.16);
+  }
+  .nv-cols__bars:has(.nv-col:focus) .nv-col:not(:focus) .nv-col__stack {
+    opacity: 0.45;
+  }
+}
+.nv-col__part {
+  flex: none;
+  height: var(--_h);
+  min-height: 2px;
+  background: var(--_c, var(--nv-data-1));
+  transform-origin: bottom;
+  animation: nv-grow var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
+  animation-delay: calc(var(--_i, 0) * 12ms + 80ms);
+}
+.nv-col__part--hatched {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--_c, var(--nv-data-1)) 0 1.5px,
+    color-mix(in oklab, var(--_c, var(--nv-data-1)) 28%, transparent) 1.5px 4.5px
+  );
+}
+.nv-col__part:first-child {
+  border-radius: 0 0 2px 2px;
+}
+.nv-col__part:last-child {
+  border-radius: 4px 4px 0 0;
+}
+.nv-col__part:only-child {
+  border-radius: 4px 4px 2px 2px;
+}
+@keyframes nv-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+.nv-col__label {
+  height: 22px;
+  padding-top: 6px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: visible;
+  color: var(--nv-ink-faint);
+  text-align: left;
+}
+/* The last column's label ends at its column's right edge: left-aligned, it ran past the card on a phone. */
+.nv-col:last-child .nv-col__label {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 720px) {
+  .nv-cols {
+    height: var(--nv-cols-height, 180px);
+    padding-left: 40px;
+  }
+  .nv-cols__grid {
+    left: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nv-spark,
+  .nv-donut__arc,
+  .nv-col__part,
+  .nv-meter > span {
+    animation: none;
+  }
+  /* Without motion the lit column still stands out, at once, without growing. */
+  .nv-col__stack {
+    transition: none;
+  }
+  .nv-col:hover .nv-col__stack,
+  .nv-col:focus .nv-col__stack {
+    transform: none;
+  }
+  /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
+  .nv-spark {
+    clip-path: none;
+  }
+  .nv-donut__arc {
+    stroke-dasharray: var(--_dash);
+    /* Without motion the lit slice still stands out, at once, without growing. */
+    transition: none;
+  }
+  .nv-donut.is-lit .nv-donut__arc.is-on {
+    transform: none;
   }
 }
 
@@ -2504,13 +3367,13 @@
   gap: 6px;
   padding: 12px 14px;
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  background: var(--nv-tile-fill);
   transition:
     background-color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .nv-tile:hover {
-  background: var(--nv-glass-fill-strong);
+  background: var(--nv-tile-fill-strong);
   transform: translateY(-1px);
 }
 .nv-tile__label {
@@ -2589,6 +3452,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* The value's glow reaches past the box: cut by it, it shows as a square behind the ring. */
+  overflow: visible;
   transform: rotate(-90deg);
 }
 .nv-ring__track,
@@ -2616,6 +3481,98 @@
   line-height: 1;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Steps: where something stands on a short path (sent, seen, settled). One node per step, joined by a line; what is
+   reached is filled with --_c and ticked, the step it stands on wears a halo, what is ahead stays a hollow ring. The
+   word and its time sit centred under each node. Colour: --_c, the data's ink by default (amber for a warning, the
+   danger for an urgency, as the screen decides). */
+.nv-steps {
+  --_c: var(--nv-data-1);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-steps__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+/* The line from the node before, edge to edge: it never runs under a node. */
+.nv-steps__step + .nv-steps__step::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: calc(-50% + 17px);
+  right: calc(50% + 17px);
+  height: 2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.nv-steps__step[data-done='true']::before {
+  background: var(--_c);
+}
+.nv-steps__node {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
+  border-radius: var(--nv-radius-full);
+  box-shadow: inset 0 0 0 2px var(--nv-fill-track);
+  color: var(--nv-void);
+  transition:
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.nv-steps__node > svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nv-steps__step[data-done='true'] > .nv-steps__node {
+  background: var(--_c);
+  box-shadow: none;
+  animation: nv-steps-in var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.nv-steps__step[aria-current='step'] > .nv-steps__node {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--_c) 24%, transparent);
+}
+.nv-steps__label {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.nv-steps__step[data-done='true'] > .nv-steps__label {
+  color: var(--nv-ink);
+}
+.nv-steps__when {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+@keyframes nv-steps-in {
+  from {
+    transform: scale(0.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-steps__step[data-done='true'] > .nv-steps__node {
+    animation: none;
+  }
 }
 
 /* What the percentage counts (« agent »), under it. */
@@ -2720,6 +3677,10 @@
   justify-content: space-between;
   gap: 14px;
   font-variant-numeric: tabular-nums;
+}
+.nv-tip__aside {
+  margin: 6px 0 0;
+  color: var(--nv-ink-faint);
 }
 .nv-tip__row > span {
   white-space: nowrap;
@@ -2893,6 +3854,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A face before the label, in the field and in the list: it never shrinks, the label is cut instead. */
+.nv-select__lead {
+  display: inline-flex;
+  flex: none;
+}
 .nv-select__value--empty {
   color: var(--nv-ink-faint);
 }
@@ -3059,6 +4025,10 @@
   .nv-stat__spark .nv-draw,
   .nv-chart__line {
     stroke-dashoffset: 0;
+  }
+  /* Same reason as nv-stat-draw: without the draw, no dash at all, so the line reaches the edge of a wide tile. */
+  .nv-stat__spark .nv-draw {
+    stroke-dasharray: none;
   }
   .nv-btn,
   .nv-iconbtn,

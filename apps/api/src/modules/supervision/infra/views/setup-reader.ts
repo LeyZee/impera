@@ -47,6 +47,7 @@ const InvitationSchema = z.enum(['none', 'pending', 'expired', 'used']) satisfie
 const AccessRow = z.object({ creator_id: CreatorIdSchema.nullable(), invitation: InvitationSchema });
 const SwitchRow = z.object({ scope: z.string(), scope_id: z.string().nullable(), active: z.boolean() });
 const AutoRow = z.object({ creator_id: CreatorIdSchema, auto: count });
+const ScriptsRow = z.object({ creator_id: CreatorIdSchema, day: count, night: count });
 const CheckRow = z.object({ platform: z.string(), clean: z.boolean(), to_day: day });
 const MemberRow = z.object({
   id: TeamMemberIdSchema,
@@ -131,7 +132,7 @@ export function createSetupReader(
         );
         const switches = await read(
           SwitchRow,
-          sql`select distinct on (scope, scope_id) scope, scope_id::text as scope_id, active from kill_switches
+          sql`select distinct on (scope, scope_id) scope, scope_id::text as scope_id, (active and (active_until is null or active_until > now())) as active from kill_switches
               order by scope, scope_id, set_at desc`,
         );
         const auto = await read(
@@ -139,6 +140,18 @@ export function createSetupReader(
           sql`select creator_id, count(*) as auto from conversations
               where mode = 'auto' and state not in ('human', 'paused') group by creator_id`,
         );
+        // Ours, recognised in Reveal and still active there (ADR 0161): what the agent may offer, by when it plays.
+        const scripts = await read(
+          ScriptsRow,
+          sql`select ps.creator_id,
+                count(*) filter (where ps.content ->> 'moment' in ('day', 'both')) as day,
+                count(*) filter (where ps.content ->> 'moment' in ('night', 'both')) as night
+              from prepared_scripts ps
+              join platform_scripts p on p.id = ps.matched_platform_script_id and p.creator_id = ps.creator_id
+              where ps.state = 'matched' and p.active
+              group by ps.creator_id`,
+        );
+        const grids = await read(IdRow, sql`select distinct creator_id from custom_price_grids`);
         const checks = await read(
           CheckRow,
           sql`select distinct on (platform) platform, clean, to_day from sales_feed_checks
@@ -149,14 +162,21 @@ export function createSetupReader(
         const withPersona = has(personas);
         const withRate = has(rates);
         const withShifts = has(shifts);
+        const withGrid = has(grids);
         const global = switches.some((s) => s.scope === 'global' && s.active);
         return creators.map(({ id, own_hours }) => {
           const hers = accounts.filter((account) => account.creator_id === id);
           const account = access.find((row) => row.creator_id === id);
+          const offered = scripts.find((row) => row.creator_id === id);
           const facts: CreatorSetupFacts = {
             accounts: hers.length,
             accountsWithPayRules: hers.filter((a) => a.with_rules).length,
             hasActivePersona: withPersona.has(id),
+            scripts: {
+              day: offered?.day ?? 0,
+              night: offered?.night ?? 0,
+            },
+            hasCustomPrices: withGrid.has(id),
             hasAgencyRate: withRate.has(id),
             hasLinkedReveal: hers.some((a) => a.platform === 'reveal' && a.linked),
             access: account?.invitation ?? 'none',

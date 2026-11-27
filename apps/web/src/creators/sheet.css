@@ -1,0 +1,50 @@
+/*
+ * A creator's sheet (ADR 0149): the selector of the views inside a tab, and the page of Compte, one card per subject.
+ * Only what the design system and the persona's classes do not already say.
+ */
+
+/* The views of a tab: one segmented selector above the view, on the page's edge. Never a second bar of tabs. */
+.cr-views {
+  align-self: stretch;
+  display: flex;
+  min-width: 0;
+}
+.cr-views > .nv-seg {
+  max-width: 100%;
+}
+
+/* Compte: its four subjects one under the other, each set apart from the next by more room than its own cards
+   keep between them. A card reached by its address clears the page's header. */
+/* Her AI: the copilot's card, then her hours, one under the other like the cards of Compte. */
+.cr-ai,
+.cr-account {
+  align-self: stretch;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-10);
+}
+.cr-account__card {
+  min-width: 0;
+  scroll-margin-top: var(--nv-space-6);
+}
+/* Each section was a page of its own: on this one it leaves the foot's room to the last card alone. */
+.cr-account__card > .ps-page {
+  padding-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  /* On a phone the selector takes the width, each view an equal share: nothing wraps nor scrolls. */
+  .cr-views > .nv-seg {
+    width: 100%;
+  }
+  .cr-views .nv-seg__opt {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 var(--nv-space-1);
+    /* Four views on a narrow phone: a name too long is cut, never laid over its neighbour. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

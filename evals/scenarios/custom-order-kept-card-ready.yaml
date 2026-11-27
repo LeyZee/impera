@@ -1,0 +1,103 @@
+# Demande sur mesure complète (ADR 0159 § A.2 bis) : la dernière case arrive, la fiche part chez elle ; elle le garde au chaud, complice, sans oui, sans prix, sans délai. Fan, grille et messages fictifs (ADR 0010).
+description: Il donne la dernière précision de sa vidéo ; la fiche part chez elle et elle lui laisse entendre que l'idée lui plaît, sans rien promettre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 72
+  age_confirmed: true
+history:
+  - from: fan
+    text: Tu me ferais une vidéo rien que pour moi, en tenue de sport ?
+  - from: creator
+    text: Mmh ça me tente… et tu la vois durer combien ? 🙈
+  - from: fan
+    text: Trois minutes ça serait parfait
+  - from: creator
+    text: Et tu la voudrais pour quand ?
+custom_order_kept:
+  open:
+    state: gathering
+    format: video
+    supplements: []
+    minutes: 3
+    details:
+      what: une vidéo en tenue de sport
+      duration: trois minutes
+    questionsAsked: 2
+  grid:
+    formats:
+      - {
+          format: photo,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: video,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: reaction_video,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: rating,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: call,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: video_call_talk,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: video_call_sexual,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+    supplements:
+      - { id: sup_0a1b2c3d, label: Tenue au choix (fictif), offered: true, percent: null }
+inbound: Quand tu veux, ce week-end si tu peux
+expect:
+  decision:
+    custom_order: reply
+    custom_order_event: custom_order_card_ready
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(demain|ce soir|cette semaine|d'ici|dans \d+)\b
+      - \d+ ?(€|euros?|balles)
+      - \b(pourboire|tip)\b
+      - \b(oui je (te )?la fais|c'est d'accord|marché conclu)\b

@@ -335,7 +335,7 @@ export function testVerdict(sent: AlertTestBody, result: AlertTestResult, pauses
 }
 
 /**
- * The routing of Réglages › Telegram as this page reads it: who has no group for which topic, `'off'` when the
+ * The routing of Réglages › Bots Telegram as this page reads it: who has no group for which topic, `'off'` when the
  * server runs without Telegram, `'none'` while no group gets anything yet. The last two are said once, in the head
  * of the page, never on every line.
  */
@@ -350,7 +350,7 @@ export function telegramHeadLine(routing: TelegramRouting | null): string | null
   return null;
 }
 
-/** Where an alert goes on Telegram, read from the routing of Réglages › Telegram (never set here). */
+/** Where an alert goes on Telegram, read from the routing of Réglages › Bots Telegram (never set here). */
 export type TelegramLine =
   | { readonly kind: 'silent'; readonly text: string }
   | { readonly kind: 'sent'; readonly text: string }
@@ -358,7 +358,7 @@ export type TelegramLine =
 
 /**
  * `routing`: `null` while it is not known, and then the line says nothing rather than guess; `'off'` and `'none'`
- * are said by the head. `topicLabel`: the topic's name, as Réglages › Telegram says it.
+ * are said by the head. `topicLabel`: the topic's name, as Réglages › Bots Telegram says it.
  */
 export function telegramLine(input: {
   readonly notify: boolean;

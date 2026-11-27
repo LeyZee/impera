@@ -86,7 +86,7 @@ let gate: Promise<void> | null;
 /** The agency's settings answer a server error (recette EQP-05). */
 let settingsDown: boolean;
 let team: readonly TeamMember[];
-/** The platform's team as Équipe › Reveal reads it (ADR 0076); `'down'` answers a refused list. */
+/** The platform's team as Équipe › Comptes Reveal reads it (ADR 0076); `'down'` answers a refused list. */
 let revealTeam: { platformChatterId: string; firstName: string; lastName: string }[] | 'down';
 
 function serve(): void {
@@ -848,6 +848,23 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('offers « Ajuster » to the owner alone: a manager reads a validated statement, and corrects nothing (SEC-15)', async () => {
+    const validated = statementOf(THEO, OCT2, { status: 'validated', canValidate: false });
+    periods[OCT2] = periodOf(OCT2, [validated], {
+      closing: {
+        period: OCT2,
+        exchangeRates: [],
+        closedBy: OWNER_USER,
+        closedAt: '2026-11-02T08:41:00.000Z',
+      },
+    });
+    renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(await screen.findByRole('button', { name: 'Théo' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByRole('button', { name: 'Fermer' }).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByRole('button', { name: 'Ajuster' })).toBeNull();
+  });
+
   it('adjusts a validated statement on the member’s next period to validate, which it says before sending', async () => {
     const validated = statementOf(THEO, OCT2, { status: 'validated', canValidate: false });
     periods[OCT2] = periodOf(OCT2, [validated], {
@@ -1399,7 +1416,7 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
         'Vente du mercredi 28 octobre à 22 h · chatteur non relié · Camille Essai',
       );
     });
-    expect(text(unlinked)).toContain('relie-le dans Équipe › Reveal');
+    expect(text(unlinked)).toContain('relie-le dans Équipe › Comptes Reveal');
     expect(within(unlinked).queryByRole('button', { name: /^Compter/u })).toBeNull();
 
     const excluded = card(list, /^Écartée$/u);

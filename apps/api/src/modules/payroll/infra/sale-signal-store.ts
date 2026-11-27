@@ -11,6 +11,7 @@ import {
   PlatformSchema,
   SaleDecisionOutcomeSchema,
   SaleEventSchema,
+  SaleTypeSchema,
   payPeriodAt,
   SaleSignalKindSchema,
   TeamMemberIdSchema,
@@ -43,6 +44,7 @@ import {
   PaySaleSignalNotFound,
   PaySaleSignalStateConflict,
 } from '../domain/errors';
+import { reportLines } from '../domain/game-facts';
 import { myFigures, type FigureLine } from '../domain/my-figures';
 import {
   myDays,
@@ -80,6 +82,7 @@ const StoredSaleSchema = z.object({
   lateFrom: PayPeriodSchema.nullish(),
   occurredAt: z.iso.datetime().nullish(),
   shareBp: z.number().int().nullish(),
+  saleType: SaleTypeSchema.nullish(),
 });
 
 const SignalRowSchema = z.object({
@@ -198,6 +201,7 @@ export async function figureLinesOf(tx: Transaction, memberId: TeamMemberId): Pr
   const rows = await tx
     .select({
       period: commissionStatements.period,
+      platformAccountId: commissionStatementLines.platformAccountId,
       currency: commissionStatementLines.currency,
       sales: commissionStatementLines.sales,
     })
@@ -215,15 +219,18 @@ export async function figureLinesOf(tx: Transaction, memberId: TeamMemberId): Pr
   return rows.flatMap((row) => {
     const period = PayPeriodSchema.parse(row.period);
     const currency = CurrencySchema.parse(row.currency);
+    const platformAccountId = PlatformAccountIdSchema.parse(row.platformAccountId);
     return z
       .array(StoredSaleSchema)
       .parse(row.sales)
       .map((one) => ({
         period,
+        platformAccountId,
         event: one.event,
         currency,
         netMinor: one.netMinor,
         occurredAt: one.occurredAt == null ? null : new Date(one.occurredAt),
+        saleType: one.saleType ?? null,
       }));
   });
 }
@@ -512,7 +519,41 @@ async function ownGifts(
   return gifts;
 }
 
-const toMySale = (line: MyLine): MySales['items'][number] => ({
+/**
+ * The instants of the member's own sales among `ids`, as their earlier statements keep them: what a late refund says
+ * it takes back (« remboursement d'une vente du 3 nov. »). Their own statements only, never the register.
+ */
+async function ownSaleInstants(
+  tx: Transaction,
+  memberId: TeamMemberId,
+  ids: ReadonlySet<string>,
+): Promise<Map<string, Date>> {
+  const found = new Map<string, Date>();
+  if (ids.size === 0) return found;
+  const rows = await tx
+    .select({ sales: commissionStatementLines.sales })
+    .from(commissionStatements)
+    .innerJoin(
+      commissionStatementLines,
+      and(
+        eq(commissionStatementLines.statementId, commissionStatements.id),
+        eq(commissionStatementLines.revision, commissionStatements.revision),
+      ),
+    )
+    .where(
+      and(eq(commissionStatements.memberId, memberId), eq(commissionStatementLines.base, 'platform_net')),
+    );
+  for (const row of rows) {
+    for (const one of z.array(StoredSaleSchema).parse(row.sales)) {
+      const key = `${one.platform}:${one.platformSaleId}`;
+      if (one.event === 'sale' && one.occurredAt != null && ids.has(key))
+        found.set(key, new Date(one.occurredAt));
+    }
+  }
+  return found;
+}
+
+const toMySale = (line: MyLine, saleInstants: ReadonlyMap<string, Date>): MySales['items'][number] => ({
   platform: line.platform,
   platformSaleId: line.platformSaleId,
   event: line.event,
@@ -521,6 +562,10 @@ const toMySale = (line: MyLine): MySales['items'][number] => ({
   netMinor: line.netMinor,
   occurredAt: line.occurredAt?.toISOString() ?? null,
   lateFrom: line.lateFrom,
+  saleOccurredAt:
+    line.event === 'refund' && line.lateFrom !== null
+      ? (saleInstants.get(`${line.platform}:${line.platformSaleId}`)?.toISOString() ?? null)
+      : null,
   state: line.state,
   signal:
     line.signal === null
@@ -543,22 +588,28 @@ export function createDrizzleSaleSignalStore(
   now: () => Date = () => new Date(),
 ): PayrollSaleSignalStore {
   return {
-    myFigures: (userId) =>
-      withMember(db, userId, async (tx) => {
+    myFigures: async (userId) => {
+      // Read before the member's transaction opens: the planning's door holds its own.
+      const validatedShifts = await reads.ownValidatedShifts(userId);
+      return withMember(db, userId, async (tx) => {
         const at = now();
         const agencyZone = await reads.agencyTimeZone(tx);
         const member = await ownMemberOf(tx, userId);
         const memberZone = member === null ? null : await ownZoneOf(tx, member);
+        const lines = member === null ? [] : await figureLinesOf(tx, member);
         return MyFiguresSchema.parse(
           myFigures({
-            lines: member === null ? [] : await figureLinesOf(tx, member),
+            lines,
+            // ADR 0118 § 10: the same lines as the game, a shift left to its sales as soon as one was read in it.
+            reportLines: member === null ? [] : reportLines(validatedShifts, lines),
             now: at,
             agencyZone,
             memberZone: memberZone ?? agencyZone,
             period: payPeriodAt(at, agencyZone),
           }),
         );
-      }),
+      });
+    },
 
     mySales: (userId, query) =>
       withMember(db, userId, async (tx) => {
@@ -582,11 +633,17 @@ export function createDrizzleSaleSignalStore(
           closed,
         });
         const page = pageOfLines(lines, after, query.limit);
+        const lateRefunds = new Set(
+          page.items
+            .filter((one) => one.event === 'refund' && one.lateFrom !== null)
+            .map((one) => `${one.platform}:${one.platformSaleId}`),
+        );
+        const saleInstants = await ownSaleInstants(tx, member, lateRefunds);
         return MySalesSchema.parse({
           period: query.period,
           closed,
           days: myDays(lines, timeZone),
-          items: page.items.map(toMySale),
+          items: page.items.map((one) => toMySale(one, saleInstants)),
           nextCursor: page.next === null ? null : encodeCursor(page.next),
         });
       }),

@@ -16,11 +16,17 @@ const days = [
 ];
 
 export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
-  period: 'week',
+  period: null,
+  span: { unit: 'week', partial: false, end: '2026-11-06', compare: 'previous', today: '2026-11-06' },
   from: '2026-10-31',
   to: '2026-11-06',
   previousFrom: '2026-10-24',
   previousTo: '2026-10-30',
+  registerSince: '2026-09-01',
+  previousDays: days.map((day, i) => ({
+    day: new Date(Date.parse(`${day}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10),
+    revenueMinor: 18_000 + i * 1_500,
+  })),
   creators: [
     { creatorId: LINA, name: 'Lina Test' },
     { creatorId: MAYA, name: 'Maya Démo' },
@@ -50,6 +56,8 @@ export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
   days: days.map((day, i) => ({
     day,
     revenueMinor: 20_000 + i * 2_000,
+    agencyMinor: 6_400 + i * 640,
+    creatorMinor: 9_600 + i * 960,
     byCreator: [
       { creatorId: LINA, revenueMinor: 12_000 + i * 1_500 },
       { creatorId: MAYA, revenueMinor: 8_000 + i * 500 },
@@ -137,7 +145,34 @@ export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
   ),
   hourly: [],
   fans: { paying: 42, previousPaying: 37, newPaying: 9, topTenShare: 58, averagePerPayingMinor: 4_395 },
+  refundList: [
+    {
+      refundedAt: '2026-11-06T13:05:00.000Z',
+      creatorId: LINA,
+      kind: 'ppv',
+      amountMinor: 2_500,
+      seller: { kind: 'member', memberId: THEO, name: 'Théo' },
+      delayDays: 2,
+    },
+    {
+      refundedAt: '2026-11-04T21:40:00.000Z',
+      creatorId: MAYA,
+      kind: 'subscriptions',
+      amountMinor: 1_500,
+      seller: { kind: 'none' },
+      delayDays: 0,
+    },
+    {
+      refundedAt: '2026-11-02T08:15:00.000Z',
+      creatorId: LINA,
+      kind: 'tips',
+      amountMinor: null,
+      seller: { kind: 'agent' },
+      delayDays: null,
+    },
+  ],
   refundsWithoutSale: 0,
+  objectives: null,
   timeZone: 'Europe/Paris',
   dollarsLeftOut: false,
   subscribers: {

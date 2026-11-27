@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
 
-import { AgencyInsightsPanel } from './AgencyInsights';
+import { AgencyInsightsPanel, readingOf, sparkValues } from './AgencyInsights';
 import { AGENCY_WEEK, LINA } from './fixture';
 
 const reads: string[] = [];
@@ -32,8 +32,8 @@ function Panel({ creatorId, canOpenSettings }: { creatorId: string | null; canOp
   return (
     <>
       <AgencyInsightsPanel
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         creatorId={creatorId}
         creatorName="Lina Test"
         canOpenSettings={canOpenSettings}
@@ -86,7 +86,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show();
     expect(await screen.findByRole('heading', { name: /D’où vient l’argent/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();
-    expect(reads[0]).toBe('/v1/dashboard/agency?period=week');
+    expect(reads[0]).toBe('/v1/dashboard/agency?unit=week');
     // « Qui vend » said the ranking again: one card now (PIL-02).
     expect(screen.queryByRole('heading', { name: /Qui vend/u })).toBeNull();
     for (const title of ['D’où vient l’argent', 'Qui a vendu', 'Les créatrices', 'Quand ça vend']) {
@@ -94,8 +94,9 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     }
     const ranking = screen.getByRole('list', { name: 'Classement de qui a vendu' });
     expect(within(ranking).getByText('Théo')).toBeTruthy();
+    // 40 sales, one refunded: the average divides the money by the 39 kept (PRO1-02).
+    expect(ranking.textContent).toContain('panier moyen 25,13');
     expect(within(ranking).getByText('Agent IA')).toBeTruthy();
-    expect(screen.getByText(/Les 10 fans qui dépensent le plus/u).textContent).toContain('58');
     // The hours as the rest of the CRM writes them (ADM-08).
     const slot = screen.getByText(/^21\sh\s–\s0\sh$/u, { selector: 'b' });
     expect(slot.textContent).toBe('21\u00a0h\u00a0–\u00a00\u00a0h');
@@ -106,12 +107,12 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show();
     const card = (await screen.findByRole('heading', { name: /D’où vient l’argent/u })).closest('article');
     if (card === null) throw new Error('card');
-    expect(card.querySelector('.ins-ring__value')?.textContent).toMatch(/€$/u);
-    expect(card.querySelector('.ins-ring__sub')?.textContent).toBe('au total');
+    expect(card.querySelector('.nv-donut__value')?.textContent).toMatch(/€$/u);
+    expect(card.querySelector('.nv-donut__sub')?.textContent).toBe('au total');
     expect(within(card).queryByText('ventes')).toBeNull();
   });
 
-  it('says a chatter nobody linked under his line, in the screen’s tip, and leads to Équipe › Reveal (ADM-06)', async () => {
+  it('says a chatter nobody linked under his line, in the screen’s tip, and leads to Équipe › Comptes Reveal (ADM-06)', async () => {
     const unlinked = {
       seller: { kind: 'unlinked' },
       revenueMinor: 37_200,
@@ -136,7 +137,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     act(() => {
       row.focus();
     });
-    expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Reveal');
+    expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Comptes Reveal');
   });
 
   it('ranks the sellers first, the sales of no seller at the bottom, unranked and under a rule (PIL-03)', async () => {
@@ -186,7 +187,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(tile.querySelector('.ins-tile__note')).toBeNull();
   });
 
-  it('says the paying fans once, in « Les fans qui paient », and two figures by the money (PIL-21)', async () => {
+  it('says two figures by the money, the paying fans in the steering now (PIL-21, pilotage 21/11)', async () => {
     serve(200, AGENCY_WEEK);
     show();
     const sales = await screen.findByLabelText('Les ventes');
@@ -194,8 +195,9 @@ describe('L’agence en chiffres (ADR 0078)', () => {
       'Ventes',
       'Remboursements',
     ]);
-    expect(screen.getAllByText('Fans qui ont payé')).toHaveLength(1);
-    expect(screen.getAllByText(/^Dépense moyenne/u)).toHaveLength(1);
+    // « Les fans qui paient » gave way to « Dépendance aux gros fans », on 30 days whatever the period.
+    expect(screen.queryByText('Fans qui ont payé')).toBeNull();
+    expect(screen.queryByText(/^Dépense moyenne/u)).toBeNull();
   });
 
   it('walks the map of the hours with the arrows, one stop, each cell saying its hour and its amount (ADM-09)', async () => {
@@ -227,8 +229,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
       if (box === null) throw new Error(label);
       return box;
     };
-    expect(tile('Part de l’agence').textContent).toContain('40 % du net');
-    expect(tile('Part des créatrices').textContent).toContain('60 % du net');
+    expect(tile('Part de l’agence').textContent).toContain('40\u00a0% du net');
+    expect(tile('Part des créatrices').textContent).toContain('60\u00a0% du net');
     const vat = tile('TVA en plus sur les virements').textContent;
     expect(vat).toContain('118,14');
     expect(vat).toContain('estimation');
@@ -253,7 +255,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     const ring = await screen.findByRole('img', { name: /^D’où vient l’argent/u });
     const card = ring.closest('article');
     if (card === null) throw new Error('card');
-    const shares = Array.from(card.querySelectorAll('.ins-legend__share'), (one) =>
+    const shares = Array.from(card.querySelectorAll('.nv-breakdown__share'), (one) =>
       Number.parseInt(one.textContent, 10),
     );
     expect(shares).toEqual([34, 33, 33]);
@@ -297,7 +299,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show(LINA);
     expect(await screen.findByRole('heading', { name: /Qui a vendu/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Les chiffres de Lina Test/u })).toBeTruthy();
-    expect(reads[0]).toBe(`/v1/dashboard/agency?period=week&creatorId=${LINA}`);
+    expect(reads[0]).toBe(`/v1/dashboard/agency?unit=week&creatorId=${LINA}`);
     expect(screen.queryByRole('heading', { name: /Les créatrices/u })).toBeNull();
     expect(within(screen.getByLabelText('L’argent')).getByText('Part de la créatrice')).toBeTruthy();
   });
@@ -306,7 +308,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     serve(200, { ...AGENCY_WEEK, creators: [], byCreator: [], sellers: [], kinds: [] });
     show();
     expect(await screen.findByText(/Aucune créatrice n’est encore reliée/u)).toBeTruthy();
-    expect(screen.getByRole('link', { name: /Réglages › Ventes/u })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Réglages › Plateformes/u })).toBeTruthy();
     expect(screen.queryByText('Chiffre d’affaires')).toBeNull();
   });
 
@@ -374,6 +376,109 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     await vi.waitFor(() => {
       expect(tipText()).not.toContain('Période d’avant');
     });
+  });
+
+  it('gives the revenue tile its tip too, to the cent against the period before (ADR 0106 § 12, PAY-16)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const label = await screen.findByText('Chiffre d’affaires', { selector: '.nv-figure__label' });
+    // On the figure, not the whole card: the curve under it keeps its own reading of a day.
+    const lead = label.closest('.nv-figure');
+    if (!(lead instanceof HTMLElement)) throw new Error('lead');
+    expect(lead.closest('.ins-lead')?.hasAttribute('tabindex')).toBe(false);
+    expect(lead.tabIndex).toBe(0);
+    fireEvent.pointerDown(lead, { pointerType: 'touch' });
+    const tipText = (): string => document.querySelector('.nv-tip.is-on')?.textContent ?? '';
+    await vi.waitFor(() => {
+      expect(tipText()).toContain('Période d’avant');
+    });
+    expect(tipText()).toContain('Montant');
+    expect(tipText()).not.toContain('Part du chiffre d’affaires');
+  });
+
+  it('draws no conclusion from too few sales, and keeps every figure (ADR 0092 § 5)', async () => {
+    const current = { ...AGENCY_WEEK.totals.current, sales: 4 };
+    serve(200, { ...AGENCY_WEEK, totals: { ...AGENCY_WEEK.totals, current } });
+    show();
+    const map = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    // The slot, the peak and the concentration are not written; the sentence that says why is, twice.
+    expect(screen.queryByText(/Le créneau qui rapporte le plus/u)).toBeNull();
+    expect(screen.queryByText(/concentré|Bien réparti/u)).toBeNull();
+    expect(screen.getAllByText('Pas encore assez de ventes pour conclure.')).toHaveLength(1);
+    // The figures stay, their changes too, but without the colour of better or worse (pilotage 21/11).
+    expect(within(map).getAllByRole('button')).toHaveLength(7 * 24);
+    // The subscribers follow their own counts, never the sales': their colours stay.
+    const judged = Array.from(document.querySelectorAll('.nv-delta--better, .nv-delta--worse'));
+    expect(judged.filter((pill) => pill.closest('.ins-subs') === null)).toHaveLength(0);
+    expect(document.querySelectorAll('.ins-figures .nv-delta').length).toBeGreaterThan(0);
+  });
+
+  it('draws no conclusion before the registers hold enough days of the period (ADR 0092 § 5)', async () => {
+    serve(200, { ...AGENCY_WEEK, registerSince: '2026-11-04' });
+    show();
+    await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    expect(screen.queryByText(/Le créneau qui rapporte le plus/u)).toBeNull();
+    // Too little hindsight is said as such, not as too few sales (Charles, 20/11).
+    expect(screen.getAllByText('Pas encore assez de recul pour conclure.')).toHaveLength(1);
+    expect(screen.queryByText('Pas encore assez de ventes pour conclure.')).toBeNull();
+  });
+
+  it('lights the best slot in one hue, and greys the map while it cannot conclude', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const map = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    const plate = map.closest('.ins-hours');
+    expect(plate?.hasAttribute('data-pending')).toBe(false);
+    // One ring over the slot's three hours, every day of the week.
+    expect(map.querySelectorAll('.ins-heat__best')).toHaveLength(1);
+    cleanup();
+    const current = { ...AGENCY_WEEK.totals.current, sales: 4 };
+    serve(200, { ...AGENCY_WEEK, totals: { ...AGENCY_WEEK.totals, current } });
+    show();
+    const grey = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    expect(grey.closest('.ins-hours')?.hasAttribute('data-pending')).toBe(true);
+    expect(grey.querySelectorAll('.ins-heat__best')).toHaveLength(0);
+  });
+
+  it('lists the refunds one by one, filtered by creator and by the sale’s chatter (ADR 0092 § 4)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const table = await screen.findByRole('table');
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(1 + 3);
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Date', 'Créatrice', 'Type', 'Montant', 'Chatteur de la vente', 'Délai depuis la vente']);
+    const [, first, second, third] = rows.map((row) => row.textContent);
+    expect(first).toContain('6 nov.');
+    expect(first).toContain('14\u00a0h\u00a005');
+    expect(first).toContain('Lina Test');
+    expect(first).toContain('PPV en privé');
+    expect(first).toContain('25,00');
+    expect(first).toContain('Théo');
+    expect(first).toContain('2 jours après');
+    expect(second).toContain('le jour même');
+    expect(second).toContain('Sans chatteur');
+    expect(third).toContain('vente hors registre');
+    expect(third).toContain('Agent IA');
+    expect(third).toContain('—');
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Créatrice' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Maya Démo' }));
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(1 + 1);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Chatteur de la vente' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Théo' }));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText('Aucun remboursement pour ce choix.')).toBeTruthy();
+  });
+
+  it('shows no refunds card on a period without one', async () => {
+    serve(200, { ...AGENCY_WEEK, refundList: [] });
+    show();
+    await screen.findByRole('heading', { name: /Quand ça vend/u });
+    expect(screen.queryByRole('heading', { name: /Les remboursements/u })).toBeNull();
   });
 
   it('shows nothing to an account whose scope is its own', async () => {
@@ -482,5 +587,167 @@ describe('Les abonnés (ADR 0081)', () => {
     serve(200, { ...AGENCY_WEEK, subscribers: null });
     show();
     expect(await screen.findByText(/première lecture des statistiques de Reveal/u)).toBeTruthy();
+  });
+});
+
+describe('the days read and their comparison (ADR 0146)', () => {
+  it('names the week, the days compared, and offers the arrows and the comparison', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const heading = screen.getByRole('heading', { name: /L’agence en chiffres/u });
+    expect(heading.textContent).toContain('comparé aux 24–30 oct.');
+    expect(screen.getByRole('radio', { name: 'Semaine' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Période précédente' })).toBeTruthy();
+    // The next week has begun by the fixture's today: it can be read.
+    expect(screen.getByRole('button', { name: 'Période suivante' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByText('vs semaine précédente')).toBeTruthy();
+  });
+
+  it('draws the curve with its comparison and reads a day in the lead’s note, in place, with no floating tip', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const plot = document.querySelector('.ins-curve__plot');
+    if (plot === null) throw new Error('curve');
+    expect(plot.querySelector('.ins-curve__compared')).not.toBeNull();
+    const layer = plot.querySelector('.ins-curve__hits');
+    const note = document.querySelector('.ins-lead__note');
+    if (layer === null || note === null) throw new Error('layer');
+    const [rest, read] = Array.from(note.children);
+    expect(rest?.textContent).toMatch(/\(1\s560\s€\)/u);
+    expect(rest?.getAttribute('aria-hidden')).toBe('false');
+    // To the far right: the last day, its revenue and the day compared, on the sentence's line (every media query
+    // matches here, a phone's: the day without its weekday, shortened rather than cut).
+    fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
+    expect(read?.textContent).toMatch(/^6 nov\. : 320\s€, contre 270\s€ le 30 oct\.$/u);
+    expect(read?.getAttribute('aria-hidden')).toBe('false');
+    // The sentence keeps its place, hidden: nothing moves.
+    expect(rest?.getAttribute('aria-hidden')).toBe('true');
+    expect(plot.querySelector('.ins-curve__hair')).not.toBeNull();
+    expect(document.querySelector('.nv-tip.is-on')).toBeNull();
+    // Off the curve, the sentence comes back.
+    fireEvent.pointerLeave(layer, { pointerType: 'mouse' });
+    expect(read?.textContent).toBe('');
+    expect(rest?.getAttribute('aria-hidden')).toBe('false');
+    expect(plot.querySelector('.ins-curve__hair')).toBeNull();
+    // A finger reads the same way, and the day stays when the finger lifts, until a tap off the curve.
+    fireEvent.pointerDown(layer, { clientX: 10, clientY: 10, pointerType: 'touch' });
+    fireEvent.pointerLeave(layer, { pointerType: 'touch' });
+    expect(read?.textContent).toContain('6 nov. : 320');
+    fireEvent.pointerDown(document.body, { pointerType: 'touch' });
+    expect(read?.textContent).toBe('');
+  });
+
+  it('gives the pill the day’s change while a day is read, the period’s again after, none for a day with nothing compared', async () => {
+    // The last day falls below its day compared (320 € against 400 €) while the week rises (+18 %).
+    const previousDays = AGENCY_WEEK.previousDays.map((one, i) =>
+      i === 6 ? { ...one, revenueMinor: 40_000 } : one,
+    );
+    serve(200, { ...AGENCY_WEEK, previousDays });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const layer = document.querySelector('.ins-curve__hits');
+    const pill = document.querySelector('.ins-lead__pill');
+    if (layer === null || pill === null) throw new Error('pill');
+    const [period, day] = Array.from(pill.children);
+    expect(period?.textContent).toMatch(/^\+18\s%$/u);
+    expect(period?.querySelector('.nv-delta--better')).not.toBeNull();
+    expect(period?.getAttribute('aria-hidden')).toBe('false');
+    // The last day read: its own change, amber, the period's kept in place, hidden.
+    fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
+    expect(day?.textContent).toMatch(/^−20\s%$/u);
+    expect(day?.querySelector('.nv-delta--worse')).not.toBeNull();
+    expect(day?.getAttribute('aria-hidden')).toBe('false');
+    expect(period?.getAttribute('aria-hidden')).toBe('true');
+    // Off the curve: the period's change again.
+    fireEvent.pointerLeave(layer, { pointerType: 'mouse' });
+    expect(day?.textContent).toBe('');
+    expect(period?.getAttribute('aria-hidden')).toBe('false');
+    cleanup();
+    // A day with nothing compared: no pill, its place kept (the period's, hidden).
+    serve(200, { ...AGENCY_WEEK, previousDays: AGENCY_WEEK.previousDays.slice(0, 6) });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const again = document.querySelector('.ins-curve__hits');
+    if (again === null) throw new Error('layer');
+    fireEvent.pointerMove(again, { clientX: 10, clientY: 10 });
+    const [kept, none] = Array.from(document.querySelector('.ins-lead__pill')?.children ?? []);
+    expect(none?.textContent).toBe('');
+    expect(kept?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('.ins-lead__note')?.textContent).toContain('6 nov. : 320');
+  });
+
+  it('reads a day with nothing compared as its revenue alone, and a phone’s day without its weekday', () => {
+    expect(
+      readingOf({ key: 'x', title: 'mar. 10 nov.', brief: '10 nov.', cents: 15_300, compared: null }, true),
+    ).toMatch(/^10 nov\. : 153\s€$/u);
+    expect(
+      readingOf({ key: 'x', title: 'mar. 10 nov.', brief: '10 nov.', cents: 15_300, compared: null }),
+    ).toMatch(/^mar\. 10 nov\. : 153\s€$/u);
+    expect(
+      readingOf({
+        key: 'x',
+        title: 'mar. 10 nov.',
+        brief: '10 nov.',
+        cents: 15_300,
+        compared: { title: '10 oct.', cents: 26_860 },
+      }),
+    ).toMatch(/^mar\. 10 nov\. : 153\s€, contre 268,60\s€ le 10 oct\.$/u);
+  });
+
+  it('colours the curve by the trend: green above the period compared, amber below, never red (lot couleurs)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
+    cleanup();
+    const lower = {
+      ...AGENCY_WEEK.totals,
+      current: {
+        ...AGENCY_WEEK.totals.current,
+        revenueMinor: AGENCY_WEEK.totals.previous.revenueMinor - 1_000,
+      },
+    };
+    serve(200, { ...AGENCY_WEEK, totals: lower });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--down')).toBe(true);
+    // Nothing to compare with: green, as the « n % » says nothing worse.
+    cleanup();
+    serve(200, { ...AGENCY_WEEK, totals: lower, registerSince: '2026-11-02' });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
+  });
+
+  it('draws one small curve, under the net, in the trend’s colour, hidden from readers (Charles 19/11)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const sparks = [...document.querySelectorAll('.nv-spark')];
+    expect(sparks.map((one) => one.getAttribute('class'))).toEqual(['nv-spark nv-spark--up']);
+    for (const one of sparks) expect(one.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws no small curve for one day read hour by hour', () => {
+    expect(sparkValues({ ...AGENCY_WEEK, to: AGENCY_WEEK.from }, (day) => day.agencyMinor)).toBeNull();
+    expect(sparkValues(AGENCY_WEEK, (day) => day.agencyMinor)).toHaveLength(7);
+    // From the register's first day, as the lead curve.
+    expect(
+      sparkValues({ ...AGENCY_WEEK, registerSince: '2026-11-02' }, (day) => day.agencyMinor),
+    ).toHaveLength(5);
+  });
+
+  it('shows no percentage when the register starts after the days compared, and says so (§ 4)', async () => {
+    serve(200, { ...AGENCY_WEEK, registerSince: '2026-11-02' });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(screen.getByText(/le registre commence le 2 nov\., rien à comparer/u)).toBeTruthy();
+    const first = screen.getByRole('heading', { name: /L’agence en chiffres/u }).closest('section');
+    if (first === null) throw new Error('section');
+    expect(first.querySelectorAll('.nv-delta')).toHaveLength(0);
+    // Said once, under the figure: nothing under the curve repeats it.
+    expect(screen.queryByText(/registre lu depuis/u)).toBeNull();
   });
 });

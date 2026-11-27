@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  automationPattern,
   messageOf,
   momentOf,
+  NO_AUTOMATIONS,
+  originOf,
   scriptsOf,
   sentStepsOf,
   snapshotOf,
+  totalsOf,
   transactionOf,
   vaultMediaOf,
   type OwnMessages,
@@ -426,5 +430,83 @@ describe('snapshotOf and transactionOf (spec § 4)', () => {
         });
       }
     });
+  });
+});
+
+describe('origin of a message (ADR 0110)', () => {
+  const automations = {
+    hooks: [
+      automationPattern('Salut %NAME%, ton profil m’a donné envie de te parler'),
+      automationPattern('Coucou toi'),
+    ].filter((pattern) => pattern !== null),
+    welcome: automationPattern('Bienvenue  chez moi %NAME% !\nÉcris-moi'),
+    expirationReminder: automationPattern('Ton abonnement se termine bientôt'),
+  };
+
+  it('reads an opener the fan chose, whatever the name in place of %NAME%', () => {
+    const text = 'Salut Léa, ton profil m’a donné envie de te parler';
+    expect(originOf(message({ fanId: 'fan_test', content: text }), 'fan', automations)).toBe('hook');
+    expect(originOf(message({ fanId: 'fan_test', content: 'Coucou toi' }), 'fan', automations)).toBe('hook');
+    expect(originOf(message({ fanId: 'fan_test', content: 'Coucou toi, ça va ?' }), 'fan', automations)).toBe(
+      undefined,
+    );
+  });
+
+  it('reads a reply to a story before anything else, and nothing of a fan’s own words', () => {
+    const reply = { ...message({ fanId: 'fan_test', content: '' }), storyReply: { storyId: 'story_test' } };
+    expect(originOf(reply, 'fan', automations)).toBe('story_reply');
+    expect(originOf(message({ fanId: 'fan_test', content: 'Salut' }), 'fan', automations)).toBe(undefined);
+  });
+
+  it('reads her welcome and her reminder, spaces and line breaks aside, never on a message of ours', () => {
+    const welcome = message({ content: 'Bienvenue chez moi Max ! Écris-moi' });
+    expect(originOf(welcome, 'human', automations)).toBe('welcome');
+    expect(originOf(welcome, 'ai', automations)).toBe(undefined);
+    expect(originOf(message({ content: 'Ton abonnement se termine bientôt' }), 'human', automations)).toBe(
+      'expiration_reminder',
+    );
+    expect(originOf(message({ content: 'Bienvenue chez moi ! Écris-moi, vite' }), 'human', automations)).toBe(
+      undefined,
+    );
+  });
+
+  it('reads nothing without her automations, and an empty text is no pattern', () => {
+    expect(automationPattern('  ')).toBeNull();
+    expect(originOf(message({ content: 'Coucou toi' }), 'fan', NO_AUTOMATIONS)).toBe(undefined);
+  });
+
+  it('carries the origin on the message, and none when there is nothing to say', () => {
+    const hook = messageOf(
+      message({ fanId: 'fan_test', content: 'Coucou toi' }),
+      CONVERSATION,
+      NOBODY,
+      automations,
+    );
+    expect(hook.origin).toBe('hook');
+    expect(messageOf(message({ fanId: 'fan_test' }), CONVERSATION, NOBODY, automations)).not.toHaveProperty(
+      'origin',
+    );
+  });
+
+  it('takes a special character in her text as it is', () => {
+    const pattern = automationPattern('Prix (spécial) : 9.99 € ? *oui*');
+    expect(pattern?.test('Prix (spécial) : 9.99 € ? *oui*')).toBe(true);
+    expect(pattern?.test('Prix (spécial) : 9x99 € ? *oui*')).toBe(false);
+  });
+});
+
+describe('totalsOf', () => {
+  const line = { sentCount: 4, paidBundlesCount: 2, paidBundlesTotalAmount: 3000 };
+
+  it('keeps the three totals the platform gives for a step', () => {
+    expect(totalsOf(line)).toEqual({ totals: { sent: 4, purchased: 2, paidMinor: 3000 } });
+  });
+
+  it('sets a step’s totals aside when one is missing or out of range, never failing the import', () => {
+    expect(totalsOf(undefined)).toEqual({});
+    expect(totalsOf({ ...line, sentCount: undefined })).toEqual({});
+    expect(totalsOf({ ...line, paidBundlesTotalAmount: 2_147_483_648 })).toEqual({});
+    expect(totalsOf({ ...line, paidBundlesCount: -1 })).toEqual({});
+    expect(totalsOf({ ...line, sentCount: 1.5 })).toEqual({});
   });
 });

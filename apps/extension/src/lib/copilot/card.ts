@@ -8,7 +8,6 @@ import {
   type FanCardField,
   type FanCardFieldSpec,
   type FanCardGroup,
-  type FanCardValue,
 } from '@impera/contracts';
 
 /**
@@ -45,6 +44,9 @@ export function entryOf(entries: readonly FanCardEntry[], field: FanCardField): 
   return entries.find((one) => one.field === field) ?? { field, current: null, toCheck: [] };
 }
 
+/** A label as it reads inside a sentence: its first letter in lower case. */
+const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
+
 /** A closed value's label is written for a choice (« Coquin »); in the card it reads as the others (Design, lot -2). */
 function closedLabel(field: FanCardField, item: string): string {
   if (field === 'intensity') {
@@ -62,43 +64,17 @@ function closedLabel(field: FanCardField, item: string): string {
 export const valueText = (field: FanCardField, items: readonly string[]): string =>
   items.map((item) => closedLabel(field, item)).join(' · ');
 
-/** « hier », « il y a 3 jours »: how old a value is, said as a person says it. */
-function ageOf(iso: string, now: Date): string {
-  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000));
-  if (minutes < 1) return 'à l’instant';
-  if (minutes < 60) return `il y a ${String(minutes)} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `il y a ${String(hours)} h`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return 'hier';
-  if (days < 30) return `il y a ${String(days)} jours`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `il y a ${String(months)} mois`;
-  const years = Math.floor(months / 12);
-  return `il y a ${String(years)} an${years > 1 ? 's' : ''}`;
-}
-
-/** « Dit par lui, il y a 3 jours », « Noté par Inès, hier ». */
-export function sourceLine(value: FanCardValue, now: Date): string {
-  const who =
-    value.source === 'declared'
-      ? 'Dit par lui'
-      : value.source === 'inferred'
-        ? 'Deviné'
-        : value.notedByName === null
-          ? 'Noté par un chatteur'
-          : `Noté par ${value.notedByName}`;
-  return `${who}, ${ageOf(value.observedAt, now)}`;
-}
-
-/** « 4 sur 11 » for a group's folded line, on the fields it shows. */
-export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup): string {
+/** How many of a group's fields are known, among those it shows: the count on its tab (Charles 21/11, piste C). */
+export function groupShare(
+  entries: readonly FanCardEntry[],
+  group: FanCardGroup,
+): { readonly known: number; readonly total: number } {
   const specs = restOf(group);
   const known = specs.filter((spec) => entryOf(entries, spec.field).current !== null).length;
-  return `${String(known)} sur ${String(specs.length)}`;
+  return { known, total: specs.length };
 }
 
-/** How many fields of a group, among those it shows, wait for a chatter: said on its folded line (V-EXT-07). */
+/** How many fields of a group, among those it shows, wait for a chatter: an amber dot on its tab (V-EXT-07). */
 export const groupChecks = (entries: readonly FanCardEntry[], group: FanCardGroup): number =>
   restOf(group).filter((spec) => entryOf(entries, spec.field).toCheck.length > 0).length;
 
@@ -123,29 +99,6 @@ export function identityText(field: IdentityField, items: readonly string[]): st
   return field === 'age' && /^\d{1,3}$/u.test(text.trim()) ? `${text.trim()} ans` : text;
 }
 
-/** A label as it reads inside a sentence: its first letter in lower case. */
-export const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
-
-/**
- * Where the identity line comes from, said once (EXT-04): one source when the three parts share it, else one line per
- * source naming its parts, « prénom et âge : dit par lui, hier ».
- */
-export function identitySources(entries: readonly FanCardEntry[], now: Date): string[] {
-  const bySource = new Map<string, string[]>();
-  for (const field of IDENTITY) {
-    const { current } = entryOf(entries, field);
-    if (current === null) continue;
-    const line = sourceLine(current, now);
-    bySource.set(line, [...(bySource.get(line) ?? []), IDENTITY_WORDS[field]]);
-  }
-  if (bySource.size <= 1) return [...bySource.keys()];
-  return [...bySource].map(([line, words]) => {
-    const named =
-      words.length === 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} et ${words.at(-1) ?? ''}`;
-    return `${named.charAt(0).toLocaleUpperCase('fr-FR')}${named.slice(1)} : ${lowerFirst(line)}`;
-  });
-}
-
 /**
  * When the newest value of the card was noted, so that a value noted after the panel first read it is marked
  * « nouveau » (ADR 0086 § 10, EXT-14); `null` for a card with no value yet.
@@ -156,4 +109,36 @@ export function newestOf(entries: readonly FanCardEntry[]): string | null {
     if (current !== null && (newest === null || Date.parse(current.observedAt) > Date.parse(newest)))
       newest = current.observedAt;
   return newest;
+}
+
+/** What « N à découvrir » opens (Design 16/11, lot 0141-3): a title, and the fields not known yet under it. */
+export interface ToDiscover {
+  readonly title: string;
+  readonly labels: readonly string[];
+}
+
+/**
+ * What is not known of him yet, by place: the brief first, then each group. A field with a value or one waiting for a
+ * check is not to discover. What is masked while his age is contested is not named either (ADR 0141 § 9).
+ */
+export function toDiscover(entries: readonly FanCardEntry[], masked: boolean): readonly ToDiscover[] {
+  const unknown = (spec: FanCardFieldSpec): boolean => {
+    const entry = entryOf(entries, spec.field);
+    return entry.current === null && entry.toCheck.length === 0 && !(masked && spec.group === 'intimate');
+  };
+  const sections = [
+    {
+      title: 'En bref',
+      labels: ESSENTIALS.map(specOf)
+        .filter((spec): spec is FanCardFieldSpec => spec !== undefined && unknown(spec))
+        .map((spec) => lowerFirst(spec.label)),
+    },
+    ...PANEL_GROUPS.map(({ group, title }) => ({
+      title,
+      labels: restOf(group)
+        .filter(unknown)
+        .map((spec) => lowerFirst(spec.label)),
+    })),
+  ];
+  return sections.filter(({ labels }) => labels.length > 0);
 }

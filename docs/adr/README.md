@@ -29,7 +29,7 @@ Date : AAAA-MM-JJ
 | 0002 | Monolithe modulaire, frontières vérifiées par ESLint | accepted |
 | 0003 | Cœur agnostique de la plateforme (y compris notre future plateforme sans abonnement) | accepted |
 | 0004 | Fastify plutôt que NestJS | accepted |
-| 0005 | Postgres + Drizzle + RLS par `creator_id` | accepted |
+| 0005 | Postgres + Drizzle + RLS par `creator_id` | accepted ; la base de production remplacé par 0152 |
 | 0006 | Graphile Worker, une file série par conversation | accepted |
 | 0007 | Journal d'événements de conversation comme source de vérité | accepted |
 | 0008 | Port `PlatformConnector` ; Reveal via session capturée et client API serveur | accepted (complétée par 0050 : l'API CRM pour les ventes et les chiffres ; B confirmée par P1-03 le 11/11, `reveal-connector-spec.md` § 1) |
@@ -51,7 +51,7 @@ Date : AAAA-MM-JJ
 | 0024 | Rôles et navigation : chacun ne voit que ce qui le concerne | accepted (Suivi du chatteur remplacé par 0025, ligne Créatrice du rail par 0042) |
 | 0025 | Le chatteur chatte dans Reveal ; dans Nirvana, il traite sa créatrice pendant son shift, et rien hors shift | accepted |
 | 0026 | Serveur MCP de Nirvana : une seconde porte sur les mêmes commandes | accepted (§ 5 « freiner, jamais accélérer » amendé par 0058 pour la seule publication du contenu public ; amendé par 0105) |
-| 0027 | Mise en production : deux images, un compose Coolify, un limiteur partagé en Postgres | accepted |
+| 0027 | Mise en production : deux images, un compose Coolify, un limiteur partagé en Postgres | accepted ; le lieu (VPS Hetzner) remplacé par 0152 |
 | 0028 | Export quotidien chiffré de la base, hors de Neon | accepted (§ 1 outils et § 2 `--no-privileges` remplacés par 0029) |
 | 0029 | L'export garde les droits de la base, et s'outille sans binaire hors d'Alpine | accepted |
 | 0030 | Médiathèque : un média, ses liaisons par plateforme, le coffre fait foi | accepted (§ 3 `validated_by` remplacé par 0042 ; § 2 et § 4 remplacés par 0044 pour le contenu déposé et par 0056 pour les scripts déposés) |
@@ -109,13 +109,15 @@ Date : AAAA-MM-JJ
 | 0083 | Chaque média que la créatrice dépose est décrit en détail, seul, et validé avant tout usage | accepted (précise 0030 § 3 et 0056 § 6) |
 | 0084 | La quinzaine vérifiée peut être la première payée sur les ventes Reveal | accepted (amende 0050 § 8 et la règle de départ des règles de paie d'EQ-03) |
 | 0085 | La fiche du fan : vingt cases fermées que l'IA remplit en lisant la conversation, et que le chatteur corrige | accepted (précise P3-02, 0018 § 1 et 0063) |
-| 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085) |
+| 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085 ; amendée le 16/11/2026 : brouillon au-dessus de la fiche ; le 21/11/2026 : fiche et vente en onglets) |
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | accepted (précise 0005 et 0027) |
 | 0088 | Fan en détresse : l'agent lui répond en mode soin, ventes gelées dans le code, et un humain valide chaque réponse | accepted (amende le filet AGT-01 et `protectionFor` ; précise 0021, 0019, 0085 § 9 et 0020) |
 | 0089 | Les vignettes d'une créatrice archivée sont effacées 90 jours après son archivage | accepted (amende 0071 § 2 pour les vignettes ; précise 0030 § 4 et 0044 § 2) |
-| 0090 | Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence | accepted (amende 0079 § 4 et § 6 ; précise P4-01 et 0023) |
+| 0090 | Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence | accepted (amende 0079 § 4 et § 6 ; précise P4-01 et 0023) ; § A points 1 et 2 remplacés par 0159 |
 | 0091 | La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges | accepted (précise 0016 et le plafond du jour) |
 | 0092 | Piloter l'agence : la valeur de chaque chatteur, ce qui a changé chez une créatrice, les fans qui comptent | accepted (précise 0078, 0081, 0024 et 0043 § 7 ; amende 0078 « jamais nommé ici » et 0024 pour Entraîner) |
+| 0094 | Alertes de pilotage : Impera prévient aussi des problèmes de business | accepted (précise 0020, P4-01, 0045, 0049 et 0078) |
+| 0096 | Un compte propriétaire de secours : deux propriétaires au plus, un retrait après 72 h de préavis que le visé peut annuler | accepted (précise 0024, 0046 et 0068) |
 | 0098 | Le déroulé d'un script se tient fan par fan : le code choisit l'étape et le prix, la voix ne fait que les dire | accepted (précise P6-01, P6-02, 0018 § 5, 0056, 0064 et la politique d'offre) |
 | 0099 | Synchroniser le coffre Reveal et bâtir des scripts avec ses médias, sans rien téléverser | accepted (précise 0030, 0018, 0083 et P6-01) |
 | 0100 | Une IA écrit les scripts à partir des médias du coffre, le code tient la vente | accepted (précise 0099, 0083, 0009, 0010, 0021) |
@@ -127,14 +129,16 @@ Date : AAAA-MM-JJ
 | 0106 | Le Dashboard de l'agence sépare chiffre d'affaires, net, part de la créatrice et part de l'agence, et estime la TVA des virements | accepted (précise 0078 et 0054 § 2) |
 | 0107 | La créatrice gagne des médailles de série et des trophées pour ce qu'elle fait pour l'agence | accepted (précise 0042 § 3 et § 7, 0055 § 4 et § 6, 0044 § 4 ; reprend les limites de 0104 § B) |
 | 0108 | Une vitrine des trophées commune au chatteur et à la créatrice : tout ce qui est gagné, ce qui reste, l'avancement vers le prochain | accepted (précise 0104 § B et 0107 § C) |
-| 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
+| 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025 ; amendée le 21/11 : une note sur le fan depuis l'extension) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
-| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
+| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) ; amendement du 19/11 (créer un script à l’écran, le recopier dans Reveal) accepted, précise 0149 |
 | 0113 | Les fichiers du coffre : lus le temps de la description, jamais gardés | accepted (précise 0018, 0030 § 3 et § 4, 0099 § 4, § 5 et § 7) |
 | 0117 | L'agent écrit le prénom du membre et le canevas de la note client | accepted (précise 0018 § 1 et 0085 § 11) |
+| 0118 | Les rapports validés nourrissent le jeu du chatteur, et un gain que le net corrigé ne justifie plus est repris | accepted (précise 0104 § 12 à § 16 et 0108 ; amende 0104 § 15 et § 16) |
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |
 | 0121 | « Mes liens » chez la créatrice, et le pilotage du trafic côté agence : paliers réglables, entonnoir par endroit, récap du jour | accepted (précise 0120, 0080 § 4, 0042) |
+| 0122 | Les commentaires Instagram : une réponse courte dans sa voix, seule après un entraînement validé, et les commentaires hostiles masqués | accepted (précise 0057 §§ 1 et 6, 0120, 0102, 0021) |
 | 0124 | Tous les fans d'une créatrice, listés pour l'agence | accepted (précise 0092 § 3, 0078, 0024, 0025, 0043 § 7, 0063) |
 | 0126 | Les lives de la créatrice : l'agent se tait pendant, en parle après, et se relaie avec les chatteurs | accepted (précise 0042, 0048 § 4, P3-14, 0088) |
 | 0128 | Ménager les scripts : une pause après un achat, un script rejoué par une autre variante du teasing, l'IA qui réclame des scripts | accepted (précise 0098 §§ 1, 6, 9 et 12, 0112 §§ 5, 11 et 15, 0103 et 0056) |
@@ -142,12 +146,34 @@ Date : AAAA-MM-JJ
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
 | 0132 | Paliers de dépense : l'IA plus proche et plus attentive avec les gros dépensiers, jamais plus pressante ; prix plus haut par branche de palier | accepted (précise 0085, 0086, 0088, 0128, 0131 ; amende 0112 § 2) |
 | 0133 | L'agent pose une réaction sur un message du fan, en plus de sa réponse, quand le message la justifie | accepted (précise 0018, 0019, 0021, 0086, 0088, 0079) |
-| 0134 | Navigation du CRM : une section Scripts, un sélecteur de créatrice, une fiche créatrice en quatre onglets, des icônes qui disent l'onglet | accepted (précise 0024, 0042 § 8, 0066 § 6) |
+| 0134 | Navigation du CRM : une section Scripts, un sélecteur de créatrice, une fiche créatrice en quatre onglets, des icônes qui disent l'onglet | accepted (précise 0024, 0042 § 8, 0066 § 6 ; §§ 1, 3, 4 et 7 amendés par 0149) |
 | 0135 | Time waster : le fan qui parle sans jamais acheter reçoit une attention rare, jamais du mépris ; le premier achat la lui rend | accepted (précise 0132, 0128, 0131, 0088, 0085, 0086, 0091) |
 | 0136 | Le feed et les stories Reveal partent seuls : une séance par publication, au moins trois par semaine, une story par jour, avec droit de retrait | accepted (amende 0044 § 3 et § 4, 0055 § 5 ; précise 0044 § 6, 0083, 0126) |
 | 0137 | Le Mass DM part seul : une annonce à tous après chaque publication du feed, un réveil avec un média demandé exprès quand plus personne ne parle | accepted, amendée deux fois le 16/11 (amende 0044 § 5 ; précise 0110 § 5 et § 6, 0136, 0126) |
 | 0138 | Aperçu net du coffre : la petite image de Reveal lue à la demande, servie sans être gardée | accepted (précise 0099 § 7, 0030 § 4, 0018 ; amende 0099 : l'écran du coffre montre l'image à la demande) |
 | 0140 | La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit | accepted (précise 0042 §§ 3-5, 0055 §§ 4-5, 0056 § 2, 0126, 0136, 0137, 0120, 0082) |
+| 0141 | Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande | accepted (précise 0086 § 3 et § 10, amende leur ordre ; amendée le 21/11/2026 : réécrire avec une consigne) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
-| 0145 | Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed à nous, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) |
+| 0145 | Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed à nous, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) ; avenant du § 5 accepté le 17/11 (import au choix, description sur sélection, plus d’interrupteur des descriptions ; amende 0113 § 5 et 0083 § 9) |
+| 0146 | Le Dashboard de l'agence se lit par jour, semaine, mois ou période choisie, et se compare à la période qu'on choisit | accepted (précise 0078 § 3 et § 5) |
+| 0147 | La session Reveal se synchronise seule à l'ouverture du popup, chez le propriétaire, sans appel ni rechargement de Reveal | accepted (précise 0050, 0066 § 7 ; amende la fiche P2-01) |
+| 0148 | L'IA d'une créatrice : un interrupteur qui dit l'état en clair, une pause rapide, et ses heures à elle dessinées sur une frise | accepted (précise P3-14, 0126 §§ 13 et 17, 0019, 0024, 0149) |
+| 0149 | La fiche d'une créatrice en sept onglets : tout ce qui la concerne au même endroit, la section Scripts du menu retirée | accepted (amende 0134 §§ 1, 3, 4, 7 ; précise 0042 § 7, 0099, 0112, 0137, 0145, 0148) |
+| 0150 | Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine | accepted (précise P4-01, 0020, 0042 § 7, 0091, 0128 § C, 0143 § 13) |
+| 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |
+| 0152 | Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs | accepted (remplace 0027 sur le lieu et 0005 sur la base de production ; précise 0028, 0037, 0067, 0087) |
+| 0153 | Le chatteur voit, pendant son shift, une fiche courte de la créatrice : qui elle est, comment elle écrit, ce qu'elle ne fait jamais | accepted (précise 0025, 0022, 0149) |
+| 0154 | L'IA connaît la bio de la créatrice sur la plateforme : lue en lecture seule, gardée avec le compte, donnée à l'IA comme une donnée, la bio prime sur la fiche | accepted (précise 0110, 0018, 0079) |
+| 0156 | Après une étape payante, elle continue de chatter : achat vu et aftercare, refus dans l'ordre, étape oubliée, aide au paiement, relances de vente | accepted (précise 0103, 0088, P6-02) |
+| 0157 | « Ta part » montre tout le chemin de ses ventes : ce que ses fans ont payé, la TVA, Reveal, l'agence et elle, avec son pourcentage | accepted (amende 0054 § 4 ; précise 0042 § 6, 0054 §§ 1-3) |
+| 0158 | Elle a du caractère et vend comme une fille : au revoir, bouderie, lassitude, répartie, mémoire datée, rythme d'un script | accepted (précise 0135, 0128, 0156 ; amende `protectionFor` pour l'insulte) |
+| 0159 | Une demande sur mesure passe par l'accord et le prix de la créatrice ; l'IA prend la commande avec un acompte par pourboire et livre depuis un dossier rattaché au fan | accepted (remplace 0090 § A points 1 et 2 ; précise 0145, 0150, 0135, 0018, 0021, 0088) |
+| 0160 | Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures | accepted (amende 0046 § 6) |
+| 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
+| 0163 | Coffre Impera : le stock de ce qu'elle dépose, compté par usage, décrit et relu par les trois | accepted (précise 0055, 0044, 0159, 0161) |
+| 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
+| 0168 | La langue du fan décidée par le code, donnée à la voix comme une consigne fixe ; couverture des langues par les gardes, fermée par défaut | accepted |
+| 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025 ; amendée le 26/11 : le retour léger) |
+| 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
+| 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |

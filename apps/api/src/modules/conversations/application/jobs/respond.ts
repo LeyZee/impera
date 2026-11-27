@@ -8,8 +8,8 @@ import {
   queueNameFor,
   replyOpenAt,
   reopenJobKey,
-  type AgentHours,
   type AlertTrigger,
+  type ConversationId,
   type EventBody,
   type HandoffCause,
   type JobPayload,
@@ -28,6 +28,7 @@ import type {
   FanDirectory,
   HoldReason,
   JobLogger,
+  HerHours,
   ReplyHours,
   StoredScriptRun,
   Transaction,
@@ -37,6 +38,7 @@ import { deferredRespondAt } from '../../domain/rules';
 import { closeAutomaticIfLocked } from '../automatic';
 import { readProposedFacts } from '../facts';
 import { appendEvent } from '../journal';
+import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
 
 export interface RespondDeps {
   readonly uow: UnitOfWork;
@@ -305,16 +307,45 @@ async function deferReply(
 }
 
 /**
+ * A time-waster's answer waits (ADR 0135 § 6): the conversation stays pending and the same job runs at `until`, under
+ * its key, so that a message of his meanwhile only brings it back to this wait. Codes only, never a status in a log.
+ */
+async function deferForTimeWaster(
+  tx: Transaction,
+  conversation: Conversation,
+  until: Date,
+  payload: JobPayload<'conversation.respond'>,
+  at: Date,
+): Promise<void> {
+  await appendEvent(
+    tx,
+    conversation,
+    { type: 'reply_deferred', payload: { reason: 'time_waster', until: until.toISOString() } },
+    { actor: 'system', correlationId: payload.correlationId, at },
+  );
+  await tx.jobs.enqueue(
+    'conversation.respond',
+    {
+      creatorId: payload.creatorId,
+      conversationId: payload.conversationId,
+      correlationId: payload.correlationId,
+    },
+    {
+      queueName: queueNameFor(conversation.id),
+      jobKey: jobKeyFor('conversation.respond', conversation.id),
+      runAt: until,
+    },
+  );
+}
+
+/**
  * Out of her reply slots (P3-14), the opening of her next slot: no draft until then, whoever is on shift. A chatter on
  * shift is not bound by her hours, but answers in Reveal (ADR 0025): a draft of the agent at 4:00 would serve nobody,
  * and her hours exist so that she does not answer at 4:00. `null` when she may answer now.
  */
-function closedUntil(
-  her: { readonly hours: AgentHours; readonly timeZone: string } | null,
-  now: Date,
-): Date | null {
-  if (her === null || replyOpenAt(her.hours, her.timeZone, now)) return null;
-  const opening = nextReplyOpening(her.hours, her.timeZone, now);
+function closedUntil(her: HerHours | null, now: Date): Date | null {
+  if (her === null || replyOpenAt(her.hours, her.timeZone, now, her.exceptions)) return null;
+  const opening = nextReplyOpening(her.hours, her.timeZone, now, her.exceptions);
   // Her hours always have an active slot (the contract); stored hours that had none never put a job off to now.
   return opening.getTime() > now.getTime() ? opening : null;
 }
@@ -385,6 +416,23 @@ async function recordScriptRuns(
 }
 
 /**
+ * His runs before the latest that went cold, and her teases about the latest when it went cold too (Charles 20/11):
+ * read only when his latest run went cold, the one case she may tease him. `null`: nothing to read.
+ */
+async function scriptAbandonOf(
+  tx: Transaction,
+  conversationId: ConversationId,
+  latest: StoredScriptRun | null,
+): Promise<NonNullable<ComposeInput['scriptAbandon']> | null> {
+  if (latest?.run.status !== 'stalled') return null;
+  const stalled = await tx.scriptRuns.stalled(conversationId);
+  return {
+    earlier: stalled.filter((stored) => stored.id !== latest.id).map((stored) => stored.run),
+    teased: await tx.events.abandonTeases(conversationId, latest.id),
+  };
+}
+
+/**
  * `conversation.respond`, after the debounce (message-flow.md §1). Three steps, so that no lock is held while the
  * engine thinks (seconds): read the gates and the context; compose outside any transaction; re-lock and write,
  * unless the fan wrote again meanwhile (the next debounce answers) or a gate closed. Never sends anything: the
@@ -411,16 +459,48 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         logger.info({ until: until.toISOString() }, 'respond: out of her hours, deferred');
         return null;
       }
+      const scriptRun = await tx.scriptRuns.latest(conversation.id);
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
+        stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
         sales: await tx.events.salesState(conversation.id),
-        scriptRun: await tx.scriptRuns.latest(conversation.id),
+        scriptRun,
+        scriptAbandon: await scriptAbandonOf(tx, conversation.id, scriptRun),
+        // His custom order kept by its module (ADR 0159 § A.2); undefined when no store is wired.
+        openCustomOrder: await tx.customOrders?.open(conversation.fanId),
         lastInbound: lastInboundKey(conversation),
+        flags: await tx.gate.fanFlags(conversation),
+        unboughtRuns: await tx.scriptRuns.unbought(conversation.id),
+        stalledRuns: await tx.scriptRuns.stalled(conversation.id),
       };
     });
     if (read === null) return;
+    // A time-waster waits his turn (ADR 0135 § 6), before any call to the AI: his next messages join this wait.
+    const wait = timeWasterWait({
+      now: clock.now(),
+      timeZone: hours?.timeZone ?? DEFAULT_TIME_ZONE,
+      conversationId: read.conversation.id,
+      setting: read.stats.timeWaster,
+      flags: read.flags,
+      careOpen: read.conversation.careSince !== null,
+      firstMessageAt: read.stats.firstMessageAt,
+      spentMinor: Math.max(read.stats.spentMinor, read.stats.registerSpentMinor ?? 0),
+      lastPurchaseAt: read.stats.lastPurchaseAt,
+      unboughtRuns: read.unboughtRuns,
+      stalledRuns: read.stalledRuns,
+      history: read.history,
+    });
+    if (wait?.until != null) {
+      const until = wait.until;
+      await uow.inTenant(payload.creatorId, async (tx) => {
+        const conversation = await tx.conversations.lock(payload.conversationId);
+        if (conversation === null || !(await stillPending(tx, conversation, logger, waitedFor))) return;
+        await deferForTimeWaster(tx, conversation, until, payload, clock.now());
+      });
+      logger.info({ level: wait.level, until: until.toISOString() }, 'respond: time-waster, deferred');
+      return;
+    }
     // Her facts come from the `fans` module, which reads them in its own transaction: outside the lock above.
     const notes = await fans.activeFacts(read.conversation.creatorId, read.conversation.fanId);
     const now = clock.now();
@@ -435,8 +515,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
+      ...(wait !== null && { timeWaster: wait.level }),
       ...(waitedFor !== null && { waited: 1 }),
-      ...(hours !== null && { hours: hours.hours }),
+      ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
       ...(read.conversation.desireScore !== null &&
         read.conversation.desireAt !== null && {
           desire: { score: read.conversation.desireScore, at: read.conversation.desireAt },
@@ -445,11 +526,14 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         care: { since: read.conversation.careSince, helpGiven: read.conversation.careHelpAt !== null },
       }),
       ...(read.sales.customOrderOpen && { customOrderOpen: true }),
+      ...(read.openCustomOrder !== undefined && { openCustomOrder: read.openCustomOrder }),
       ...(read.sales.usedObjectionReplies.length > 0 && {
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
       scriptRun: read.scriptRun?.run ?? null,
+      ...(read.scriptAbandon !== null && { scriptAbandon: read.scriptAbandon }),
       fanAvailability: read.conversation.fanAvailability,
+      saleTrouble: read.sales.saleTrouble,
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -516,10 +600,46 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // The turn on his custom order (ADR 0159 § A.2), kept once per message of his, whatever the answer becomes.
+      if (result.customOrderTurn !== undefined && source !== null && tx.customOrders !== undefined) {
+        await tx.customOrders.record({
+          fanId: conversation.fanId,
+          inboundMessageId: source.platformMessageId,
+          turn: result.customOrderTurn,
+          at: meta.at,
+        });
+      }
+      // No script left for him where one would open (ADR 0150 § 9): said once, until a script starts again for him.
+      if (result.scriptsExhausted === true && !(await tx.events.scriptsExhaustedSaid(conversation.id))) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'scripts_exhausted', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       // His script runs as his message and Reveal left them (ADR 0098); the step decided only with a draft.
       const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
       conversation = scripted.conversation;
       if (result.kind === 'draft') {
+        // She answered a sale gone wrong: the same trouble again soon after goes to a human (ADR 0156 § 4 and § 7).
+        if (result.saleTrouble !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'sale_trouble', payload: { conversationId: conversation.id, kind: result.saleTrouble } },
+            meta,
+          );
+        }
+        // She teased him about the run he left: counted, so that she never says it more than due (Charles 20/11).
+        if (result.abandonTeased === true && read.scriptRun !== null) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'script_abandon_teased', payload: { scriptRunId: read.scriptRun.id } },
+            meta,
+          );
+        }
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {
           conversation = await appendEvent(
@@ -548,6 +668,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
           ...(scripted.step !== undefined && { scriptStep: scripted.step }),
+          ...(result.copilot !== undefined && { copilot: result.copilot }),
+          // Her French for the team (ADR 0168 § 9): kept beside the draft, never in what is sent nor in its key.
+          ...(result.translation !== undefined && { translation: result.translation }),
         });
         await appendEvent(
           tx,

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FanInsights } from './FanInsights';
 import { DEMO_INSIGHTS } from './insights-fixture';
-import { arcsOf, heatOf, shareText, slotLabel, waitingLines } from './insights-view';
+import { heatOf, shareText, slotLabel, waitingLines } from './insights-view';
 
 function serve(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -65,7 +65,18 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
         'Trop peu de fans t’ont encore dit leur situation : ce chiffre s’affichera dès que dix l’auront dit.',
       ),
     ).toBeDefined();
-    expect(screen.getByText('Panier moyen sur 30 jours')).toBeDefined();
+    expect(screen.getByText('Panier moyen d’un fan qui a payé, sur 30 jours')).toBeDefined();
+  });
+
+  it('says one count once when the three are alike (recette visuelle 16/11, CRE-02)', async () => {
+    serve(200, { ...DEMO_INSIGHTS, fans: { total: 20, newLast30Days: 20, wroteLast7Days: 20 } });
+    show();
+    expect(
+      await screen.findByText(
+        'fans en tout, à peu près autant de nouveaux sur 30 jours et à t’avoir écrit cette semaine',
+      ),
+    ).toBeDefined();
+    expect(document.querySelectorAll('.fi-stat')).toHaveLength(1);
   });
 
   it('says « moins de 10 » for a count under ten, never the exact count', async () => {
@@ -132,7 +143,7 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     expect(none.closest('article')?.className).toContain('fi-card--full');
     expect(screen.queryByText('ont déjà débloqué')).toBeNull();
     expect(screen.queryByText('Rien débloqué')).toBeNull();
-    expect(screen.queryByText('Panier moyen sur 30 jours')).toBeNull();
+    expect(screen.queryByText(/Panier moyen/u)).toBeNull();
   });
 
   it('says the figures do not load, with a way to try again', async () => {
@@ -144,16 +155,6 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
 });
 
 describe('the geometry', () => {
-  it('cuts the ring in arcs that follow each other', () => {
-    const arcs = arcsOf([50, 50], 10, 0);
-    const half = Math.round(Math.PI * 10 * 100) / 100;
-    expect(arcs[0]?.offset).toBe(0);
-    expect(arcs[1]?.offset).toBe(-half);
-    expect(arcsOf([100], 10)[0]?.dash.startsWith(String(Math.round(2 * Math.PI * 10 * 100) / 100))).toBe(
-      true,
-    );
-  });
-
   it('says what each waiting block counts: facts told, fans in all, fans who wrote', () => {
     expect(waitingLines([])).toEqual([]);
     expect(waitingLines(['job'])).toEqual([

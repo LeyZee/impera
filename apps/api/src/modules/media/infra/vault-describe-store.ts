@@ -1,5 +1,4 @@
 import {
-  CreatorSettingsSchema,
   DESCRIPTION_TRIES,
   JOB_MAX_ATTEMPTS,
   JOB_PAYLOADS,
@@ -35,7 +34,6 @@ const RefRowSchema = z.object({
 });
 const ScriptRowSchema = z.object({ id: z.string(), active: z.boolean(), media: z.string() });
 const CountSchema = z.object({ n: z.coerce.number().int() });
-const BacklogRowSchema = z.object({ creator_id: z.string(), platform_account_id: z.string() });
 
 /** The platform's text beside its media (author `platform`, never validated), once per text. */
 async function keepPlatformText(
@@ -107,24 +105,18 @@ async function enqueue(
  * `media.describe_vault`'s reads and writes, as the owner role (ADR 0087): the job crosses no tenant, it is keyed by an
  * account. It writes `media_assets` and `media_descriptions`, and of `media_platform_refs` the link and the tries only.
  */
-export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescribeStore & {
-  /** `media.describe_vault_backlog`: the run of each account whose vault still waits, her switch on. How many. */
-  backlog(correlationId: string): Promise<number>;
-} {
+export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescribeStore {
   return {
     account: (platformAccountId) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
-          .select({ creatorId: platformAccounts.creatorId, settings: creators.settings })
+          .select({ creatorId: platformAccounts.creatorId })
           .from(platformAccounts)
           .innerJoin(creators, eq(creators.id, platformAccounts.creatorId))
           .where(and(eq(platformAccounts.id, platformAccountId), sql`${creators.archivedAt} is null`))
           .limit(1);
         if (row === undefined) return null;
-        return {
-          creatorId: row.creatorId,
-          describes: CreatorSettingsSchema.parse(row.settings).describeDrops,
-        };
+        return { creatorId: row.creatorId };
       }),
 
     waiting: (creatorId, platformAccountId) =>
@@ -133,10 +125,15 @@ export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescrib
           select id, platform, platform_media_id, kind, folder_ref, folder_name,
                  to_char(platform_created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as platform_created_at,
                  folder_position, platform_description
-            from ${mediaPlatformRefs}
+            from ${mediaPlatformRefs} r
            where creator_id = ${creatorId} and platform_account_id = ${platformAccountId}
              and media_asset_id is null and removed_at is null and kind in ('image', 'video')
-             and description_failures < ${DESCRIPTION_TRIES}`);
+             and description_failures < ${DESCRIPTION_TRIES}
+             -- Only what the owner asked and what is in the CRM (ADR 0145 § 5): nothing is described of itself.
+             and exists (select 1 from ${schema.vaultDescribeRequests} q
+                          where q.platform_account_id = r.platform_account_id
+                            and q.platform_media_id = r.platform_media_id)
+             and ${schema.vaultImported({ account: sql`r.platform_account_id`, media: sql`r.platform_media_id`, folder: sql`r.folder_ref` })}`);
         // Every imported script of the account, its media in its own order: steps, previews before what is sold.
         const scripts = await tx.execute(sql`
           select s.id, s.active, m.platform_media_ref as media
@@ -256,35 +253,18 @@ export function createDrizzleVaultDescribeStore(adminDb: Database): VaultDescrib
       }),
 
     later: (job, runAt) => withAdmin(adminDb, (tx) => enqueue(tx, job, runAt, 'replace')),
-
-    backlog: (correlationId) =>
-      withAdmin(adminDb, async (tx) => {
-        const result = await tx.execute(sql`
-          select distinct r.creator_id, r.platform_account_id
-            from ${mediaPlatformRefs} r
-            join ${creators} c on c.id = r.creator_id
-           where r.media_asset_id is null and r.removed_at is null and r.kind in ('image', 'video')
-             and r.description_failures < ${DESCRIPTION_TRIES}
-             -- Only what vaultDescribeOrder describes: a media of a folder, never one at the vault's root.
-             and r.folder_ref is not null
-             and c.archived_at is null and coalesce((c.settings ->> 'describeDrops')::boolean, false)
-           order by 1, 2`);
-        const accounts = z.array(BacklogRowSchema).parse(result.rows);
-        for (const row of accounts) {
-          // A run already waiting keeps its time: one put off by a spent budget is not brought forward.
-          await enqueue(
-            tx,
-            { creatorId: row.creator_id, platformAccountId: row.platform_account_id, correlationId },
-            null,
-            'preserve_run_at',
-          );
-        }
-        return accounts.length;
-      }),
   };
 }
 
 /** `media.describe_vault` queued behind a vault sync (ADR 0113 § 5): a run already waiting keeps its time. */
 export function enqueueVaultDescribe(adminDb: Database, job: Job): Promise<void> {
   return enqueue(adminDb, job, null, 'preserve_run_at');
+}
+
+/**
+ * `media.describe_vault` queued in the owner's transaction that asked descriptions (ADR 0145 § 5): a run already
+ * waiting keeps its time, one put off by a spent budget is not brought forward.
+ */
+export function enqueueVaultDescribeIn(tx: Transaction, job: Job): Promise<void> {
+  return enqueue(tx, job, null, 'preserve_run_at');
 }

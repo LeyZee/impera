@@ -62,6 +62,7 @@ const shift = (id: string, startsAt: string): Shift =>
     endsAt: startsAt.replace('T08', 'T10'),
     templateId: null,
     stoppedAt: null,
+    checkedInAt: null,
   });
 
 const report = (
@@ -281,7 +282,7 @@ describe('a refused « Ventes relevées » (CRM-03, ADR 0050 § 8)', () => {
     expect(refusalText(refused('pay_rules_source_conflict', 'model_unlinked'))).toBe(
       SOURCE_REFUSAL_TEXTS.model_unlinked,
     );
-    expect(SOURCE_REFUSAL_TEXTS.model_unlinked).toMatch(/Réglages › Ventes/u);
+    expect(SOURCE_REFUSAL_TEXTS.model_unlinked).toMatch(/Réglages › Plateformes/u);
     expect(SOURCE_REFUSAL_TEXTS.check_missing).toMatch(/vérification de fiabilité/u);
   });
 
@@ -417,7 +418,7 @@ describe('a report against its platform (ADR 0073)', () => {
     expect(plain(thresholdText({ bps: 100, minor: 0 }))).toBe('1 %');
     expect(thresholdText({ bps: 0, minor: 0 })).toBe('Aucun écart');
     expect(uncheckedText('model_unlinked', 'Reveal', true)).toBe(
-      'Ce compte n’est relié à aucun modèle de Reveal : relie-le dans Réglages › Ventes pour comparer ses rapports.',
+      'Ce compte n’est relié à aucun modèle de Reveal : relie-le dans Réglages › Plateformes pour comparer ses rapports.',
     );
     expect(uncheckedText('chatter_unlinked', 'Reveal', false)).toBe(
       'Ton compte de chatteur sur Reveal n’est pas encore relié : l’agence relit ton rapport.',

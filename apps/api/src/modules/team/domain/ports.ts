@@ -173,6 +173,9 @@ export interface CreatorRoster {
   existing(ids: readonly CreatorId[]): Promise<ReadonlySet<CreatorId>>;
 }
 
+/** The creators' names, archived ones included: what an announcement says it is addressed to (EQ-12). */
+export type CreatorNames = (ids: readonly CreatorId[]) => Promise<ReadonlyMap<CreatorId, string>>;
+
 /**
  * The link out of each member asked for (EQ-10), injected by the composition root from the links' table, which the
  * module never reads: at most one per member, neither used nor replaced, expired or not; a member with none is absent.

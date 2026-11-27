@@ -1,4 +1,5 @@
 import type {
+  AgentHoursNow,
   AutomaticGate,
   CreatorId,
   DecidedDraft,
@@ -53,6 +54,10 @@ export interface DashboardFacts {
   readonly creator: { readonly name: string; readonly timezone: string };
   /** The latest row of each kill switch scope that stops her: the global one, and hers. */
   readonly switches: { readonly global: boolean; readonly creator: boolean };
+  /** Her Arrêt is a pause (ADR 0148 § 1): when it lifts itself. `null` for an Arrêt lifted by hand, or none. */
+  readonly pausedUntil: Date | null;
+  /** Her hours now, exceptions read (ADR 0148 § 1). */
+  readonly hoursNow: AgentHoursNow;
   readonly autoConversations: number;
   /**
    * Decided drafts of the active voice version as they stood three weeks ago, newest first (at most 200), for the
@@ -109,6 +114,8 @@ export interface AgencyFiguresStore {
     creatorId: CreatorId,
     userId: UserId,
     range: { readonly from: string; readonly previousFrom: string; readonly to: string },
+    /** A calendar month's first day: her revenue objective for it is read too (ADR 0092 § 6). */
+    objectiveMonth?: string | null,
   ): Promise<
     | { readonly kind: 'out_of_scope' }
     | { readonly kind: 'not_linked' }
@@ -179,6 +186,8 @@ export interface CreatorOverviewFacts {
   readonly timezone: string;
   readonly scope: TeamScope;
   readonly switches: DashboardFacts['switches'];
+  readonly pausedUntil: DashboardFacts['pausedUntil'];
+  readonly hoursNow: DashboardFacts['hoursNow'];
   readonly autoConversations: number;
   /** Her open requests with nothing dropped, the first due first; empty for a scope of one's own (RLS). */
   readonly requests: readonly { readonly category: DropCategory; readonly dueOn: string }[];

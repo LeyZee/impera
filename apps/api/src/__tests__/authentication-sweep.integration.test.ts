@@ -39,7 +39,13 @@ const PUBLIC: Readonly<Record<string, string>> = {
 
 /** A value for each path parameter: none is looked up, the guard answers first. */
 const filler = (name: string): string =>
-  name === 'day' ? '2026-11-06' : name === 'period' ? '2026-11-01' : '00000000-0000-4000-8000-000000000000';
+  name === 'day'
+    ? '2026-11-06'
+    : name === 'date'
+      ? '2099-01-01'
+      : name === 'period' || name === 'month'
+        ? '2026-11-01'
+        : '00000000-0000-4000-8000-000000000000';
 
 describe('no route answers without a session, but those said (audit des tests d’isolation, 06/11)', () => {
   let test: TestDb;

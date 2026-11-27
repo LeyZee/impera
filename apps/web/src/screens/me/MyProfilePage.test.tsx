@@ -113,6 +113,7 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
     expect(text).toContain('1er septembre 2026');
   });
 
+  // No « Calendrier »: a chatter's link is on Planning, « Dans mon téléphone » (ADR 0134, lot 1).
   it('opens Moi with Profil, before Dossier', async () => {
     serve([THEO_HERE]);
     renderPage(THEO_ME);
@@ -121,7 +122,7 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Sécurité', 'Aide', 'Préférences']);
   });
 
   it('gives a manager on leave no « Trophées » tab, which his routes would not open (recette 16/11, CHT-05)', async () => {
@@ -132,6 +133,6 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Dossier', 'Sécurité', 'Aide', 'Préférences']);
   });
 });

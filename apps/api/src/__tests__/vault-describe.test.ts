@@ -81,7 +81,7 @@ describe('media.describe_vault on FakeReveal (ADR 0113)', () => {
   let vision: { answer: 'ok' | 'budget' | 'failed' };
 
   const store: VaultDescribeStore = {
-    account: (id) => Promise.resolve(id === ACCOUNT ? { creatorId: CREATOR, describes: true } : null),
+    account: (id) => Promise.resolve(id === ACCOUNT ? { creatorId: CREATOR } : null),
     waiting: () =>
       Promise.resolve({
         refs: [...refs.values()].filter((ref) => ref.asset === null && ref.failures < DESCRIPTION_TRIES),

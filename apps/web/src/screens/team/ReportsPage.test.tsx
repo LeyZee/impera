@@ -64,6 +64,8 @@ const teamMember = (memberId: string, name: string, status = 'active'): Record<s
 let team: { status: number; body: unknown };
 /** A period whose list the server does not answer. */
 let downPeriod: string | null;
+/** Reveal's team answers: the reader may open Équipe › Comptes Reveal (the owner, an active manager). */
+let revealOpen: boolean;
 
 const text = (element: Element | null | undefined): string =>
   (element?.textContent ?? '').replaceAll('\u00a0', ' ');
@@ -77,8 +79,30 @@ const shift = (n: number, memberId: string, day: number) => ({
   endsAt: `2026-10-${String(day)}T22:00:00.000Z`,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
 });
 const SHIFTS = [shift(1, THEO, 26), shift(2, BASILE, 26), shift(3, THEO, 25), shift(4, BASILE, 24)];
+
+/** A mini feedback as the list sends it; `patch` sets what the test is about. */
+const feedback = (n: number, patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+  id: id(500 + n),
+  shiftId: id(100 + n),
+  creatorId: id(1),
+  platformAccountId: id(11),
+  memberId: BASILE,
+  period: '2026-10-16',
+  nothingToReport: false,
+  comment: null,
+  incident: null,
+  signals: [],
+  draftReason: null,
+  incidentSeenAt: null,
+  incidentResolvedAt: null,
+  createdAt: '2026-10-26T22:00:00.000Z',
+  shiftStartsAt: '2026-10-26T16:00:00.000Z',
+  shiftEndsAt: '2026-10-26T22:00:00.000Z',
+  ...patch,
+});
 
 interface FakeReport {
   readonly id: string;
@@ -117,6 +141,10 @@ const report = (n: number, shiftIndex: number, patch: Record<string, unknown> = 
 
 let open: FakeReport[];
 let period: FakeReport[];
+/** The mini feedbacks: the incidents still open, and the period's (ADR 0050 § 10, trous béants n° 1). */
+let openIncidents: Record<string, unknown>[];
+let periodFeedbacks: Record<string, unknown>[];
+let missingFeedbacks: Record<string, unknown>[];
 /** The pay rules of the period for the shift corrected. */
 let rules: unknown;
 /** What a `POST` answers: the same for each, or from what it was sent. */
@@ -139,6 +167,15 @@ function serve(): void {
       switch (url.pathname) {
         case '/v1/scheduling/settings':
           return json(settingsOf());
+        case '/v1/scheduling/shift-feedback':
+          return json({
+            feedbacks: url.searchParams.has('period') ? periodFeedbacks : openIncidents,
+            accounts: [ACCOUNT],
+            members: MEMBERS,
+            missing: url.searchParams.has('period') ? missingFeedbacks : [],
+          });
+        case '/v1/settings/sales-feeds/reveal/team/counts':
+          return revealOpen ? json({ newCount: 0, removalCount: 0, abnormalRead: false }) : json(null, 403);
         case '/v1/team/members':
           return json(team.body, team.status);
         case '/v1/scheduling/shift-reports':
@@ -231,12 +268,16 @@ beforeEach(() => {
   writes.length = 0;
   team = { status: 200, body: { members: [teamMember(THEO, 'Théo'), teamMember(BASILE, 'Basile')] } };
   downPeriod = null;
+  revealOpen = false;
   open = [
     report(1, 0, { comment: 'Un pack a bien plu' }),
     report(2, 1, { incident: 'Le compte a été déconnecté une heure' }),
     report(3, 2, { canReview: false }),
   ];
   period = [];
+  openIncidents = [];
+  periodFeedbacks = [];
+  missingFeedbacks = [];
   rules = null;
   answer = { status: 200, body: { results: [] } };
   serve();
@@ -682,8 +723,23 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(late)).toContain('Délai passé sans explication : à toi de décider.');
     expect(late?.querySelector('input')?.disabled).toBe(false);
 
+    // A report with a gap is never swept by « Tout valider »: it is ticked by hand, once read.
+    expect(screen.queryByRole('button', { name: /^Tout valider/u })).toBeNull();
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));
     expect(screen.getByRole('button', { name: 'Valider (2)' })).toBeTruthy();
+  });
+
+  it('counts in « Tout valider » the reports without a gap only', async () => {
+    open = [
+      report(1, 0),
+      report(2, 1, {
+        check: gapOf(-3_000, 15_000, '2026-10-28T22:00:00.000Z'),
+        explanation: 'Un remboursement arrivé après le shift.',
+      }),
+      report(3, 2),
+    ];
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Tout valider (2)' })).toBeTruthy();
   });
 
   it('says once when no sale of the platform is read yet: every report waits for a hand (recette EQP-05)', async () => {
@@ -717,12 +773,56 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(provisional)).toContain(
       'Reveal a lu 40,00 € pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.',
     );
-    expect(text(unlinked)).toContain(
-      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Équipe › Reveal pour comparer ses rapports.',
-    );
+    // Said once above the list, not on his line (GES-25).
+    expect(text(unlinked)).not.toContain('relié');
+    expect(
+      screen.getByText('1 membre n’est pas relié à Reveal : ses rapports ne sont pas comparés.'),
+    ).toBeTruthy();
     // Nothing the comparison cannot say holds a validation back.
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));
     expect(screen.getByRole('button', { name: 'Valider (3)' })).toBeTruthy();
+  });
+
+  it('says once who is not linked to Reveal, names the total declared, and offers « Tout valider » (GES-25)', async () => {
+    revealOpen = true;
+    const unlinked = { check: { state: 'unavailable', reason: 'chatter_unlinked' } };
+    open = [report(1, 0, unlinked), report(2, 1, unlinked), report(3, 2, unlinked), report(4, 3)];
+    answer = validatesAll;
+    renderPage();
+    const line = await screen.findByText(
+      '2 membres ne sont pas reliés à Reveal : leurs rapports ne sont pas comparés.',
+    );
+    expect(document.querySelectorAll('.rp-validate__unlinked')).toHaveLength(1);
+    const link = await within(line.parentElement ?? document.body).findByRole('link', { name: 'Relier' });
+    expect(link.getAttribute('href')).toBe('/equipe/reveal');
+    for (const row of document.querySelectorAll('.rp-review')) expect(text(row)).not.toContain('relié');
+    // 110 + 120 + 130 + 140 €, said for what it is.
+    expect(text(document.querySelector('.rp-validate__sum'))).toBe('500,00 € déclarés');
+
+    // The screen's action before anything is ticked: one neon, in the header.
+    const all = screen.getByRole('button', { name: 'Tout valider (4)' });
+    expect(all.classList.contains('nv-btn--neon')).toBe(true);
+    expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
+    // Once some are ticked, « Valider (N) » at the foot takes over: still one neon.
+    fireEvent.click(screen.getByLabelText('Tout sélectionner'));
+    expect(screen.queryByRole('button', { name: /^Tout valider/u })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Valider (4)' })).toBeTruthy();
+    expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Tout sélectionner/u }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tout valider (4)' }));
+    expect(await screen.findByText(/Validation de 4 rapports dans 5\ss/u)).toBeTruthy();
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(writes.map((one) => one.body)).toEqual([
+      { reports: [1, 2, 3, 4].map((n) => ({ id: id(300 + n), version: 1 })) },
+    ]);
+  });
+
+  it('says « Relier » only to who may open Équipe › Comptes Reveal (GES-25)', async () => {
+    open = [report(1, 0, { check: { state: 'unavailable', reason: 'chatter_unlinked' } })];
+    renderPage();
+    await screen.findByText('1 membre n’est pas relié à Reveal : ses rapports ne sont pas comparés.');
+    expect(screen.queryByRole('link', { name: 'Relier' })).toBeNull();
   });
 
   it('counts a member’s gaps on the period, and says a validation made by the check (§ 4, § 5)', async () => {
@@ -747,5 +847,84 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     const lines = [...(theo.closest('details')?.querySelectorAll('.rp-pline') ?? [])].map(text);
     expect(lines.find((line) => line.includes('écart +12,00 €'))).toContain('Validé');
     expect(lines.find((line) => line.includes('150,00 €'))).toContain('Validé automatiquement');
+  });
+  it('puts the incidents still open first, in red, and says « Vu » then « Réglé » (trous béants n° 1)', async () => {
+    const incident = feedback(1, { incident: 'Un fan menace de signaler le compte' });
+    openIncidents = [incident];
+    answer = {
+      status: 200,
+      body: {
+        ...incident,
+        shiftStartsAt: undefined,
+        shiftEndsAt: undefined,
+        incidentSeenAt: '2026-10-28T00:00:00.000Z',
+      },
+    };
+    renderPage();
+    const card = (await screen.findByText('1 incident à suivre')).closest('section');
+    if (card === null) throw new Error('no card');
+    expect(text(card)).toContain('Un fan menace de signaler le compte');
+    expect(text(card)).toContain('Basile');
+    expect(text(card)).toContain('1 pas encore vu');
+    expect(within(card).getByRole('list', { name: 'Incident : Envoyé' })).toBeTruthy();
+    // Before the reports to validate: the urgency first.
+    const board = card.parentElement;
+    expect(board?.firstElementChild).toBe(card);
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Vu' }));
+    await waitFor(() => {
+      expect(writes).toEqual([
+        {
+          method: 'POST',
+          path: `/v1/scheduling/shift-feedback/${id(501)}/incident`,
+          body: { step: 'seen' },
+        },
+      ]);
+    });
+  });
+
+  it('shows no incidents card when none waits, and the period’s feedbacks in figures and colours', async () => {
+    periodFeedbacks = [
+      feedback(1, { incident: 'Coupure de connexion', incidentSeenAt: '2026-10-27T08:00:00.000Z' }),
+      feedback(2, {
+        comment: 'Soirée calme',
+        signals: [
+          { category: 'missing_content', text: 'Une vidéo en extérieur' },
+          { category: 'fan_request', text: 'Une photo en robe rouge' },
+        ],
+      }),
+      feedback(3, { nothingToReport: true }),
+    ];
+    renderPage();
+    const panel = (await screen.findByText('3 retours')).closest('section');
+    if (panel === null) throw new Error('no panel');
+    expect(screen.queryByText(/incidents? à suivre/u)).toBe(null);
+    expect(text(panel)).toContain('1incident');
+    expect(text(panel)).toContain('1sans souci');
+    expect(text(panel)).toContain('Incident · Vu');
+    expect(text(panel)).toContain('Contenu manquant');
+    expect(text(panel)).toContain('Demande d’un fan');
+    expect(text(panel)).toContain('« Soirée calme »');
+    expect(text(panel)).toContain('0sans retour');
+  });
+
+  it('counts the shifts left without their feedback, never caught up (retour léger, 26/11)', async () => {
+    periodFeedbacks = [feedback(1, { nothingToReport: true, draftReason: 'too_long' })];
+    missingFeedbacks = [
+      {
+        shiftId: id(190),
+        creatorId: id(1),
+        platformAccountId: id(11),
+        memberId: BASILE,
+        startsAt: '2026-10-24T16:00:00.000Z',
+        endsAt: '2026-10-24T22:00:00.000Z',
+      },
+    ];
+    renderPage();
+    const panel = (await screen.findByText('1 retour')).closest('section');
+    if (panel === null) throw new Error('no panel');
+    expect(text(panel)).toContain('1sans retour');
+    expect(text(panel)).toContain('Sans retour');
+    expect(text(panel)).toContain('surtout : trop longues');
   });
 });

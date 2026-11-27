@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AgentHoursNowSchema } from './agent-hours';
 import { AutomaticGateSchema } from './automatic';
 import { PlatformSchema } from './enums';
 import { HandoffCauseSchema } from './events';
@@ -30,11 +31,35 @@ export type AgentMode = z.infer<typeof AgentModeSchema>;
  * `details.missing`) while ADR 0019 keeps it locked. The answer is the mode now in force, as `GET /v1/dashboard`
  * gives it: Arrêt when the global switch stays on.
  */
-export const SetAgentModeBodySchema = z.object({ creatorId: CreatorIdSchema, mode: AgentModeSchema });
+export const SetAgentModeBodySchema = z
+  .object({
+    creatorId: CreatorIdSchema,
+    mode: AgentModeSchema,
+    /**
+     * A pause (ADR 0148 § 1): Arrêt that lifts itself at this instant, back to the mode she had. Only with Arrêt;
+     * the server refuses an instant already past or more than a week ahead (`agent_pause_invalid`).
+     */
+    until: z.iso.datetime().optional(),
+  })
+  .refine((body) => body.until === undefined || body.mode === 'stop', {
+    message: 'Une pause est un arrêt avec une fin',
+    path: ['until'],
+  });
+export type SetAgentModeBody = z.infer<typeof SetAgentModeBodySchema>;
+
+/** The mode « Rallumer » gives back (ADR 0148 § 1): never Arrêt. */
+export const ResumeModeSchema = z.enum(['auto', 'copilot']);
+export type ResumeMode = z.infer<typeof ResumeModeSchema>;
+
+/** The longest pause (ADR 0148 § 1): past a week, it is an Arrêt, lifted by hand. */
+export const AGENT_PAUSE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const AgentModeResultSchema = z.object({
   mode: AgentModeSchema,
   /** The global switch is on: Arrêt for every creator, whatever she asked, until an operator lifts it. */
   globalStop: z.boolean(),
+  /** Her Arrêt is a pause: it lifts itself at this instant. `null` for an Arrêt lifted by hand, or no Arrêt. */
+  pausedUntil: z.iso.datetime().nullable().default(null),
 });
 export type AgentModeResult = z.infer<typeof AgentModeResultSchema>;
 
@@ -181,6 +206,12 @@ export const DashboardSchema = z.object({
   mode: AgentModeSchema,
   /** The global switch is on: Arrêt for every creator, whatever she sets, as `PUT /v1/agent/mode` answers it. */
   globalStop: z.boolean(),
+  /** Her Arrêt is a pause (ADR 0148 § 1): it lifts itself at this instant. `null` otherwise. */
+  pausedUntil: at.nullable().default(null),
+  /** Her hours now, as the switch says them (ADR 0148 § 1); `null` from a server that does not say it yet. */
+  hoursNow: AgentHoursNowSchema.nullable().default(null),
+  /** The mode lifting her Arrêt gives back, the one she had (ADR 0148 § 1 « Rallumer »). */
+  resumesAs: ResumeModeSchema.default('copilot'),
   /** Automatique opens only when nothing is missing. */
   automatic: AutomaticGateSchema,
   /** Taux en réel: drafts approved without an edit among the last 200 decided, for the active voice version. */

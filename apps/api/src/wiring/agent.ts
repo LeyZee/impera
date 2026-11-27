@@ -10,18 +10,21 @@ import {
   startDraftComposer,
   startFollowUpPlan,
   startKycSlots,
+  startPersonaLanguages,
   type ActivePersonaSource,
   type AgentModule,
 } from '../modules/agent';
 import type { AlertsModule } from '../modules/alerts';
 import type { ConnectorsModule } from '../modules/connectors';
 import type { BubbleGuard, CardReader, DraftComposer } from '../modules/conversations';
+import type { CustomOrdersModule } from '../modules/custom-orders';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
+import { createDbVoiceExampleBank } from '../modules/playground';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
 
-import { createAgentScriptSource, createLastOfferAt } from './agent-scripts';
+import { createAgentScriptSource, createLastOfferAt, createLastPurchaseAt } from './agent-scripts';
 import type { Shared } from './shared';
 
 export interface WiredAgent {
@@ -34,6 +37,8 @@ export interface WiredAgent {
   readonly cardReader: CardReader;
   /** The canvas lines her active persona collects, for « À apprendre » in the Suivi (P5-01); every line without one. */
   readonly kycSlotsOf: ReturnType<typeof startKycSlots>;
+  /** The languages her active persona speaks, for his language on his card (ADR 0168); none without one. */
+  readonly personaLanguagesOf: ReturnType<typeof startPersonaLanguages>;
   /** The voice version the server writes with now, the one Automatique is proved on (ADR 0019): defined here only. */
   readonly activeVoice: { readonly voicePrompt: string; readonly voiceModel: string };
 }
@@ -51,6 +56,8 @@ export function wireAgent(
     readonly scripts: ScriptsModule;
     /** His script history and last priced offer, read on the platform at each message (ADR 0018 § 5). */
     readonly connectors: ConnectorsModule;
+    /** Her grid of custom prices (ADR 0159 § C), read by the turn on his custom order. */
+    readonly customOrders: CustomOrdersModule;
     /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
     readonly composer?: DraftComposer;
   },
@@ -71,6 +78,8 @@ export function wireAgent(
     startDraftComposer({
       gateway: deps.llm.gateway,
       activePersona,
+      // The agency's base style, read at each draft beside her persona (ADR 0173).
+      baseStyleOf: () => persona.agencyStyle.activeUnscoped(),
       fans: deps.fans,
       onDroppedNotes: (event) => {
         logger.warn(event, 'fan notes shaped like an order kept out of the prompt');
@@ -91,9 +100,18 @@ export function wireAgent(
       // Her clock is the creator's (`creators.timezone`); Paris when the row cannot be read.
       scripts: createAgentScriptSource(scriptReads),
       lastOfferAt: createLastOfferAt(scriptReads),
+      lastPurchaseAt: createLastPurchaseAt(scriptReads),
+      gridOf: (creatorId) => deps.customOrders.gridOf(CreatorIdSchema.parse(creatorId)),
+      // Her bio on her platform profile, as the poll last read it (ADR 0154): beside her persona, it wins where they differ.
+      profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),
       timeZoneOf: async (creatorId) => {
         const [creator] = await persona.creators.list([CreatorIdSchema.parse(creatorId)]);
         return creator?.timezone ?? DEFAULT_LLM_CONFIG.dailyBudget.timeZone;
+      },
+      // Her bank of examples, the playground's corrections, read as the playground reads them (ADR 0102 § 2).
+      voiceExamplesOf: createDbVoiceExampleBank(shared.db),
+      onExamplesUnread: (event) => {
+        logger.warn(event, 'voice examples unread: she wrote from her sheet alone');
       },
     });
   // Her follow-up delays only beside the agent's own composer, the one that writes what `conversation.follow_up`
@@ -126,6 +144,7 @@ export function wireAgent(
       },
     }),
     kycSlotsOf: startKycSlots({ activePersona }),
+    personaLanguagesOf: startPersonaLanguages({ activePersona }),
     activeVoice: {
       voicePrompt: loadPrompt('voice').header.version,
       voiceModel: DEFAULT_LLM_CONFIG.roles.voice.model,

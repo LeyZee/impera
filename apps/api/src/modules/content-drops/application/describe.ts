@@ -21,6 +21,12 @@ export interface DescribeDeps {
   readonly describer: DropDescriber;
   /** A sent script holding the medium is told once its last media is described (§ 6). */
   readonly summaries: Pick<ScriptSummaryStore, 'enqueueFor'>;
+  /**
+   * Whoever waits for a medium to be described, told each time it is (again on a replay: the listener is replayable).
+   * It knows what it does with it; this module does not. It must stay short and replayable: it enqueues, and never
+   * calls a model here.
+   */
+  readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
   readonly versions: Pick<ScriptVersions, 'frozen'>;
   readonly scratchDir: string;
   readonly room: ScratchRoom;
@@ -46,24 +52,25 @@ async function contextOf(deps: DescribeDeps, target: MediaToDescribe): Promise<D
 /**
  * `content_drops.describe_file` (ADR 0083 § 1): a photo or a video she dropped, once kept in her library, is described
  * by the vision AI with what the drop says of it, then kept for the agency to validate. Nothing for a voice note (its
- * transcription is elsewhere), a medium no live drop holds, an original already erased, or a creator whose switch is off
- * (§ 9). Replayable: a medium already described is left alone, and the description is written once. Described, each
+ * transcription is elsewhere), a medium no live drop holds, or an original already erased. No switch holds it back
+ * (ADR 0145 § 5, 17/11: the drop is the choice). Replayable: a medium already described is left alone, and the description is written once. Described, each
  * sent script holding it is asked to be told (`content_drops.summarize_script`), which waits for its other media.
  * Every model failing is counted on the medium: retried until `DESCRIPTION_TRIES`, then given up, for the agency.
  */
 export async function describeFile(
   deps: DescribeDeps,
+  creatorId: string,
   mediaAssetId: string,
   now: Date,
   correlationId: string,
 ): Promise<DescribeOutcome> {
-  const target = await deps.queue.target(mediaAssetId);
+  const target = await deps.queue.target(creatorId, mediaAssetId);
   if (target === null || target.erased) return 'gone';
   if (target.kind === 'audio') return 'not_described';
-  if (!target.describes) return 'off';
   if (await deps.describer.described(mediaAssetId)) {
     // A run that stopped between the description and the next job: the script is asked again, once.
-    await deps.summaries.enqueueFor(mediaAssetId, correlationId);
+    await deps.summaries.enqueueFor(creatorId, mediaAssetId, correlationId);
+    await deps.onDescribed?.(target.creatorId, mediaAssetId, correlationId);
     return 'already';
   }
 
@@ -91,10 +98,13 @@ export async function describeFile(
     if (outcome === 'failed') {
       // Counted on the medium, so that neither the job nor the hourly backlog asks it forever (recette créatrice, 2):
       // at the last try it is left to the agency, who asks again or writes it.
-      if ((await deps.queue.failed(mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
+      if ((await deps.queue.failed(target.creatorId, mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
       throw new DropDescriptionFailed(`media ${mediaAssetId}: every model failed`);
     }
-    if (outcome === 'described') await deps.summaries.enqueueFor(mediaAssetId, correlationId);
+    if (outcome === 'described') {
+      await deps.summaries.enqueueFor(creatorId, mediaAssetId, correlationId);
+      await deps.onDescribed?.(target.creatorId, mediaAssetId, correlationId);
+    }
     return outcome;
   } finally {
     if (dir !== null) await rm(dir, { recursive: true, force: true });

@@ -1,0 +1,7 @@
+# 2026-11-20 — Carte « À faire » en tête du Dashboard de l'agence — done
+Fait : une seule carte « À faire » pour ce qui attend le propriétaire et le manager actif, à la place d'un bandeau par sujet (sauvegarde, factures et pièces, rapports de fin de shift). Le plus pressant d'abord (rouge pour la seule urgence, une facture en retard ; ambre pour les avertissements), quatre lignes puis « Et N autres », chaque ligne s'ouvre là où ça se règle et dit l'écran où elle mène ; les pièces à examiner mènent au dossier de chaque membre. Rien n'attend : pas de carte, les chiffres restent en tête. Sur l'agence, la carte passe avant les chiffres ; sur le Dashboard d'une créatrice sans vue d'agence, elle reste à la place des bandeaux. Les trois composants de bandeau et leurs règles de style sont supprimés ; leurs tests sont repris par ceux de la carte. Les heures des sauvegardes s'écrivent « 3 h 12 » comme partout ailleurs, sur le Dashboard et dans Réglages › Sauvegardes. Aucune route, aucun contrat, aucune table.
+Pas fait : « créatrice sans persona active » et « compte non couvert ce soir », cités dans le relevé des trous, ne sont pas dans la carte : le second arrive avec les alertes du fil Alertes, le premier demande une lecture que l'écran n'a pas.
+Décisions : aucune ADR touchée.
+Découvertes : `apps/web/src/App.test.tsx`, « goes back to the sign-in page at the first 401… », instable sous charge (signalé au fil Bilan).
+Candidats à suppression : aucun.
+Vérifié : tests du Dashboard et de Réglages › Sauvegardes, captures du lot `dashboard-a-faire-1` (validé).

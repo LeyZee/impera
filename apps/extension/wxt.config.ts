@@ -2,12 +2,20 @@ import { readFileSync } from 'node:fs';
 
 import { defineConfig } from 'wxt';
 
+import { assertSameCrm, builtInCrmOf } from './src/lib/built-in-crm';
+
 /** The manifest's `key`: the public key's DER in base64, read from its PEM file (a public key, not a secret). */
 function manifestKey(): string {
   return readFileSync(new URL('./manifest-key.pub.pem', import.meta.url), 'utf8')
     .replace(/-----(BEGIN|END) PUBLIC KEY-----/gu, '')
     .replace(/\s+/gu, '');
 }
+
+// A hosted build knows its CRM (ADR 0067, second amendement): the image passes the deployment's official address, the
+// build refuses a bad one, and the browser grants that site alone at the install. Without it, nothing changes.
+const builtInCrm = builtInCrmOf(process.env['EXTENSION_CRM_ORIGIN']);
+// The image also passes the CRM's own address: both must name the same site (apps/web/Dockerfile).
+assertSameCrm(builtInCrm, process.env['WEB_ORIGIN']);
 
 // Manifest V3 (ADR 0066). Reveal over HTTPS only: a session captured on plain HTTP could be read on the way (audit de
 // sécurité du 02/11, M3). The CRM on this computer (localhost) is readable from the install; a deployed CRM asks the
@@ -24,7 +32,12 @@ export default defineConfig({
     // ce post pour… » on a post's link (VEI-02); webRequest: the owner's « Sync » reads the bearer of the open Reveal
     // tab's requests to api.reveal.me, only while it waits (P2-01), never the body nor any other site.
     permissions: ['storage', 'activeTab', 'alarms', 'scripting', 'contextMenus', 'webRequest'],
-    host_permissions: ['https://*.reveal.me/*', 'http://localhost/*', 'http://127.0.0.1/*'],
+    host_permissions: [
+      'https://*.reveal.me/*',
+      'http://localhost/*',
+      'http://127.0.0.1/*',
+      ...(builtInCrm === null ? [] : [`${builtInCrm}/*`]),
+    ],
     // Instagram is asked at the first « Veille », never at the install (ADR 0060 § 1); `https://*/*` is a deployed CRM.
     optional_host_permissions: ['https://www.instagram.com/*', 'https://*/*'],
     commands: {
@@ -37,6 +50,8 @@ export default defineConfig({
   // The contracts package only declares schemas and constants: what a script does not import is left out of it, so the
   // reader on instagram.com carries the few schemas it parses and not the whole of `@impera/contracts`.
   vite: () => ({
+    // The address the popup, the panel and the service worker read (lib/crm-origin-store.ts); empty without one.
+    define: { __IMPERA_BUILT_IN_CRM__: JSON.stringify(builtInCrm ?? '') },
     build: {
       rollupOptions: {
         treeshake: { moduleSideEffects: (id: string) => !id.includes('/packages/contracts/') },
