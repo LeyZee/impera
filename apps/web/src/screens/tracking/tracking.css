@@ -977,3 +977,19 @@
   border-radius: 50%;
   background: var(--nv-warning);
 }
+
+/* An outage behind several fans: the hand given back to all of them at once, under its line (recette 27/11, G14). */
+.tr-group__act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  padding: 0 var(--nv-space-3) var(--nv-space-3);
+}
+.tr-group__note {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
