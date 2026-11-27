@@ -7,8 +7,8 @@ import { pillStatusLabel } from '@/agent/state';
 import { useAgentMode } from '@/agent/useAgentMode';
 import { useCreators } from '@/creators/api';
 import { creatorsOverviewQuery } from '@/creators/overview/api';
-import { todosAcrossQuery } from '@/screens/tracking/api';
-import { outageWords, outageZone } from '@/screens/tracking/view';
+import { useAiOutage } from '@/screens/tracking/outage';
+import { outageWords } from '@/screens/tracking/view';
 
 const TITLE = {
   unavailable: 'Le serveur ne répond pas : mode de l’agent inconnu. Ouvrir le Dashboard.',
@@ -41,8 +41,7 @@ export function AgentPill(): JSX.Element {
   const said = live === null || live.mode === 'stop' ? null : pillStatusLabel(status);
   // No model answers (recette 27/11, A9): the pill says the outage as Suivi's banner does, from the same reading, red as
   // its dot. An Arrêt someone chose stays said by its mode.
-  const queue = useQuery({ ...todosAcrossQuery, enabled: live !== null });
-  const aiOutage = live === null || live.mode === 'stop' ? null : (queue.data?.aiOutage ?? null);
+  const aiOutage = useAiOutage(live !== null && live.mode !== 'stop');
   const modePill = pillOf(live?.mode ?? null, stalled === null);
   const pill: {
     readonly label: string;
@@ -61,8 +60,7 @@ export function AgentPill(): JSX.Element {
                 : 'unknown',
             live: false,
           };
-  const creators = useCreators().data ?? [];
-  const several = creators.length >= 2;
+  const several = (useCreators().data?.length ?? 0) >= 2;
   const mode = view.source === 'loading' ? '…' : view.source === 'empty' ? 'Sans créatrice' : pill.label;
   const label = live !== null && several ? `${live.creatorName} · ${mode}` : mode;
   const title =
@@ -71,7 +69,7 @@ export function AgentPill(): JSX.Element {
       : view.source === 'unavailable' || view.source === 'empty'
         ? TITLE[view.source]
         : aiOutage !== null
-          ? `Agent : ${live !== null && several ? `${live.creatorName} · ` : ''}${outageWords(aiOutage, outageZone(creators.map((creator) => creator.timezone)))} Voir le Dashboard.`
+          ? `Agent : ${live !== null && several ? `${live.creatorName} · ` : ''}${outageWords(aiOutage, aiOutage.zone)} Voir le Dashboard.`
           : stalled !== null && live?.mode !== 'stop'
             ? `Agent : ${label}, mais rien ne tourne : ${stalled}. Voir le Dashboard.`
             : `Agent : ${label}. Le changer sur le Dashboard.`;

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { agentStateOf, pauseChoices, pillStatusLabel, withPersona, type AgentStateInput } from './state';
 
+import { clockAt } from '@/scheduling/time';
+
 const PARIS = 'Europe/Paris';
 /** Thursday 19/11/2026, 16:30 in Paris (UTC+1). */
 const NOW = new Date('2026-11-19T15:30:00Z');
@@ -182,5 +184,29 @@ describe('what runs, as the server says it (recette 27/11, G18, PRO-03, PRO-15)'
     expect(pillStatusLabel('drafts_off')).toBe('brouillons éteints');
     expect(pillStatusLabel('copilot')).toBeNull();
     expect(pillStatusLabel(null)).toBeNull();
+  });
+});
+
+describe('an AI outage (recette 27/11, A9)', () => {
+  const outage = { since: '2026-11-19T13:05:00Z', zone: PARIS };
+
+  it('says it over what runs, red, at the clock given', () => {
+    expect(agentStateOf(input({ agentStatus: 'no_scripts', aiOutage: outage }), PARIS, NOW)).toEqual({
+      kind: 'outage',
+      label: 'IA indisponible',
+      detail: `depuis ${clockAt(outage.since, PARIS)}, un humain répond`,
+      tone: 'bad',
+    });
+    expect(agentStateOf(input({ aiOutage: { since: null, zone: PARIS } }), PARIS, NOW).detail).toBe(
+      'un humain répond',
+    );
+  });
+
+  it('leaves an Arrêt someone chose said as such', () => {
+    for (const status of ['global_stop', 'paused', 'stopped'] as const) {
+      expect(agentStateOf(input({ agentStatus: status, aiOutage: outage }), PARIS, NOW).kind).not.toBe(
+        'outage',
+      );
+    }
   });
 });

@@ -35,6 +35,9 @@
 .ai-switch .nv-dot.ai-switch__dot--drafts_off {
   --_c: var(--nv-ink-faint);
 }
+.ai-switch .nv-dot.ai-switch__dot--outage {
+  --_c: var(--nv-danger);
+}
 .ai-switch .nv-dot.ai-switch__dot--idle,
 .ai-switch .nv-dot.ai-switch__dot--paused,
 .ai-switch .nv-dot.ai-switch__dot--expired,

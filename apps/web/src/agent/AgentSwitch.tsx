@@ -44,7 +44,8 @@ export function AgentSwitch({
     state.kind === 'out' ||
     state.kind === 'expired' ||
     state.kind === 'no_scripts' ||
-    state.kind === 'drafts_off';
+    state.kind === 'drafts_off' ||
+    state.kind === 'outage';
   const stopped = state.kind === 'paused' || state.kind === 'off';
   const choices = pauseChoices(zone, now, state.kind === 'out' ? (input.hoursNow?.changesAt ?? null) : null);
 

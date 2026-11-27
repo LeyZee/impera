@@ -20,6 +20,7 @@ import { AgentSwitch } from '@/agent/AgentSwitch';
 import { withPersona } from '@/agent/state';
 import { readerZone, dayOf } from '@/scheduling/time';
 import { todosAcrossQuery } from '@/screens/tracking/api';
+import { useAiOutage } from '@/screens/tracking/outage';
 import { SetupLink } from '@/setup/SetupCard';
 import { useCreatorSetups } from '@/setup/api';
 import { creatorLines, nextOf, progressOf } from '@/setup/model';
@@ -94,6 +95,8 @@ function CreatorCard({
   read: number;
   switches: boolean;
 }): JSX.Element {
+  // No model answers (recette 27/11, A9): her card says it as the pill and Suivi do.
+  const aiOutage = useAiOutage();
   const todos = todosOf(count);
   const today = dayOf(new Date(), creator.timezone);
   const request = card?.requests == null ? null : requestOf(card.requests, today);
@@ -119,7 +122,7 @@ function CreatorCard({
           creatorId={creator.id}
           creatorName={creator.displayName}
           zone={creator.timezone}
-          state={withPersona(card, hasActivePersonaOf(setup))}
+          state={{ ...withPersona(card, hasActivePersonaOf(setup)), aiOutage }}
           read={read}
           variant="card"
           readOnly={!switches}

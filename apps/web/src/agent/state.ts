@@ -39,10 +39,15 @@ export interface AgentStateInput {
    * it wins over the fields above. Absent or `null` (the Dashboard, an older server): the state is read from them.
    */
   readonly agentStatus?: AgentStatus | null | undefined;
+  /**
+   * No model answers the agent now (recette 27/11, A9): `GET /v1/dashboard/todos`'s `aiOutage`, with the clock its hour
+   * is said at (`outageZone`, as Suivi's banner and the menu's pill). Every state but an Arrêt says it then.
+   */
+  readonly aiOutage?: { readonly since: string | null; readonly zone: string } | null | undefined;
 }
 
 export type AgentStateKind =
-  'on' | 'out' | 'idle' | 'expired' | 'paused' | 'off' | 'global' | 'no_scripts' | 'drafts_off';
+  'on' | 'out' | 'idle' | 'expired' | 'paused' | 'off' | 'global' | 'no_scripts' | 'drafts_off' | 'outage';
 
 export interface AgentState {
   readonly kind: AgentStateKind;
@@ -50,7 +55,8 @@ export interface AgentState {
   readonly label: string;
   /** When it changes, or what holds, in her clock; `null` when nothing more is to be said. */
   readonly detail: string | null;
-  readonly tone: 'ok' | 'calm' | 'warn';
+  /** `bad` for an outage alone: fans wait for a human now, the red of the urgencies. */
+  readonly tone: 'ok' | 'calm' | 'warn' | 'bad';
 }
 
 /** « demain », « jeudi », or nothing for her today: the day of an instant, in her clock. */
@@ -91,6 +97,17 @@ function statusOf(input: AgentStateInput): AgentStatus {
 
 export function agentStateOf(input: AgentStateInput, zone: string, now: Date): AgentState {
   const status = input.agentStatus ?? statusOf(input);
+  // An outage says itself over what runs, as Suivi's banner and the menu's pill do (A9); an Arrêt someone chose stays.
+  const chosenStop = status === 'global_stop' || status === 'paused' || status === 'stopped';
+  if (input.aiOutage != null && !chosenStop) {
+    const { since, zone: outageZone } = input.aiOutage;
+    return {
+      kind: 'outage',
+      label: 'IA indisponible',
+      detail: since === null ? 'un humain répond' : `depuis ${clockAt(since, outageZone)}, un humain répond`,
+      tone: 'bad',
+    };
+  }
   switch (status) {
     case 'global_stop':
       return {
