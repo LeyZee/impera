@@ -10,6 +10,7 @@ import { createFanListReader, type UsdRateMicrosOf } from './infra/fan-list-read
 import { createDrizzleFanStore } from './infra/fan-store';
 import { createDrizzleFlagStore } from './infra/flag-store';
 import { createCardRoutes } from './infra/http/card-routes';
+import { createCopilotFanRoutes, type LinkPerson } from './infra/http/copilot-routes';
 import {
   createFlagRoutes,
   createKycRoutes,
@@ -39,6 +40,8 @@ export interface FansModule extends FansService {
    * whose scope is `self` read, never write, the sheet of a fan of a creator his window opens or of a conversation he
    * holds, each read in the audit log (ADR 0025). `/fans?creatorId=…`, every fan of a creator for the agency (ADR
    * 0124), his dollars brought to euros for the order at pay's last rate (`usdRateMicrosOf`, none without it).
+   * `/copilot/fans/:id/card/:field` and `/copilot/fans/:id/notes` (ADR 0109): the same card field and a note written
+   * from the extension's panel, by the person's link (`linkPerson`, the `trends` module's; without it, none opens).
    */
   routes(
     requireRole: RequireRole,
@@ -46,6 +49,7 @@ export interface FansModule extends FansService {
     fanAccess?: FanAccess,
     usdRateMicrosOf?: UsdRateMicrosOf,
     personaLanguagesOf?: PersonaLanguagesOf,
+    linkPerson?: LinkPerson,
   ): FastifyPluginAsyncZod;
 }
 
@@ -79,11 +83,13 @@ export function createFansModule(deps: FansDeps): FansModule {
         fanAccess = noFanAccess,
         usdRateMicrosOf = () => Promise.resolve(null),
         personaLanguagesOf = () => Promise.resolve([]),
+        linkPerson: LinkPerson = () => Promise.resolve(null),
       ) =>
       async (app) => {
         await app.register(createListRoutes(createFanListReader(deps.db, usdRateMicrosOf), requireRole));
         await app.register(createFlagRoutes(service, requireRole, undefined, fanAccess));
         await app.register(createCardRoutes(service, requireRole, fanAccess));
+        await app.register(createCopilotFanRoutes(service, linkPerson, fanAccess));
         await app.register(createLanguageRoutes(service, requireRole, personaLanguagesOf, fanAccess));
         await app.register(
           createKycRoutes(

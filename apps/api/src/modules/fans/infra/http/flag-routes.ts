@@ -8,6 +8,7 @@ import {
   SetFanFlagBodySchema,
   UserIdSchema,
   type CreatorId,
+  type CurrentUser,
   type FanId,
   type KycSlot,
   type MessageId,
@@ -80,21 +81,35 @@ export const noFanAccess: FanAccess = {
  * Limites du fan (en lecture) », recette 05/11 CHAT-03). A chatter's read is in the audit log before anything is read
  * (ADR 0025). Never a write.
  */
-export async function readerFor(
+export function readerFor(
   request: FastifyRequest,
   creatorId: CreatorId,
   fanId: FanId,
   access: FanAccess,
   via: FanSheetVia,
 ): Promise<UserId> {
-  const { user } = request;
+  return readerOf(request.user, request.ip, creatorId, fanId, access, via);
+}
+
+/**
+ * `readerFor` for a person read otherwise than from the session (the extension's link, ADR 0109 § 2): the same
+ * function decides, for the same person, the same fans.
+ */
+export async function readerOf(
+  user: CurrentUser | null,
+  ip: string,
+  creatorId: CreatorId,
+  fanId: FanId,
+  access: FanAccess,
+  via: FanSheetVia,
+): Promise<UserId> {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   if (user.role === 'owner' || user.creatorIds.includes(creatorId)) return UserIdSchema.parse(user.id);
   if (!user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
   const userId = UserIdSchema.parse(user.id);
   if (!user.shiftCreatorIds.includes(creatorId) && !(await access.holds(creatorId, fanId, userId)))
     throw new CreatorForbidden();
-  await access.traceOpening(creatorId, fanId, { userId, ip: request.ip, via });
+  await access.traceOpening(creatorId, fanId, { userId, ip, via });
   return userId;
 }
 

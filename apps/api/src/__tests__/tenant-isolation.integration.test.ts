@@ -1,6 +1,7 @@
 import {
   ContractorDocumentIdSchema,
   DraftIdSchema,
+  ExtensionLinkCreatedSchema,
   newId,
   PayPeriodSchema,
   PlatformAccountIdSchema,
@@ -53,6 +54,12 @@ const bodiesFor = (
   },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  // The extension's panel (ADR 0109): the person's link, its scope and the shift, then the same right as the CRM's.
+  'PUT /v1/copilot/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  'POST /v1/copilot/fans/:id/notes': {
+    note: 'Note inventée',
+    idempotencyKey: '00000000-0000-4000-8000-000000000000',
+  },
   'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
     descriptionIds: ['00000000-0000-4000-8000-000000000000'],
@@ -137,6 +144,9 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: POST /v1/team/members/:memberId/notes → 201',
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
   // The commission a report would earn (reco 19): the same reach as the report and the commission above.
+  // The watch's creators, read with his extension link (ADR 0060 § 2): an active manager marks a post for any creator
+  // of the agency, so he reads their names, nothing else of them. Swept with the link since ADR 0109.
+  'manager of A: GET /v1/trends/readings/creators → 200 shows Béa',
   'manager of A: GET /v1/payroll/shifts/:shiftId/estimate → 200',
   // The game of a member on their file (ADR 0104 § 20): rank, streak and trophies of anyone of the team, read only,
   // with no amount; the same reach as the member's record above.
@@ -276,7 +286,7 @@ function seededFor(path: string, name: string): Seeded | undefined {
     if (segments.length === 4) return 'creator';
   }
   if (name === 'id' && /^\/v1\/(creator-space\/)?conversations\/:id/u.test(path)) return 'conversation';
-  if (name === 'id' && path.startsWith('/v1/fans/:id')) return 'fan';
+  if (name === 'id' && /^\/v1\/(copilot\/)?fans\/:id/u.test(path)) return 'fan';
   const byName: Readonly<Record<string, Seeded>> = {
     draftId: 'draft',
     versionId: 'version',
@@ -344,7 +354,7 @@ describe('no route lets the people of one creator reach another one (audit des t
   let team: PayrollTeam;
   let ids: Record<Seeded, string>;
   let markers: string[];
-  let people: { readonly role: string; readonly cookie: string }[];
+  let people: { readonly role: string; readonly cookie: string; link?: string }[];
   let onShift: { readonly member: TeamMember; readonly cookie: string };
 
   /** B's rows as the owner reads them: every table with a `creator_id`, her chatter and her account. */
@@ -544,6 +554,25 @@ describe('no route lets the people of one creator reach another one (audit des t
     ];
   });
 
+  // Each of A's people who may link a browser does (ADR 0066, 0109): the extension's routes are swept with it.
+  beforeAll(async () => {
+    for (const person of people) {
+      const response = await team.server.inject({
+        method: 'POST',
+        url: '/v1/trends/extension-links',
+        headers: { cookie: person.cookie, origin: DASHBOARD_ORIGIN },
+        payload: { label: 'Navigateur' },
+      });
+      if (response.statusCode === 201) person.link = ExtensionLinkCreatedSchema.parse(response.json()).token;
+    }
+    expect(people.filter((person) => person.link !== undefined).map((person) => person.role)).toEqual([
+      'creator account of A',
+      'chatter of A',
+      'chatter of A on shift',
+      'manager of A',
+    ]);
+  });
+
   afterAll(async () => {
     await team.close();
   });
@@ -620,6 +649,8 @@ describe('no route lets the people of one creator reach another one (audit des t
           headers: {
             cookie: person.cookie,
             origin: DASHBOARD_ORIGIN,
+            // The extension's routes read the person's link, never the cookie: both are sent, each route reads its own.
+            ...(person.link !== undefined && { 'x-extension-link': person.link }),
             ...(special?.contentType !== undefined && { 'content-type': special.contentType }),
           },
           // One address per request: the limiter counts by address, and a 429 would hide what the route answers.

@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { Writable } from 'node:stream';
 
 import { DomainError } from '@impera/contracts';
@@ -835,5 +836,67 @@ describe('route guards', () => {
         readiness: () => Promise.resolve(READY),
       }),
     ).rejects.toThrow(/declare route guards as preValidation/);
+  });
+});
+
+describe('the routes an extension link opens (ADR 0109)', () => {
+  const start = (routes: FastifyPluginAsyncZod) => {
+    const config = testConfig();
+    return buildServer({
+      config,
+      logger: createLogger(config),
+      routes: [routes],
+      readiness: () => Promise.resolve(READY),
+    });
+  };
+
+  it('refuses at startup a route that declares a link and is not on the closed list', async () => {
+    const stray: FastifyPluginAsyncZod = async (app) => {
+      await Promise.resolve();
+      app.post(
+        '/copilot/fans/:id/everything',
+        { config: { originCheck: false, extensionLink: true } },
+        () => ({
+          ok: true,
+        }),
+      );
+    };
+    await expect(start(stray)).rejects.toThrow(
+      /an extension link opens only the routes of EXTENSION_LINK_ROUTES/,
+    );
+  });
+
+  it('starts with a route of the list, under its own method only', async () => {
+    const listed: FastifyPluginAsyncZod = async (app) => {
+      await Promise.resolve();
+      app.post('/copilot/fans/:id/notes', { config: { originCheck: false, extensionLink: true } }, () => ({
+        ok: true,
+      }));
+    };
+    const server = await start(listed);
+    await server.close();
+    const wrongMethod: FastifyPluginAsyncZod = async (app) => {
+      await Promise.resolve();
+      app.delete('/copilot/fans/:id/notes', { config: { originCheck: false, extensionLink: true } }, () => ({
+        ok: true,
+      }));
+    };
+    await expect(start(wrongMethod)).rejects.toThrow(/EXTENSION_LINK_ROUTES/);
+  });
+
+  it('reads `x-extension-link` only in the files of the routes on the list', () => {
+    const root = new URL('../', import.meta.url);
+    const readers = readdirSync(root, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.includes('__tests__'))
+      .filter((file) => readFileSync(new URL(file, root), 'utf8').includes("'x-extension-link'"))
+      .map((file) => file.replaceAll('\\', '/'))
+      .sort();
+    // Each of these declares `extensionLink: true` on its routes.
+    expect(readers).toEqual([
+      'modules/connectors/infra/http/routes.ts',
+      'modules/conversations/infra/http/copilot-routes.ts',
+      'modules/fans/infra/http/copilot-routes.ts',
+      'modules/trends/infra/http/routes.ts',
+    ]);
   });
 });

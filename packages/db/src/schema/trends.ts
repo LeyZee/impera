@@ -1,5 +1,6 @@
 import {
   CONTENT_IDEA_STATES,
+  ExtensionLinkScopeSchema,
   IdeaDropCategorySchema,
   TREND_FORMATS,
   TREND_SIGNAL_KINDS,
@@ -285,9 +286,22 @@ export const extensionLinks = pgTable(
     createdAt: createdAt(),
     lastUsedAt: timestampTz('last_used_at'),
     revokedAt: timestampTz('revoked_at'),
+    /**
+     * What the link allows beyond what every link did before ADR 0109 (`ExtensionLinkScopeSchema`), fixed when it is
+     * made: a link made before has none (§ 5). Revoked in the same transaction as the account's departure or a change
+     * of its role (triggers of migration 0286).
+     */
+    scopes: text('scopes')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
   },
   (t) => [
     check('extension_links_revoked_check', sql`${t.revokedAt} is null or ${t.revokedAt} >= ${t.createdAt}`),
+    check(
+      'extension_links_scopes_check',
+      sql`${t.scopes} <@ array[${sql.raw(ExtensionLinkScopeSchema.options.map((scope) => `'${scope}'`).join(', '))}]::text[]`,
+    ),
     check('extension_links_label_check', sql`char_length(${t.label}) between 1 and 40`),
     index('extension_links_live_idx')
       .on(t.userId)

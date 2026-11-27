@@ -10,6 +10,7 @@ import {
   ExtensionLinkCreatorsSchema,
   ExtensionLinkIdSchema,
   ExtensionLinkListSchema,
+  ExtensionLinkStatusSchema,
   ExtensionLinkTokenSchema,
   PastedTrendLinkSchema,
   PasteTrendLinkBodySchema,
@@ -141,7 +142,7 @@ export function createTrendRoutes(
     // below `warn`, and a body (what she watched) is never logged nor echoed.
     const extensionDoor = {
       logLevel: 'warn' as const,
-      config: { originCheck: false, rateLimit: READINGS_LIMIT },
+      config: { originCheck: false, extensionLink: true, rateLimit: READINGS_LIMIT },
       preParsing: async (request: FastifyRequest, _reply: unknown, payload: unknown) => {
         const token = ExtensionLinkTokenSchema.safeParse(request.headers['x-extension-link']);
         // Only a batch counts as its last use: asking for the creators does not.
@@ -159,6 +160,33 @@ export function createTrendRoutes(
       if (holder === undefined) throw new ExtensionLinkUnauthenticated();
       return holder;
     };
+
+    // What the link presented allows (ADR 0109): the popup says who it names, its scopes and when it lapses. Any live
+    // link, a chatter's too; reading it is not a use (`touch: false`).
+    app.get(
+      '/extension/link',
+      {
+        logLevel: 'warn',
+        config: { originCheck: false, extensionLink: true, rateLimit: READINGS_LIMIT },
+        preParsing: async (request: FastifyRequest, _reply: unknown, payload: unknown) => {
+          const token = ExtensionLinkTokenSchema.safeParse(request.headers['x-extension-link']);
+          const holder = token.success ? await stores.links.holder(token.data, { touch: false }) : null;
+          if (holder === null) throw new ExtensionLinkUnauthenticated();
+          holders.set(request, holder);
+          return payload;
+        },
+        schema: { headers: LinkHeadersSchema, response: { 200: ExtensionLinkStatusSchema } },
+      },
+      (request) => {
+        const holder = holderOf(request);
+        return {
+          role: holder.kind,
+          displayName: holder.displayName,
+          scopes: [...holder.scopes],
+          expiresAt: holder.expiresAt.toISOString(),
+        };
+      },
+    );
 
     app.get(
       '/trends/readings/creators',

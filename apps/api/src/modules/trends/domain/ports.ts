@@ -8,6 +8,8 @@ import type {
   ExtensionLink,
   ExtensionLinkCreated,
   ExtensionLinkId,
+  ExtensionLinkRole,
+  ExtensionLinkScope,
   PasteTrendLinkBody,
   TrendCaptureDescription,
   TrendReadingsBatch,
@@ -43,6 +45,13 @@ export interface LinkHolder {
    * link for the copilot panel's writes only (ADR 0086 § 8), never the watch's doors (ADR 0060 § 2, amended 07/11).
    */
   readonly watch: boolean;
+  /** Who the popup says the link names (ADR 0109): the owner, a manager, a chatter, a creator. */
+  readonly kind: ExtensionLinkRole;
+  /** What the link allows beyond what every link does (ADR 0109), as it was made: never widened since. */
+  readonly scopes: readonly ExtensionLinkScope[];
+  /** When it stops naming anyone if nobody uses it again: `EXTENSION_LINK_IDLE_DAYS` after its last use. */
+  readonly expiresAt: Date;
+  readonly displayName: string;
 }
 
 /** The links of the extensions (`extension_links`), through the admin connection only. */

@@ -569,7 +569,9 @@ content_ideas     id, creator_id → creators, signal_id → trend_signals, titl
                   declined|deposited ; refused = l'agence, declined = elle dans son agenda), proposed_on, refusal_reason? (refus seulement), decided_by?, decided_at?
                   (propriétaire et manager actif ; ni le chatteur ni la créatrice)
 extension_links   id, user_id → user, token_hash (unique), created_at, revoked_at? (une liaison vivante par
-                  personne ; hors de portée de `nirvana_app`, lue par `withAdmin`, comme `calendar_links`)
+                  personne ; hors de portée de `nirvana_app`, lue par `withAdmin`, comme `calendar_links`),
+                  scopes text[] (fan_card, operator_note ; vide avant ADR 0109, migration 0286 ; révoquée par
+                  déclencheur au départ et à tout changement de rôle)
 ```
 
 ## Agenda de la créatrice (module `creator-tasks`, CR-05, migration 0103)

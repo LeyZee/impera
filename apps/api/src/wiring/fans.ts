@@ -9,6 +9,7 @@ type KycSlotsOf = NonNullable<Parameters<FansModule['routes']>[1]>;
 type FanAccess = NonNullable<Parameters<FansModule['routes']>[2]>;
 type UsdRateMicrosOf = NonNullable<Parameters<FansModule['routes']>[3]>;
 type PersonaLanguagesOf = NonNullable<Parameters<FansModule['routes']>[4]>;
+type LinkPerson = NonNullable<Parameters<FansModule['routes']>[5]>;
 
 export interface WiredFans {
   readonly module: FansModule;
@@ -24,6 +25,7 @@ export interface WiredFans {
     fanAccess: FanAccess,
     usdRateMicrosOf: UsdRateMicrosOf,
     personaLanguagesOf: PersonaLanguagesOf,
+    linkPerson: LinkPerson,
   ): Routes;
 }
 
@@ -45,7 +47,7 @@ export function wireFans(shared: Shared): WiredFans {
         },
       ),
     },
-    routes: (kycSlotsOf, fanAccess, usdRateMicrosOf, personaLanguagesOf) =>
-      module.routes(requireRole, kycSlotsOf, fanAccess, usdRateMicrosOf, personaLanguagesOf),
+    routes: (kycSlotsOf, fanAccess, usdRateMicrosOf, personaLanguagesOf, linkPerson) =>
+      module.routes(requireRole, kycSlotsOf, fanAccess, usdRateMicrosOf, personaLanguagesOf, linkPerson),
   };
 }

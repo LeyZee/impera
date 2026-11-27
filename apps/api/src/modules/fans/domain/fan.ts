@@ -4,6 +4,7 @@ import type {
   Language,
   FanFlagName,
   FanFlags,
+  FanCardField,
   FanId,
   PlatformAccountId,
   TeamScope,
@@ -96,7 +97,19 @@ export interface FactStore {
     creatorId: CreatorId,
     fanId: FanId,
     plan: (current: readonly StoredFact[], pending: readonly StoredFact[]) => readonly FactWrite[],
+    trace?: WriteTrace,
   ): Promise<StoredFact[]>;
+}
+
+/**
+ * A write from the extension's panel (ADR 0109 § 6), in the audit log in the same transaction when it wrote something:
+ * who, from where, what kind of gesture and which field, never the value.
+ */
+export interface WriteTrace {
+  readonly userId: UserId;
+  readonly ip: string;
+  readonly action: 'fan_card.edit' | 'fan_note.create';
+  readonly field?: FanCardField;
 }
 
 /** Retention across every creator (owner role, no tenant): facts of fans not seen since `cutoff` are dropped. */

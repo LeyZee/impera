@@ -47,7 +47,7 @@ export function createConnectorRoutes(deps: {
       '/connector/accounts',
       {
         logLevel: 'warn',
-        config: { originCheck: false, rateLimit: LIST_LIMIT },
+        config: { originCheck: false, extensionLink: true, rateLimit: LIST_LIMIT },
         onRequest: ownerOnly,
         schema: {
           headers: LinkHeadersSchema,
@@ -71,7 +71,7 @@ export function createConnectorRoutes(deps: {
       {
         // The body is a session: nothing below `warn` is logged.
         logLevel: 'warn',
-        config: { originCheck: false, rateLimit: SYNC_LIMIT },
+        config: { originCheck: false, extensionLink: true, rateLimit: SYNC_LIMIT },
         onRequest: ownerOnly,
         schema: {
           headers: LinkHeadersSchema,
