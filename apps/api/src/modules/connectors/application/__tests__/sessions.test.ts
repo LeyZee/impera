@@ -5,9 +5,11 @@ import {
   SessionAutoSyncUnprocessable,
   SessionMemberConflict,
   SessionOwnerConflict,
+  SessionMemberMismatch,
   SessionShapeUnprocessable,
+  SessionTokenExpired,
 } from '../../domain/errors';
-import type { AccountStore } from '../../domain/ports';
+import type { AccountStore, SessionShape } from '../../domain/ports';
 import { createConnectorSessions } from '../sessions';
 
 const creatorId = newId(CreatorIdSchema);
@@ -95,12 +97,14 @@ describe('a « Sync » of a token with an hour left (16/11)', () => {
 });
 
 /**
- * Invented sessions: `<member>|<model>|<expiry ISO or ->[|declared]`, read by a test shape (`declared`: the member is not
- * in the token, only beside it); the vault keeps them as they are.
+ * Invented sessions: `<member>|<model>|<expiry ISO or ->[|declared|mismatch]`, read by a test shape (`declared`: the
+ * member is not in the token, only beside it; `mismatch`: the token names another member); the vault keeps them as
+ * they are.
  */
-const testShape = (raw: string) => {
+const testShape: SessionShape = (raw) => {
   const [member, owner, expiry, declared] = raw.split('|');
   if (member === undefined || owner === undefined || expiry === undefined) return null;
+  if (declared === 'mismatch') return 'member_mismatch';
   return {
     owner,
     member,
@@ -220,11 +224,20 @@ describe('a session that still holds (ADR 0147 § 7)', () => {
     ).toMatchObject({ kept: false });
   });
 
+  it('tells a token naming another member from a session that is not one: nothing stored', async () => {
+    const { send, stored } = harness('member-test-a|model-test-a|2026-11-17T07:00:00Z', 'expired');
+    await expect(
+      send('member-test-a|model-test-a|2026-11-18T08:00:00Z|mismatch', 'click'),
+    ).rejects.toBeInstanceOf(SessionMemberMismatch);
+    await expect(send('not-a-session', 'click')).rejects.toBeInstanceOf(SessionShapeUnprocessable);
+    expect(stored).toEqual([]);
+  });
+
   it('refuses a token already past its expiry, whatever the gesture: nothing stored', async () => {
     const { send, stored } = harness('member-test-a|model-test-a|2026-11-17T07:00:00Z', 'expired');
     for (const trigger of ['click', 'open'] as const)
       await expect(send('member-test-a|model-test-a|2026-11-17T08:00:00Z', trigger)).rejects.toBeInstanceOf(
-        SessionShapeUnprocessable,
+        SessionTokenExpired,
       );
     expect(stored).toEqual([]);
   });
