@@ -1,6 +1,6 @@
 {
-  "id": "df62fddc-07cf-416a-afb1-c2ea51ced359",
-  "prevId": "a154937b-99fb-4950-a35d-f18f43aaaafc",
+  "id": "1a8baae5-9326-4549-85f4-921a586def6e",
+  "prevId": "72b1d658-fbe6-4ed2-ac4d-3f4ca3ed5ffd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2090,6 +2090,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "ready_video_id": {
+          "name": "ready_video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2291,6 +2297,10 @@
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
           "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
+        },
+        "content_drops_ready_video_check": {
+          "name": "content_drops_ready_video_check",
+          "value": "\"content_drops\".\"ready_video_id\" is null or (\"content_drops\".\"category\" = 'sale_video' and \"content_drops\".\"ready_video_id\" ~ '^rv_[0-9a-f]{8}$')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
