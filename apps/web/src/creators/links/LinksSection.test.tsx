@@ -231,6 +231,28 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     expect(screen.getByRole('switch').getAttribute('aria-label')).toBe(before);
     expect(writes).toHaveLength(1);
   });
+
+  it('asks the password and the code outside the dialog’s own form when saving needs it (PRO1-01)', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: { code: REAUTHENTICATION_ERROR_CODE, message: 'x', details: {}, requestId: 'r1' },
+          }),
+          { status: 403 },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifier le lien « Story du jour »' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await within(dialog).findByText('Pour changer un de ses liens, confirme ton mot de passe et ton code.');
+    // A form inside a form is dropped by the browser: the prompt's own form must stand on its own.
+    const promptForm = within(dialog).getByLabelText('Mot de passe').closest('form');
+    expect(promptForm).not.toBeNull();
+    expect(promptForm?.parentElement?.closest('form') ?? null).toBeNull();
+  });
 });
 
 /* Invented links of an invented account: opaque references, an address that leads nowhere. */
@@ -330,6 +352,46 @@ describe('« Détecter ses liens » (INS-02)', () => {
     expect(screen.getByRole('link', { name: 'Ouvrir Réglages › Plateformes' }).getAttribute('href')).toBe(
       '/reglages/ventes',
     );
+  });
+
+  it('is not offered when this installation has no link service, and says so plainly if asked (PRO1-14)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const path = new URL(input, 'http://localhost').pathname;
+        if (path === '/v1/settings/link-service')
+          return Promise.resolve(new Response(JSON.stringify({ state: 'off', connectedAt: null })));
+        return Promise.resolve(new Response(JSON.stringify({ links: [STORY] })));
+      }),
+    );
+    renderSection();
+    expect(await screen.findByRole('button', { name: /Ajouter un lien/u })).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Détecter ses liens' })).toBeNull();
+    });
+  });
+
+  it('says plainly that the service is not installed when the server answers so (PRO1-14)', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'link_service_unprocessable',
+              message: 'x',
+              details: { kind: 'off' },
+              requestId: 'r1',
+            },
+          }),
+          { status: 422 },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Détecter ses liens' }));
+    expect(
+      await screen.findByText('Le service de liens n’est pas encore installé : ajoute ses liens à la main.'),
+    ).toBeDefined();
   });
 
   it('is not offered to a manager', async () => {

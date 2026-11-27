@@ -20,6 +20,8 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
  */
 
 const UNAVAILABLE = 'Le serveur ne répond pas. Réessaie dans un instant.';
+/** No redirect service on this installation (PRO1-14): said plainly, with what to do instead. */
+const SERVICE_OFF = 'Le service de liens n’est pas encore installé : ajoute ses liens à la main.';
 
 /** What the server says of a refused write, in the words of the screen. */
 const REFUSALS: Readonly<Record<string, string>> = {
@@ -138,6 +140,7 @@ export async function detectLinks(creatorId: string): Promise<DetectOutcome> {
     const refusal = LinkServiceRefusalBodySchema.safeParse(body);
     if (!refusal.success) return refused(UNAVAILABLE);
     const { kind, message } = refusalOf(refusal.data);
+    if (kind === 'off') return refused(SERVICE_OFF);
     return refused(message, kind === 'not_connected' || kind === 'unauthorized');
   }
   if (response.status === 401) return refused('Ta session a expiré. Reconnecte-toi.');

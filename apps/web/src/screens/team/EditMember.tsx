@@ -408,6 +408,8 @@ export function RatePanel({
                 );
               })}
             </div>
+            {/* No day is chosen for her: said, so that a greyed « Enregistrer le taux » has a reason (PRO2-04). */}
+            {from === null ? <span className="tm-hint">Choisis la date de départ.</span> : null}
             <span className="tm-hint">
               Une quinzaine se paie à un seul taux : le nouveau part d’un 1er ou d’un 16, rien n’est recalculé
               avant.

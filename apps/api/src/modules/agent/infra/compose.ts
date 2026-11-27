@@ -6,6 +6,7 @@ import {
   supplementsIn,
   type CustomPriceGrid,
   type FanFlags,
+  type GuardCode,
   type Language,
   type LanguageExamples,
   type MediaDescription,
@@ -108,6 +109,7 @@ import {
 } from '../domain/sale-trouble';
 import {
   paidWaiting,
+  mayOpenScript,
   permittedScripts,
   scriptStepsHeld,
   type PlatformScriptView,
@@ -382,13 +384,19 @@ function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): 
   return language.keep ?? input.keptLanguage?.value ?? 'french';
 }
 
-/** The scripts the brain may pick from, by the short ids it answers with (`s1`…). */
+/**
+ * The scripts the brain may pick from, by the short ids it answers with (`s1`…): none when no script may open at this
+ * message, whatever he says (recette REV-13).
+ */
 function scriptChoices(
   scripts: ScriptsInput | undefined,
   situation: Situation,
+  offer: OfferInput | undefined,
+  careMode: boolean,
   language: Language | null,
 ): readonly { readonly id: string; readonly script: PlatformScriptView }[] {
-  if (scripts?.history === undefined || scripts.history === null) return [];
+  if (scripts?.history === undefined || scripts.history === null || offer === undefined) return [];
+  if (!mayOpenScript({ offer, latest: scripts.latest, careMode })) return [];
   return permittedScripts(scripts.catalogue, {
     moment: isNight(situation) ? 'night' : 'day',
     history: scripts.history,
@@ -478,6 +486,11 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
   close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
   help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
 };
+
+/** The codes of the blocking guards an answer broke, each once. */
+function blockingCodes(violations: readonly GuardViolation[]): GuardCode[] {
+  return [...new Set(violations.filter((v) => v.severity === 'blocking').map((v) => v.code))];
+}
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
   const blocking = violations.filter(
@@ -898,6 +911,11 @@ export interface ComposedTurn {
   readonly bubbles: readonly string[];
   readonly voiceFailure?: LlmFailure;
   readonly violations: readonly GuardViolation[];
+  /**
+   * A first answer a blocking guard set aside, written again (IA-08): its blocking codes, kept for the human who reads
+   * the second one. Absent when the first answer went through.
+   */
+  readonly retried?: readonly GuardCode[];
   readonly isBlocked: boolean;
   readonly costUsd: number;
   readonly latencyMs: number;
@@ -1174,7 +1192,14 @@ export async function composeTurn(
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   const scriptLanguage = scriptLanguageOf(language, input);
-  const choices = scriptChoices(input.scripts, input.situation, scriptLanguage);
+  // The care mode may depend on what the brain reads: only a care already open is known before it.
+  const choices = scriptChoices(
+    input.scripts,
+    input.situation,
+    input.offer,
+    input.care === true,
+    scriptLanguage,
+  );
   const brainScripts: BrainScript[] = choices.map(({ id, script }) => ({
     id,
     description: script.description,
@@ -1789,6 +1814,7 @@ export async function composeTurn(
     ...translationOfVoice(voice, voiceLanguage.reply, budget, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
+    ...(retried !== undefined && { retried: blockingCodes(first.violations) }),
     // Still nothing to send after the second try: a human answers.
     isBlocked: isBlocked(violations) || !voice.ok || written.length === 0,
     costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),

@@ -1,7 +1,8 @@
-import type { CreatorId, VaultMediaView } from '@impera/contracts';
+import type { CreatorId, PlatformAccountId, VaultMediaView } from '@impera/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type JSX } from 'react';
 
-import { vaultPreviewUrl } from './api';
+import { reviewVaultDescription, vaultChoicesKey, vaultPreviewUrl } from './api';
 import { descriptionLine, type MediaChoice } from './choice';
 import { durationLine, mediaKindLine, suggestedLine, uploadedLine, waveOf } from './model';
 import { previewOf } from './preview';
@@ -20,6 +21,7 @@ import { Dialog } from '@/shell/Dialog';
  */
 export function MediaSheet({
   creatorId,
+  platformAccountId,
   media,
   rank,
   count,
@@ -28,6 +30,8 @@ export function MediaSheet({
   onClose,
 }: {
   creatorId: CreatorId;
+  /** The account its folder is read from: a description is reviewed under it. */
+  platformAccountId: PlatformAccountId;
   media: VaultMediaView;
   rank: number;
   count: number;
@@ -47,6 +51,9 @@ export function MediaSheet({
     };
   }, [onStep]);
   const described = descriptionLine(choice);
+  // What became of the sharp picture of this media: the note says it was read only once it was (PRO1-10).
+  const [sharp, setSharp] = useState<{ readonly id: string; readonly state: SharpState } | null>(null);
+  const sharpState = sharp?.id === media.platformMediaId ? sharp.state : 'loading';
 
   return (
     <Dialog
@@ -65,7 +72,13 @@ export function MediaSheet({
           ) : (
             <>
               <Preview hash={media.blurhash} />
-              <Sharp creatorId={creatorId} media={media} />
+              <Sharp
+                creatorId={creatorId}
+                media={media}
+                onState={(state) => {
+                  setSharp({ id: media.platformMediaId, state });
+                }}
+              />
             </>
           )}
           {media.kind !== 'image' && media.durationSeconds !== null ? (
@@ -125,7 +138,7 @@ export function MediaSheet({
               {choice.description === 'described' ? (
                 <span className="vp-badge vp-badge--described">
                   <SparkIcon />
-                  Décrit
+                  {choice.validated ? 'Description validée' : 'Décrit'}
                 </span>
               ) : (
                 <span className={`vx-sheet__said vx-sheet__said--${described.tone}`}>{described.text}</span>
@@ -135,7 +148,19 @@ export function MediaSheet({
           {choice.description === 'described' && choice.excerpt !== null ? (
             <div className="vx-sheet__fact">
               <dt className="nv-eyebrow">Sa description, pour l’IA</dt>
-              <dd className="vx-sheet__excerpt">{choice.excerpt}</dd>
+              <dd className="vx-sheet__excerpt">
+                {choice.descriptionId === null ? (
+                  choice.excerpt
+                ) : (
+                  <DescriptionReview
+                    key={choice.descriptionId}
+                    creatorId={creatorId}
+                    platformAccountId={platformAccountId}
+                    platformMediaId={media.platformMediaId}
+                    choice={choice}
+                  />
+                )}
+              </dd>
             </div>
           ) : null}
           <div className="vx-sheet__fact">
@@ -149,11 +174,155 @@ export function MediaSheet({
             </div>
           )}
         </dl>
-        {media.kind === 'audio' || media.removed ? null : (
-          <p className="vx-note">Image lue dans Reveal à l’instant, jamais gardée par Impera.</p>
+        {media.kind === 'audio' || media.removed || sharpState === 'loading' ? null : (
+          <p className="vx-note">
+            {sharpState === 'shown'
+              ? 'Image lue dans Reveal à l’instant, jamais gardée par Impera.'
+              : 'Aperçu indisponible : sa session Reveal n’est pas lisible.'}
+          </p>
         )}
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * A media's description on its sheet, whole, and the person's say on it (REV-02): « Valider la description » as it is,
+ * or « Corriger » it and validate the words written. A script made of her vault asks this of each of its media before
+ * it can be « Prêt à copier ». One gesture at a time: a second click while one goes asks nothing.
+ */
+function DescriptionReview({
+  creatorId,
+  platformAccountId,
+  platformMediaId,
+  choice,
+}: {
+  creatorId: CreatorId;
+  platformAccountId: PlatformAccountId;
+  platformMediaId: string;
+  choice: MediaChoice;
+}): JSX.Element {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const text = choice.detailed ?? choice.excerpt ?? '';
+  const descriptionId = choice.descriptionId;
+  if (descriptionId === null) return <>{text}</>;
+
+  const send = async (detailed: string | null): Promise<void> => {
+    if (busy) return;
+    setBusy(true);
+    setSaid(null);
+    const answer = await reviewVaultDescription(
+      creatorId,
+      platformMediaId,
+      detailed === null
+        ? { kind: 'validate', platformAccountId, descriptionId }
+        : { kind: 'correct', platformAccountId, descriptionId, detailed },
+    );
+    setBusy(false);
+    if (answer === 'stale') {
+      setSaid('Cette description a changé entre-temps : relis la nouvelle avant de la valider.');
+      void queryClient.invalidateQueries({ queryKey: vaultChoicesKey(creatorId) });
+      return;
+    }
+    if (answer === null) {
+      setSaid('Rien n’a été enregistré : le serveur ne répond pas. Réessaie dans un instant.');
+      return;
+    }
+    queryClient.setQueryData(vaultChoicesKey(creatorId), answer);
+    setDraft(null);
+  };
+
+  if (draft !== null) {
+    const empty = draft.trim() === '';
+    return (
+      <form
+        className="vx-review"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!empty) void send(draft.trim());
+        }}
+      >
+        <label className="nv-field">
+          <span className="nv-field__label">Sa description corrigée</span>
+          <textarea
+            className="nv-field__control nv-glass vx-review__text"
+            rows={5}
+            maxLength={6000}
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+            }}
+          />
+        </label>
+        {empty ? <p className="vx-review__said">Écris ce que l’on voit sur ce média.</p> : null}
+        <div className="vx-review__actions">
+          <button type="submit" className="nv-btn nv-btn--neon nv-btn--sm" disabled={busy || empty}>
+            Enregistrer et valider
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            disabled={busy}
+            onClick={() => {
+              setDraft(null);
+              setSaid(null);
+            }}
+          >
+            Annuler
+          </button>
+        </div>
+        {said === null ? null : (
+          <p className="vx-review__said vx-review__said--warn" role="alert">
+            {said}
+          </p>
+        )}
+      </form>
+    );
+  }
+
+  return (
+    <div className="vx-review">
+      <span>{text}</span>
+      {choice.validated ? (
+        <span className="vx-review__said">Validée : les scripts peuvent la lire.</span>
+      ) : (
+        <span className="vx-review__said">
+          À valider : un script ne peut pas passer « Prêt à copier » sans elle.
+        </span>
+      )}
+      <div className="vx-review__actions">
+        {choice.validated ? null : (
+          <button
+            type="button"
+            className="nv-btn nv-btn--neon nv-btn--sm"
+            disabled={busy}
+            onClick={() => void send(null)}
+          >
+            Valider la description
+          </button>
+        )}
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm"
+          disabled={busy}
+          onClick={() => {
+            setDraft(text);
+            setSaid(null);
+          }}
+        >
+          Corriger
+        </button>
+      </div>
+      {said === null ? null : (
+        <p className="vx-review__said vx-review__said--warn" role="alert">
+          {said}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -183,14 +352,19 @@ export function VoiceFace({ seed, bars }: { seed: string; bars: number }): JSX.E
  * The sharp small picture over the blurred one (ADR 0138), faded in once loaded; on any failure it stays hidden and
  * the blur shows. Never for a voice note nor a media Reveal removed: there is no picture to read.
  */
+type SharpState = 'loading' | 'shown' | 'failed';
+
 export function Sharp({
   creatorId,
   media,
+  onState,
 }: {
   creatorId: CreatorId;
   media: VaultMediaView;
+  /** Told once the picture is read or failed. */
+  onState?: (state: SharpState) => void;
 }): JSX.Element | null {
-  const [state, setState] = useState<'loading' | 'shown' | 'failed'>('loading');
+  const [state, setState] = useState<SharpState>('loading');
   if (media.kind === 'audio' || media.removed || state === 'failed') return null;
   return (
     <img
@@ -203,9 +377,11 @@ export function Sharp({
       decoding="async"
       onLoad={() => {
         setState('shown');
+        onState?.('shown');
       }}
       onError={() => {
         setState('failed');
+        onState?.('failed');
       }}
     />
   );

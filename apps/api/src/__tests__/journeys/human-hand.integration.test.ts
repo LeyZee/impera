@@ -17,9 +17,8 @@ describe('the hand given back to the agent', () => {
     await journey.close();
   });
 
-  // Bug: the composer reads again his « 16 ans » still unanswered since her last message, hands him over as a minor
-  // and takes the human's confirmation back (draft-composer.ts, `sinceAnswer` then `protect`).
-  it.fails('answers his next message normally, and keeps the confirmation', async () => {
+  // Once a human confirmed his age, his « 16 ans » read before that decision no longer hands him over (recette IA-02).
+  it('answers his next message normally, and keeps the confirmation', async () => {
     journey.models({ voice: { bubbles: ['Je regarde une série, et toi ?'] } });
     const id = await journey.fanWrites('age-confirmed', 'j’ai 16 ans');
     await journey.respond(id);

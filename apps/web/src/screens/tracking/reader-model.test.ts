@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decisionError,
+  retriedLine,
+  scriptStepLine,
   draftsOf,
   endsRun,
   isOutdated,
@@ -171,6 +173,20 @@ describe('threadOf', () => {
     expect(whyHuman({ events: [] })).toBeNull();
   });
 
+  it('names the watched word that made the agent step back (IA-05)', () => {
+    const events = [
+      event(1, 1, {
+        type: 'handoff_requested',
+        payload: {
+          conversationId: CONVERSATION,
+          cause: 'keyword',
+          trigger: { alert: { kind: 'system', code: 'keyword' }, matchedBy: 'keyword', keyword: 'bot' },
+        },
+      }),
+    ];
+    expect(whyHuman({ events })).toBe('L’agent passe la main (Mot surveillé : « bot »)');
+  });
+
   // Recette 05/11, PRO-26: giving back a grave handoff asks for a confirmation.
   it('names a grave handoff while it is the latest change of hand, and only then', () => {
     const minor = event(5, 9, {
@@ -300,7 +316,21 @@ describe('draftsOf', () => {
   });
 });
 
+describe('retriedLine (IA-08)', () => {
+  it('names the guards of the answer set aside, each once, and says nothing without one', () => {
+    expect(retriedLine([])).toBeNull();
+    expect(retriedLine(['ai_disclosure'])).toBe('1 réponse écartée : un aveu d’IA');
+    expect(retriedLine(['ai_disclosure', 'contact_info', 'ai_disclosure'])).toBe(
+      '1 réponse écartée : un aveu d’IA, des coordonnées',
+    );
+  });
+});
+
 describe('decisionError', () => {
+  it('says a fan whose age is in doubt needs his age confirmed before the agent gets him back (IA-01)', () => {
+    expect(decisionError(409, apiError('age_in_doubt_conflict', {}))).toContain('Confirmer son âge');
+  });
+
   it('says a creator without an active persona sends nothing, and where to activate one (recette G4)', () => {
     expect(decisionError(422, apiError('script_step_cut_unprocessable', { cut: 'sales_frozen' }))).toContain(
       'étape payante',
@@ -392,6 +422,9 @@ describe('todoLabel', () => {
     expect(todoLabel(todo('send_failed'))).toBe('Envoi échoué');
     expect(todoLabel(todo('awaiting_approval'))).toBe('Brouillon à valider');
     expect(todoLabel(todo('unanswered'))).toBe('Sans réponse');
+    // An AI outage, then over (IA-07).
+    expect(todoLabel(todo('llm_unavailable'))).toBe('IA indisponible');
+    expect(todoLabel({ ...todo('llm_unavailable'), voiceBack: true })).toBe('IA de retour');
   });
 });
 
@@ -444,6 +477,38 @@ describe('the times and notes of the thread (CHAT-24)', () => {
       'L’arrêt d’urgence est actif\u00a0: rien ne part pour l’instant. Préviens ton responsable si ça dure.',
     );
     expect(stoppedText(false)).toContain('Dashboard');
+  });
+});
+
+describe('what leaves with a draft of her script (REV-03)', () => {
+  it('says the script, the step, its media and its price under the bubbles', () => {
+    expect(
+      scriptStepLine({
+        scriptName: 'Café inventé',
+        stepIndex: 1,
+        stepName: null,
+        priceMinor: 900,
+        currency: 'EUR',
+        hasMedia: true,
+      }),
+    ).toBe('Part avec : étape 2 de « Café inventé » · un média · 9\u00a0€');
+    expect(
+      scriptStepLine({
+        scriptName: null,
+        stepIndex: 0,
+        stepName: 'Teaser',
+        priceMinor: 0,
+        currency: 'EUR',
+        hasMedia: false,
+      }),
+    ).toBe('Part avec : étape 1 de son script (Teaser) · offerte');
+  });
+
+  it('says nothing for words only, nor while the server does not say it', () => {
+    expect(scriptStepLine(null)).toBeNull();
+    expect(scriptStepLine(undefined)).toBeNull();
+    const words = { id: DRAFT, status: 'pending', bubbles: ['Coucou'], finalBubbles: null };
+    expect(DraftViewSchema.parse({ ...words, createdAt: '2026-10-19T12:01:00Z' }).scriptStep).toBeUndefined();
   });
 });
 

@@ -321,8 +321,10 @@ describe('the Reveal session card', () => {
 
   it('writes the day and the hour', () => {
     expect(whenOf(new Date(2026, 10, 9, 8, 30))).toBe('le 09/11/2026 à 8 h 30');
-    expect(untilOf(new Date(2026, 10, 15, 23, 0), NOW)).toBe('23 h 00');
-    expect(untilOf(new Date(2026, 10, 17, 8, 0), NOW)).toBe('le 17/11/2026 à 8 h 00');
+    expect(untilOf(new Date(2026, 10, 15, 23, 0), NOW)).toBe('jusqu’à 23 h 00');
+    expect(untilOf(new Date(2026, 10, 16, 8, 0), NOW)).toBe('jusqu’à demain 8 h 00');
+    // Never « jusqu’à le … » (EXT-03).
+    expect(untilOf(new Date(2026, 10, 17, 8, 0), NOW)).toBe('jusqu’au 17/11/2026 à 8 h 00');
   });
 });
 
@@ -362,14 +364,15 @@ describe('before a session leaves (demande de Sécurité)', () => {
   const confirm = (seen: 'same' | 'other' | 'unknown') =>
     sync(THREE, { confirm: { accountId: ACCOUNT_B, modelId: 'model-essai-7', seen } });
 
-  it('shows the account alone and the model read in the tab, « Annuler » first on a first sync', () => {
+  it('shows the account alone, never the raw model id (EXT-05), « Annuler » first on a first sync', () => {
     const { card, actions } = confirm('unknown');
     const text = card?.textContent ?? '';
     expect(text).toContain('Première synchro de ce compte');
     expect(text).toContain('Soleil (@soleil.noir)');
     expect(text).not.toContain('Lune');
     expect(text).not.toContain('Garde la messagerie Reveal ouverte');
-    expect(card?.querySelector('.pp-code')?.textContent).toBe('model-essai-7');
+    expect(card?.querySelector('.pp-code')).toBeNull();
+    expect(text).not.toContain('model-essai-7');
     expect(names(card)).toEqual(['Annuler', 'Envoyer la session']);
     // The safe choice holds the focus; « Envoyer » is soft, never the neon.
     expect(card?.querySelector('[data-autofocus]')?.textContent).toBe('Annuler');
@@ -388,6 +391,17 @@ describe('before a session leaves (demande de Sécurité)', () => {
 
   it('puts the focus on « Envoyer » when the model is the one of last time', () => {
     expect(confirm('same').card?.querySelector('[data-autofocus]')?.textContent).toBe('Envoyer la session');
+  });
+});
+
+// EXT-05: a tab showing another account's creator is refused before anything leaves, by her name.
+describe('a tab that shows another account’s creator', () => {
+  it('names her under the account synchronised', () => {
+    const { card } = sync(THREE, {
+      outcome: { kind: 'failed', accountId: ACCOUNT_B, failure: 'other-account', other: ACCOUNT_A },
+    });
+    expect(card?.querySelector('.pp-sync__cause')?.textContent).toBe('Cet onglet montre Lune.');
+    expect(card?.textContent).not.toContain(ACCOUNT_A);
   });
 });
 

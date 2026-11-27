@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { OfferContext } from '../policy';
 import {
   applyScriptRunEvent,
+  mayOpenScript,
   nextScriptStep,
   openScriptRun,
   permittedScripts,
@@ -698,5 +699,26 @@ describe('nextScriptStep: the gate before the first teaser (ADR 0103 § 11-12)',
         startGate: { open: false, missing: ['availability_unconfirmed'] },
       }),
     ).toEqual({ kind: 'send_step', step: toSend(NIGHT, 1) });
+  });
+});
+
+describe('mayOpenScript (recette REV-13)', () => {
+  it('lets a script open with an adult fan, never twice the same evening, his asking or not', () => {
+    expect(mayOpenScript({ offer: offer, latest: null, careMode: false })).toBe(true);
+    expect(mayOpenScript({ offer: { ...offer, lastOfferAt: at(-30) }, latest: null, careMode: false })).toBe(
+      false,
+    );
+  });
+
+  it('shows no script while a run is open, in the care mode, or when the policy refuses even his asking', () => {
+    const open = play([sent(0, 1)]);
+    expect(mayOpenScript({ offer: offer, latest: open, careMode: false })).toBe(false);
+    expect(mayOpenScript({ offer: offer, latest: null, careMode: true })).toBe(false);
+    expect(mayOpenScript({ offer: { ...offer, flags: {} }, latest: null, careMode: false })).toBe(false);
+    const frozen = {
+      ...offer.flags,
+      salesFrozen: { reason: 'operator' as const, since: '2026-11-01T10:00:00Z' },
+    };
+    expect(mayOpenScript({ offer: { ...offer, flags: frozen }, latest: null, careMode: false })).toBe(false);
   });
 });

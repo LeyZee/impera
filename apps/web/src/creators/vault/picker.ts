@@ -1,7 +1,6 @@
 import type { VaultChoicesChange, VaultFolderView, VaultMediaView } from '@impera/contracts';
 
 import { choiceOf, folderCount, type ChoiceIndex } from './choice';
-import { folderName } from './model';
 
 /*
  * « Choisir dans Reveal » (ADR 0145 § 5, avenant du 20/11): what the last sync read of her vault, folder by folder, and
@@ -199,10 +198,6 @@ export function draftChanges(draft: PickDraft, folders: readonly VaultFolderView
   }
   return changes;
 }
-
-/** A folder's name in the window: the vault's root says what it holds. */
-export const pickerFolderName = (folder: Pick<VaultFolderView, 'folderName' | 'folderRef'>): string =>
-  folder.folderRef === null ? 'Médias hors dossier' : folderName(folder);
 
 /** How a card says where its folder stands in Impera, `null` when nothing of it is. */
 export function inImperaLine(pick: FolderPick, folder: VaultFolderView): string | null {

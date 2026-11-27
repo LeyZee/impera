@@ -380,7 +380,7 @@ describe('Paie › Quinzaine', () => {
     // Only the validated statements not paid yet: never the drafts, never what already went.
     expect(text((await screen.findByText('Reste à envoyer')).nextElementSibling)).toBe('200,00 €');
     expect(text(screen.getByText(/^Déjà versé/u))).toBe(
-      'Déjà versé 100,00 € · 50,00 € pas encore validé (1 relevé)',
+      'Déjà versé 100,00 € · hors ce montant : 50,00 € encore à valider (1 relevé)',
     );
     expect(text(row('Théo'))).toContain('versé le 3 nov.');
     expect(within(row('Théo')).getByText('Payé').className).toContain('rp-chip--ok');
@@ -430,6 +430,8 @@ describe('Paie › Quinzaine', () => {
     expect(text(await screen.findByText(/^Le premier relevé validé clôt la quinzaine/u))).toBe(
       'Le premier relevé validé clôt la quinzaine pour toute l’équipe. Un rapport validé ou une vente lue ensuite ira sur la quinzaine du 1er au 15 novembre.',
     );
+    // The row's button says one statement in the singular to a screen reader (recette COUV-12).
+    expect(screen.getByRole('button', { name: 'Valider 1 relevé' })).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Valider (1)' }));
     const dialog = await screen.findByRole('dialog');
     expect(text(dialog)).toContain('Ventes comptées');
@@ -539,12 +541,21 @@ describe('Paie › Quinzaine', () => {
       { ...report(3, IRIS.id), status: 'submitted', canReview: false },
     ];
     renderPage(IRIS_ME);
-    expect(await screen.findByText('3 rapports de la quinzaine attendent leur relecture')).toBeTruthy();
+    // The gap between the two is the manager's own, said in the title (recette MAN-05, H-13).
+    expect(
+      await screen.findByText(
+        '3 rapports de la quinzaine attendent leur relecture, dont 1 à toi : un autre membre de l’agence le relit',
+      ),
+    ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Relire les 2 rapports' })).toBeTruthy();
     cleanup();
     reports = [{ ...report(3, IRIS.id), status: 'submitted', canReview: false }];
     renderPage(IRIS_ME);
-    expect(await screen.findByText('Un rapport de la quinzaine attend sa relecture')).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'Un rapport de la quinzaine attend sa relecture, le tien : un autre membre de l’agence le relit',
+      ),
+    ).toBeTruthy();
     const link = screen.getByRole('link', { name: 'Voir les rapports' });
     expect(link.className).not.toContain('nv-btn--neon');
   });
@@ -660,6 +671,11 @@ describe('Paie › Quinzaine', () => {
     fireEvent.change(reference, { target: { value: 'FR62 1234 5678 9000 00AB C123 456' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     expect(within(dialog).getByText(/Ceci contient un IBAN/u)).toBeTruthy();
+    expect(within(dialog).queryByText(/versés à/u)).toBeNull();
+    // Nor a phone number (COUV-07).
+    fireEvent.change(reference, { target: { value: '+33 6 12 34 56 78' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(within(dialog).getByText(/Ceci ressemble à un numéro de téléphone/u)).toBeTruthy();
     expect(within(dialog).queryByText(/versés à/u)).toBeNull();
 
     fireEvent.change(reference, { target: { value: 'WR-4E7F2C1A' } });
@@ -978,12 +994,16 @@ describe('Paie › Quinzaine', () => {
           totalMinor: 20_000,
           validatedAt,
         }),
+        statementOf(LOU, OCT2, { payableMinor: 5_000, totalMinor: 5_000 }),
       ],
       { closing: { period: OCT2, exchangeRates: [], closedBy: OWNER_USER, closedAt: validatedAt } },
     );
     renderPage(OWNER);
     expect(text((await screen.findByText('Reste à envoyer')).nextElementSibling)).toBe('300,00 €');
-    expect(text(screen.getByText(/^Dont/u))).toBe('Dont 100,00 € au versement bloqué (1 relevé)');
+    // « Dont » right after the amount; what waits for a validation is said apart from it (COUV-01).
+    expect(text(screen.getByText(/^Dont/u))).toBe(
+      'Dont 100,00 € au versement bloqué (1 relevé) · hors ce montant : 50,00 € encore à valider (1 relevé)',
+    );
     expect(text(row('Théo'))).toContain('Versement bloqué : attestation de résidence 2026 absente.');
     expect(within(row('Théo')).getByText('Versement bloqué').className).toContain('rp-chip--warn');
     expect(within(row('Théo')).queryByRole('button', { name: 'Marquer payé' })).toBeNull();

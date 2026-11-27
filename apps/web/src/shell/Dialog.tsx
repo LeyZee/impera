@@ -47,6 +47,7 @@ export function Dialog({
     )?.focus({ preventScroll: true });
     return () => {
       opener?.focus();
+      guardClicksAfterClose();
     };
   }, []);
 
@@ -117,4 +118,33 @@ export function Dialog({
     </div>,
     document.body,
   );
+}
+
+/** How long, once a panel closes, a click still belongs to it: the second half of a double click or tap. */
+export const CLOSE_GUARD_MS = 400;
+
+/**
+ * Whether a click is the end of the gesture that closed a panel rather than a new one: a person's click (never one a
+ * script dispatches) within `CLOSE_GUARD_MS` of the close.
+ */
+export const isClickThrough = (click: { readonly isTrusted: boolean }, sinceClose: number): boolean =>
+  click.isTrusted && sinceClose >= 0 && sinceClose < CLOSE_GUARD_MS;
+
+/**
+ * A double click on a panel's last button closes it on the first click: the second would land on what lies under it, a
+ * link or a switch (recette CHAT-05, MOD-10). For a moment after the close, such a click is swallowed.
+ */
+function guardClicksAfterClose(): void {
+  const closedAt = performance.now();
+  const swallow = (event: MouseEvent): void => {
+    if (!isClickThrough(event, performance.now() - closedAt)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  // The window it listens on, kept: the timer may fire after a test tore the page down.
+  const target = window;
+  target.addEventListener('click', swallow, true);
+  target.setTimeout(() => {
+    target.removeEventListener('click', swallow, true);
+  }, CLOSE_GUARD_MS);
 }

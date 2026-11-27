@@ -195,8 +195,21 @@ export function MyProgressCard({ user }: { user: Me }): JSX.Element | null {
   const goals = nextGoals(trophyCase);
   const ranked = level !== null || nextLevel !== null;
   if (!ranked && !running && goals.length === 0) return null;
+  const headless = !ranked && !running;
+  const go = (
+    <span className="rw-quest__go" aria-hidden="true">
+      Mes trophées
+      <svg viewBox="0 0 16 16" focusable="false">
+        <path d="M6 3.5 10.5 8 6 12.500" />
+      </svg>
+    </span>
+  );
   return (
-    <Panel className="rw-quest sc-linked nv-enter" eyebrow="Ma progression">
+    <Panel
+      className="rw-quest sc-linked nv-enter"
+      eyebrow="Ma progression"
+      actions={headless ? go : undefined}
+    >
       <Link to="/moi/trophees" className="sc-card-link" aria-label="Voir mes trophées" />
       <div className="rw-quest__body" ref={body}>
         {/* Drawn only: the light that follows the pointer, the embers that rise under it. */}
@@ -206,39 +219,37 @@ export function MyProgressCard({ user }: { user: Me }): JSX.Element | null {
             <i key={at} style={{ left: `${String(at)}%`, '--_i': at % 7 }} />
           ))}
         </span>
-        <div className="rw-quest__head">
-          {ranked ? (
-            <span className="rw-quest__insignia">
-              <span className="rw-quest__halo" aria-hidden="true" />
-              <LevelInsignia rank={level?.rank ?? 1} earned={level !== null} size={64} />
-            </span>
-          ) : null}
-          <div className="rw-quest__who">
+        {/* Neither rank nor series: no head, « Mes trophées » goes up beside « Ma progression » (recette CHAT-11). */}
+        {headless ? null : (
+          <div className="rw-quest__head">
             {ranked ? (
-              <p className="rw-quest__name">{level === null ? 'Pas encore de rang' : level.name}</p>
+              <span className="rw-quest__insignia">
+                <span className="rw-quest__halo" aria-hidden="true" />
+                <LevelInsignia rank={level?.rank ?? 1} earned={level !== null} size={64} />
+              </span>
             ) : null}
-            {nextLevel === null ? null : (
-              <p className="rw-quest__line">
-                {level === null ? 'Premier rang' : 'Rang suivant'}&nbsp;: <b>{nextLevel.name}</b>
-              </p>
-            )}
-            {running ? (
-              <p className="rw-quest__streak nv-num">
-                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                  <path d="M8.3 1.5c.5 2.6 4 3.800 4 7.400 0 2.500-1.900 4.100-4.300 4.100S3.700 11.400 3.700 9c0-1.500.7-2.500 1.300-3.200.2 1 .6 1.600 1.200 1.900C5.900 5.400 6.600 3 8.300 1.500z" />
-                </svg>
-                Série en cours&nbsp;: <b>{shifts(streak.current)}</b>
-                {streak.best > streak.current ? <span> · record {String(streak.best)}</span> : null}
-              </p>
-            ) : null}
+            <div className="rw-quest__who">
+              {ranked ? (
+                <p className="rw-quest__name">{level === null ? 'Pas encore de rang' : level.name}</p>
+              ) : null}
+              {nextLevel === null ? null : (
+                <p className="rw-quest__line">
+                  {level === null ? 'Premier rang' : 'Rang suivant'}&nbsp;: <b>{nextLevel.name}</b>
+                </p>
+              )}
+              {running ? (
+                <p className="rw-quest__streak nv-num">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="M8.3 1.5c.5 2.6 4 3.800 4 7.400 0 2.500-1.900 4.100-4.300 4.100S3.700 11.400 3.700 9c0-1.500.7-2.500 1.300-3.200.2 1 .6 1.600 1.200 1.900C5.900 5.400 6.600 3 8.300 1.500z" />
+                  </svg>
+                  Série en cours&nbsp;: <b>{shifts(streak.current)}</b>
+                  {streak.best > streak.current ? <span> · record {String(streak.best)}</span> : null}
+                </p>
+              ) : null}
+            </div>
+            {go}
           </div>
-          <span className="rw-quest__go" aria-hidden="true">
-            Mes trophées
-            <svg viewBox="0 0 16 16" focusable="false">
-              <path d="M6 3.5 10.5 8 6 12.500" />
-            </svg>
-          </span>
-        </div>
+        )}
         {nextLevel === null ? null : (
           <RankBar
             userId={user.id}
