@@ -22,6 +22,9 @@ import './meeting-tiers.css';
  * months (Charles, 27/11), stored in hours. The agent picks its reason from that tier; without these durations no fan
  * goes past the second. No value is suggested: he types them.
  */
+/** The second tier's name, its guillemets held to it by no-break spaces (never a « alone at a line's end). */
+const QUELQUES_JOURS = '«\u00a0quelques jours\u00a0»';
+
 export function MeetingTiersSection({ creatorId }: { creatorId: CreatorId }): JSX.Element | null {
   const read = useMeetingTiers(creatorId);
   if (read.data === undefined) return null;
@@ -63,9 +66,8 @@ function MeetingTiersForm({
       </h2>
       <p className="ft-lead">
         Quand un fan demande à la voir, l’agent répond selon son palier : nouveau, quelques jours, proche,
-        très proche. Les durées sont comptées depuis le premier message échangé avec lui (une semaine fait 7
-        jours, un mois 30 jours). Proche et très proche demandent qu’il ait payé. Sans ces durées, aucun fan
-        ne dépasse « quelques jours ».
+        très proche. Les durées sont comptées depuis le premier message échangé avec lui. Proche et très
+        proche demandent qu’il ait payé. Sans ces durées, aucun fan ne dépasse {QUELQUES_JOURS}.
       </p>
       <form
         className="ft-fields mt-fields"
@@ -101,7 +103,10 @@ function MeetingTiersForm({
             </div>
           </Field>
         ))}
-        {stored === null && !dirty ? <p className="mt-unset">Pas encore réglé</p> : null}
+        <p className="mt-note">
+          {stored === null && !dirty ? <span>Pas encore réglé</span> : null}
+          <span>Une semaine fait 7 jours, un mois 30 jours.</span>
+        </p>
         {'problem' in read && dirty ? (
           <p className="ft-problem" role="alert">
             {read.problem}

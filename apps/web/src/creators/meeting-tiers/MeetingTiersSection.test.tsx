@@ -72,6 +72,7 @@ describe('Créatrices › Compte › Paliers de rencontre (guide 26/11)', () => 
         .find((radio) => radio.getAttribute('aria-checked') === 'true')?.textContent;
     expect([checked(NEW), checked(CLOSE), checked(VERY_CLOSE)]).toEqual(['jours', 'semaines', 'mois']);
     expect(screen.getByText('Pas encore réglé')).toBeDefined();
+    expect(screen.getByText('Une semaine fait 7 jours, un mois 30 jours.')).toBeDefined();
     const save = screen.getByRole('button', { name: 'Enregistrer' });
     expect(save.hasAttribute('disabled')).toBe(true);
 
@@ -105,6 +106,8 @@ describe('Créatrices › Compte › Paliers de rencontre (guide 26/11)', () => 
     });
     expect(screen.getByLabelText(VERY_CLOSE)).toHaveProperty('value', '5');
     expect(screen.queryByText('Pas encore réglé')).toBeNull();
+    // Once set, the note on a week and a month stays in its place.
+    expect(screen.getByText('Une semaine fait 7 jours, un mois 30 jours.')).toBeDefined();
     for (const label of [NEW, CLOSE, VERY_CLOSE]) type(label, '');
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByText('Paliers de rencontre enregistrés.')).toBeDefined();
