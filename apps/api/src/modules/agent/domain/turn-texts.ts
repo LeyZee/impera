@@ -279,6 +279,9 @@ export const CLOSE_TO_COMING_HINT =
  */
 export const CUSTOM_INSTEAD_HINT =
   'il réclame un média d’un fantasme qu’aucun de ses scripts ne sert : elle peut lui suggérer quelque chose fait rien que pour lui, sans prix, sans dire oui ni quand';
+/** Mid-script, after his purchase, he wants what the script does not send (Charles 27/11, `customMidScript`). */
+export const CUSTOM_MID_SCRIPT_HINT =
+  'en plein script, après son achat, il veut aller plus loin ou autre chose que ce que le script lui envoie : elle peut lui suggérer une cam ou une vidéo faite rien que pour lui, sans prix, sans dire oui ni quand, et son script continue avec lui';
 /** Her gauge in the middle of the action (Charles 26/11): the intention only, her words never the same. */
 export const GAUGE_HINT =
   'jauge-le : fais-lui dire ou décrire dans quel état il est, avec tes mots à toi et jamais les mêmes que la dernière fois ; jamais de photo à lui demander';

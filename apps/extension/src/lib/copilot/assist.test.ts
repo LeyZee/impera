@@ -1,4 +1,9 @@
-import { CopilotAssistSchema, type CopilotAssist, type CopilotNextMove } from '@impera/contracts';
+import {
+  CopilotAssistSchema,
+  type CopilotAssist,
+  type CopilotNextMove,
+  type CopilotSaleBlock,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -232,7 +237,7 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
 });
 
 describe('the moment to sell (ADR 0141 § 4 bis)', () => {
-  const noSale = (block: 'low_desire' | 'risk' | 'cooldown') => ({
+  const noSale = (block: CopilotSaleBlock) => ({
     kind: 'no_sale' as const,
     label: 'Ne rien vendre',
     priceMinor: null,
@@ -366,5 +371,11 @@ describe('the moment to sell (ADR 0141 § 4 bis)', () => {
     expect(momentLine(moment, noSale('cooldown')).text).toBe(
       'Pas encore · Offre trop récente · il manque son désir',
     );
+  });
+
+  it('says why the engine sells nothing tonight when no condition names it (audit 27/11)', () => {
+    const tonight = { verdict: 'not_yet' as const, conditions: [] };
+    expect(momentLine(tonight, noSale('after_purchase')).text).toBe('Pas encore · Pause après achat');
+    expect(momentLine(tonight, noSale('he_came')).text).toBe('Pas encore · Il vient de jouir');
   });
 });

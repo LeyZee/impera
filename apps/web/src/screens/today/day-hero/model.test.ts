@@ -17,6 +17,17 @@ describe('« L’essentiel du jour » on her Aujourd’hui', () => {
     expect(hero?.chips.map((c) => c.part)).toEqual(['tasks']);
   });
 
+  it('names a lone part in its line instead of repeating the ring in a legend', () => {
+    const posts = dayHeroOf({ essentials: { done: 0, total: 2 }, tasks: null, toSend: 0 });
+    expect(posts).toMatchObject({ legend: false, line: 'Encore 2 choses à poster pour boucler ta journée.' });
+    expect(dayHeroOf({ essentials: null, tasks: { done: 2, total: 3 }, toSend: 0 })?.line).toBe(
+      'Encore 1 tâche pour boucler ta journée.',
+    );
+    expect(
+      dayHeroOf({ essentials: { done: 0, total: 1 }, tasks: { done: 0, total: 1 }, toSend: 0 })?.legend,
+    ).toBe(true);
+  });
+
   it('says the day is done, and an empty day is not a failure', () => {
     expect(dayHeroOf({ essentials: { done: 3, total: 3 }, tasks: null, toSend: 0 })?.title).toBe(
       'Tout est fait',

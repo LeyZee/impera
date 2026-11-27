@@ -76,7 +76,9 @@ const BLOCK_WORDS: Readonly<Record<CopilotSaleBlock, string>> = {
   age_unconfirmed: 'Âge pas encore confirmé',
   no_budget: 'Il a dit ne pas avoir d’argent',
   cooldown: 'Offre trop récente',
+  after_purchase: 'Pause après achat',
   low_desire: 'Désir encore trop bas',
+  he_came: 'Il vient de jouir',
 };
 
 /**

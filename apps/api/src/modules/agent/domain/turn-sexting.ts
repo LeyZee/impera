@@ -8,7 +8,14 @@ import { keepsWarm, offerSignals, saysNoMoneyNow } from './policy';
 import { registerOf, type Register } from './register';
 import { scriptStepsHeld, type PlatformScriptView, type ScriptRun } from './script-run';
 import type { ScriptTurn } from './script-turn';
-import { cameBeforeFinale, haggles, isBareMurmur, peakSeen, wantsOtherMan } from './sexting-moves';
+import {
+  cameBeforeFinale,
+  haggles,
+  isBareMurmur,
+  peakSeen,
+  wantsMadeForHim,
+  wantsOtherMan,
+} from './sexting-moves';
 import type { SexualizationDecision } from './sexualization';
 import type { Situation } from './situation';
 import { paysNow, type StandingFacts, type StandingLimits } from './standing';
@@ -111,6 +118,12 @@ export interface SextingMoment {
   readonly justBought: boolean;
   readonly compliment: boolean;
   readonly suggestsCustom: boolean;
+  /**
+   * In the middle of her script, once he bought a paid step of it, he wants what the script does not send (a fantasy
+   * no script serves, a cam, a video made for him, further): she may steer him to something made for him, her script
+   * still running (Charles 27/11).
+   */
+  readonly customMidScript: boolean;
   readonly cameEarly: boolean;
   readonly inPlay: boolean;
   readonly haggling: boolean;
@@ -138,6 +151,8 @@ export function sextingMomentOf(facts: {
   readonly boughtOut: boolean;
   readonly hasScriptStep: boolean;
   readonly customOrder: boolean;
+  /** Something made for him may be suggested to him now (`maySuggestCustom`): never to a fan nobody may sell to. */
+  readonly customAllowed: boolean;
   readonly desireMap: DesireMap;
   readonly uncovered: readonly string[];
   readonly degradingWords: readonly string[];
@@ -230,6 +245,21 @@ export function sextingMomentOf(facts: {
     !facts.customOrder &&
     // No money now: nothing made for him is suggested either.
     !saysNoMoneyNow({ risks: brief.risks });
+  // In the middle of her script, after he bought a paid step of it (Charles 27/11): he wants what it does not send, and
+  // she may steer him to something made for him. Before any purchase in the run, nothing changes; his own asking for a
+  // service is the custom order's (`customOrder`).
+  const boughtInRun =
+    running?.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought') === true;
+  const customMidScript =
+    fantasyAllowed &&
+    boughtInRun &&
+    brief !== undefined &&
+    (HEATED_INTENTS.includes(brief.intent) || brief.intent === 'asks_for_media') &&
+    // A fantasy the running script meets is no wish beyond it, even when no other script of hers is left to rank.
+    (facts.uncovered.some((item) => !playOn.includes(item) && mentions(item, facts.fanText)) ||
+      wantsMadeForHim(facts.fanText)) &&
+    !facts.customOrder &&
+    facts.customAllowed;
   // The creator's calibration of the sexting (Charles 26/11), each an intention for the voice.
   const cameEarly = heCame && cameBeforeFinale(storedRun);
   const inPlay = running !== null && !care;
@@ -263,6 +293,7 @@ export function sextingMomentOf(facts: {
     justBought,
     compliment,
     suggestsCustom,
+    customMidScript,
     cameEarly,
     inPlay,
     haggling,

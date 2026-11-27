@@ -480,7 +480,7 @@ export interface NextScriptStepInput {
  */
 const MIN_MESSAGES_BETWEEN_PAID_STEPS = 2;
 
-type NoScriptReason =
+export type NoScriptReason =
   | OfferBlock
   | 'held'
   | 'no_history'
