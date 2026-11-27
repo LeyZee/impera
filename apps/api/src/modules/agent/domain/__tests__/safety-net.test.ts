@@ -138,6 +138,22 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns('en première ligne au taf', now, 'tu fais quoi ?')).not.toContain('minor_suspected');
   });
 
+  it('lets a trade cancel a school word in its own sentence only, in four languages, never an age (Sécurité, #1043)', () => {
+    for (const text of [
+      'je suis au lycée, je suis prof',
+      'sono al liceo, sono un insegnante',
+      'estoy en el instituto, soy profesor',
+      'I’m at high school, I’m a teacher',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+    for (const text of [
+      'je suis prof. Bon sinon moi je suis au lycée',
+      'je suis prof, j’ai 16 ans',
+      'je suis prof, je suis né en 2011',
+    ])
+      expect(safetySigns(text, new Date('2026-11-27T12:00:00Z')), text).toContain('minor_suspected');
+  });
+
   it('lets a set phrase about death through, and still hears distress (Sécurité, #1043)', () => {
     for (const text of [
       'j’ai envie de mourir de rire',

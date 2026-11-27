@@ -108,7 +108,7 @@ function classOfHis(text: string, herLastTurn: string | undefined): boolean {
 }
 // His trade at a school or a minor's word that is a trade: « je suis prof », « je bosse au lycée », « surveillant ».
 const HIS_TRADE =
-  /\b(?:je suis|j'?suis|jsuis|chui|je bosse|je travaille|je taffe)(?: (?:comme|en tant que))? (?:prof|professeur|professeure|enseignant|enseignante|surveillant|surveillante|cpe|proviseur|principal|principale|documentaliste|aed|instit|maitre|maitresse|agent|cuisinier|cuisiniere|infirmier|infirmiere)\b|\b(?:je bosse|je travaille|je taffe|j'?enseigne) (?:au|dans un|dans une|en) (?:lycee|college|ecole)\b/u;
+  /\b(?:sono|soy|i'?m|i am)(?: (?:un|una|a|an|il|la|el))? (?:insegnante|professore|professoressa|maestra|maestro|docente|bidello|bidella|profesor|profesora|teacher|tutor|teaching assistant|school counselor|janitor)\b|\b(?:i (?:work|teach) (?:at|in)|lavoro (?:al|in un|in una|a)|insegno (?:al|in un|in una|a)|trabajo en (?:el|un|una)|enseno en (?:el|un|una)) (?:a |the )?(?:high school|middle school|school|liceo|scuola|instituto|colegio|escuela)\b|\b(?:je suis|j'?suis|jsuis|chui|je bosse|je travaille|je taffe)(?: (?:comme|en tant que))? (?:prof|professeur|professeure|enseignant|enseignante|surveillant|surveillante|cpe|proviseur|principal|principale|documentaliste|aed|instit|maitre|maitresse|agent|cuisinier|cuisiniere|infirmier|infirmiere|tuteur|tutrice)\b|\b(?:je bosse|je travaille|je taffe|j'?enseigne) (?:au|dans un|dans une|en) (?:lycee|college|ecole)\b/u;
 // Set phrases that name death or harm without meaning it.
 const SET_PHRASES =
   /\b(?:mourir|crever|me tuer|creve|meurs) (?:de (?:rire|chaud|faim|fatigue|froid|soif|honte|envie)|au (?:boulot|travail|taf|sport)|a la (?:salle|tache)|tellement)\b/gu;
@@ -246,19 +246,19 @@ export function safetySigns(fanText: string, now: Date = new Date(), herLastTurn
   const text = normalise(fanText);
   const signs: SafetySign[] = [];
   // A pupil's role he asks of her is about her costume, never his class (Sécurité, #1043).
-  const his = clausesOfHis(text).filter((clause) => !SCHOOL_ROLE.test(normaliseWords(clause)));
-  // A trade said in the same message cancels a school or a minor's word (Sécurité, #1043): « je suis au lycée, je
-  // suis prof ». An age under 18 still counts.
-  const atWork = HIS_TRADE.test(text);
+  const hisOf = (sentence: string) =>
+    clausesOfHis(sentence).filter((clause) => !SCHOOL_ROLE.test(normaliseWords(clause)));
+  // A trade said in the same sentence cancels a school or a minor's word (Sécurité, #1043): « je suis au lycée, je
+  // suis prof ». Never in another sentence of a long message, and never an age nor a birth year.
+  const schoolWord = (sentence: string) =>
+    !HIS_TRADE.test(sentence) &&
+    (MINOR_WORDS.some((pattern) => pattern.test(sentence)) ||
+      hisOf(sentence).some((clause) => MINOR_PLACES.some((pattern) => pattern.test(clause))) ||
+      classOfHis(sentence, herLastTurn));
   if (
     MINOR_AGE.some((pattern) => pattern.test(text)) ||
-    (!atWork &&
-      (MINOR_WORDS.some((pattern) => pattern.test(text)) ||
-        his.some(
-          (clause) =>
-            MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
-        ) ||
-        classOfHis(text, herLastTurn)))
+    hisOf(text).some((clause) => bornMinor(clause, now.getUTCFullYear())) ||
+    text.split(/[.!?\n]+/u).some(schoolWord)
   )
     signs.push('minor_suspected');
   if (minorFantasy(fanText)) signs.push('minor_fantasy');

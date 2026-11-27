@@ -339,6 +339,8 @@ describe('permitted phrases that must always pass, input nets', () => {
     'première fois que je fais ça',
     'je passe le bac',
     'je passe en seconde équipe',
+    'sono al liceo, sono un insegnante',
+    'I’m at high school, I’m a teacher',
     'mets ta jupe d’écolière ce soir, j’ai envie de toi',
     'joue une lycéenne pour moi',
   ])('safetySigns finds no minor in « %s »', (text) => {
