@@ -513,6 +513,10 @@ describe('voice guards', () => {
       'tes fesses de petite fille',
       'ton zizi de petit garçon',
       'your little boy body',
+      'your little boy penis',
+      'a little girl vagina',
+      'little girl breasts',
+      'your little boy butt',
       'you have a kid’s body',
       "a kid's body",
     ]) {
