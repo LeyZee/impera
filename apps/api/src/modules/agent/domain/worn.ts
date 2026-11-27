@@ -18,6 +18,19 @@ export interface WornLimits {
 /** Safe defaults while no creator sets her own (her persona's settings do not carry them yet). */
 export const DEFAULT_WORN_LIMITS: WornLimits = { window: 60, maxUses: 4 };
 
+/**
+ * A phrase is worn only once it came back to at least this many different fans (one conversation each). What she
+ * repeats to one fan alone (his first name, his town, a detail of his) is that fan's own, already caught by the
+ * repetition guard of his conversation: it must never be named in the prompt of another fan (Sécurité, 27/11).
+ */
+export const WORN_MIN_CONVERSATIONS = 3;
+
+/** One of her last outgoing texts, with the conversation it went to. */
+export interface HerRecentMessage {
+  readonly conversationId: string;
+  readonly text: string;
+}
+
 /** At most this many worn phrases are named to the voice. */
 const WORN_NAMED_MAX = 8;
 
@@ -66,18 +79,30 @@ function namesIn(messages: readonly string[]): Set<string> {
   return names;
 }
 
-/** The phrases worn in her recent messages, the most used first; none under the limits. */
+/**
+ * The phrases worn in her recent messages, the most used first: in at least `maxUses` of them, sent to at least
+ * `WORN_MIN_CONVERSATIONS` different conversations. None under the limits.
+ */
 export function wornPhrases(
-  herRecent: readonly string[],
+  herRecent: readonly HerRecentMessage[],
   limits: WornLimits = DEFAULT_WORN_LIMITS,
 ): string[] {
   const read = herRecent.slice(0, limits.window);
-  const names = namesIn(read);
+  const names = namesIn(read.map((message) => message.text));
   const counts = new Map<string, number>();
+  const conversations = new Map<string, Set<string>>();
   for (const message of read) {
-    for (const motif of motifsOf(message, names)) counts.set(motif, (counts.get(motif) ?? 0) + 1);
+    for (const motif of motifsOf(message.text, names)) {
+      counts.set(motif, (counts.get(motif) ?? 0) + 1);
+      const seen = conversations.get(motif) ?? new Set<string>();
+      seen.add(message.conversationId);
+      conversations.set(motif, seen);
+    }
   }
-  const worn = [...counts].filter(([, count]) => count >= limits.maxUses);
+  const worn = [...counts].filter(
+    ([motif, count]) =>
+      count >= limits.maxUses && (conversations.get(motif)?.size ?? 0) >= WORN_MIN_CONVERSATIONS,
+  );
   // A run inside a longer worn one says the same: the longest is kept.
   return worn
     .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)

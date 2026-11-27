@@ -220,10 +220,10 @@ interface MessageRepository {
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
   /**
-   * Her last `limit` texts to all her fans, newest first, the platform's automations left out: what her worn phrases
-   * are counted on (passe 2 du 26/11).
+   * Her last `limit` texts to all her fans, newest first, each with its conversation, the platform's automations left
+   * out: what her worn phrases are counted on, across fans only (passe 2 du 26/11, Sécurité 27/11).
    */
-  herRecent(limit: number): Promise<readonly string[]>;
+  herRecent(limit: number): Promise<readonly HerRecentMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
   /** His spend and first message; his tier and last purchase from her sales register (ADR 0132, 0128) at `now`. */
   fanStats(fanId: FanId, now: Date): Promise<FanStats>;
@@ -331,6 +331,12 @@ interface SalesState {
 }
 
 /** The reasons she already gave him for not meeting yet, and whether she already teased him once (Charles 21/11). */
+/** One of her last texts, and the conversation it went to: a phrase is worn only across several fans. */
+interface HerRecentMessage {
+  readonly conversationId: ConversationId;
+  readonly text: string;
+}
+
 interface MeetingJournal {
   readonly given: readonly MeetingReason[];
   readonly teased: boolean;
@@ -759,7 +765,7 @@ export interface ComposeInput {
   /** What she already answered him about meeting her (`meeting_answered`); absent, nothing given yet. */
   readonly meeting?: MeetingJournal;
   /** Her last texts to all her fans, newest first: her worn phrases (passe 2 du 26/11). Absent: none read. */
-  readonly herRecent?: readonly string[];
+  readonly herRecent?: readonly HerRecentMessage[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
   /** His runs before `scriptRun` that went cold, and her teases about `scriptRun` when he left it (Charles 20/11). */

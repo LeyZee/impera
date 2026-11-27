@@ -211,7 +211,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
       },
       async herRecent(limit) {
         const rows = await tx
-          .select({ text: schema.messages.text })
+          .select({ conversationId: schema.messages.conversationId, text: schema.messages.text })
           .from(schema.messages)
           .where(
             and(
@@ -224,7 +224,10 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           )
           .orderBy(sql`${schema.messages.platformCreatedAt} desc, ${schema.messages.id} desc`)
           .limit(limit);
-        return rows.map((row) => row.text);
+        return rows.map((row) => ({
+          conversationId: ConversationIdSchema.parse(row.conversationId),
+          text: row.text,
+        }));
       },
       async fanStats(fanId, now) {
         const [totals] = await tx

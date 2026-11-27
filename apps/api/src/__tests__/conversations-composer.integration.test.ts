@@ -735,8 +735,16 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     composer.next = { kind: 'draft', bubbles: ['Coucou toi'], softViolations: [], costUsd: 0 };
     await respond(id);
     const herRecent = composer.inputs.at(-1)?.herRecent ?? [];
-    expect(herRecent.slice(0, 2)).toEqual(['Et toi ta soirée ?', 'Un chocolat chaud sous le plaid 😌']);
-    expect(herRecent).not.toContain('Bienvenue chez moi');
+    const [other] = await test.admin.db
+      .select({ id: schema.conversations.id })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.platformConversationId, 'c-other-fan'));
+    // Each text with the conversation it went to: a phrase is worn only across fans (Sécurité 27/11).
+    expect(herRecent.slice(0, 2)).toEqual([
+      { conversationId: other?.id, text: 'Et toi ta soirée ?' },
+      { conversationId: other?.id, text: 'Un chocolat chaud sous le plaid 😌' },
+    ]);
+    expect(herRecent.map((message) => message.text)).not.toContain('Bienvenue chez moi');
   });
 
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {

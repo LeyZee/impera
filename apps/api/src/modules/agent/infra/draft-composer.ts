@@ -67,6 +67,7 @@ import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
 import { spenderRegisterOf } from '../domain/spender-register';
 import { handoffCauseOf } from '../domain/traps';
+import type { HerRecentMessage } from '../domain/worn';
 
 import {
   composeTurn,
@@ -212,8 +213,11 @@ export interface AgentComposeInput {
   readonly saleTrouble?: SaleTroubleSeen;
   /** What she already answered him about meeting her, and how close he is (Charles 21/11); absent, nothing given. */
   readonly meeting?: ComposeTurnInput['meeting'];
-  /** Her last outgoing messages to all her fans, newest first: her worn phrases (passe 2 du 26/11). Absent: none read. */
-  readonly herRecent?: readonly string[];
+  /**
+   * Her last outgoing messages to all her fans, newest first, each with its conversation: her worn phrases (passe 2 du
+   * 26/11), counted across fans only. Absent: none read.
+   */
+  readonly herRecent?: readonly HerRecentMessage[];
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
