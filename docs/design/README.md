@@ -94,6 +94,21 @@ Donnés sur la maquette du Dashboard (fil de revue 08), valables pour tout le CR
 
 Ce qui le vérifie tout seul : `shell/figures/figures-answer.test.ts` échoue si un écran dessine un graphique sans rien brancher sur le pointeur, ou si une figure partagée perd son entrée ou son état allumé ; un `<Donut>` s'allume de lui-même quand l'écran ne tient pas la part allumée ; `shell/figures/one-drawing.test.ts` refuse le retour d'un dessin propre à un écran ; les tests de titres, de cibles de 44 px et de durées en dur existaient déjà. La hiérarchie, l'alignement et les icônes ne se vérifient pas par un test : ils se jugent sur captures, par le fil Design, avant Charles.
 
+### La hiérarchie d'abord (Charles, 2026-11-27)
+
+« À chaque fois qu'on travaille sur un nouvel écran, et même sur les autres, il faut s'assurer qu'il y a une belle hiérarchie des informations. C'est super important que l'œil pointe naturellement vers les trucs les plus importants, que les trucs les moins importants soient un peu plus discrets… pour une lisibilité complète et pour une navigation fluide, intuitive. »
+
+La hiérarchie est le premier critère de l'accord du fil Design, avant les briques, les couleurs et l'alignement. Un écran conforme au design system mais sans hiérarchie est refusé. Elle vaut pour un écran nouveau comme pour un écran existant qu'un lot touche : celui qui y ajoute une carte, un chiffre ou un bouton vérifie que l'ensemble se lit encore dans le bon ordre.
+
+Le fil Design la juge sur capture par quatre questions, dans cet ordre :
+
+1. **Qui lit l'écran, et à quel moment ?** Un chatteur qui finit son shift, une créatrice sur son téléphone, le propriétaire le matin. La réponse décide de tout le reste.
+2. **Quelle est la première chose que l'œil lit ?** Capture réduite au quart ou vue de loin : ce qui reste lisible doit être la réponse qu'il cherche (l'argent vendu, ce qu'il doit faire maintenant), dans ses mots à lui et non dans ceux d'Impera. Si c'est un titre de carte, un compteur interne ou un bouton secondaire, l'écran n'a pas choisi.
+3. **Quelle est la deuxième, puis la troisième ?** L'ordre de lecture suit l'ordre d'importance : taille, contraste et position descendent ensemble. Deux blocs de même poids côte à côte se départagent ; une rangée de tuiles égales n'est une réponse que si les chiffres ont vraiment la même importance.
+4. **Qu'est-ce qui peut se taire ?** Tout ce qui ne sert ni à agir ni à décider passe en `ink-muted` ou `ink-faint`, descend, ou se replie. Un écran ne gagne pas en clarté par ce qu'on y ajoute.
+
+L'accord posté sur la PR dit en une ligne ce que l'œil lit en premier sur chaque écran du lot. Un lot dont cette ligne ne peut pas s'écrire n'a pas d'accord.
+
 ## Où vivent les choses
 
 | Fichier                                                 | Rôle                                                                                                                                                |

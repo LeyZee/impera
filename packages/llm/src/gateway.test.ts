@@ -1164,6 +1164,19 @@ describe('instagramComment (ADR 0122 § 2)', () => {
     expect(system).not.toContain('Merciii');
   });
 
+  it('puts the public part of the agency’s style in the system, as data, and nothing without one', async () => {
+    const xai = scripted([{ text: JSON.stringify(reply) }, { text: JSON.stringify(reply) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.instagramComment({ ...base, publicStyle: 'Un merci simple.' });
+    await gateway.instagramComment(base);
+
+    const systemOf = (call: number) =>
+      JSON.stringify(xai.doGenerateCalls[call]?.prompt.filter((m) => m.role === 'system'));
+    expect(systemOf(0)).toContain('<agency_public_style>\\nUn merci simple.\\n</agency_public_style>');
+    expect(systemOf(1)).not.toContain('agency_public_style');
+  });
+
   it('gives the shape of her closest reply', async () => {
     const xai = scripted([{ text: JSON.stringify(reply) }]);
     const { gateway } = setup({ xai });

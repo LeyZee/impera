@@ -64,6 +64,7 @@ export const JOB_NAMES = [
   'notifications.recap',
   'alerts.route',
   'notifications.creator_sale',
+  'notifications.creator_notices',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
   'creator_week.plan',
@@ -91,6 +92,7 @@ export const JOB_NAMES = [
   'payroll.purge_refused_documents',
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
+  'payroll.notify_payout_change',
   'media.describe',
   'media.describe_vault',
   'content_drops.receive_file',
@@ -152,6 +154,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.recap': 'Récapitulatif des notifications',
   'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
+  'notifications.creator_notices': 'Demandes, propositions et semaine dites à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
   'creator_week.plan': 'Semaine de la créatrice',
@@ -179,6 +182,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.purge_refused_documents': 'Nettoyage des documents refusés',
   'payroll.settle_documents': 'Règlement des documents',
   'payroll.lock_payout_certificate': 'Attestation de paiement',
+  'payroll.notify_payout_change': 'Où te verser changé',
   'media.describe': 'Description des médias',
   'media.describe_vault': 'Description des médias du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
@@ -335,6 +339,12 @@ export const JOB_PAYLOADS = {
    */
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   /**
+   * Every five minutes (trou 9 du 21/11): what the agency asked of a creator in the last half hour (a request for
+   * content, a script, a proposition for her agenda, her week validated) told to her accounts, once each, on the sort
+   * she may turn off. A run missed is caught by the next one within the half hour.
+   */
+  'notifications.creator_notices': z.object({}),
+  /**
    * The reminder she chose for a task at an hour (CR-05 lot b3): enqueued with the task's write under the key
    * `creator_tasks.remind:<taskId>`, at its start less her minutes. `startsAt` is the start it was scheduled for: a
    * move replaces the job, and a job left from before rings nothing.
@@ -479,6 +489,16 @@ export const JOB_PAYLOADS = {
    * not locked yet (`null`). A bucket that does not answer fails the run, never the transfer.
    */
   'payroll.lock_payout_certificate': z.object({ statementId: CommissionStatementIdSchema.nullable() }),
+  /**
+   * A member's « Où te verser » changed (ADR 0165 § 5): told to his own devices (his account, read with the write, so
+   * that the job needs no service-role read), the version's id as its object.
+   */
+  'payroll.notify_payout_change': z.object({
+    memberId: TeamMemberIdSchema,
+    versionId: z.uuid(),
+    userId: z.string().min(1),
+    timeZone: z.string().min(1),
+  }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -678,6 +698,8 @@ export const JOB_MAX_ATTEMPTS = {
   'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
+  // Every five minutes, and each notification rings once: the next run is the retry.
+  'notifications.creator_notices': 1,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
@@ -727,6 +749,7 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.settle_documents': 5,
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
+  'payroll.notify_payout_change': 5,
   'media.describe': 3,
   // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
   'media.describe_vault': 3,

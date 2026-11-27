@@ -1214,7 +1214,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const kept = keptLanguage?.value ?? null;
       const herLastTurn = input.history[lastAnswer]?.text;
       // Once a human confirmed his age, a sign of a minor read before that decision is settled: only what he wrote
-      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress reads it all.
+      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress and a fantasy of
+      // his on minors read it all.
       const signs = safetySigns(fanText, input.now, herLastTurn, kept).filter(
         (sign) =>
           sign !== 'minor_suspected' ||
@@ -1222,7 +1223,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
             'minor_suspected',
           ),
       );
-      if (signs.includes('minor_suspected')) {
+      // A fantasy of his on minors: the same, the alert names the reason, never his words (Charles 26/11 at 23:45).
+      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
       }

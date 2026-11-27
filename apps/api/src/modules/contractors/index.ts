@@ -1,5 +1,5 @@
 import type { CommissionStatementId } from '@impera/contracts';
-import { withAdmin, type Database } from '@impera/db';
+import { withAdmin, type Database, type EncryptionKey } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -18,6 +18,8 @@ import { createDrizzleDocumentPurgeStore } from './infra/document-purge-store';
 import { createDrizzleDocumentReminderStore, documentReminderDaysOf } from './infra/document-reminder-store';
 import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createDrizzlePayoutCertificateStore } from './infra/payout-certificate-store';
+import { createPayoutDestinationRoutes } from './infra/payout-routes';
+import { createPayoutDestinationStore } from './infra/payout-store';
 import { readPng } from './infra/png';
 import type {
   ContractorInvoiceReads,
@@ -40,6 +42,8 @@ export { lockAtLeast, readChecked, sha256Hex } from './application/locked-object
 /** `payroll.lock_payout_certificate`, which recording a transfer enqueues in its transaction (ADR 0041 § 6). */
 export { enqueuePayoutCertificateLock } from './infra/queue';
 export type { ContractorInvoiceReads, ContractorPayReads, InvoiceRequeue } from './infra/ports';
+/** « Où te verser » under the key checks and rotation of the ops commands (ADR 0165 § 2). */
+export { checkPayoutDestinations, resealPayoutDestinations } from './infra/payout-store';
 
 /** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
 export { contractorReadsForAccounting } from './infra/accounting-reads';
@@ -57,6 +61,11 @@ export interface ContractorsModule {
    * `/payroll/billing-regimes`; `recentLogin` guards every write (EQ-15).
    */
   routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
+  /**
+   * « Où te verser » (ADR 0165), mounted under `/v1` too: `/payroll/payout-destinations` and
+   * `/payroll/contractors/:memberId/payout-destination…`.
+   */
+  payoutRoutes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   readonly jobs: {
     /**
      * `payroll.remind_documents`, each hour (EQ-06 lot 5c-2): each document a contractor's regime asks for that comes
@@ -95,14 +104,19 @@ export interface ContractorsDeps {
   readonly pay: ContractorPayReads;
   /** The two buckets the documents are kept in. */
   readonly buckets: { readonly primary: InvoiceObjectStore; readonly copy: InvoiceObjectStore };
+  /** CREDENTIALS_ENCRYPTION_KEYS, for « Où te verser » (ADR 0165 § 2); `null`: nothing is kept unsealed. */
+  readonly credentialKeys: readonly EncryptionKey[] | null;
   readonly now?: () => Date;
 }
 
 export function createContractorsModule(deps: ContractorsDeps): ContractorsModule {
   const now = deps.now ?? (() => new Date());
   const { primary, copy } = deps.buckets;
+  const payouts = createPayoutDestinationStore(deps.db, deps.credentialKeys, now);
   return {
     name: 'contractors',
+    payoutRoutes: (requireRole, recentLogin) =>
+      createPayoutDestinationRoutes(payouts, requireRole, recentLogin),
     routes: (requireRole, recentLogin) =>
       createContractorRoutes(
         createPayrollBillingSettings(

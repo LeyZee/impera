@@ -157,12 +157,34 @@ async function herPersona(now: Date): Promise<ReturnType<typeof commentWriterPer
   }
 }
 
+/** The public part of the agency's active base style (ADR 0173), read on a connection that cannot write; none: empty. */
+async function agencyPublicStyle(): Promise<string> {
+  const admin = readOnlyAdminDb(`${COMMAND} (style de base)`, false);
+  try {
+    const rows = await admin.db
+      .select({ version: schema.agencyStyles.version, publicStyle: schema.agencyStyles.publicStyle })
+      .from(schema.agencyStyles)
+      .where(eq(schema.agencyStyles.isActive, true));
+    const [row] = rows;
+    const text = row?.publicStyle.trim() ?? '';
+    console.log(
+      row === undefined
+        ? 'Style de base : aucun actif'
+        : `Style de base : version ${String(row.version)}${text === '' ? ', partie publique vide' : ''}`,
+    );
+    return text;
+  } finally {
+    await admin.close();
+  }
+}
+
 const now = new Date();
 const pairs = readPairs(values.corpus);
 if (pairs.length <= count.data) fail('il faut plus de paires que --count : le reste sert d’exemples.');
 const { test, bank } = setAside(pairs, count.data, seed.data);
 const examples = bank.map((pair, index) => ({ id: String(index), comment: pair.comment, reply: pair.reply }));
 const persona = await herPersona(now);
+const publicStyle = await agencyPublicStyle();
 
 const credentials = readProviderCredentials(
   values['key-from-crm'] ? { ...process.env, ...(await crmKeys(`${COMMAND} --key-from-crm`)) } : process.env,
@@ -203,7 +225,7 @@ for (const pair of test) {
     {
       fromOwnAccount: false,
       authorAgeDoubtOpen: false,
-      ageDoubtDetected: signs.includes('minor_suspected'),
+      ageDoubtDetected: signs.includes('minor_suspected') || signs.includes('minor_fantasy'),
       distressDetected: signs.includes('self_harm'),
       repliesToAuthorToday: 0,
       repliesInThread: 0,
@@ -217,6 +239,7 @@ for (const pair of test) {
       const result = await gateway.instagramComment({
         creatorName: persona.creatorName,
         personaSheet: persona.personaSheet,
+        ...(publicStyle === '' ? {} : { publicStyle }),
         examples: [],
         recentReplies,
         nearExamples: near,
