@@ -326,3 +326,7 @@
     padding-left: var(--nv-space-4);
   }
 }
+.cw-head__arrow {
+  width: 44px;
+  padding: 0;
+}

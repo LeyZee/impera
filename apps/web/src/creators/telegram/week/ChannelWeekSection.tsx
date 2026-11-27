@@ -104,7 +104,7 @@ export function ChannelWeekSection({
         <div className="cw-head__weeks" role="group" aria-label="Changer de semaine">
           <button
             type="button"
-            className="nv-iconbtn"
+            className="nv-btn nv-btn--soft nv-btn--sm cw-head__arrow"
             aria-label="Semaine d’avant"
             onClick={() => {
               goWeek(-7);
@@ -114,7 +114,7 @@ export function ChannelWeekSection({
           </button>
           <button
             type="button"
-            className="nv-iconbtn"
+            className="nv-btn nv-btn--soft nv-btn--sm cw-head__arrow"
             aria-label="Semaine d’après"
             onClick={() => {
               goWeek(7);
@@ -345,7 +345,9 @@ function Post({
             <span className="nv-tag nv-tag--tint" style={{ '--_c': colour }}>
               {label}
             </span>
-            <span className="cw-post__theme">{THEME_LABEL[post.theme]}</span>
+            {post.theme === 'poll' || post.theme === 'evening' ? null : (
+              <span className="cw-post__theme">{THEME_LABEL[post.theme]}</span>
+            )}
           </span>
           {removed ? null : (
             <span className="cw-post__text">{words === null ? 'Le texte s’écrit…' : words.text}</span>
