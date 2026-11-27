@@ -54,3 +54,10 @@ export const BARE_TEEN_NOT_A_DATE = new RegExp(
     `(?!\\s*(?:au|al|a|to|-)\\s*\\d)(?!\\s*${MONTHS}\\b)`,
   'u',
 );
+
+/**
+ * Her question about his age, in the covered languages (« t'as quel âge ? », « how old are you », « quanti anni hai »,
+ * « cuántos años tienes »): a bare number in his answer is his age. On normalised text.
+ */
+export const HER_AGE_QUESTION =
+  /\b(?:quel age|ton age|how old|your age|quanti anni|che eta|cuantos anos|que edad|tu edad)\b/u;

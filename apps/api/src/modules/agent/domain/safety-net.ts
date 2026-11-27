@@ -1,7 +1,7 @@
 import { isGuardedLanguage, normalise, type Language } from '@impera/contracts';
 
-import { detectLanguage, isMostlyLatin, uncoveredSentences } from './language';
-import { BARE_TEEN, NOT_AGE_ANY, TEEN_NOT_A_THING, UNIT } from './teen-number';
+import { bareTeenReading, detectLanguage, isMostlyLatin } from './language';
+import { BARE_TEEN, HER_AGE_QUESTION, NOT_AGE_ANY, TEEN_NOT_A_THING, UNIT } from './teen-number';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -197,13 +197,18 @@ const AGE_WITHOUT_UNIT = [
 ];
 
 /**
- * Whether a bare number of a minor is read as his age (ADR 0168 § 4): his message is in a language the guards do not
- * read (`'unknown'`, another script, a language outside the coverage), or it says nothing of its language and none
- * covered is kept for him. A short message of a fan whose kept language is covered (« je rentre le 15 », « mdr 12 »)
- * is read by the patterns of his language, never by this one. Nothing kept, or not known here: closed by default.
+ * Whether a bare number of a minor is read as his age (ADR 0168 § 4). His kept language is covered: only when it is
+ * alone in its sentence, answers her question about his age, or stands with a word of a language outside the coverage
+ * (`bareTeenReading`, 27/11); among unknown words, a human reads it without the doubt (`humanOnly`). Otherwise, as
+ * before: his message, or one of its sentences, is in a language the guards do not read (`'unknown'`, another script,
+ * a language outside the coverage), or it says nothing of its language and none covered is kept for him. Nothing
+ * kept, or not known here: closed by default.
  */
-function bareNumberIsAge(fanText: string, kept: Language | null): boolean {
-  if (!isMostlyLatin(fanText)) return true;
+function bareNumberIsAge(fanText: string, kept: Language | null, herLastTurn: string | undefined): boolean {
+  const asked = herLastTurn !== undefined && HER_AGE_QUESTION.test(normalise(herLastTurn));
+  const reading = bareTeenReading(fanText, asked);
+  if (kept !== null && isGuardedLanguage(kept)) return reading === 'age';
+  if (reading === 'age' || !isMostlyLatin(fanText)) return true;
   const read = detectLanguage(fanText);
   if (read === 'unknown') return true;
   if (read === null) return kept === null || !isGuardedLanguage(kept);
@@ -217,6 +222,8 @@ function bareNumberIsAge(fanText: string, kept: Language | null): boolean {
 export function safetySigns(
   fanText: string,
   now: Date = new Date(),
+  /** Her last turn before his message: a bare number after she asked his age is his age (ADR 0168 § 4). */
+  herLastTurn?: string,
   /** His kept language (ADR 0168 § 3); `null` when none is kept, or the caller does not know it. */
   kept: Language | null = null,
 ): SafetySign[] {
@@ -229,8 +236,7 @@ export function safetySigns(
       (clause) =>
         MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
     ) ||
-    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept)) ||
-    uncoveredSentences(fanText).some((sentence) => BARE_TEEN.test(normalise(sentence)))
+    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept, herLastTurn))
   )
     signs.push('minor_suspected');
   if (SELF_HARM.some((pattern) => pattern.test(text))) signs.push('self_harm');

@@ -722,6 +722,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           .slice(lastAnswer + 1)
           .map((t) => t.text)
           .join('\n'),
+        undefined,
+        history[lastAnswer]?.text,
       );
       if (signs.includes('minor_suspected')) {
         scripts = { ...scripts, salesFrozen: true };

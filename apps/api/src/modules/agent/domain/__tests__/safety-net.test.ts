@@ -167,7 +167,7 @@ describe('safetySigns (recette AGT-01)', () => {
     'ich bin 15. salut',
     '15 jahre. salut',
   ])('reads the bare number of a sentence the guards do not read in « %s »', (text) => {
-    expect(safetySigns(text, new Date(), 'french')).toEqual(['minor_suspected']);
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual(['minor_suspected']);
   });
 
   it.each([
@@ -180,7 +180,38 @@ describe('safetySigns (recette AGT-01)', () => {
     'à 16h. bisous',
     'le 12 décembre. ciao',
   ])('lets « %s » through: a lone foreign word, a name, no number in the other sentence', (text) => {
-    expect(safetySigns(text, new Date(), 'french')).toEqual([]);
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual([]);
+  });
+
+  // ADR 0168 § 4, two levels (Sécurité, 27/11): with his kept language covered, a bare number is an age doubt only
+  // alone in its sentence, after her question about his age, or beside a word of an uncovered language.
+  it.each([
+    'salut. 15',
+    'lol. 17 !',
+    'ich bin 15. salut',
+    '15 jahre. salut',
+    'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir',
+  ])('freezes on « %s » for a fan whose kept language is French', (text) => {
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual(['minor_suspected']);
+  });
+
+  it.each([
+    'niveau 15. trop dur ce jeu',
+    'étage 12. tu montes ?',
+    'saison 12. tu regardes ?',
+    'chambre 14. je t’attends en rêve',
+    'ligne 13. quelle galère ce matin',
+    'j’habite au 14. viens en rêve',
+    'bah 15 mdr',
+  ])('does not freeze on « %s » for a fan whose kept language is French', (text) => {
+    expect(safetySigns(text, new Date(), undefined, 'french')).toEqual([]);
+  });
+
+  it('reads a bare number as his age when it answers her question about it', () => {
+    expect(safetySigns('bah 15 mdr', new Date(), 't’as quel âge ?', 'french')).toEqual(['minor_suspected']);
+    expect(safetySigns('saison 12. tu regardes ?', new Date(), 'how old are you?', 'french')).toEqual([
+      'minor_suspected',
+    ]);
   });
 
   it('says both, the minor first, when he says both', () => {

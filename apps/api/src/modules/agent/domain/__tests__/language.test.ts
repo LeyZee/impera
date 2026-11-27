@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bareTeenReading,
   decideLanguage,
   detectLanguage,
   hasUncoveredSentence,
@@ -226,5 +227,41 @@ describe('uncoveredSentences: the language read sentence by sentence (ADR 0168 �
       spoken: ['french', 'english'],
     });
     expect(decision.humanOnly).toBe(false);
+  });
+});
+
+describe('bareTeenReading: a bare number from 10 to 17, two levels (ADR 0168 § 4, 27/11)', () => {
+  it.each(['salut. 15', 'lol. 17 !', 'ich bin 15. salut', '15 jahre. salut', 'mam 15. salut'])(
+    'reads « %s » as an age',
+    (text) => {
+      expect(bareTeenReading(text)).toBe('age');
+    },
+  );
+
+  it.each(['saison 12. tu regardes ?', 'niveau 15. trop dur ce jeu', 'ligne 13. quelle galère ce matin'])(
+    'gives « %s » to a human, without the age doubt',
+    (text) => {
+      expect(bareTeenReading(text)).toBe('human');
+    },
+  );
+
+  it.each(['rdv le 15. bisous', 'j’habite au 14. viens en rêve', 'à 16h. bisous', 'bah 15 mdr'])(
+    'reads nothing in « %s »',
+    (text) => {
+      expect(bareTeenReading(text)).toBeNull();
+    },
+  );
+
+  it('reads an age in any bare number that answers her question', () => {
+    expect(bareTeenReading('bah 15 mdr', true)).toBe('age');
+  });
+
+  it('puts « saison 12. tu regardes ? » for a human, with no freeze', () => {
+    const decision = decideLanguage({
+      fanTexts: ['saison 12. tu regardes ?'],
+      kept: { value: 'french', source: 'detected' },
+      spoken: ['french', 'english'],
+    });
+    expect(decision.humanOnly).toBe(true);
   });
 });
