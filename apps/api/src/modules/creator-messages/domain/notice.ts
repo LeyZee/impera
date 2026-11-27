@@ -20,12 +20,15 @@ export function toAgencyNotice(creatorName: string, kind: ToAgencyMessageKind): 
   };
 }
 
-/** « L'agence t'a répondu », to her: opens Aujourd'hui, where the answer sits under her message. */
+/**
+ * « L'agence t'a répondu », to her: opens Aujourd'hui on « Écrire à l'agence » itself, where the answer sits under her
+ * message, not on the top of her day three screens above (recette navigation 27/11, MOD-05).
+ */
 export function answerNotice(): PushMessage {
   return {
     title: 'L’agence t’a répondu',
     body: 'Sa réponse est sous ton message, dans Aujourd’hui.',
-    url: '/aujourdhui',
+    url: '/aujourdhui#agence',
   };
 }
 

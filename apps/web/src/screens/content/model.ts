@@ -86,6 +86,9 @@ export const DROP_OUTPUTS: readonly {
   },
 ];
 
+/** Every tile of her Contenu, in their order: what `?depot=` may open (recette MOD-06). */
+export const DROP_TILES: readonly DropCategory[] = DROP_OUTPUTS.flatMap((output) => output.categories);
+
 /** The extensions a browser may give no type for (MKV often), read as the type they are (ADR 0070 § 2). */
 const MIME_BY_EXTENSION: Readonly<Record<string, DropMime>> = {
   jpg: 'image/jpeg',

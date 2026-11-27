@@ -89,7 +89,9 @@ export function MemberSheet({
           <h2 className="nv-h2">{member.displayName}</h2>
           <p>
             {member.firstName} {member.lastName} · {ROLE_LABELS[member.teamRole]}
-            {arrivedDays >= 0 && arrivedDays < NEW_DAYS ? <span className="tm-new">Nouveau</span> : null}
+            {arrivedDays >= 0 && arrivedDays < NEW_DAYS ? (
+              <span className="tm-new">Vient d’arriver</span>
+            ) : null}
           </p>
           {/* Where and what hour, one small line: the team is mostly one hour apart (EQ-08). */}
           <p className="tm-sheet__where">

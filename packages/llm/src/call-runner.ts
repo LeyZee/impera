@@ -276,11 +276,26 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
     trace: CallTrace = {},
   ): Promise<Result<LlmSuccess<T>, LlmFailure>> {
     const roleConfig = deps.config.roles[role];
-    const targets: { ref: ModelRef; isFallback: boolean }[] = [{ ref: roleConfig, isFallback: false }];
-    if (roleConfig.fallback !== undefined) targets.push({ ref: roleConfig.fallback, isFallback: true });
+    const { fallback } = roleConfig;
+    const targets: { ref: ModelRef; isFallback: boolean; maxOutputTokens: number; timeoutMs: number }[] = [
+      {
+        ref: roleConfig,
+        isFallback: false,
+        maxOutputTokens: roleConfig.maxOutputTokens,
+        timeoutMs: roleConfig.timeoutMs,
+      },
+    ];
+    // The fallback's own room and patience when it has them (a thinking model needs more of both), else the role's.
+    if (fallback !== undefined)
+      targets.push({
+        ref: { provider: fallback.provider, model: fallback.model },
+        isFallback: true,
+        maxOutputTokens: fallback.maxOutputTokens ?? roleConfig.maxOutputTokens,
+        timeoutMs: fallback.timeoutMs ?? roleConfig.timeoutMs,
+      });
     const attempts: LlmFailure['attempts'][number][] = [];
 
-    for (const { ref, isFallback } of targets) {
+    for (const { ref, isFallback, maxOutputTokens, timeoutMs } of targets) {
       // Checked before each model: a costly failure can spend the last euros before the fallback.
       const refusedBy = deps.overBudget(trace.purpose);
       if (refusedBy !== undefined) return err({ code: refusedBy, attempts });
@@ -330,9 +345,9 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             // Mistral refuses greedy sampling (temperature 0) unless top_p is 1, and its SDK never sends it (400 «
             // invalid_request_greedy_sampling », the evals' judge, 20/11): every call of that role would fail.
             ...(ref.provider === 'mistral' && roleConfig.temperature === 0 && { topP: 1 }),
-            maxOutputTokens: roleConfig.maxOutputTokens,
+            maxOutputTokens,
             maxRetries: 0,
-            abortSignal: AbortSignal.timeout(roleConfig.timeoutMs),
+            abortSignal: AbortSignal.timeout(timeoutMs),
             ...(ref.provider === 'google' && { providerOptions: GOOGLE_SAFETY }),
             ...(ref.provider === 'xai' &&
               roleConfig.reasoningEffort !== undefined && {

@@ -831,7 +831,7 @@ function Rate({
         <Field
           id={`${id}-share`}
           label="Part du net de l’équipe"
-          hint="Ce qu’il touche sur le net de son équipe, en plus de ses ventes. Laisse vide s’il n’en a pas."
+          hint="Ce que ce membre touche sur le net de son équipe, en plus de ses ventes. Laisse vide s’il n’y en a pas."
           problem={problems.teamShare}
         >
           <span className="tm-percent">
@@ -858,8 +858,8 @@ function Rate({
               ? 'Aucune créatrice dans ta liste.'
               : 'Aucune créatrice pour l’instant.'
             : presetsOnly
-              ? 'Parmi les tiennes : celles sur lesquelles il travaille.'
-              : 'Celles sur lesquelles il travaille.'
+              ? 'Parmi les tiennes : celles de son travail.'
+              : 'Celles de son travail.'
         }
       >
         {creators.length === 0 ? null : (
