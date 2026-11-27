@@ -95,6 +95,8 @@ function script(ref: string, steps: readonly HerStep[], over: Partial<HerScript>
 /** Ours as an import recognised it on Reveal (ADR 0161): the same steps at the same prices. */
 const oursOf = (steps: readonly HerStep[]) => ({
   preparedScriptId: PreparedScriptIdSchema.parse(newId(PreparedScriptIdSchema)),
+  language: 'french' as const,
+  versionOf: null,
   description: 'Une soirée complice inventée.',
   moment: 'night' as const,
   steps: steps.map((each) => ({ branches: [{ priceMinor: each.priceMinor, currency: 'EUR' as const }] })),

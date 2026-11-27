@@ -22,10 +22,14 @@ ADR 0112 (§§ 13, 14, 20-26), ADR 0145 (coffre), ADR 0149 (fiche créatrice), m
   - [ ] 4 b : relevé quotidien automatique (accès de plus du rôle de service, avis de Sécurité).
   - [x] 4 c : bilan d'un script sur 7, 30 ou 90 jours (fans exposés, achat par étape, argent rapporté, ligne de contrôle de Reveal) et sa route `GET …/platform-scripts/performance`.
   - [ ] 4 d : vue sous chaque script dans « Ses scripts », captures et avis de Design.
+- [ ] Langue du fan, lot 2 (ADR 0169) :
+  - [x] serveur : langue d'un script, version dans une autre langue liée à son script (migration 0290), lacunes `version_differs`, `version_name_same`, `version_mentions_price`, routes `…/versions` et `…/resync`, langue et famille dans `ours` pour l'agent ;
+  - [ ] écran : langue d'un script, « Créer la version en … », « Reprendre la structure » (captures et avis de Design) ;
+  - [ ] proposition de traduction par l'IA, relue par un humain (accord de Charles sur le coût).
 
 ## Critères d'acceptation
 - Domaine en unitaire ; intégration : création rejouée, conflit, compte refusé, révision périmée, manques → 422, script fermé, isolation (chatteur, compte de la créatrice, manager hors liste) ; balayages d'isolation, d'authentification et d'origine verts.
 - Aucune donnée réelle ; aucune méthode, aucun seuil d'agence dans le dépôt.
 
 ## Hors périmètre
-Écriture d'un script chez Reveal (jamais), choix de la branche par l'agent (lot 2 du moteur), `script_writer`.
+Écriture d'un script chez Reveal (ADR 0167, autre lot), choix de la branche par l'agent (lot 2 du moteur), `script_writer`.

@@ -1,5 +1,6 @@
 import {
   CurrencySchema,
+  LANGUAGES,
   MEDIA_SLOT_KINDS,
   PLATFORM_SCRIPT_MEDIA_ROLES,
   PLATFORM_SCRIPT_NAME_MAX,
@@ -592,6 +593,13 @@ export const preparedScripts = pgTable(
     state: enumText('state').notNull().default('editing'),
     revision: integer('revision').notNull().default(1),
     content: jsonb('content').notNull(),
+    /** The language its texts are written in (langue du fan, ADR 0169): what the agent matches to the fan's. */
+    language: enumText('language').notNull().default('french'),
+    /**
+     * The script it is a version of, in another language (ADR 0169): the same media, prices and steps, its texts
+     * translated. `null` for a script of its own; never a version of a version.
+     */
+    versionOf: uuid('version_of'),
     /** The native script it became; set with `matched` only. */
     matchedPlatformScriptId: uuid('matched_platform_script_id'),
     matchedAt: timestampTz('matched_at'),
@@ -610,6 +618,18 @@ export const preparedScripts = pgTable(
       columns: [t.platformAccountId, t.creatorId],
       foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
     }),
+    unique('prepared_scripts_id_creator_unique').on(t.id, t.creatorId),
+    // A version is of a script of the same creator, and one per language (ADR 0169).
+    foreignKey({
+      name: 'prepared_scripts_version_creator_fk',
+      columns: [t.versionOf, t.creatorId],
+      foreignColumns: [t.id, t.creatorId],
+    }),
+    uniqueIndex('prepared_scripts_version_language_unique')
+      .on(t.versionOf, t.language)
+      .where(sql`${t.versionOf} is not null`),
+    check('prepared_scripts_version_self_check', sql`${t.versionOf} is distinct from ${t.id}`),
+    enumCheck('prepared_scripts', t.language, LANGUAGES),
     foreignKey({
       name: 'prepared_scripts_matched_creator_fk',
       columns: [t.matchedPlatformScriptId, t.creatorId],

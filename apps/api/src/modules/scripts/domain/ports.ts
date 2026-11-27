@@ -17,6 +17,7 @@ import type {
   PreparedScriptId,
   PreparedScriptMoment,
   PreparedScriptState,
+  ScriptLanguage,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
   ScriptIdentityContent,
@@ -353,9 +354,10 @@ export interface PlatformScriptReadStore {
   /**
    * What the performance of her scripts counts besides the runs (ADR 0129, sous-lot 4c), read as `ofCreator` is and
    * under the same rights: her active scripts recognised as ours and Reveal's daily readings of their steps. `null` for
-   * a reader who may not read her.
+   * a reader who may not read her. Only the readings from `fromDay` on (`YYYY-MM-DD`): the period and a few days before
+   * it, for the base it is counted from.
    */
-  performanceOf(creatorId: CreatorId, userId: string): Promise<PerformanceInput | null>;
+  performanceOf(creatorId: CreatorId, userId: string, fromDay: string): Promise<PerformanceInput | null>;
 }
 
 /** Her scripts as the performance measures them; readings by `readingKey(account, step ref)`. */
@@ -447,6 +449,11 @@ export interface StoredPreparedScript {
   readonly state: PreparedScriptState;
   readonly revision: number;
   readonly content: PreparedScriptContent;
+  readonly language: ScriptLanguage;
+  /** The script it is a version of (ADR 0169); `null` for a script of its own. */
+  readonly versionOf: PreparedScriptId | null;
+  /** A version only: its script's content, read in the same transaction, that it must keep but for its texts. */
+  readonly source: PreparedScriptContent | null;
   readonly matchedPlatformScriptId: PlatformScriptId | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -456,7 +463,8 @@ export interface StoredPreparedScript {
   readonly natives: readonly NativeScriptForMatch[] | null;
 }
 
-export type CreatePreparedOutcome = 'created' | 'replayed' | 'conflict' | 'account_invalid' | 'not_found';
+export type CreatePreparedOutcome =
+  'created' | 'replayed' | 'conflict' | 'account_invalid' | 'version_conflict' | 'not_found';
 type UpdatePreparedOutcome = 'updated' | 'stale' | 'closed' | 'not_found';
 
 /**
@@ -474,6 +482,12 @@ export interface PreparedScriptStore {
       readonly id: PreparedScriptId;
       readonly platformAccountId: PlatformAccountId;
       readonly content: PreparedScriptContent;
+      readonly language: ScriptLanguage;
+      /**
+       * Its script, for a version (ADR 0169): one of hers on the same account, not itself a version, in another language,
+       * and without a version in this one yet; else `version_conflict`.
+       */
+      readonly versionOf: PreparedScriptId | null;
     },
     userId: string,
   ): Promise<CreatePreparedOutcome>;
@@ -497,6 +511,10 @@ export interface PreparedScriptStore {
  */
 export interface OurCopy {
   readonly preparedScriptId: PreparedScriptId;
+  /** The language of its texts (ADR 0169): the agent offers it only to a fan of that language. */
+  readonly language: ScriptLanguage;
+  /** The script it is a version of; the family the agent counts once is `versionOf ?? preparedScriptId`. */
+  readonly versionOf: PreparedScriptId | null;
   readonly description: string;
   readonly moment: PreparedScriptMoment;
   readonly steps: readonly {
