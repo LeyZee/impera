@@ -4,7 +4,7 @@ import { abandonTease, type AbandonTease } from './abandon';
 import { fantasyMatchOf, mentions, type DesireMap } from './fantasy-match';
 import { gaugeDue, holdsBackNow, projectionDue } from './gauge';
 import { touchesTerm } from './guards';
-import { keepsWarm, offerSignals } from './policy';
+import { keepsWarm, offerSignals, saysNoMoneyNow } from './policy';
 import { registerOf, type Register } from './register';
 import { scriptStepsHeld, type PlatformScriptView, type ScriptRun } from './script-run';
 import type { ScriptTurn } from './script-turn';
@@ -227,7 +227,9 @@ export function sextingMomentOf(facts: {
     brief?.intent === 'asks_for_media' &&
     facts.uncovered.some((item) => mentions(item, facts.fanText)) &&
     !facts.hasScriptStep &&
-    !facts.customOrder;
+    !facts.customOrder &&
+    // No money now: nothing made for him is suggested either.
+    !saysNoMoneyNow({ risks: brief.risks });
   // The creator's calibration of the sexting (Charles 26/11), each an intention for the voice.
   const cameEarly = heCame && cameBeforeFinale(storedRun);
   const inPlay = running !== null && !care;

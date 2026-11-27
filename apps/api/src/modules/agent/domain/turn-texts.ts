@@ -164,7 +164,7 @@ export const AFTER_INSULT_HINT =
 /** Broke until his pay, a fan who already paid (passe 11a, Charles 21/11): kept warm, words only (`keepsWarm`). */
 export const KEEP_WARM_HINT =
   'il est à sec pour l’instant mais il a déjà payé : elle le garde au chaud, gratuitement, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
-/** He asks for more the evening he took everything (passe 18, Charles 21/11): nothing more tonight (`asksMoreSameEvening`). */
+/** He asks for more the evening he bought a step of his script (passe 18, Charles 21/11): nothing more tonight (`asksMoreTonight`). */
 export const MORE_TONIGHT_HINT =
   'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle l’oriente vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
 

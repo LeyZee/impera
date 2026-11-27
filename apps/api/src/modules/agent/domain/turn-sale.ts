@@ -3,7 +3,13 @@ import type { ObjectionReplies } from '@impera/contracts';
 import type { ScriptStart, ScriptStartBlock } from './availability';
 import type { CustomOrderDecision } from './custom-order';
 import { pickObjectionReply, type PickedObjectionReply } from './objections';
-import { asksMoreSameEvening, offerDecision, offerSignals, type OfferBlock } from './policy';
+import {
+  asksMoreSameEvening,
+  maySuggestCustom,
+  offerDecision,
+  offerSignals,
+  type OfferBlock,
+} from './policy';
 import { refusalMove, type RefusalMove } from './refusal';
 import {
   complainsOfPurchase,
@@ -12,7 +18,7 @@ import {
   type SaleTroubleOutcome,
   type SaleTroubleSeen,
 } from './sale-trouble';
-import { scriptStepsHeld } from './script-run';
+import { scriptStepsHeld, type ScriptRun } from './script-run';
 import type { ScriptTurn } from './script-turn';
 import type { Situation } from './situation';
 import type { TurnReading } from './turn-briefs';
@@ -183,16 +189,31 @@ export function saleMovesOf(
   return { refusal, reminds, saleTrouble, waitingStep, complaint };
 }
 
-/** He asks for more the evening he had his script: nothing more tonight, a custom request instead (passe 18). */
+/** When he last bought a paid step of this run, `null` when he bought none: the purchase, never the offer. */
+function lastBoughtStepAt(run: ScriptRun | null | undefined): Date | null {
+  return run?.steps.findLast((step) => step.kind === 'paid' && step.outcome === 'bought')?.at ?? null;
+}
+
+/**
+ * He asks for more the evening he bought a step of his script: nothing more tonight, a custom request instead (passe
+ * 18). Only after a real purchase this evening, read on his latest run; an offer made or refused is not one. Never to a
+ * fan nobody may sell to, nor one who says he has no money now (`maySuggestCustom`): no custom nor cam pushed at him.
+ */
 export function asksMoreTonight(
-  brief: Pick<TurnReading, 'intent' | 'sentiment' | 'desireSignals'> | undefined,
+  brief: Pick<TurnReading, 'intent' | 'sentiment' | 'desireSignals' | 'risks'> | undefined,
   offer: OfferInput | undefined,
   hasScriptStep: boolean,
+  latestRun: ScriptRun | null | undefined,
 ): boolean {
   return (
     brief !== undefined &&
     offer !== undefined &&
     !hasScriptStep &&
-    asksMoreSameEvening({ ...offer, fanAsksForPaid: offerSignals(brief).fanAsksForPaid })
+    maySuggestCustom({ risks: brief.risks, flags: offer.flags }) &&
+    asksMoreSameEvening({
+      ...offer,
+      fanAsksForPaid: offerSignals(brief).fanAsksForPaid,
+      boughtAt: lastBoughtStepAt(latestRun),
+    })
   );
 }

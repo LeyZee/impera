@@ -150,13 +150,64 @@ describe('the offer decided by code', () => {
     expect(objectionReplyOf(READ, false, false, objections)).toBeUndefined();
   });
 
-  it('nothing more the evening he had his script', () => {
+  describe('he asks for more the evening he bought (passe 18)', () => {
     const tonight = { ...OFFER, lastOfferAt: minutesAgo(60) };
     const asks: TurnReading = { ...READ, intent: 'asks_for_media' };
-    expect(asksMoreTonight(asks, tonight, false)).toBe(true);
-    expect(asksMoreTonight(asks, tonight, true)).toBe(false);
-    expect(asksMoreTonight(asks, OFFER, false)).toBe(false);
-    expect(asksMoreTonight(undefined, tonight, false)).toBe(false);
+    const runOf = (outcome: 'bought' | 'sent' | 'refused', boughtMinutesAgo: number): ScriptRun => ({
+      scriptRef: 'script-a',
+      status: 'open',
+      steps: [
+        {
+          stepIndex: 0,
+          kind: 'paid',
+          outcome,
+          priceMinor: 1_500,
+          sentAt: minutesAgo(boughtMinutesAgo + 5),
+          at: minutesAgo(boughtMinutesAgo),
+        },
+      ],
+      ignoredMessages: 0,
+      startedAt: minutesAgo(boughtMinutesAgo + 10),
+      endedAt: null,
+    });
+    const boughtTonight = runOf('bought', 45);
+
+    it('steers him to a custom only when he bought a step this evening', () => {
+      expect(asksMoreTonight(asks, tonight, false, boughtTonight)).toBe(true);
+      expect(asksMoreTonight(asks, tonight, true, boughtTonight)).toBe(false);
+      expect(asksMoreTonight(undefined, tonight, false, boughtTonight)).toBe(false);
+      expect(
+        asksMoreTonight({ ...READ, intent: 'small_talk', desireSignals: [] }, tonight, false, boughtTonight),
+      ).toBe(false);
+    });
+
+    it('follows the normal flow when her script was only offered or refused tonight', () => {
+      expect(asksMoreTonight(asks, tonight, false, runOf('sent', 45))).toBe(false);
+      expect(asksMoreTonight(asks, tonight, false, runOf('refused', 45))).toBe(false);
+      expect(asksMoreTonight(asks, tonight, false, null)).toBe(false);
+      expect(asksMoreTonight(asks, tonight, false, undefined)).toBe(false);
+    });
+
+    it('follows the normal flow when he bought another evening', () => {
+      // 30 h ago: past her 24 h cooldown and another day in Paris.
+      expect(asksMoreTonight(asks, tonight, false, runOf('bought', 30 * 60))).toBe(false);
+    });
+
+    it('steers no fan with no money now to a custom or a cam', () => {
+      expect(asksMoreTonight({ ...asks, risks: ['no_budget'] }, tonight, false, boughtTonight)).toBe(false);
+      expect(asksMoreTonight({ ...asks, risks: ['money_trouble'] }, tonight, false, boughtTonight)).toBe(
+        false,
+      );
+      expect(asksMoreTonight({ ...asks, risks: ['distress'] }, tonight, false, boughtTonight)).toBe(false);
+      const frozen: OfferInput = {
+        ...tonight,
+        flags: {
+          ...tonight.flags,
+          salesFrozen: { reason: 'money_trouble', since: '2026-11-10T10:00:00.000Z' },
+        },
+      };
+      expect(asksMoreTonight(asks, frozen, false, boughtTonight)).toBe(false);
+    });
   });
 });
 

@@ -161,4 +161,32 @@ describe('the sexting at a turn', () => {
     expect(moment.noScript).toEqual([]);
     expect(moment.inPlay).toBe(false);
   });
+
+  it('suggests nothing made for him when he says he has no money now', () => {
+    const asks: TurnReading = { ...HOT, intent: 'asks_for_media' };
+    const momentOf = (brief: TurnReading) =>
+      sextingMomentOf({
+        brief,
+        fanText: 'Tu as une vidéo de pirates ?',
+        history: HISTORY,
+        situation: SITUATION,
+        scriptsIn: SCRIPTS,
+        scripts: undefined,
+        run: runOf(brief),
+        heat: 90,
+        care: false,
+        trapped: false,
+        ageConfirmed: true,
+        noExplicit: false,
+        sexualization: { kind: 'free' },
+        boughtOut: false,
+        hasScriptStep: false,
+        customOrder: false,
+        desireMap: desireMapOf('desires : pirates'),
+        uncovered: ['pirates'],
+        degradingWords: [],
+      });
+    expect(momentOf(asks).suggestsCustom).toBe(true);
+    expect(momentOf({ ...asks, risks: ['no_budget'] }).suggestsCustom).toBe(false);
+  });
 });

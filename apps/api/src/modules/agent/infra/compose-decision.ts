@@ -296,7 +296,7 @@ export function decideTurn(
   const farewell = farewellNow(brief, hasScriptStep, waitingStep !== undefined, input.herDayEnds === true);
   const teases = teaseSaid(tease, farewell, asking, waitingStep !== undefined, complaint);
   const insulted = brief?.risks.includes('insult') === true;
-  const moreTonight = asksMoreTonight(brief, input.offer, hasScriptStep);
+  const moreTonight = asksMoreTonight(brief, input.offer, hasScriptStep, input.scripts?.latest);
   const sexting = sextingMomentOf({
     brief,
     fanText: input.fanText,
