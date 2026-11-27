@@ -1,5 +1,6 @@
 import type {
   Currency,
+  NotificationKinds,
   NotificationInboxItem,
   NotificationPreferences,
   NotificationRequest,
@@ -45,6 +46,9 @@ export interface SubscriptionStore {
 export interface PreferencesStore {
   get(userId: string): Promise<NotificationPreferences | null>;
   put(userId: string, preferences: NotificationPreferences): Promise<void>;
+  /** Her sorts on and off (ADR 0150 § 16 ter); a sort with no row is on. */
+  kinds(userId: string): Promise<NotificationKinds>;
+  putKinds(userId: string, kinds: NotificationKinds): Promise<void>;
 }
 
 export type DeliveryOutcome = 'sent' | 'gone' | 'retry' | 'refused';
