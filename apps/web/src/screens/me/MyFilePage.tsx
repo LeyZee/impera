@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import { FileBoard } from './FileBoard';
 import { MeNav } from './MeNav';
 
+import { MyPayoutCard } from '@/payroll/PayoutCard';
 import { playsTheGame } from '@/rewards/api';
 import { Loading, Unreachable } from '@/screens/pay/parts';
 import { useMembers } from '@/screens/team/api';
@@ -24,12 +25,15 @@ export function MyFilePage({ user }: { user: Me }): JSX.Element {
       <PageHeader
         eyebrow="Moi"
         title="Dossier"
-        lead="Ce qu’il faut pour que l’agence émette tes factures en ton nom : ton identité, ton contrat et ton mandat, les pièces de ton régime."
+        lead="Ce qu’il faut pour que l’agence te paie et émette tes factures en ton nom : où te verser, ton identité, ton contrat et ton mandat, les pièces de ton régime."
         tabs={<MeNav manager={manager} trophies={playsTheGame(user)} />}
       />
       <div className="py-board">
         {me !== null ? (
-          <FileBoard memberId={me.id} name={me.displayName} reader={{ self: true, checks: false }} />
+          <>
+            <MyPayoutCard memberId={me.id} zone={me.timeZone} />
+            <FileBoard memberId={me.id} name={me.displayName} reader={{ self: true, checks: false }} />
+          </>
         ) : members.data !== undefined ? (
           <Panel className="nv-enter">
             <p className="tm-warn">Ta fiche d’équipe est introuvable : le propriétaire peut la vérifier.</p>

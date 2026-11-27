@@ -1,6 +1,7 @@
 /**
  * Re-seals every secret kept under CREDENTIALS_ENCRYPTION_KEYS with the newest key after a rotation
- * (runbooks/rotate-secrets.md): the AI service keys of Réglages › Modèles IA, the Telegram bot tokens and the sales feed keys (ADR 0050). Any later
+ * (runbooks/rotate-secrets.md): the AI service keys of Réglages › Modèles IA, the Telegram bot tokens, the sales feed keys (ADR 0050) and
+ * « Où te verser » (ADR 0165 § 2, a new version each, never an update). Any later
  * secret sealed with the same keys adds its own re-sealer below.
  * Usage: `pnpm ops:reencrypt-credentials`, with `CREDENTIALS_ENCRYPTION_KEYS=v2:<nouvelle>,v1:<ancienne>`.
  */
@@ -8,6 +9,7 @@ import { createDbClient, parseEncryptionKeys } from '@impera/db';
 
 import { loadConfig, ownerDatabaseUrl, secretOrNull } from '../config';
 import { resealSalesFeedCredentials } from '../modules/connectors';
+import { resealPayoutDestinations } from '../modules/contractors';
 import { resealProviderCredentials } from '../modules/providers';
 import { resealTelegramTokens } from '../modules/telegram';
 
@@ -33,7 +35,9 @@ try {
   console.log(`${String(bots.rewritten)} jeton(s) de bot Telegram rechiffré(s) en ${version}.`);
   const feeds = await resealSalesFeedCredentials(admin.db, parsed);
   console.log(`${String(feeds.rewritten)} clé(s) de lecture des ventes rechiffrée(s) en ${version}.`);
-  const unreadable = [...services.unreadable, ...bots.unreadable, ...feeds.unreadable];
+  const payouts = await resealPayoutDestinations(admin.db, parsed);
+  console.log(`${String(payouts.rewritten)} coordonnée(s) de versement rescellée(s) en ${version}.`);
+  const unreadable = [...services.unreadable, ...bots.unreadable, ...feeds.unreadable, ...payouts.unreadable];
   if (unreadable.length > 0) {
     console.error(
       `Illisible(s) avec ces clés : ${unreadable.join(', ')}. Ne retire pas l’ancienne clé de chiffrement : remets-la, relance la commande.`,

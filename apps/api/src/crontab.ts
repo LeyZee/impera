@@ -215,6 +215,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_uncovered'] },
   },
+  // What the agency asked of a creator (trou 9 du 21/11): a request, a script, a proposition, her week validated, told
+  // to her accounts once each. The run looks back half an hour; no backfill, the next run finds them all.
+  {
+    task: 'notifications.creator_notices',
+    match: '3,8,13,18,23,28,33,38,43,48,53,58 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['notifications.creator_notices'] },
+  },
   // The member of a shift ended without its report is reminded on his phone (ADR 0077): 15 minutes after its end, then
   // 12 hours after, each within its window. Each reminder rings once; no backfill, the next run finds them all.
   {
