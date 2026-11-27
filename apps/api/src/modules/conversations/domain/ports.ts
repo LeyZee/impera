@@ -298,7 +298,10 @@ interface EventWriter {
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
   /** The whole journal in `seq` order. */
   list(conversationId: ConversationId): Promise<readonly StoredEvent[]>;
-  /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
+  /**
+   * What set off each `alert_triggered` after `since` (all of them when null), and each alert that paused the agent
+   * (`handoff_requested` with its `trigger`), in `seq` order (P4-01): an alert already heard of is not sounded again.
+   */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
   /**
    * Whether the team already knows no script is left for him (ADR 0150 § 9): a `scripts_exhausted` with no
@@ -880,7 +883,7 @@ export type ComposeResult =
 /** An alert of hers that went off and only lets a human know (P4-01): named, never with what the fan wrote. */
 interface ComposedAlert {
   readonly trigger: AlertTrigger;
-  /** Sent to Telegram, as her alert says when it went off. */
+  /** Rung to the team, as her alert says when it went off. */
   readonly notify: boolean;
 }
 
@@ -911,6 +914,15 @@ export interface CardReader {
     | { readonly ok: true; readonly read: FanCardRead }
     | { readonly ok: false; readonly reason: 'budget' | 'failed' }
   >;
+}
+
+/**
+ * Her alert words read in what he wrote, implemented by the agent's adapter (the persona's words and her own alerts'
+ * words, in code, at no cost): what `conversation.watch_keywords` reads while the agent does not answer him. Named,
+ * never with his words. Throws when her persona or her alerts cannot be read: the job tries again.
+ */
+export interface KeywordWatch {
+  alertsIn(creatorId: CreatorId, text: string, now: Date): Promise<readonly ComposedAlert[]>;
 }
 
 /**

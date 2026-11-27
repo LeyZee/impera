@@ -12,11 +12,22 @@ const ModelRefSchema = z.object({
 });
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 
+/**
+ * A role's fallback model, with its own room and patience when it needs more than the role's main model: Mistral Large
+ * 4 thinks before it answers (3 600 to 4 600 tokens on a short conversation, PC 21/11) and counts that thinking in its
+ * output tokens, so the 800 of the brain left it no room for the answer (`invalid_output`, PC 27/11, xAI out of quota).
+ * Absent, the role's own.
+ */
+const FallbackRefSchema = ModelRefSchema.extend({
+  maxOutputTokens: z.number().int().positive().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
 const LlmRoleConfigSchema = ModelRefSchema.extend({
   temperature: z.number().min(0).max(2),
   maxOutputTokens: z.number().int().positive(),
   timeoutMs: z.number().int().positive(),
-  fallback: ModelRefSchema.optional(),
+  fallback: FallbackRefSchema.optional(),
   /**
    * How long an xAI model thinks before it answers, for every xAI model the role calls, its fallback included: Grok 4.7
    * cannot stop thinking, and left at xAI's default (`high`) its answer took close to a minute on 11/11, past the
@@ -69,7 +80,18 @@ export type LlmConfig = z.infer<typeof LlmConfigSchema>;
  * it names the model, not a dated build (none is published). Moving it is a change of default like any other.
  */
 export const MISTRAL_FALLBACK_MODEL = 'mistral-large-4';
-const MISTRAL_FALLBACK: ModelRef = { provider: 'mistral', model: MISTRAL_FALLBACK_MODEL };
+/**
+ * The voice's and the brain's fallback: Mistral Large 4, given room for its thinking and its answer, and time to write
+ * both. It answers only when xAI cannot (down, slow, out of quota as from 27/11 to 01/12/2026): an answer that comes
+ * late is better than none. Its thinking cannot be turned down through our SDK (only `high` or `none`, which Mistral
+ * refuses).
+ */
+const MISTRAL_FALLBACK = {
+  provider: 'mistral',
+  model: MISTRAL_FALLBACK_MODEL,
+  maxOutputTokens: 8_000,
+  timeoutMs: 120_000,
+} as const;
 
 /** Defaults (ADR 0009); per-creator overrides arrive with CreatorSettings.llm. Changing a default needs evals first. */
 export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({

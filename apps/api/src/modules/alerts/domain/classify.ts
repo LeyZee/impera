@@ -1,5 +1,6 @@
 import {
   EVENT_PAYLOADS,
+  type AlertTrigger,
   type ConversationId,
   type CreatorAlertCode,
   type Currency,
@@ -16,7 +17,16 @@ export interface ClassifiedAlert {
   readonly conversationId: ConversationId | null;
   /** A sale's amount and who made it, said in its notification: never the fan (recette 27/11, G19). */
   readonly sale?: SaleSaid;
+  /**
+   * A word of her persona's « Mots-clés d’alerte » (her name, her family, her places): it rings at once, even at night,
+   * and she is told too, without the fan nor the word (decision of 27/11/2026).
+   */
+  readonly herWords?: true;
 }
+
+/** Whether what set an alert off is one of her persona's words (the system's `keyword`), not one of her own alerts. */
+const isHerWord = (trigger: AlertTrigger | undefined): boolean =>
+  trigger?.alert.kind === 'system' && trigger.alert.code === 'keyword';
 
 /** What a sale's notification says of it: what the fan paid, and whether the agent, a member or nobody known sold. */
 export interface SaleSaid {
@@ -65,14 +75,17 @@ export function classifyEvent(type: string, payload: unknown): ClassifiedAlert |
       const parsed = EVENT_PAYLOADS.handoff_requested.safeParse(payload);
       if (!parsed.success) return null;
       const code = handoffAlert(parsed.data.cause);
-      return code === null ? null : { code, conversationId: parsed.data.conversationId };
+      if (code === null) return null;
+      const { conversationId, trigger } = parsed.data;
+      return { code, conversationId, ...(isHerWord(trigger) && { herWords: true as const }) };
     }
     case 'alert_triggered': {
       const parsed = EVENT_PAYLOADS.alert_triggered.safeParse(payload);
       if (!parsed.success) return null;
       const { alert } = parsed.data.trigger;
       const conversationId = parsed.data.conversationId;
-      if (alert.kind === 'custom' || alert.code === 'keyword') return { code: 'her_alerts', conversationId };
+      if (isHerWord(parsed.data.trigger)) return { code: 'her_alerts', conversationId, herWords: true };
+      if (alert.kind === 'custom') return { code: 'her_alerts', conversationId };
       if (alert.code === 'identity_doubt') return { code: 'identity_doubt', conversationId };
       if (alert.code === 'script_price') return { code: 'script_price', conversationId };
       // A service the fan asks for (call, cam, voice, custom content): an offer outside the scripts (§ 12).

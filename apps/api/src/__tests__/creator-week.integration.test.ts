@@ -496,9 +496,22 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     const ticked = await read('nora');
     expect(ticked.lines.find((line) => line.item === 'insta_posts')?.done).toBe(1);
     expect(ticked.lines.find((line) => line.item === 'telegram_posts')?.done).toBe(2);
-    expect(
-      (await read('nora', addDays(today, -1))).lines.find((line) => line.item === 'reveal_video')?.done,
-    ).toBe(1);
+    // Her video of the day is done by her coffre, never by a tick (ADR 0140, avenant du 27/11).
+    const video = async (day?: string) =>
+      (await read('nora', day)).lines.find((line) => line.item === 'reveal_video');
+    expect(await video(addDays(today, -1))).toMatchObject({ done: 0, source: 'drop' });
+    expect(ticked.lines.find((line) => line.item === 'insta_cta_story')?.source).toBe('tick');
+
+    // A video of the feed that reached the agency yesterday does yesterday; one still on its way does nothing.
+    const yesterdayNoon = wallClockToInstant(addDays(today, -1), 12 * 60, PARIS);
+    await drop(nora, 'feed_video', 'published', yesterdayNoon);
+    await drop(nora, 'feed_video', 'uploading', new Date());
+    expect((await video(addDays(today, -1)))?.done).toBe(1);
+    expect((await video())?.done).toBe(0);
+    // One waiting in her coffre does today, whenever she dropped it.
+    await drop(nora, 'feed_video', 'ready', wallClockToInstant(addDays(today, -3), 12 * 60, PARIS));
+    expect((await video())?.done).toBe(1);
+    expect((await video(addDays(today, -1)))?.done).toBe(1);
 
     const late = await tick('nora', addDays(today, -2), 'reveal_video', 1);
     expect(late.statusCode).toBe(422);
@@ -528,8 +541,11 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     expect(seen.today).toBe(today);
     expect(seen.days[0]?.day).toBe(seen.week);
     const todays = seen.days.find((day) => day.day === today);
-    // One post on Instagram, two on Telegram: none of them an essential.
-    expect(todays).toMatchObject({ essentialsDone: 0, done: 3, ahead: false });
+    // Her video waiting in her coffre, one post on Instagram, two on Telegram: the video alone an essential.
+    expect(todays).toMatchObject({ essentialsDone: 1, done: 4, ahead: false });
+    // Yesterday's video, arrived that day, read for her team as she reads it (when yesterday is of this week).
+    const yesterday = seen.days.find((day) => day.day === addDays(today, -1));
+    if (yesterday !== undefined) expect(yesterday.essentialsDone).toBeGreaterThanOrEqual(1);
     expect(seen.days.filter((day) => day.day > today).every((day) => day.ahead)).toBe(true);
     expect((await progress('manager', today)).days).toEqual(seen.days);
     // Her validated week, as she reads it herself.

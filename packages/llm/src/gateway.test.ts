@@ -293,6 +293,22 @@ describe('LlmGateway', () => {
     expect(mistral.doGenerateCalls[0]?.providerOptions).toBeUndefined();
   });
 
+  it('gives the Mistral fallback room to think and answer when xAI is out of quota (PC, 27/11)', async () => {
+    const xai = scripted([{ status: 429, body: '{"error":"used all available credits"}' }]);
+    const mistral = scripted([{ text: BUBBLES }]);
+    const { gateway } = setup({ xai, mistral });
+
+    await gateway.voice(INPUT);
+
+    expect(xai.doGenerateCalls[0]?.maxOutputTokens).toBe(DEFAULT_LLM_CONFIG.roles.voice.maxOutputTokens);
+    expect(mistral.doGenerateCalls[0]?.maxOutputTokens).toBe(8_000);
+    for (const role of ['voice', 'brain'] as const) {
+      const config = DEFAULT_LLM_CONFIG.roles[role];
+      expect(config.fallback?.maxOutputTokens).toBeGreaterThanOrEqual(4_618 + 2_000);
+      expect(config.fallback?.timeoutMs).toBeGreaterThan(config.timeoutMs);
+    }
+  });
+
   it('asks once more when the output does not match the schema', async () => {
     const xai = scripted([{ text: 'Coucou toi' }, { text: BUBBLES }]);
     const { gateway, log } = setup({ xai });

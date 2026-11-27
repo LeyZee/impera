@@ -9,7 +9,7 @@ import {
 
 import { classifyEvent } from '../domain/classify';
 import { creatorAlertLines } from '../domain/creator-alerts';
-import { agencyModesFor, alertMessage, modesFor, reachedRoles } from '../domain/route';
+import { agencyModesFor, alertMessage, herWordsNotice, modesFor, reachedRoles } from '../domain/route';
 
 /** One event of the outbox, as the router reads it (the service role, every creator). */
 export interface RoutedEventRow {
@@ -17,6 +17,14 @@ export interface RoutedEventRow {
   readonly creatorId: CreatorId | null;
   readonly type: string;
   readonly payload: unknown;
+}
+
+/** A safety relay nobody took yet: the event, her, the conversation and when it was raised. */
+export interface WaitingSafetyRelay {
+  readonly id: string;
+  readonly creatorId: CreatorId;
+  readonly conversationId: string | null;
+  readonly createdAt: Date;
 }
 
 /** An account a notification goes to, in its own time zone (its quiet hours, its day). */
@@ -39,6 +47,10 @@ export interface RouterReads {
   safetyEvents(since: Date): Promise<readonly RoutedEventRow[]>;
   /** Every routed event written after `since`, oldest first, read page by page to the window's newest. */
   events(since: Date): Promise<readonly RoutedEventRow[]>;
+  /** The agency's alerts written after `since` (`AGENCY_EVENT_TYPES`), oldest first, page by page. */
+  agencyEvents(since: Date): Promise<readonly RoutedEventRow[]>;
+  /** The safety relays written after `since` that no takeover followed yet (no `takeover_started` nor `_ended`). */
+  waitingSafety(since: Date): Promise<readonly WaitingSafetyRelay[]>;
   /** Her stored choices, through `creatorAlertLines`: a locked alert reads « reçoit » whatever a row says. */
   lines(creatorId: CreatorId): Promise<readonly CreatorAlertLine[]>;
   /** The creators not archived, with the name a notification shows. */
@@ -49,6 +61,11 @@ export interface RouterReads {
   managers(): Promise<readonly Manager[]>;
   /** The accounts of these team members, active ones only, each in his own time zone. */
   members(memberIds: readonly string[]): Promise<readonly Recipient[]>;
+  /**
+   * Her own accounts (role `creator`, given her and only her), in her time zone: told of her persona's words only
+   * (relecture Sécurité: an account given several creators is never hers).
+   */
+  creatorAccounts(creatorId: CreatorId): Promise<readonly Recipient[]>;
 }
 
 export interface RouterDeps {
@@ -128,7 +145,8 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
         : modesFor(alert.code, await linesOf(event.creatorId));
 
     const byRole = async (role: CreatorAlertRole): Promise<readonly Recipient[]> => {
-      if (role === 'owner') return owners;
+      // The owners hear of the AI budget by the agency's alerts, with the figures (`alerts.agency`): never twice.
+      if (role === 'owner') return alert.code === 'ai_budget' ? [] : owners;
       // A creator's alert to her managers only; the agency's (budget, no creator) to every active manager.
       if (role === 'manager') {
         const creatorId = event.creatorId;
@@ -152,8 +170,10 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
       }
     }
     const creatorName = event.creatorId === null ? null : (nameOf.get(event.creatorId) ?? null);
-    // A safety relay rings through the quiet hours and outside the daily cap (ADR 0150 § 6: « partent toujours »).
-    const reason = isCreatorAlertLocked(alert.code) ? 'safety_alert' : 'creator_alert';
+    // A safety relay rings through the quiet hours and outside the daily cap (ADR 0150 § 6: « partent toujours »), and
+    // so does a word of her persona: her name or her places written by a fan wait for nobody's morning (27/11/2026).
+    const reason =
+      isCreatorAlertLocked(alert.code) || alert.herWords === true ? 'safety_alert' : 'creator_alert';
     for (const { recipient, silent } of loudest.values()) {
       try {
         await deps.notify(
@@ -169,6 +189,28 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
         asked += 1;
       } catch (error) {
         deps.onFailure?.('notify', error);
+      }
+    }
+    // Her persona's words tell her too, whatever her tab says: never the fan, never the word (27/11/2026).
+    if (alert.herWords === true && event.creatorId !== null) {
+      const hers = await deps.reads.creatorAccounts(event.creatorId).catch(failed('creator_accounts'));
+      for (const recipient of hers) {
+        if (loudest.has(recipient.userId)) continue;
+        try {
+          await deps.notify(
+            {
+              userId: recipient.userId,
+              reason: 'safety_alert',
+              objectKey: event.id,
+              timeZone: recipient.timeZone,
+              message: herWordsNotice(),
+            },
+            now,
+          );
+          asked += 1;
+        } catch (error) {
+          deps.onFailure?.('notify', error);
+        }
       }
     }
   }

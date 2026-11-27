@@ -1019,7 +1019,7 @@ describe('a link from the sheet', () => {
       within(list)
         .getAllByRole('button')
         .find((row) => row.textContent.includes(name))
-        ?.textContent.includes('Invité') ?? false;
+        ?.textContent.includes('Invitation envoyée') ?? false;
     expect(invitedOf('Théo')).toBe(false);
     expect(invitedOf('Mialy')).toBe(true);
     expect(screen.getByRole('button', { name: 'Remplacer le lien' })).toBeDefined();
@@ -1040,7 +1040,7 @@ describe('a link from the sheet', () => {
         ?.querySelector('.tm-row__pills')?.textContent ?? '';
     expect(side('Théo')).toBe('');
     expect(side('Basile')).toBe('En congé');
-    expect(side('Mialy')).toBe('Invité');
+    expect(side('Mialy')).toBe('Invitation envoyée');
     expect(side('Koffi')).toBe('Lien expiré');
   });
 

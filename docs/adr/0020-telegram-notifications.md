@@ -1,6 +1,6 @@
 # 0020. Notifications Telegram : bots, groupes et routage gérés depuis le CRM
 
-Statut : proposed
+Statut : superseded par l'ADR 0176 (27/11/2026 : Telegram ne sert plus qu'aux canaux des créatrices ; les alertes de l'agence passent par les notifications d'Impera)
 Date : 2026-10-17
 
 ## Contexte

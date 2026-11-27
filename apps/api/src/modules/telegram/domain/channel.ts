@@ -117,8 +117,6 @@ export interface ChannelContext {
   readonly chats: readonly ChatRecord[];
   /** The chats chosen by other creators. */
   readonly takenByOthers: ReadonlySet<TelegramChatId>;
-  /** The chats an alert route points at. */
-  readonly routed: ReadonlySet<TelegramChatId>;
 }
 
 function chatRefusal(chatId: TelegramChatId | null, context: ChannelContext): ChannelRefusal | null {
@@ -138,12 +136,6 @@ function chatRefusal(chatId: TelegramChatId | null, context: ChannelContext): Ch
   }
   if (context.takenByOthers.has(chatId)) {
     return { kind: 'chat_taken', message: `« ${chat.title} » est déjà le canal d’une autre créatrice.` };
-  }
-  if (context.routed.has(chatId)) {
-    return {
-      kind: 'chat_routed',
-      message: `« ${chat.title} » reçoit des alertes de l’agence : retire-le du routage dans Réglages › Telegram d’abord.`,
-    };
   }
   return null;
 }
@@ -166,7 +158,6 @@ export function channelChoices(context: ChannelContext): ChannelChoice[] {
       membership: chat.membership,
       canPost: chat.membership === 'member' && chat.canPost,
       takenByOther: context.takenByOthers.has(chat.id),
-      routedForAlerts: context.routed.has(chat.id),
     }))
     .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 }

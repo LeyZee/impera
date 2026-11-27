@@ -2,6 +2,7 @@
 
 Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses aux questions du brouillon ; demande du même jour à 12h14 ; fil « Automatiser le canal Telegram de Messa »). Les phrases écrites d'après ses réponses, marquées †, acceptées le 07/11/2026 à 13h05 (« ok phrases 0080 »). Les phrases marquées ‡ (où mène un lien, lien pour un seul post), demandées par Charles le 07/11/2026 à 14h45 (« un live TikTok »), acceptées le même jour à 14h56 (« ok lien-ponctuel »). Les phrases marquées ◊ (sondages du canal, § 5.7), demandées par Charles le 08/11/2026 à 14h36 (« de temps en temps des sondages »), acceptées le même jour à 14h37 (« ok sondages »). Les phrases marquées ◆ (rôle des créneaux, § 1.5 et § 5.8), demandées par Charles le 08/11/2026 à 15h13 (« celui à 19h… c'est lui le plus important »), acceptées le même jour à 15h20 (« ok posts-engagement »).
 Date : 2026-11-07
+Amendée le 27/11/2026 par l'ADR 0176 (Telegram ne sert plus qu'aux canaux des créatrices), proposée.
 Précise : l'ADR 0057 (connecteur Telegram, légendes, lien ajouté par le code), l'ADR 0055 § 1 et § 5 (catégorie `telegram_post`, stock et demandes), l'ADR 0020 (groupes de l'agence).
 Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
 Précisée par : l'ADR 0121 § 1 (acceptée le 16/11/2026) : les liens de redirection ont leur propre table et se règlent dans l'onglet « Liens » de la fiche de la créatrice, avec leur endroit et leur phrase d'usage ; un lien s'éteint au lieu d'être supprimé ; le canal choisit le sien parmi les liens allumés (§ 4.1 et § 6.3 ci-dessous).
@@ -124,3 +125,7 @@ Négatives, à surveiller :
 - **Lot A1 bis** : le champ « où il mène » de chaque lien (contrat et écran ; le prompt le lit au lot A2). ‡
 - **Lot A3** : jobs des créneaux (dont la place des sondages, § 5.7 ◊), aperçu dans le groupe Info, Valider / Réécrire / Changer de média / Changer de lien / Ne pas publier, demande de dépôt automatique, journal et vues à 48 h.
 - **Lot B** : la vidéo publique Reveal, après les captures et CR-08.
+
+## Amendement du 27/11/2026 : l'aperçu par notification (ADR 0176 § 9)
+
+Le groupe « Info » de l'agence n'existe plus. L'aperçu d'un post (§ 2) et l'avis « Pool vide » (§ 2, point 4) partent en notification Impera, motif `agency_alert` (hors plafond, après les heures calmes). Le reste de cette ADR ne change pas.

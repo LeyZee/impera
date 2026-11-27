@@ -81,6 +81,7 @@ export function ContentPage({
   onOpenScript,
   onOpenStock,
   asked: askedId = null,
+  tile = null,
   onAsked,
 }: {
   /** Her script, card by card (SC-02 lot b2). */
@@ -89,6 +90,8 @@ export function ContentPage({
   onOpenStock?: () => void;
   /** A request to open the sheet on, from Aujourd'hui's « Déposer » (`?demande=`, recette visuelle 16/11, CRE-01). */
   asked?: string | null;
+  /** A tile to open the sheet on, from her coffre's or her day's « Déposer » (`?depot=`, recette MOD-06). */
+  tile?: DropCategory | null;
   /** The sheet opened on it: the address forgets it, so that « retour » does not open it again. */
   onAsked?: () => void;
 }): JSX.Element {
@@ -141,9 +144,16 @@ export function ContentPage({
       setOpened({ category: request.category, request });
     else onAsked?.();
   }, [askedId, requests, onAsked]);
+  // The coffre's « Déposer »: the sheet opens on its tile at once, as a tap on the tile would (recette MOD-06).
+  const openedTile = useRef<DropCategory | null>(null);
+  useEffect(() => {
+    if (tile === null || openedTile.current === tile) return;
+    openedTile.current = tile;
+    setOpened({ category: tile, request: null });
+  }, [tile]);
   const closeSheet = (): void => {
     setOpened(null);
-    if (askedId !== null) onAsked?.();
+    if (askedId !== null || tile !== null) onAsked?.();
   };
   const moving = content.data === undefined ? [] : onTheirWay(content.data.drops);
   const out = content.data === undefined ? [] : published(content.data.drops);

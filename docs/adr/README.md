@@ -47,7 +47,7 @@ Date : AAAA-MM-JJ
 | 0017 | Vision : Gemini en natif, bascule sur Grok en images clés | accepted |
 | 0018 | Port connecteur étendu : scripts natifs, notes, coffre, médias, garde d'écriture | accepted (l'alternative « un second port » remplacée par 0050 pour les ventes et les chiffres) |
 | 0019 | Deux taux (au playground, en réel) et la règle qui ouvre le mode Automatique | accepted |
-| 0020 | Notifications Telegram : bots, groupes et routage gérés depuis le CRM | proposed |
+| 0020 | Notifications Telegram : bots, groupes et routage gérés depuis le CRM | superseded par 0176 |
 | 0021 | Rester en personnage est fixé dans le code, sans réglage | accepted |
 | 0022 | La persona fait partie de la version qui ouvre l'Automatique | accepted |
 | 0023 | La gestion d'équipe entre dans Nirvana : planning, rapports, paie, routine des créatrices | accepted (§ Navigation remplacé par 0024, gardes du chatteur par 0025, congés par 0031, attestation de résidence par 0041, rôle de la créatrice par 0042) |
@@ -73,7 +73,7 @@ Date : AAAA-MM-JJ
 | 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | accepted (précise 0023 et EQ-03 ; au § 4 la vente sans attribution et au § 5 le rapport d'un compte détecté remplacés par 0050) |
 | 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | accepted (remplace 0030 § 2 et § 4 pour le seul contenu déposé ; § 1 usage et § 2 départ des 30 jours remplacés par 0055) |
 | 0045 | Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt | accepted (remplace dans 0031 la phrase « la seule porte ») |
-| 0046 | Accès au dashboard : deuxième facteur, connexions bornées, alertes de sécurité | accepted (remplace security.md § 1 sur l'exposition du dashboard ; précisée par 0053 : une clé d'accès vaut mot de passe et code) |
+| 0046 | Accès au dashboard : deuxième facteur, connexions bornées, alertes de sécurité | accepted (remplace security.md § 1 sur l'exposition du dashboard ; précisée par 0053 : une clé d'accès vaut mot de passe et code) ; amendée par 0176 |
 | 0047 | Ranger le code qui a grossi : la paie en quatre modules, l'argent calculé par le seul serveur, l'assemblage par module, le dashboard par domaine | accepted (précise 0002) |
 | 0048 | L'IA dans le calendrier des shifts : ses heures se lisent à côté de celles des chatteurs | accepted (précise 0045) |
 | 0049 | Créneaux libres, plusieurs chatteurs sur un compte, fans confiés ; la créatrice sans notification de shift | accepted (remplace le réglage de créneaux d'EQ-02, la contrainte d'un membre par compte et 0045 § 4 pour la créatrice) |
@@ -86,7 +86,7 @@ Date : AAAA-MM-JJ
 | 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés ; § 3, phrase sur la palette, remplacée par 0064) |
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted (§ 6 et § 7 précisés par 0082 : fenêtre visible d'une légende, aperçu ; § 2 amendé par 0120 : branchement en deux temps, lecture d'abord) |
 | 0058 | Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui | accepted (amende 0026 § 5 pour la seule publication) |
-| 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |
+| 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) ; amendée par 0176 |
 | 0060 | Veille et idées de contenu : signaux de sources propres, capture passive par l'extension, idées filtrées par le code et validées par l'agence | accepted (§ 2, « la moyenne de son compte », remplacée par la médiane de 0082 ; § 4 et § 5 précisés par 0082 : écart, fiche reel ; § 2 amendé par 0120 : la lecture des statistiques n'attend plus la publication) |
 | 0062 | Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel | accepted |
 | 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte » ; § 3 en partie remplacé et § 2 précisé par 0065) |
@@ -94,7 +94,7 @@ Date : AAAA-MM-JJ
 | 0065 | La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans | accepted (remplace dans 0042 § 2 la phrase sur l'auteur d'un message, dans 0063 § 3 « sans jamais voir qui a écrit un message » ; précise 0063 § 2) ; nombre au survol du § 2 remplacé par 0074 |
 | 0066 | Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret de connexion | accepted (précise 0008 et 0062 § 8) |
 | 0067 | L'équipe installe l'extension depuis le CRM, puis depuis le Chrome Web Store en « non répertoriée » | accepted (précise 0066 et 0027) |
-| 0068 | Mot de passe oublié du propriétaire (Telegram, puis e-mail) et QR code de la validation en deux étapes | accepted (précise 0016, 0020 et 0046) |
+| 0068 | Mot de passe oublié du propriétaire (Telegram, puis e-mail) et QR code de la validation en deux étapes | accepted (précise 0016, 0020 et 0046) ; amendée par 0176 |
 | 0069 | Les créatrices s'importent depuis Reveal par une revue du propriétaire, jamais en silence | accepted (précise 0050 § 3 et 0054) |
 | 0070 | Une vidéo déposée pèse jusqu'à 10 Go et vient dans tout format courant ; ce que les plateformes ne lisent pas est converti en MP4 | accepted (précise 0055 § 2 et § 3) |
 | 0071 | Une créatrice se renomme et s'archive, sans rien supprimer, et l'e-mail d'un accès pas encore utilisé se corrige | accepted (précise 0042 § 1 et 0069 § 5) |
@@ -106,7 +106,7 @@ Date : AAAA-MM-JJ
 | 0077 | Rapport de fin de shift : Impera le rappelle au chatteur sur son téléphone | accepted (précise 0042 § 7, 0023 et 0073 § 5) |
 | 0078 | Le Dashboard de l'agence lit ses insights dans le registre des ventes, pour le propriétaire et un manager actif | accepted (précise 0050 et 0043 § 7) |
 | 0079 | La fiche persona reprend la fiche Desirali, onglet par onglet et question par question | accepted (précise 0010 ; remplace pour toute nouvelle version les blocs P5-01, `additional_info` et les listes fermées) |
-| 0080 | Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM | accepted (précise 0057, 0055, 0020 ; remplace pour le canal Telegram l'acceptation de 0057 § 3 et l'adresse de 0057 § 6) |
+| 0080 | Canal Telegram de la créatrice : les posts partent seuls à leurs créneaux, montrés une heure avant, avec un lien de redirection réglé dans le CRM | accepted (précise 0057, 0055, 0020 ; remplace pour le canal Telegram l'acceptation de 0057 § 3 et l'adresse de 0057 § 6) ; amendée par 0176 |
 | 0081 | Les abonnés, les PPV envoyés et les messages se gardent en photo quotidienne lue chez la plateforme | accepted (précise 0078 § 6 et 0050) |
 | 0082 | Veille et Instagram : la médiane du compte, ce que le fil montre avant « … plus », la fiche reel | accepted (remplace dans 0060 § 2 « la moyenne de son compte » par la médiane ; précise 0060 § 4 et § 5, 0057 § 6 et § 7, 0042 § 4) |
 | 0083 | Chaque média que la créatrice dépose est décrit en détail, seul, et validé avant tout usage | accepted (précise 0030 § 3 et 0056 § 6) |
@@ -114,7 +114,7 @@ Date : AAAA-MM-JJ
 | 0085 | La fiche du fan : vingt cases fermées que l'IA remplit en lisant la conversation, et que le chatteur corrige | accepted (précise P3-02, 0018 § 1 et 0063) |
 | 0086 | Le panneau copilote : à côté de la conversation Reveal, la fiche du fan d'abord, le brouillon de l'agent ensuite, et c'est le chatteur qui envoie | accepted (précise 0025, 0019, 0066 § 7 et 0085 ; amendée le 16/11/2026 : brouillon au-dessus de la fiche ; le 21/11/2026 : fiche et vente en onglets) |
 | 0087 | Un rôle de service entre le rôle applicatif et le rôle propriétaire de la base | accepted (précise 0005 et 0027) |
-| 0088 | Fan en détresse : l'agent lui répond en mode soin, ventes gelées dans le code, et un humain valide chaque réponse | accepted (amende le filet AGT-01 et `protectionFor` ; précise 0021, 0019, 0085 § 9 et 0020) |
+| 0088 | Fan en détresse : l'agent lui répond en mode soin, ventes gelées dans le code, et un humain valide chaque réponse | accepted (amende le filet AGT-01 et `protectionFor` ; précise 0021, 0019, 0085 § 9 et 0020) ; amendée par 0176 |
 | 0089 | Les vignettes d'une créatrice archivée sont effacées 90 jours après son archivage | accepted (amende 0071 § 2 pour les vignettes ; précise 0030 § 4 et 0044 § 2) |
 | 0090 | Une demande sur mesure passe à un chatteur qui prend la commande ; une objection de prix reçoit une réplique de la banque de l'agence | accepted (amende 0079 § 4 et § 6 ; précise P4-01 et 0023) ; § A points 1 et 2 remplacés par 0159 |
 | 0091 | La consommation IA dans le CRM : la dépense lue dans `llm_calls`, les crédits prépayés décomptés depuis la saisie des recharges | accepted (précise 0016 et le plafond du jour) |
@@ -163,7 +163,7 @@ Date : AAAA-MM-JJ
 | 0147 | La session Reveal se synchronise seule à l'ouverture du popup, chez le propriétaire, sans appel ni rechargement de Reveal | accepted (précise 0050, 0066 § 7 ; amende la fiche P2-01) |
 | 0148 | L'IA d'une créatrice : un interrupteur qui dit l'état en clair, une pause rapide, et ses heures à elle dessinées sur une frise | accepted (précise P3-14, 0126 §§ 13 et 17, 0019, 0024, 0149) |
 | 0149 | La fiche d'une créatrice en sept onglets : tout ce qui la concerne au même endroit, la section Scripts du menu retirée | accepted (amende 0134 §§ 1, 3, 4, 7 ; précise 0042 § 7, 0099, 0112, 0137, 0145, 0148) |
-| 0150 | Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine | accepted (précise P4-01, 0020, 0042 § 7, 0091, 0128 § C, 0143 § 13) |
+| 0150 | Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine | accepted (précise P4-01, 0020, 0042 § 7, 0091, 0128 § C, 0143 § 13) ; amendée par 0176 |
 | 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |
 | 0152 | Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs | accepted (remplace 0027 sur le lieu et 0005 sur la base de production ; précise 0028, 0037, 0067, 0087) |
 | 0153 | Le chatteur voit, pendant son shift, une fiche courte de la créatrice : qui elle est, comment elle écrit, ce qu'elle ne fait jamais | accepted (précise 0025, 0022, 0149) |
@@ -183,3 +183,4 @@ Date : AAAA-MM-JJ
 | 0171 | Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre | proposed |
 | 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |
 | 0173 | Style de base de l'agence en base, la fiche le complète | accepted (précise 0158 § O) |
+| 0176 | Telegram ne sert plus qu'aux canaux des créatrices ; les alertes passent par les notifications d'Impera | accepted (remplace 0020 ; amende 0046 § 8, 0059, 0068, 0080, 0088 § 5, 0150 ; acceptée le 27/11, code fusionné par #1052) |

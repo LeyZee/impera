@@ -117,11 +117,9 @@ describe('the creator’s Telegram channel on Postgres', () => {
     });
     module = createTelegramModule({
       bots: store.bots,
-      deliveries: store.deliveries,
       channels: createPostgresChannelsStore(test.service.db),
       channel: telegram,
       channelLinks: (creatorId) => Promise.resolve(linksOn.get(creatorId) ?? null),
-      webOrigin: 'https://crm.example.test',
       channelWriter: {
         // Nora has an active persona, no one else.
         persona: (creatorId) =>
@@ -289,28 +287,6 @@ describe('the creator’s Telegram channel on Postgres', () => {
     const other = await put(lea, { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, chatId: channelB });
     expect(other.statusCode).toBe(200);
     expect(TelegramChannelViewSchema.parse(other.json()).warnings).toEqual(['bot_cannot_post', 'no_link']);
-  });
-
-  it('never routes an alert to a creator’s channel', async () => {
-    const overview = await module.overview();
-    const refused = await server.inject({
-      method: 'PUT',
-      url: '/v1/settings/telegram/routes',
-      headers,
-      payload: {
-        version: overview.version,
-        routes: [{ creatorId: null, topic: 'urgent', chatId: channelA }],
-      },
-    });
-    expect(refused.statusCode).toBe(400);
-    expect(refused.json()).toMatchObject({ error: { code: 'telegram_route_channel_invalid' } });
-    const toGroup = await server.inject({
-      method: 'PUT',
-      url: '/v1/settings/telegram/routes',
-      headers,
-      payload: { version: overview.version, routes: [{ creatorId: null, topic: 'urgent', chatId: group }] },
-    });
-    expect(toGroup.statusCode).toBe(200);
   });
 
   it('answers 404 for a creator who does not exist, or is archived', async () => {

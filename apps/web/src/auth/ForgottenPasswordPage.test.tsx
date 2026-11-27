@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
-import { PASSWORD_RESET_REQUESTED_MESSAGE } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ForgottenPasswordPage, NO_TELEGRAM_HINT, keepUnits } from './ForgottenPasswordPage';
+import { ForgottenPasswordPage, keepUnits } from './ForgottenPasswordPage';
 import { forgetTakenToken } from './api';
 
 const TOKEN = 'lien-invente-pour-les-tests';
@@ -15,12 +14,12 @@ function refusal(code: string, details: Record<string, unknown> = {}) {
 }
 
 type Answer = readonly [number, unknown] | 'offline';
-type Route = 'request' | 'inspect' | 'redeem';
+type Route = 'other' | 'inspect' | 'redeem';
 
 const routeOf = (url: string): Route =>
-  url.endsWith('/inspect') ? 'inspect' : url.endsWith('/redeem') ? 'redeem' : 'request';
+  url.endsWith('/inspect') ? 'inspect' : url.endsWith('/redeem') ? 'redeem' : 'other';
 
-/** The three routes; each answers its turns in order, the last one for good. */
+/** The two routes; each answers its turns in order, the last one for good. */
 function serve(routes: Partial<Record<Route, Answer[]>>) {
   const fake = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
     const turns = routes[routeOf(url)] ?? [];
@@ -60,58 +59,18 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
-describe('« Mot de passe oublié » without a link (SEC-05 lot 3)', () => {
-  it('sends the address as typed, checks nothing of it, and shows the server’s one sentence as it is', async () => {
-    const fake = serve({ request: [[202, { message: PASSWORD_RESET_REQUESTED_MESSAGE }]] });
-    open();
-    expect(screen.getByRole('button', { name: 'Envoyer le lien' })).toHaveProperty('disabled', true);
-    // Not an address at all: the page says nothing of it, the server answers the same sentence.
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: '  pas-une-adresse ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
-    expect(await screen.findByText(PASSWORD_RESET_REQUESTED_MESSAGE)).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Demande reçue' })).toBeDefined();
-    expect(callsTo(fake, 'request')).toEqual([
-      { url: '/v1/auth/password-reset', body: { email: 'pas-une-adresse' } },
-    ]);
-  });
-
-  /** Its non-breaking space kept: the default normalizer would make it a plain one. */
-  const asIs = (text: string) => text;
-  it('tells whoever has no Telegram to ask the agency, before and after the request (CRE-05, CHT-16)', async () => {
-    serve({ request: [[202, { message: PASSWORD_RESET_REQUESTED_MESSAGE }]] });
-    open();
-    const hint = screen.getByText(NO_TELEGRAM_HINT, { normalizer: asIs });
-    // Under the send button, not between the field and the button (Design, #829), and nothing to click in it.
-    const send = screen.getByRole('button', { name: 'Envoyer le lien' });
-    expect(send.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(hint.querySelector('a, button')).toBeNull();
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'nora@example.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
-    expect(await screen.findByRole('heading', { name: 'Demande reçue' })).toBeDefined();
-    expect(screen.getByText(NO_TELEGRAM_HINT, { normalizer: asIs })).toBeDefined();
-  });
-
-  it('keeps the address to correct it, and goes back to the sign-in page', async () => {
-    serve({ request: [[202, { message: PASSWORD_RESET_REQUESTED_MESSAGE }]] });
+describe('« Mot de passe oublié » without a link (SEC-05 lot 3, amended 27/11/2026)', () => {
+  it('says where a link comes from, asks nothing and calls nothing', () => {
+    const fake = serve({});
     const { onLeave } = open();
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'theo@exemple.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Corriger l’adresse' }));
-    expect(screen.getByLabelText('E-mail')).toHaveProperty('value', 'theo@exemple.test');
+    expect(screen.getByRole('heading', { name: 'Mot de passe oublié' })).toBeDefined();
+    expect(screen.getByText(/Demande un nouveau lien à ton agence/)).toBeDefined();
+    expect(screen.getByText(/le lien se fait sur le serveur/)).toBeDefined();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByText(/Telegram/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retour à la connexion' }));
     expect(onLeave).toHaveBeenCalled();
-  });
-
-  it('says to wait a few minutes after too many requests, and when the server does not answer', async () => {
-    serve({ request: [[429, refusal('rate_limited')], 'offline'] });
-    open();
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'theo@example.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
-    expect(
-      await screen.findByText('Trop de demandes d’un coup : réessaie dans quelques minutes.'),
-    ).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
-    expect(await screen.findByText('Le serveur ne répond pas. Réessaie dans un instant.')).toBeDefined();
+    expect(fake).not.toHaveBeenCalled();
   });
 });
 
@@ -142,12 +101,13 @@ describe('« Mot de passe oublié » with its link (SEC-05 lot 3)', () => {
     ]);
   });
 
-  it('says a link that does not work any more, and asks a new one from there', async () => {
+  it('says a link that does not work any more, and where to get a new one', async () => {
     serve({ inspect: [[404, refusal('password_reset_link_not_found')]] });
     open(`#t=${TOKEN}`);
     expect(await screen.findByRole('heading', { name: 'Ce lien ne marche plus' })).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Demander un nouveau lien' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Avoir un nouveau lien' }));
     expect(screen.getByRole('heading', { name: 'Mot de passe oublié' })).toBeDefined();
+    expect(screen.getByText(/Demande un nouveau lien à ton agence/)).toBeDefined();
   });
 
   it('says a cut link does not work, without asking the server', () => {
@@ -180,7 +140,7 @@ describe('« Mot de passe oublié » with its link (SEC-05 lot 3)', () => {
 });
 
 describe('keepUnits', () => {
-  it('keeps a number on the line of its unit, in the server\u2019s sentence too', () => {
+  it('keeps a number on the line of its unit', () => {
     expect(keepUnits('Le lien vaut 15 minutes et 6 chiffres.')).toBe(
       'Le lien vaut 15\u00a0minutes et 6\u00a0chiffres.',
     );

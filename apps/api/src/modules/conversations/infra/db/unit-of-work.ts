@@ -458,7 +458,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .where(
             and(
               eq(schema.conversationEvents.conversationId, conversationId),
-              eq(schema.conversationEvents.type, 'alert_triggered'),
+              inArray(schema.conversationEvents.type, ['alert_triggered', 'handoff_requested']),
               since === null
                 ? undefined
                 : sql`${schema.conversationEvents.createdAt} > ${since.toISOString()}`,
@@ -467,7 +467,13 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .orderBy(schema.conversationEvents.seq);
         return rows
           .map(toStoredEvent)
-          .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
+          .flatMap(({ body }) =>
+            body.type === 'alert_triggered'
+              ? [body.payload.trigger]
+              : body.type === 'handoff_requested' && body.payload.trigger !== undefined
+                ? [body.payload.trigger]
+                : [],
+          );
       },
       async scriptsExhaustedSaid(conversationId) {
         const [last] = await tx

@@ -13,9 +13,9 @@ function harness(options: {
   readonly events: readonly RoutedEventRow[];
   readonly lines?: () => Promise<readonly CreatorAlertLine[]>;
   readonly onShift?: readonly string[];
-  readonly failing?: readonly ('events' | 'managers' | 'on_shift' | 'members')[];
+  readonly failing?: readonly ('events' | 'managers' | 'on_shift' | 'members' | 'creator_accounts')[];
 }) {
-  const fails = (step: 'events' | 'managers' | 'on_shift' | 'members') =>
+  const fails = (step: 'events' | 'managers' | 'on_shift' | 'members' | 'creator_accounts') =>
     options.failing?.includes(step) === true;
   const down = () => Promise.reject(new Error('down'));
   const asked: NotificationRequest[] = [];
@@ -27,6 +27,8 @@ function harness(options: {
         ),
       ),
     events: () => (fails('events') ? down() : Promise.resolve(options.events)),
+    agencyEvents: () => Promise.resolve([]),
+    waitingSafety: () => Promise.resolve([]),
     lines: options.lines ?? (() => Promise.resolve(creatorAlertLines([]))),
     creators: () => Promise.resolve([{ id: NORA, name: 'Nora' }]),
     owners: () => Promise.resolve([{ userId: 'owner', timeZone: 'Europe/Paris' }]),
@@ -41,6 +43,10 @@ function harness(options: {
       fails('members')
         ? down()
         : Promise.resolve(ids.map((id) => ({ userId: `user-of-${id}`, timeZone: 'Africa/Porto-Novo' }))),
+    creatorAccounts: () =>
+      fails('creator_accounts')
+        ? down()
+        : Promise.resolve([{ userId: 'nora-herself', timeZone: 'America/Montreal' }]),
   };
   const unread: unknown[] = [];
   const failures: string[] = [];
@@ -165,7 +171,7 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     expect(await h.run()).toBe(0);
   });
 
-  it('tells the agency’s budget once to each role, never to a chatter', async () => {
+  it('tells the agency’s budget once to each manager, never to a chatter; the owners by the agency’s alerts', async () => {
     const budget: RoutedEventRow = {
       id: 'event-4',
       creatorId: null,
@@ -175,7 +181,6 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     const h = harness({ events: [budget], onShift: ['member-1'] });
     await h.run();
     expect(h.asked.map((r) => [r.userId, r.message.title])).toEqual([
-      ['owner', 'Budget IA'],
       ['manager', 'Budget IA'],
       ['manager-of-iris', 'Budget IA'],
     ]);
@@ -185,5 +190,85 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     const h = harness({ events: [safety] });
     await h.run();
     expect(h.asked.map((r) => r.userId)).toEqual(['owner', 'manager']);
+  });
+
+  const herWord = {
+    alert: { kind: 'system', code: 'keyword' },
+    matchedBy: 'keyword',
+    keyword: 'Mot inventé',
+  };
+
+  it('rings her persona’s words at once, even at night, and tells her too, without the fan nor the word', async () => {
+    const paused: RoutedEventRow = {
+      id: 'event-5',
+      creatorId: NORA,
+      type: 'handoff_requested',
+      payload: { conversationId: CONVERSATION, cause: 'keyword', trigger: herWord },
+    };
+    const h = harness({ events: [paused], onShift: ['member-1'] });
+    await h.run();
+    expect(h.asked.map((r) => [r.userId, r.reason, r.objectKey])).toEqual([
+      ['owner', 'safety_alert', 'event-5'],
+      ['manager', 'safety_alert', 'event-5'],
+      ['user-of-member-1', 'safety_alert', 'event-5'],
+      ['nora-herself', 'safety_alert', 'event-5'],
+    ]);
+    const hers = h.asked.find((r) => r.userId === 'nora-herself');
+    expect(hers?.timeZone).toBe('America/Montreal');
+    expect(hers?.message.url).toBe('/aujourdhui');
+    expect(JSON.stringify(hers?.message)).not.toContain('Mot inventé');
+    expect(JSON.stringify(hers?.message)).not.toContain(CONVERSATION);
+  });
+
+  it('tells her of a word heard while the agent did not answer him too (alert_triggered)', async () => {
+    const heard: RoutedEventRow = {
+      id: 'event-6',
+      creatorId: NORA,
+      type: 'alert_triggered',
+      payload: { conversationId: CONVERSATION, trigger: herWord, notify: true },
+    };
+    const h = harness({ events: [heard] });
+    await h.run();
+    expect(h.asked.map((r) => [r.userId, r.reason])).toEqual([
+      ['owner', 'safety_alert'],
+      ['manager', 'safety_alert'],
+      ['nora-herself', 'safety_alert'],
+    ]);
+  });
+
+  it('never tells her of the agency’s own alerts, and keeps them in the quiet hours', async () => {
+    const custom: RoutedEventRow = {
+      id: 'event-7',
+      creatorId: NORA,
+      type: 'alert_triggered',
+      payload: {
+        conversationId: CONVERSATION,
+        trigger: {
+          alert: { kind: 'custom', id: '01900000-0000-7000-8000-000000000030' },
+          matchedBy: 'keyword',
+          keyword: 'autre',
+        },
+        notify: true,
+      },
+    };
+    const h = harness({ events: [custom] });
+    await h.run();
+    expect(h.asked.map((r) => [r.userId, r.reason])).toEqual([
+      ['owner', 'creator_alert'],
+      ['manager', 'creator_alert'],
+    ]);
+  });
+
+  it('tells the team all the same when her accounts cannot be read', async () => {
+    const heard: RoutedEventRow = {
+      id: 'event-8',
+      creatorId: NORA,
+      type: 'alert_triggered',
+      payload: { conversationId: CONVERSATION, trigger: herWord, notify: true },
+    };
+    const h = harness({ events: [heard], failing: ['creator_accounts'] });
+    await h.run();
+    expect(h.asked.map((r) => r.userId)).toEqual(['owner', 'manager']);
+    expect(h.failures).toEqual(['creator_accounts']);
   });
 });

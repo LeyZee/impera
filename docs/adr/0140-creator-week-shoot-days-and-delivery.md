@@ -135,3 +135,12 @@ Charles a fixé ce qu'elle publie chaque jour. Ce sont des listes à cocher dans
 - Rien ne passe de Reveal à Instagram. La vidéo du jour peut aller sur Telegram.
 - Le rythme vit dans le code (`DAY_DEFAULTS`), le même pour toutes jusqu'à ses réglages (lot 3). Seul ce qu'elle a fait est gardé : `creator_day_ticks`, une ligne par jour et par élément, écrite par elle seule sur son compte, le jour même ou le lendemain dans son fuseau. Son équipe la lit, et rien n'est supprimé.
 - Chaque post a sa coche : une ligne de deux posts a deux coches. Ses couleurs couvrent aussi Instagram et Telegram.
+
+## Avenant du 27/11/2026 : sa vidéo du jour se fait par son coffre
+
+La recette du 27/11 a demandé si la créatrice poste elle-même sa vidéo du jour, ou si elle dépose et l'équipe poste. Réponse de Charles : elle dépose, Impera planifie. Jusque-là, « Ma journée » et son coffre comptaient sa journée de deux façons : Aujourd'hui restait à 0/2 après une vidéo déposée, pendant que le coffre disait « ta journée est bouclée ». Il n'y a plus qu'une définition, calculée par le serveur au même endroit (`domain/day.ts`) :
+
+- **Sa vidéo du jour** ne se coche plus. Elle est faite quand son coffre en a une pour ce jour : une vidéo du feed arrivée ce jour-là, ou, pour aujourd'hui, une qui attend dans son coffre (reçue, prête ou programmée). Le rythme reste d'une par jour. Sa ligne porte `source: 'drop'` ; à l'écran, « Déposer » ouvre la feuille de la vidéo du feed.
+- **Sa story qui mène à Reveal** (Instagram) reste une coche : aucune automatisation ne touche Instagram.
+- **Son coffre** ne dit plus « ta journée est bouclée ». Il dit ce qui manque à sa vidéo du jour, sinon ce qui lui donnerait de l'avance pour la semaine. Seul Aujourd'hui compte sa journée.
+- « Où elle en est » lit chaque jour de la même façon, avec les vidéos arrivées ce jour-là.

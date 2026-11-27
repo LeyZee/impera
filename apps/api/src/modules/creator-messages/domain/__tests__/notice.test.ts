@@ -52,7 +52,7 @@ describe('« Écrire à l’agence » rings the other side (recette 27/11, G4 an
       url: '/',
     });
     expect(JSON.stringify(toAgencyNotice('Nora', 'worry'))).not.toContain(MESSAGE.body);
-    expect(answerNotice().url).toBe('/aujourdhui');
+    expect(answerNotice().url).toBe('/aujourdhui#agence');
   });
 
   it('tells her owners and her managers once each, keyed on the message', async () => {

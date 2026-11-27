@@ -18,21 +18,25 @@ import type { DayTickStore } from '../../domain/ports';
 
 const ticks = schema.creatorDayTicks;
 
-async function todayOf(tx: Transaction, creatorId: string, now: Date): Promise<string> {
+async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
     .from(schema.creators)
     .where(eq(schema.creators.id, creatorId));
   // Her own row, read under her account: always there for a linked account.
-  return calendarDayIn(now, creator?.timeZone ?? 'Europe/Paris');
+  return creator?.timeZone ?? 'Europe/Paris';
 }
+
+const todayOf = async (tx: Transaction, creatorId: string, now: Date): Promise<string> =>
+  calendarDayIn(now, await zoneOf(tx, creatorId));
 
 /** Her day on her own account (`withCreatorAccount`): the row policies keep her to her own creator. */
 export function createDrizzleDayTickStore(db: Database): DayTickStore {
   return {
     read: (userId, day, now) =>
       withCreatorAccount(db, userId, async (tx, creatorId) => {
-        const today = await todayOf(tx, creatorId, now);
+        const timeZone = await zoneOf(tx, creatorId);
+        const today = calendarDayIn(now, timeZone);
         const shown = day ?? today;
         const rows = await tx
           .select({ item: ticks.item, done: ticks.done })
@@ -43,7 +47,7 @@ export function createDrizzleDayTickStore(db: Database): DayTickStore {
           const item = DayItemSchema.safeParse(row.item);
           if (item.success) counts[item.data] = row.done;
         }
-        return { day: shown, today, done: counts };
+        return { day: shown, today, timeZone, done: counts };
       }),
 
     teamDays: (creatorId, userId, from, to, now) =>
@@ -67,7 +71,8 @@ export function createDrizzleDayTickStore(db: Database): DayTickStore {
           counts[item.data] = row.done;
           days.set(row.day, counts);
         }
-        return { today: await todayOf(tx, creatorId, now), days };
+        const timeZone = await zoneOf(tx, creatorId);
+        return { today: calendarDayIn(now, timeZone), timeZone, days };
       }),
 
     write: (userId, day, item, done, now) =>
