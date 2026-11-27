@@ -2,6 +2,7 @@
 export const CONTRACTS_PACKAGE = '@impera/contracts';
 
 export * from './agency-rates';
+export * from './agency-style';
 export * from './agent-hours';
 export * from './alert-history';
 export * from './alerts';
@@ -104,3 +105,4 @@ export * from './telegram-channel';
 export * from './trends';
 export * from './trophy-case';
 export * from './vault';
+export * from './voice-form';

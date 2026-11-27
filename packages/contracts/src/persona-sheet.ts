@@ -15,6 +15,7 @@ import {
   PersonaStrategiesSchema,
   type Persona,
 } from './persona';
+import { VoiceFormSettingsSchema } from './voice-form';
 
 /**
  * The persona sheet at format 2 (ADR 0079): Desirali's sheet, section by section and question by question, with its
@@ -331,6 +332,11 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
   /** The only pet names she gives fans: guards refuse any other. */
   pet_names: PersonaSchema.shape.behavior.shape.pet_names,
   response_delay_minutes: PersonaSchema.shape.behavior.shape.response_delay_minutes,
+  /**
+   * The form of her bubbles (Charles 26/11): first letter, final period, space before « ? » and « ! », and her emoji
+   * streak (`emoji_misuse`). Each absent: her agency's base style decides, then the code's default.
+   */
+  ...VoiceFormSettingsSchema.shape,
 });
 
 /** The most examples of her messages per language, and the longest one. */

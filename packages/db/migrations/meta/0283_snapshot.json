@@ -1,9 +1,187 @@
 {
-  "id": "bac9fedb-7e4f-421a-83fc-27ec37d810bc",
-  "prevId": "d4cea7f1-ed14-4b3a-94dc-343f27565cb0",
+  "id": "9dba89a8-94ef-42e6-881d-b1923cc27f62",
+  "prevId": "47bad8e8-3ff8-455a-a691-9eee36a66ced",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.agency_styles": {
+      "name": "agency_styles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "private_style": {
+          "name": "private_style",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_style": {
+          "name": "public_style",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form": {
+          "name": "form",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "activated_by": {
+          "name": "activated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "agency_styles_version_unique": {
+          "name": "agency_styles_version_unique",
+          "columns": [
+            {
+              "expression": "version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agency_styles_one_active": {
+          "name": "agency_styles_one_active",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agency_styles\".\"is_active\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agency_styles_created_by_user_id_fk": {
+          "name": "agency_styles_created_by_user_id_fk",
+          "tableFrom": "agency_styles",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "agency_styles_activated_by_user_id_fk": {
+          "name": "agency_styles_activated_by_user_id_fk",
+          "tableFrom": "agency_styles",
+          "tableTo": "user",
+          "columnsFrom": ["activated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "owner_read": {
+          "name": "owner_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"agency_styles\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not \"agency_styles\".\"is_active\""
+        },
+        "owner_activate": {
+          "name": "owner_activate",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and (not \"agency_styles\".\"is_active\" or \"agency_styles\".\"activated_by\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "agency_styles_version_check": {
+          "name": "agency_styles_version_check",
+          "value": "\"agency_styles\".\"version\" > 0"
+        },
+        "agency_styles_private_style_check": {
+          "name": "agency_styles_private_style_check",
+          "value": "char_length(\"agency_styles\".\"private_style\") <= 8000"
+        },
+        "agency_styles_public_style_check": {
+          "name": "agency_styles_public_style_check",
+          "value": "char_length(\"agency_styles\".\"public_style\") <= 4000"
+        },
+        "agency_styles_form_check": {
+          "name": "agency_styles_form_check",
+          "value": "jsonb_typeof(\"agency_styles\".\"form\") = 'object'"
+        },
+        "agency_styles_activated_check": {
+          "name": "agency_styles_activated_check",
+          "value": "not \"agency_styles\".\"is_active\" or (\"agency_styles\".\"activated_at\" is not null and \"agency_styles\".\"activated_by\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.agent_hour_exceptions": {
       "name": "agent_hour_exceptions",
       "schema": "",
