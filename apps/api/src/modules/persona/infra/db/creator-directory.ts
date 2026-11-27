@@ -436,6 +436,45 @@ export function createDrizzleCreatorDirectory(
         return tiers;
       });
     },
+
+    async meetingTiers(id) {
+      const [row] = await db
+        .select({ settings: schema.creators.settings })
+        .from(schema.creators)
+        .where(eq(schema.creators.id, id));
+      return row === undefined ? null : { settings: settingsOf(row.settings).meetingTiers ?? null };
+    },
+
+    setMeetingTiers(id, body, userId) {
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ settings: schema.creators.settings })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, id))
+          .for('update');
+        if (row === undefined) return null;
+        const before = settingsOf(row.settings).meetingTiers ?? null;
+        // Only her `meetingTiers` key is written, or removed: the rest of her settings stays as stored.
+        await tx
+          .update(schema.creators)
+          .set({
+            settings:
+              body.settings === null
+                ? sql`${schema.creators.settings} - 'meetingTiers'`
+                : sql`${schema.creators.settings} || jsonb_build_object('meetingTiers', ${JSON.stringify(body.settings)}::jsonb)`,
+          })
+          .where(eq(schema.creators.id, id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'creator.meeting_tiers',
+          entity: 'creator',
+          entityId: id,
+          details: { from: before, to: body.settings },
+        });
+        return body;
+      });
+    },
   };
 }
 

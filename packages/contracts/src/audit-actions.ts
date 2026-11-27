@@ -596,6 +596,11 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     none,
     (_d, c) => `a changé les paliers de dépense des fans de ${c.creator(c.entityId)}`,
   ),
+  'creator.meeting_tiers': action(
+    'agent',
+    none,
+    (_d, c) => `a changé les paliers de rencontre de ${c.creator(c.entityId)}`,
+  ),
   'automatic.on': agent('a allumé l’Automatique'),
   'conversation.takeover': agent('a pris la main sur une conversation'),
   'conversation.release': agent('a rendu une conversation à l’agent'),

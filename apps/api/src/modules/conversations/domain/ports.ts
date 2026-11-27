@@ -4,6 +4,7 @@ import type {
   FanTier,
   FanTiersSetting,
   TimeWasterSetting,
+  MeetingTierSettings,
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
@@ -664,6 +665,11 @@ interface FanStats {
   readonly registerSpentMinor?: number;
   /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */
   readonly timeWaster?: TimeWasterSetting;
+  /**
+   * Her meeting tiers (guide 26/11), as the owner set them: the agent reads his tier from them when he asks to see
+   * her. Absent, no fan goes past the second.
+   */
+  readonly meetingTiers?: MeetingTierSettings;
 }
 
 interface FanContext extends FanStats {

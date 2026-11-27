@@ -6,6 +6,7 @@ import type {
   CopilotSwitches,
   FanTiersSetting,
   CreatorId,
+  MeetingTiersBody,
   CreatorSummary,
   DayRange,
   LocalDate,
@@ -70,6 +71,16 @@ export interface CreatorDirectory {
   fanTiers(id: CreatorId): Promise<FanTiersSetting | null>;
   /** Sets all three, audited with the owner who set them; `null` when she does not exist. */
   setFanTiers(id: CreatorId, tiers: FanTiersSetting, userId: string): Promise<FanTiersSetting | null>;
+  /**
+   * Her meeting tiers (guide 26/11), `{ settings: null }` when never set or no longer read; `null` when she does not
+   * exist.
+   */
+  meetingTiers(id: CreatorId): Promise<MeetingTiersBody | null>;
+  /**
+   * Sets the three durations, or removes them with `settings: null`, audited with the owner who did; `null` when she
+   * does not exist.
+   */
+  setMeetingTiers(id: CreatorId, body: MeetingTiersBody, userId: string): Promise<MeetingTiersBody | null>;
 }
 
 /**

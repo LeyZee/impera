@@ -504,6 +504,25 @@ describe('createDraftComposer', () => {
     expect(teased).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'tease' } });
   });
 
+  it('reads his meeting tier from her settings, absent past the second for nobody (guide 26/11)', async () => {
+    const meet: Brief = { ...BRIEF, intent: 'asks_to_meet', risks: ['meet_request'] };
+    // A payer known 50 hours: past every duration of these arbitrary settings, so very close.
+    const payer = {
+      ...INPUT,
+      fan: { ...INPUT.fan, spentMinor: 2_000, firstMessageAt: new Date('2026-10-15T08:00:00Z') },
+    };
+    const withTiers = composer({ brief: meet });
+    const close = await withTiers.draftComposer.compose({
+      ...payer,
+      fan: { ...payer.fan, meetingTiers: { newFanHours: 3, closeFanHours: 17, veryCloseFanHours: 41 } },
+    });
+    expect(close).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'reason', reason: 'safety' } });
+
+    const without = composer({ brief: meet });
+    const second = await without.draftComposer.compose(payer);
+    expect(second).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'reason', reason: 'needs_time' } });
+  });
+
   it('answers an insult herself, never sorry, and makes him earn it when he comes back (passes 8 and 16, Charles 21/11)', async () => {
     const insult: Brief = { ...BRIEF, intent: 'complaint', risks: ['insult'] };
     const hurt = composer({ brief: insult });
