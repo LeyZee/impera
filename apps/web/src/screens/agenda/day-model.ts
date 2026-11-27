@@ -1,4 +1,4 @@
-import type { DayLine, DayPlatform } from '@impera/contracts';
+import type { DayItem, DayLine, DayPlatform, DropCategory } from '@impera/contracts';
 
 import type { ColorKind } from './week-colors';
 
@@ -32,3 +32,6 @@ export function firstSentence(sheet: string): string {
   const end = sheet.search(/[.:!?](\s|$)/u);
   return end === -1 ? sheet : sheet.slice(0, end + (sheet[end] === ':' ? 0 : 1)).trimEnd();
 }
+
+/** What she drops for a line her coffre does (ADR 0140, avenant du 27/11): Contenu's tile it opens on. */
+export const DROP_FOR: Partial<Readonly<Record<DayItem, DropCategory>>> = { reveal_video: 'feed_video' };

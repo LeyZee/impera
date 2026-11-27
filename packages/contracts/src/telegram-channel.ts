@@ -179,8 +179,6 @@ export const ChannelChoiceSchema = z.object({
   canPost: z.boolean(),
   /** Another creator's channel already: not offered to her. */
   takenByOther: z.boolean(),
-  /** A group of the alerts' routing points at it: refused, alerts never go to a public channel. */
-  routedForAlerts: z.boolean(),
 });
 export type ChannelChoice = z.infer<typeof ChannelChoiceSchema>;
 
@@ -219,7 +217,6 @@ export const ChannelRefusalKindSchema = z.enum([
   'chat_unknown',
   'chat_not_channel',
   'chat_taken',
-  'chat_routed',
 ]);
 export type ChannelRefusalKind = z.infer<typeof ChannelRefusalKindSchema>;
 

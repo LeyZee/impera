@@ -64,8 +64,6 @@ export { payReadsForAccounting } from './infra/accounting-reads';
 export { payReadsForInvoicing } from './infra/invoicing-reads';
 /** Whether a period is closed at or after a given one, for the planning's pay rules (ADR 0084 § 2). */
 export { payReadsForPayRules } from './infra/pay-rules-reads';
-/** The newest rate of a currency, on or before a day, in the caller's transaction (Telegram's minimum, CRM-04). */
-export { latestRateOf } from './infra/latest-rate';
 export type { StatementForInvoicing } from './infra/invoicing-reads';
 /** @public What another door (the MCP, ADR 0026 § 1) reads of the statements. */
 export type { PayrollStatementReads } from './application/statement-reads';

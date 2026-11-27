@@ -14,7 +14,6 @@ import { invoiceReadiness } from '../modules/invoicing';
 import type { PayrollModule } from '../modules/payroll';
 import type { SchedulingModule } from '../modules/scheduling';
 import { createSupervisionModule, type SupervisionModule } from '../modules/supervision';
-import type { TelegramModule } from '../modules/telegram';
 import { readStuckJobs } from '../readiness';
 
 import type { WiredAgent } from './agent';
@@ -34,7 +33,8 @@ export function wireSupervision(
     readonly conversations: ConversationsModule;
     readonly payroll: PayrollModule;
     readonly scheduling: SchedulingModule;
-    readonly telegram: TelegramModule | null;
+    /** Whether this server sends notifications (a push key is set). */
+    readonly pushOn: () => boolean;
     /** The connectors' feeds, as Réglages › Ventes shows them: a stopped one is named on the sales panel (AGT-11). */
     readonly salesFeeds: ConnectorsModule['salesFeedStates'];
     /** Every job a worker task takes: a dead one is counted on the Dashboard. */
@@ -42,16 +42,12 @@ export function wireSupervision(
   },
 ): WiredSupervision {
   const { db, adminDb, requireRole } = shared;
-  const { llm, conversations, payroll, telegram } = deps;
+  const { llm, conversations, payroll } = deps;
   const module = createSupervisionModule({
     db,
     adminDb,
-    // « Mise en route »: the coverage Réglages › Telegram shows, per creator; nothing when Telegram is off.
-    telegramReach: async () => {
-      if (telegram === null) return null;
-      const { coverage } = await telegram.overview();
-      return new Map(coverage.map((c) => [c.creatorId, c.urgentReachable] as const));
-    },
+    // « Mise en route »: her urgent alerts ring an owner's device at night only while this server sends push.
+    pushOn: deps.pushOn,
     // « Facturation »: the very reason the validation of the 16th would give, read in one admin transaction.
     billingReadiness: (memberIds, day) =>
       withAdmin(adminDb, async (tx) => {
@@ -92,20 +88,6 @@ export function wireSupervision(
         return rate === null ? null : { day: rate.day, rateMicros: rate.rateMicros };
       },
     },
-    ...(telegram !== null && {
-      telegram: {
-        read: async (creatorId) => {
-          const [night, { coverage }] = await Promise.all([
-            telegram.nightCounts(creatorId),
-            telegram.overview(),
-          ]);
-          return {
-            alertsTonight: night.urgent + night.important,
-            urgentReachable: coverage.find((c) => c.creatorId === creatorId)?.urgentReachable ?? false,
-          };
-        },
-      },
-    }),
   });
   return { module, routes: [module.routes] };
 }

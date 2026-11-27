@@ -121,7 +121,12 @@ function roleHealth(
     state,
     active: { provider: roleConfig.provider, model: roleConfig.model, label: label(roleConfig) },
     ...(roleConfig.fallback && {
-      fallback: { ...roleConfig.fallback, label: label(roleConfig.fallback), hasKey: fallbackHasKey },
+      fallback: {
+        provider: roleConfig.fallback.provider,
+        model: roleConfig.fallback.model,
+        label: label(roleConfig.fallback),
+        hasKey: fallbackHasKey,
+      },
     }),
     hasKey,
     isOnFallback,

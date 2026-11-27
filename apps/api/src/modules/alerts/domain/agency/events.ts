@@ -1,0 +1,300 @@
+import {
+  AutomaticMissingSchema,
+  ConversationIdSchema,
+  CreatorIdSchema,
+  EVENT_PAYLOADS,
+  HandoffCauseSchema,
+  InvoiceKindSchema,
+  InvoiceNotIssuedReasonSchema,
+  KillSwitchScopeSchema,
+  PayPeriodSchema,
+  PlatformAccountIdSchema,
+  SecurityAlertPayloadSchema,
+} from '@impera/contracts';
+import { z } from 'zod';
+
+import type { ScannedEvent, Signal } from './signals';
+
+/**
+ * Reads a `domain_events` row into a signal (ADR 0020 §3). Local, tolerant schemas: the agency's alerts read the facts
+ * they need and nothing else, accept rows written before a field existed, and skip a row they cannot read rather than
+ * blocking the others.
+ */
+
+const HandoffSchema = z.object({
+  conversationId: ConversationIdSchema.optional().catch(undefined),
+  cause: HandoffCauseSchema.optional().catch(undefined),
+});
+
+const BudgetSchema = z.object({
+  kind: z.enum(['alert', 'reached']),
+  spentMinor: z.number().int().min(0),
+  capMinor: z.number().int().min(0),
+});
+
+const CreditsLowSchema = z.object({
+  provider: z.enum(['xai', 'mistral', 'google']),
+  level: z.enum(['low', 'critical', 'empty']),
+  balanceMinor: z.number().int(),
+  currency: z.enum(['EUR', 'USD']),
+  runsOutOn: z.iso.date().nullable(),
+});
+
+const QuotaExhaustedSchema = z.object({
+  provider: z.enum(['xai', 'mistral', 'google']),
+  mode: z.enum(['credits', 'subscription']),
+});
+
+const KillSwitchSchema = z.object({
+  scope: KillSwitchScopeSchema,
+  scopeId: z.string().nullable(),
+  active: z.boolean(),
+  reason: z.string(),
+});
+
+// Only the last failure counts: the retries before it are the platform's hiccups, not news. No fallback on the
+// attempt count for rows without `isFinal`: the outbox never held `send_failed` before the flag existed. The
+// error code stays out, as anything the platform said.
+const SendFailedSchema = z.object({
+  conversationId: ConversationIdSchema.optional().catch(undefined),
+  isFinal: z.literal(true),
+});
+
+// The voice version (`voicePrompt`, `voiceModel`) stays out: the agency's alerts never say anything of the voice.
+const AutomaticClosedSchema = z.object({
+  missing: z.array(AutomaticMissingSchema).min(1),
+  conversations: z.number().int().min(1),
+});
+
+const BackupOverdueSchema = z.object({ lastSucceededAt: z.iso.datetime().nullable() });
+
+// Only the currency and the ECB's day of its last rate: no figure of the agency's pay is notified (ADR 0033).
+const ExchangeRateOverdueSchema = z.object({
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  lastRateDay: z.iso.date().nullable(),
+});
+
+// The period, the document and the reason only: the member and the amount stay in Impera (no figure of the pay is notified, ADR
+// 0033).
+const InvoiceNotIssuedSchema = z.object({
+  period: PayPeriodSchema,
+  document: InvoiceKindSchema,
+  reason: InvoiceNotIssuedReasonSchema,
+});
+
+// The document's number, where and, for a conflict, at which stage (ADR 0037): the member stays in Impera.
+const InvoicePdfMissingSchema = EVENT_PAYLOADS.invoice_pdf_missing.pick({ number: true, place: true });
+const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
+  number: true,
+  place: true,
+  stage: true,
+});
+
+// The document's number and kind (ADR 0039): the contractor and the reason stay in Impera.
+const InvoiceContestedSchema = EVENT_PAYLOADS.invoice_contested.pick({ number: true, document: true });
+
+// The document's kind and last day, and the member's id for the link (EQ-06 lot 5c-2): never a name.
+const ContractorDocumentExpiringSchema = EVENT_PAYLOADS.contractor_document_expiring.pick({
+  memberId: true,
+  kind: true,
+  lastDay: true,
+});
+
+// The invoice's number, due date and what blocks its transfer (EQ-06 lot 8), the member's id for the link: never its
+// total nor a name.
+const InvoiceDueSchema = EVENT_PAYLOADS.invoice_due_soon.pick({
+  memberId: true,
+  number: true,
+  dueOn: true,
+  payoutBlock: true,
+});
+
+// The platform, the fortnight and how many days and accounts differ (CRM-04 b3): the nets and the differences stay in
+// Impera, and a notification never says a figure pay rests on.
+const SalesFeedMismatchSchema = EVENT_PAYLOADS.sales_feed_mismatch
+  .pick({ platform: true, from: true })
+  .extend({
+    days: z.array(z.object({ day: z.iso.date(), platformAccountId: PlatformAccountIdSchema })).min(1),
+  });
+
+// Her account and fortnight (CRM-04 d3): her share, the expected one and their difference stay in Impera.
+const AgencyShareMismatchSchema = EVENT_PAYLOADS.agency_share_mismatch.pick({
+  creatorId: true,
+  platform: true,
+  platformAccountId: true,
+  from: true,
+});
+
+// Her account and fortnight (ADR 0054 § 5): both shares stay in Impera.
+const AgencyShareChangedSchema = EVENT_PAYLOADS.agency_share_changed.pick({
+  creatorId: true,
+  platform: true,
+  platformAccountId: true,
+  from: true,
+});
+
+function signalOf(type: string, payload: unknown): Signal | null {
+  switch (type) {
+    case 'handoff_requested': {
+      const parsed = HandoffSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return {
+        kind: 'handoff',
+        conversationId: parsed.data.conversationId ?? null,
+        cause: parsed.data.cause ?? null,
+      };
+    }
+    case 'budget_threshold_crossed': {
+      const parsed = BudgetSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return {
+        kind: 'budget',
+        threshold: parsed.data.kind,
+        spentMinor: parsed.data.spentMinor,
+        capMinor: parsed.data.capMinor,
+      };
+    }
+    case 'ai_credits_low': {
+      const parsed = CreditsLowSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'ai_credits_low', ...parsed.data };
+    }
+    case 'ai_quota_exhausted': {
+      const parsed = QuotaExhaustedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'ai_quota_exhausted', ...parsed.data };
+    }
+    case 'kill_switch_toggled': {
+      const parsed = KillSwitchSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'kill_switch', ...parsed.data };
+    }
+    case 'send_failed': {
+      const parsed = SendFailedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'send_failed', conversationId: parsed.data.conversationId ?? null };
+    }
+    case 'backup_overdue': {
+      const parsed = BackupOverdueSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { lastSucceededAt } = parsed.data;
+      return {
+        kind: 'backup_overdue',
+        lastSucceededAt: lastSucceededAt === null ? null : new Date(lastSucceededAt),
+      };
+    }
+    case 'exchange_rate_overdue': {
+      const parsed = ExchangeRateOverdueSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'exchange_rate_overdue', ...parsed.data };
+    }
+    case 'invoice_not_issued': {
+      const parsed = InvoiceNotIssuedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_not_issued', ...parsed.data };
+    }
+    case 'invoice_pdf_conflict': {
+      const parsed = InvoicePdfConflictSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_pdf_conflict', ...parsed.data };
+    }
+    case 'invoice_pdf_missing': {
+      const parsed = InvoicePdfMissingSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_pdf_missing', ...parsed.data };
+    }
+    case 'invoice_contested': {
+      const parsed = InvoiceContestedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_contested', ...parsed.data };
+    }
+    case 'invoice_due_soon':
+    case 'invoice_overdue': {
+      const parsed = InvoiceDueSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_due', overdue: type === 'invoice_overdue', ...parsed.data };
+    }
+    case 'contractor_document_expiring': {
+      const parsed = ContractorDocumentExpiringSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { memberId, kind, lastDay } = parsed.data;
+      return { kind: 'contractor_document_expiring', memberId, document: kind, lastDay };
+    }
+    case 'automatic_closed': {
+      const parsed = AutomaticClosedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'automatic_closed', ...parsed.data };
+    }
+    case 'sales_feed_mismatch': {
+      const parsed = SalesFeedMismatchSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { platform, from, days } = parsed.data;
+      return {
+        kind: 'sales_feed_mismatch',
+        platform,
+        from,
+        days: new Set(days.map((day) => day.day)).size,
+        accounts: new Set(days.map((day) => day.platformAccountId)).size,
+      };
+    }
+    case 'sales_feed_signal': {
+      // Only a linked model gone or banned is told; the other signals are for Réglages › Ventes.
+      const parsed = EVENT_PAYLOADS.sales_feed_signal.safeParse(payload);
+      if (!parsed.success) return null;
+      const { platform, signal } = parsed.data;
+      if (signal.kind !== 'model_gone' && signal.kind !== 'model_banned') return null;
+      return {
+        kind: 'sales_feed_model',
+        platform,
+        change: signal.kind === 'model_gone' ? 'gone' : 'banned',
+        platformModelId: signal.platformModelId,
+      };
+    }
+    case 'agency_share_mismatch': {
+      const parsed = AgencyShareMismatchSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'agency_share_mismatch', ...parsed.data };
+    }
+    case 'agency_share_changed': {
+      const parsed = AgencyShareChangedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'agency_share_changed', ...parsed.data };
+    }
+    case 'account_uncovered': {
+      const parsed = EVENT_PAYLOADS.account_uncovered.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'account_uncovered', ...parsed.data };
+    }
+    case 'connection_state_changed': {
+      const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);
+      if (!parsed.success) return null;
+      const { data } = parsed;
+      return data.state === 'down'
+        ? { kind: 'connection_down', service: data.service, reason: data.reason }
+        : { kind: 'connection_back', service: data.service };
+    }
+    case 'security_alert': {
+      const parsed = SecurityAlertPayloadSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'security_alert', alert: parsed.data };
+    }
+    default:
+      return null;
+  }
+}
+
+export interface EventRow {
+  readonly id: string;
+  readonly creatorId: string | null;
+  readonly type: string;
+  readonly payload: unknown;
+}
+
+/** Null for a row the module has nothing to say about. */
+export function toScannedEvent(row: EventRow): ScannedEvent | null {
+  const signal = signalOf(row.type, row.payload);
+  if (signal === null) return null;
+  if (row.creatorId === null) return { id: row.id, creatorId: null, signal };
+  const creatorId = CreatorIdSchema.safeParse(row.creatorId);
+  return creatorId.success ? { id: row.id, creatorId: creatorId.data, signal } : null;
+}

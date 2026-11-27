@@ -1993,10 +1993,11 @@
   align-content: start;
   gap: var(--nv-space-4);
 }
+/* Side by side, the two browsers' cards end on the same line (avis Design du 27/11). */
 .nv-help-install__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: var(--nv-space-4);
 }
 .nv-help-install__steps {

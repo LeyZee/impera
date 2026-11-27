@@ -12,6 +12,7 @@ import { createReleaseUnavailableJob } from './application/jobs/release-unavaila
 import { createReopenJob } from './application/jobs/reopen';
 import { createRespondJob } from './application/jobs/respond';
 import { createSendJob } from './application/jobs/send';
+import { createWatchKeywordsJob } from './application/jobs/watch-keywords';
 import { createConversationReads, type ConversationReads } from './application/reads';
 import type {
   AlertNames,
@@ -23,6 +24,7 @@ import type {
   FanDirectory,
   FollowUpPlan,
   JobLogger,
+  KeywordWatch,
   MediaDescriptions,
   OutboundSender,
   ReplyHours,
@@ -53,6 +55,7 @@ export type {
   FollowUpContext,
   FollowUpPlan,
   GuardReadContext,
+  KeywordWatch,
   OutboundSender,
 } from './domain/ports';
 
@@ -97,6 +100,8 @@ export interface ConversationsModule extends ConversationCommands {
     recordFacts(payload: JobPayload<'conversation.record_facts'>, logger: JobLogger): Promise<void>;
     /** `fans.read_card` (ADR 0085 § 7): his new messages read for his card, whoever answers him. */
     readCard(payload: JobPayload<'fans.read_card'>, logger: JobLogger): Promise<void>;
+    /** `conversation.watch_keywords`: her alert words read in what he wrote while the agent does not answer him. */
+    watchKeywords(payload: JobPayload<'conversation.watch_keywords'>, logger: JobLogger): Promise<void>;
     followUp(payload: JobPayload<'conversation.follow_up'>, logger: JobLogger): Promise<void>;
     /** `conversation.after_sale` (ADR 0156 § 2): a step he bought or a tip wakes his conversation for her word after it. */
     afterSale(payload: JobPayload<'conversation.after_sale'>, logger: JobLogger): Promise<void>;
@@ -127,6 +132,11 @@ export interface ConversationsDeps {
   readonly composer?: DraftComposer;
   /** His card read in his messages (ADR 0085 § 7, agent module's adapter); without it, the card waits for a chatter. */
   readonly cardReader?: CardReader;
+  /**
+   * Her alert words read while the agent does not answer him (agent module's adapter); without it, they are read only
+   * in the agent's own turn.
+   */
+  readonly keywordWatch?: KeywordWatch;
   /** Her follow-up delays (P3-10, agent module's adapter); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
   /** Her typing rhythm between bubbles (agent module's adapter); without it, her bubbles leave one after the other. */
@@ -232,6 +242,13 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
               return Promise.resolve();
             }
           : createReadCardJob({ uow, clock, fans: deps.fans, reader: deps.cardReader }),
+      watchKeywords:
+        deps.keywordWatch === undefined
+          ? (_payload, logger) => {
+              logger.info({}, 'watch_keywords: no watch, her words are read in the agent turn only');
+              return Promise.resolve();
+            }
+          : createWatchKeywordsJob({ uow, clock, watch: deps.keywordWatch }),
       followUp: createFollowUpJob({
         uow,
         clock,

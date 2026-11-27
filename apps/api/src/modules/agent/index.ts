@@ -3,6 +3,7 @@ import { loadPrompt, type LlmGateway } from '@impera/llm';
 
 import type { FansModule } from '../fans';
 
+import { keywordAlerts, noticeOf, type AlertNotice } from './domain/alerts';
 import { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
 import { pickVoiceExamples, type VoiceExample } from './infra/calibration-record';
@@ -339,6 +340,27 @@ export function startFollowUpPlan(options: {
   return {
     delaysHours: async (creatorId) =>
       (await activePersonaForModels(options.activePersona, creatorId, now()))?.followUps.delaysHours ?? [],
+  };
+}
+
+/**
+ * Her alert words read in what he wrote (P4-01), in code and at no cost: her active persona's words (always on, they
+ * pause the agent in its own turn) and her own alerts' words. What `conversation.watch_keywords` reads while the agent
+ * does not answer him: each one only lets a human know. Without an active version, her own alerts' words still count.
+ * A failed read throws: the job tries again. @public Wired by the composition root on the `conversations` module.
+ */
+export function startKeywordWatch(options: {
+  readonly activePersona: ActivePersonaSource;
+  readonly alertsOf: NonNullable<DraftComposerDeps['alertsOf']>;
+}): {
+  alertsIn(creatorId: string, text: string, now: Date): Promise<readonly AlertNotice[]>;
+} {
+  return {
+    alertsIn: async (creatorId, text, now) => {
+      const persona = await activePersonaForModels(options.activePersona, creatorId, now);
+      const settings = await options.alertsOf(creatorId);
+      return keywordAlerts(text, persona?.alertKeywords ?? [], settings).map(noticeOf);
+    },
   };
 }
 

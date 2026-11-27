@@ -14,6 +14,8 @@ import { DAY_DEFAULTS, dayLines } from '../domain/day';
 import { deliveryAsks, deliveryDue } from '../domain/plan';
 import type { AcceptSuggestion, DayTickStore, WeekFactsReader } from '../domain/ports';
 
+import { videosFor } from './her-day';
+
 export interface HerWeekDeps {
   readonly agenda: Pick<WeekAgendaStore, 'herWeek'>;
   readonly facts: Pick<WeekFactsReader, 'arrivals'>;
@@ -131,7 +133,7 @@ export async function herWeek(
 
 export interface ProgressDeps {
   readonly agenda: Pick<WeekAgendaStore, 'teamWeek'>;
-  readonly facts: Pick<WeekFactsReader, 'teamArrivals'>;
+  readonly facts: Pick<WeekFactsReader, 'teamArrivals' | 'teamVideos'>;
   readonly days: Pick<DayTickStore, 'teamDays'>;
 }
 
@@ -154,9 +156,21 @@ export async function creatorProgress(
   const herWeekRead = await weekOf(read, week, (window, requestIds) =>
     deps.facts.teamArrivals(creatorId, userId, window, requestIds),
   );
+  const cover = await deps.facts.teamVideos(
+    creatorId,
+    userId,
+    {
+      from: wallClockToInstant(week, 0, ticked.timeZone),
+      to: wallClockToInstant(addDays(week, 7), 0, ticked.timeZone),
+    },
+    ticked.timeZone,
+  );
   const days = Array.from({ length: 7 }, (_, offset) => {
     const day = addDays(week, offset);
-    const lines = dayLines(DAY_DEFAULTS, ticked.days.get(day) ?? {});
+    const lines = dayLines(DAY_DEFAULTS, {
+      ticked: ticked.days.get(day) ?? {},
+      videos: videosFor(day, ticked.today, cover),
+    });
     const essentials = lines.filter((line) => line.essential);
     return {
       day,

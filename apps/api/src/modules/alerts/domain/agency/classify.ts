@@ -1,0 +1,689 @@
+import {
+  payPeriodLastDay,
+  OWNER_REMOVAL_NOTICE_HOURS,
+  type AutomaticMissing,
+  type ConnectionDownReason,
+  type ConnectionService,
+  type ContractorDocumentKind,
+  type HandoffCause,
+  type InvoiceNotIssuedReason,
+  type InvoicePdfPlace,
+  type PayoutBlock,
+  type PayPeriod,
+  type Platform,
+  type SecurityAlertPayload,
+  type UserRole,
+} from '@impera/contracts';
+
+import { SAFETY_HANDOFF_CAUSES } from '../classify';
+
+import type { Notice, Signal } from './signals';
+
+/**
+ * The agency's alerts (ADR 0020 §2, kept for the owners when Telegram went back to the channels, CLAUDE.md rule 3): which event becomes which
+ * notification for the owners, in code. An event missing from here produces nothing. What her tab tells (ADR 0150:
+ * a safety relay, her alerts, a sale, the AI budget, an expired session) is never told here a second time.
+ */
+
+/**
+ * The event types the agency's alerts read. A takeover closed a Telegram thread and has nothing to ring; an expired
+ * session rings by her tab (`session_expired`, `alerts.route`).
+ */
+export const AGENCY_EVENT_TYPES = [
+  'handoff_requested',
+  'budget_threshold_crossed',
+  'ai_credits_low',
+  'ai_quota_exhausted',
+  'kill_switch_toggled',
+  'automatic_closed',
+  'send_failed',
+  'backup_overdue',
+  'exchange_rate_overdue',
+  'invoice_not_issued',
+  'invoice_pdf_conflict',
+  'invoice_pdf_missing',
+  'invoice_contested',
+  'contractor_document_expiring',
+  'invoice_due_soon',
+  'invoice_overdue',
+  'security_alert',
+  'sales_feed_mismatch',
+  'connection_state_changed',
+  'agency_share_mismatch',
+  'agency_share_changed',
+  'sales_feed_signal',
+  'account_uncovered',
+] as const;
+
+const CAUSE_TEXT: Readonly<Record<HandoffCause, string>> = {
+  minor: 'Possible mineur dans la conversation.',
+  non_consent: 'Possible contenu sans consentement.',
+  distress: 'Le fan semble en détresse.',
+  meeting: 'Le fan insiste pour une rencontre.',
+  manipulation: 'Le fan tente de manipuler l’agent.',
+  guard: 'Une réponse a été bloquée par une garde.',
+  budget: 'Le plafond IA du jour est atteint.',
+  keyword: 'Un mot surveillé a été écrit.',
+  llm_unavailable: 'Le modèle ne répond plus.',
+  other: 'L’agent ne sait pas répondre.',
+  custom_alert: 'Une alerte personnalisée a sonné.',
+  identity_doubt: 'Le fan doute de parler vraiment à la créatrice.',
+  persona_inactive: 'La créatrice n’a pas de persona active : l’agent n’écrit rien.',
+  custom_order: 'Le fan demande quelque chose fait pour lui : un humain prend la commande.',
+  sale_trouble: 'Une vente coince encore (paiement ou plainte après achat) : un humain doit répondre.',
+};
+
+const KILL_REASON_MAX = 200;
+
+/** The services as the owner knows them, by the model he pays for. */
+const CREDIT_PROVIDER_NAME: Readonly<Record<'xai' | 'mistral' | 'google', string>> = {
+  xai: 'Grok (xAI)',
+  mistral: 'Mistral',
+  google: 'Gemini (Google)',
+};
+
+/** « 23,4 $ » or « 23,4 € »: the credits in the currency the provider bills them in. */
+const money = (minor: number, currency: 'EUR' | 'USD'): string =>
+  `${(minor / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency === 'EUR' ? '€' : '$'}`;
+
+const euros = (minor: number): string =>
+  `${(minor / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+
+/** « 74,5 % » for a rate, always to the tenth; « 80 % » for a target, the tenth only when it has one. */
+const percent = (value: number, minimumFractionDigits: 0 | 1): string =>
+  `${value.toLocaleString('fr-FR', { minimumFractionDigits, maximumFractionDigits: 1 })} %`;
+
+/** Why Automatique closed, in the owner's words; the figures are the server's, the thresholds too. */
+function missingText(missing: AutomaticMissing): string {
+  switch (missing.kind) {
+    case 'active_persona':
+      return 'elle n’a pas de persona active';
+    case 'live_rate':
+      return missing.value === null
+        ? `le taux en réel n’est pas encore mesuré (objectif : ${percent(missing.target, 0)})`
+        : `le taux en réel est à ${percent(missing.value, 1)} (objectif : ${percent(missing.target, 0)})`;
+    case 'decided_drafts':
+      return `${String(missing.value)} brouillons décidés sur les ${String(missing.target)} demandés`;
+    case 'blind_test':
+      return 'le test à l’aveugle de cette version de la voix n’est pas validé';
+  }
+}
+
+/** « le 26 oct. à 03:04 », in Paris time: the export's schedule is Paris time too (ADR 0028 § 1). */
+const parisMoment = (at: Date): string => {
+  const day = at.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short' });
+  const time = at.toLocaleTimeString('fr-FR', {
+    timeZone: 'Europe/Paris',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `le ${day} à ${time}`;
+};
+
+/** « le 24 oct. », for a day as the ECB writes it (`2026-10-24`): a calendar day, no time zone to apply. */
+const calendarDay = (day: string): string =>
+  `le ${new Date(`${day}T12:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC', day: 'numeric', month: 'short' })}`;
+
+/** « la quinzaine du 16 au 31 oct. »: calendar days, no time zone to apply. */
+const periodText = (period: PayPeriod): string => {
+  const last = payPeriodLastDay(period);
+  const month = new Date(`${last}T12:00:00Z`).toLocaleDateString('fr-FR', {
+    timeZone: 'UTC',
+    month: 'short',
+  });
+  const first = period.endsWith('-01') ? '1er' : '16';
+  return `la quinzaine du ${first} au ${String(Number(last.slice(8)))} ${month}`;
+};
+
+/** « de 14 h à 20 h », or « de 22 h 30 à 4 h », on the planning's clock. */
+function slotText(slot: {
+  readonly slotStartsAt: string;
+  readonly slotEndsAt: string;
+  readonly timeZone: string;
+}): string {
+  const clock = (at: string): string => {
+    const parts = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: slot.timeZone,
+      hour: 'numeric',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(at));
+    const hour = String(Number(parts.find((part) => part.type === 'hour')?.value ?? '0'));
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+    return minute === '00' ? `${hour} h` : `${hour} h ${minute}`;
+  };
+  return `de ${clock(slot.slotStartsAt)} à ${clock(slot.slotEndsAt)}`;
+}
+
+const countText = (count: number, one: string, many: string): string =>
+  `${String(count)} ${count > 1 ? many : one}`;
+
+/** Why a document was not issued, as the owner settles it; the contractor is never named in a notification. */
+const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
+  mandate_unpublished: 'aucun mandat de facturation n’est publié dans Réglages › Facturation',
+  no_mandate: 'le prestataire n’a pas accepté de mandat de facturation',
+  no_regime: 'aucun régime de facturation n’était attribué au prestataire à la date de la facture',
+  regime_not_validated:
+    'le régime de facturation du prestataire n’était pas validé par le comptable à la date de la facture',
+  regime_country_mismatch: 'le régime de facturation du prestataire n’est pas celui du pays de sa fiche',
+  identity_incomplete: 'le dossier prestataire est incomplet pour son régime de facturation',
+  identity_unverified: 'le dossier prestataire n’est pas encore vérifié',
+  tax_residence_missing:
+    'le prestataire n’a pas d’attestation de résidence fiscale de cette année au dossier',
+  tax_residence_unverified: 'l’attestation de résidence fiscale du prestataire attend ta vérification',
+  prefix_missing: 'le prestataire n’a pas de préfixe de facture',
+  agency_missing: 'les réglages de facturation de l’agence ne sont pas remplis',
+  no_invoice_to_credit: 'aucune facture ne peut prendre l’avoir entier, à voir avec le comptable',
+};
+
+/** Where a document's PDF lies (ADR 0037): Hetzner first, the copy at a second provider; named as the owner knows them. */
+const PDF_PLACE_NAMES: Record<InvoicePdfPlace, string> = { primary: 'Hetzner', ovhcloud: 'OVHcloud' };
+
+const pdfPlaceText = (place: InvoicePdfPlace): string =>
+  place === 'primary' ? `chez ${PDF_PLACE_NAMES.primary}` : `chez ${PDF_PLACE_NAMES[place]} (la copie)`;
+
+/**
+ * What a conflict means by stage and place, as #335 raises it: the render found another file at Hetzner; the copy found
+ * the first file missing or altered (`primary`) or a copy not the expected one, other bytes or another lock (a copy
+ * provider); a download found the file of that place missing or altered and did not serve it.
+ */
+function pdfConflictText(signal: Signal & { kind: 'invoice_pdf_conflict' }): string {
+  const { number, place } = signal;
+  switch (signal.stage) {
+    case 'render':
+      return `Le PDF du document ${number} n’a pas été enregistré : ${pdfPlaceText(place)}, sa place est déjà prise par un autre fichier. Rien n’a été remplacé ; le document reste émis, mais ne se télécharge pas encore. À vérifier.`;
+    case 'copy':
+      return place === 'primary'
+        ? `Le PDF du document ${number} manque chez ${PDF_PLACE_NAMES.primary} ou ne correspond plus à son empreinte : il n’a pas été copié, et aucune copie n’existe encore ; il ne se télécharge plus. À vérifier.`
+        : `La copie du PDF du document ${number} chez ${PDF_PLACE_NAMES[place]} n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`;
+    case 'download':
+      return `Au téléchargement, le PDF du document ${number} ${pdfPlaceText(place)} manquait ou ne correspondait pas à son empreinte : ce fichier n’a pas été servi, rien n’a été remplacé. À vérifier.`;
+  }
+}
+
+const PAY_LINK = { label: 'Ouvrir la Paie', path: '/paie' };
+
+/** « 31 décembre 2026 »: a calendar day, no time zone to apply. */
+const longDay = (day: string): string => {
+  const date = new Date(`${day}T12:00:00Z`);
+  const month = date.toLocaleDateString('fr-FR', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+  const number = date.getUTCDate();
+  return `${number === 1 ? '1er' : String(number)} ${month}`;
+};
+
+/** Why the transfer that will pay an invoice is blocked (ADR 0041 § 4), as the Paie says it. */
+const payoutBlockText = (block: PayoutBlock): string => {
+  switch (block.reason) {
+    case 'documents_not_issued':
+      return 'une facture ou un avoir qu’il paie n’est pas encore émis';
+    case 'tax_residence_missing':
+      return `l’attestation de résidence fiscale ${block.year ?? ''} du prestataire est absente`;
+    case 'tax_residence_unverified':
+      return `l’attestation de résidence fiscale ${block.year ?? ''} du prestataire attend ta vérification`;
+  }
+};
+
+/**
+ * An invoice's due date (EQ-06 lot 8): its number and due date, worded to stay true whatever day it is read; when the
+ * transfer is blocked, why, and what passing the due date costs (L441-10: late-payment penalties and the 40 €
+ * indemnity, mentions printed on every invoice). Never its amount: no figure of pay is notified.
+ */
+const invoiceDueText = (signal: Extract<Signal, { kind: 'invoice_due' }>): string => {
+  const day = longDay(signal.dueOn);
+  const block =
+    signal.payoutBlock === null ? '' : ` Son versement est bloqué : ${payoutBlockText(signal.payoutBlock)}.`;
+  const costs = 'des pénalités de retard et l’indemnité forfaitaire de 40 € peuvent être réclamées';
+  if (signal.overdue) {
+    return `La facture ${signal.number} d’un prestataire a passé son échéance du ${day} sans être réglée : ${costs}.${block}`;
+  }
+  return `La facture ${signal.number} d’un prestataire arrive à échéance le ${day}.${block}${
+    signal.payoutBlock === null ? '' : ` S’il dépasse l’échéance, ${costs}.`
+  }`;
+};
+
+/**
+ * What a contractor's document expiring means (EQ-06 lot 5c-2, glossary « Pièce du prestataire »): without the tax
+ * residence certificate of the next year, no transfer of that year is recorded under a treaty regime (ADR 0041 § 5),
+ * the invoices leaving all the same; without a valid URSSAF certificate, an invoice leaves with a warning. Worded to
+ * stay true after the last day: the reminder can come late. The contractor is never named in a notification: the link opens
+ * their file.
+ */
+const contractorDocumentText = (document: ContractorDocumentKind, lastDay: string): string => {
+  switch (document) {
+    case 'tax_residence': {
+      // Its last day is always 31 December: it covers the transfers of its year, and those of January wait for the next.
+      const next = String(Number(lastDay.slice(0, 4)) + 1);
+      return `L’attestation de résidence fiscale d’un prestataire couvre l’année ${lastDay.slice(0, 4)}, et aucune plus récente n’est au dossier. Sans celle de ${next}, ses versements à partir du 1er janvier ${next} seront bloqués.`;
+    }
+    case 'urssaf_vigilance':
+      return `L’attestation de vigilance URSSAF d’un prestataire a pour dernier jour le ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.`;
+  }
+};
+
+const conversationLink = (conversationId: string | null): { label: string; path: string } => ({
+  label: 'Ouvrir la conversation',
+  path: conversationId === null ? '/suivi' : `/suivi?conversation=${conversationId}`,
+});
+
+function scopeLabel(scope: Signal & { kind: 'kill_switch' }): string {
+  switch (scope.scope) {
+    case 'global':
+      return 'pour toutes les créatrices';
+    case 'creator':
+      return 'pour cette créatrice';
+    case 'conversation':
+      return 'pour une conversation';
+  }
+}
+
+/** `nameOf` names her alerts (P4-01); without it, a message says « une alerte personnalisée ». */
+const ROLE_TEXT: Readonly<Record<UserRole, string>> = {
+  owner: 'le compte propriétaire',
+  operator: 'un compte de l’équipe',
+  creator: 'le compte d’une créatrice',
+};
+
+const accountText = (role: UserRole | null): string => (role === null ? 'un compte' : ROLE_TEXT[role]);
+
+const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
+  reveal: 'Reveal',
+  onlyfans: 'OnlyFans',
+  instagram: 'Instagram',
+  impera: 'Impera',
+};
+
+// Réglages › Sécurité (SEC-04): the owner's sessions, and each account's, where he closes them.
+const SECURITY_LINK = { label: 'Ouvrir la sécurité', path: '/reglages/securite' };
+
+/**
+ * A security alert (ADR 0046 § 8): the act, the account's role and its network, written by the code; never a name,
+ * never a full address (the payload holds none), never the ids it carries.
+ */
+function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'link'> {
+  switch (alert.reason) {
+    case 'new_device_sign_in':
+      return {
+        body: `Connexion ${alert.role === 'owner' ? 'au compte propriétaire' : `à ${accountText(alert.role)}`} depuis un appareil qui n’était pas de confiance${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si ce n’est pas le propriétaire, ferme ses sessions et change son mot de passe.`,
+        link: SECURITY_LINK,
+      };
+    case 'sign_in_refusals':
+      return {
+        body: `${String(alert.refusals)} refus de mot de passe, de code ou de clé d’accès en ${String(alert.windowMinutes)} minutes sur ${accountText(alert.role)}${alert.network === null ? '' : ` (dernier réseau ${alert.network})`} : quelqu’un essaie peut-être d’y entrer.`,
+        link: SECURITY_LINK,
+      };
+    case 'second_factor_reset':
+      return {
+        body: `Deuxième facteur remis à zéro sur ${accountText(alert.role)}, ${alert.via === 'ops' ? 'depuis le serveur' : 'par un lien de réinitialisation'} : ses sessions et ses appareils de confiance sont fermés.`,
+        link: SECURITY_LINK,
+      };
+    case 'passkey_added':
+      return {
+        body: `Clé d’accès (Face ID, empreinte) ajoutée sur ${accountText(alert.role)}${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si personne ne l’a fait, retire ses clés et ferme ses sessions.`,
+        link: SECURITY_LINK,
+      };
+    case 'passkey_new_sign_in':
+      return {
+        body: `Connexion au compte propriétaire avec une clé d’accès jamais utilisée${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si ce n’est pas le propriétaire, retire ses clés et ferme ses sessions.`,
+        link: SECURITY_LINK,
+      };
+    case 'owner_added':
+      return {
+        body: 'Un membre de l’équipe vient de devenir propriétaire (deux au plus). Si ce n’est pas voulu, l’autre propriétaire peut demander son retrait dans Réglages › Sécurité.',
+        link: SECURITY_LINK,
+      };
+    case 'owner_removal_requested':
+      return {
+        body: `Un propriétaire a demandé le retrait de l’autre : il prend effet dans ${String(OWNER_REMOVAL_NOTICE_HOURS)} h. Le propriétaire visé peut l’annuler d’ici là dans Réglages › Sécurité.`,
+        link: SECURITY_LINK,
+      };
+    case 'owner_removal_cancelled':
+      return {
+        body: 'Le propriétaire visé a annulé le retrait qui attendait : il y a toujours deux propriétaires.',
+        link: SECURITY_LINK,
+      };
+    case 'owner_removed':
+      return {
+        body: 'Le préavis est passé sans annulation : un compte n’est plus propriétaire, ses sessions sont fermées.',
+        link: SECURITY_LINK,
+      };
+    case 'persona_activated':
+      return {
+        body: `Une autre version de la persona est maintenant active (${alert.version}).`,
+        link: { label: 'Ouvrir les créatrices', path: '/creatrices' },
+      };
+    case 'automatic_enabled':
+      return {
+        body:
+          alert.scope === 'creator'
+            ? 'Mode Automatique allumé : l’agent envoie seul sur toutes ses conversations.'
+            : 'Mode Automatique allumé sur une conversation : l’agent y envoie seul.',
+        link: { label: 'Ouvrir le mode de l’agent', path: '/reglages/mode' },
+      };
+    case 'platform_session_replaced':
+      return {
+        body: `La session ${PLATFORM_NAMES[alert.platform]} de l’agent a été remplacée par une autre. Si personne de l’agence ne l’a fait, vérifie le compte branché.`,
+        link: { label: 'Ouvrir les Réglages', path: '/reglages' },
+      };
+  }
+}
+
+/** Each service as the team names it, in a sentence (P3-12). */
+const CONNECTION_NAMES: Readonly<Record<ConnectionService, string>> = {
+  xai: 'la connexion xAI',
+  mistral: 'la connexion Mistral',
+  google: 'la connexion Google',
+  elevenlabs: 'la connexion ElevenLabs',
+  reveal_crm: 'la connexion à l’API CRM de Reveal',
+};
+
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** What stops while the service is down: the agent's own words for each role it plays. */
+const CONNECTION_EFFECT: Readonly<Record<ConnectionService, string>> = {
+  xai: 'L’agent passe sur le modèle de secours, s’il est connecté.',
+  mistral: 'L’agent n’a plus de modèle de secours si xAI tombe.',
+  google: 'Les médias ne sont plus décrits.',
+  elevenlabs: 'Les vocaux ne sont plus générés.',
+  reveal_crm: 'Les ventes ne sont plus relevées.',
+};
+
+const CONNECTION_REASON: Readonly<Record<ConnectionDownReason, string>> = {
+  refused: 'la clé est refusée. Reconnecte-la.',
+  low_credit: 'le crédit est bas ou épuisé. Recharge-le.',
+  unreachable: 'le service ne répond plus.',
+};
+
+const connectionLink = (service: ConnectionService): { label: string; path: string } =>
+  service === 'reveal_crm'
+    ? { label: 'Ouvrir les ventes', path: '/reglages/ventes' }
+    : { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' };
+
+/** One thread per service (P3-12). */
+const connectionThreadKey = (service: ConnectionService): string => `connection:${service}`;
+
+/**
+ * The handoffs her tab tells (ADR 0150 § B): a safety relay, her alerts, a doubt on who she is, a custom order. The
+ * others (a guard, the model down, no active persona, a sale that sticks…) only the owners hear of, here.
+ */
+const TOLD_BY_HER_TAB: ReadonlySet<HandoffCause> = new Set([
+  ...SAFETY_HANDOFF_CAUSES,
+  'identity_doubt',
+  'keyword',
+  'custom_alert',
+  'custom_order',
+]);
+
+export function classify(signal: Signal): Notice | null {
+  switch (signal.kind) {
+    case 'handoff': {
+      if (signal.cause !== null && TOLD_BY_HER_TAB.has(signal.cause)) return null;
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
+        title: 'Important',
+        body: `${signal.cause === null ? 'L’agent passe la main.' : CAUSE_TEXT[signal.cause]} L’agent n’écrit plus à ce fan et attend un humain.`,
+        link: conversationLink(signal.conversationId),
+      };
+    }
+    case 'send_failed':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: signal.conversationId === null ? null : `conversation:${signal.conversationId}`,
+        title: 'Important',
+        body: 'Un message de l’agent n’a pas pu partir. L’agent n’écrit plus à ce fan et attend un humain.',
+        link: conversationLink(signal.conversationId),
+      };
+    // The cap reached stops every generation until midnight: red (Charles, 03/11/2026); the 80 % warning stays amber.
+    case 'budget':
+      return {
+        kind: 'notice',
+        topic: signal.threshold === 'reached' ? 'urgent' : 'important',
+        threadKey: null,
+        title: signal.threshold === 'reached' ? 'URGENT' : 'Important',
+        body:
+          signal.threshold === 'reached'
+            ? `Plafond IA atteint (${euros(signal.capMinor)}) : plus de génération jusqu’à minuit, les chatteurs reprennent.`
+            : `Plafond IA : ${euros(signal.spentMinor)} sur ${euros(signal.capMinor)} aujourd’hui.`,
+        link: { label: 'Voir les modèles IA', path: '/reglages/modeles-ia' },
+      };
+    case 'kill_switch': {
+      const threadKey = `kill:${signal.scope}:${signal.scopeId ?? 'global'}`;
+      // Lifted: nothing rings, the Dashboard says it.
+      if (!signal.active) return null;
+      const reason = signal.reason.trim().slice(0, KILL_REASON_MAX);
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey,
+        title: 'Important',
+        body: `Agent arrêté ${scopeLabel(signal)}${reason === '' ? '.' : ` : ${reason}`}`,
+        link: { label: 'Ouvrir le CRM', path: '/' },
+      };
+    }
+    // Important, not urgent: the base itself runs, only its copy outside Neon is missing (Neon's PITR still holds).
+    case 'backup_overdue':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body:
+          signal.lastSucceededAt === null
+            ? 'Aucune sauvegarde de la base n’a encore réussi : la copie chiffrée hors Neon n’existe pas.'
+            : `Pas de sauvegarde de la base depuis ${parisMoment(signal.lastSucceededAt)} : la copie chiffrée hors Neon a plus de 26 h.`,
+        link: { label: 'Ouvrir le Dashboard', path: '/' },
+      };
+    // Important, not urgent: nothing is paid on a wrong rate, a closing without a recent one is refused (ADR 0033).
+    // Red and empty are urgent: the agent stops on that provider when its credits run out (ADR 0091 § 4).
+    case 'ai_credits_low': {
+      const name = CREDIT_PROVIDER_NAME[signal.provider];
+      const left = money(Math.max(0, signal.balanceMinor), signal.currency);
+      const when = signal.runsOutOn === null ? '' : `, épuisés vers ${calendarDay(signal.runsOutOn)}`;
+      const urgent = signal.level !== 'low';
+      return {
+        kind: 'notice',
+        topic: urgent ? 'urgent' : 'important',
+        threadKey: null,
+        title: urgent ? 'URGENT' : 'Important',
+        body:
+          signal.level === 'empty'
+            ? `Crédits ${name} épuisés d’après le décompte du CRM : l’IA s’arrête sur ce service. Recharge, puis note-le dans Consommation IA.`
+            : signal.level === 'critical'
+              ? `Crédits ${name} : moins de 2 jours au rythme actuel (${left} restants${when}). Recharge maintenant.`
+              : `Crédits ${name} : moins de 5 jours au rythme actuel (${left} restants${when}). Pense à recharger.`,
+        link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+      };
+    }
+    // Urgent: the agent answers with its fallback model until the provider takes calls again (ADR 0091 § 6).
+    case 'ai_quota_exhausted': {
+      const name = CREDIT_PROVIDER_NAME[signal.provider];
+      return {
+        kind: 'notice',
+        topic: 'urgent',
+        threadKey: null,
+        title: 'URGENT',
+        body:
+          signal.mode === 'subscription'
+            ? `${name} refuse les appels : le quota de ton abonnement est épuisé. L’agent répond avec son modèle de repli jusqu’à la remise à zéro du quota.`
+            : `${name} refuse les appels faute de crédits. L’agent répond avec son modèle de repli : recharge, puis note-le dans Consommation IA.`,
+        link: { label: 'Ouvrir Consommation IA', path: '/reglages/consommation-ia' },
+      };
+    }
+    case 'exchange_rate_overdue':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body:
+          signal.lastRateDay === null
+            ? `Aucun taux ${signal.currency} de la BCE n’est encore arrivé : une quinzaine payée en ${signal.currency} ne peut pas être clôturée.`
+            : `Pas de nouveau taux ${signal.currency} de la BCE depuis ${calendarDay(signal.lastRateDay)} : une quinzaine qui finit sans taux récent ne pourra pas être clôturée.`,
+        link: { label: 'Ouvrir le Dashboard', path: '/' },
+      };
+    // Important, not urgent: the statement stays validated and nothing is paid wrong, a document is only missing.
+    case 'invoice_not_issued':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: `${signal.document === 'invoice' ? 'La facture d’un relevé validé de' : 'Un avoir dû par'} ${periodText(signal.period)} n’a pas été ${signal.document === 'invoice' ? 'émise' : 'émis'} : ${INVOICE_NOT_ISSUED_TEXT[signal.reason]}. Le relevé reste validé.`,
+        link: { label: 'Ouvrir la quinzaine', path: `/paie/quinzaine?quinzaine=${signal.period}` },
+      };
+    // Important, not urgent: nothing was replaced and nothing altered was served; the owner looks into it.
+    case 'invoice_pdf_conflict':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: pdfConflictText(signal),
+        link: PAY_LINK,
+      };
+    // Important, not urgent: the document stays issued, only its file (or its copy) is missing.
+    case 'invoice_pdf_missing':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body:
+          signal.place === 'primary'
+            ? `Le document ${signal.number} n’a toujours pas de PDF après plusieurs essais : il reste émis, mais ne se télécharge pas encore. À vérifier.`
+            : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`,
+        link: PAY_LINK,
+      };
+    // Important, not urgent: only the owner settles a contest, upheld or refused (ADR 0039); the reason is read in Impera.
+    case 'invoice_contested':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: `${signal.document === 'invoice' ? `La facture ${signal.number} est contestée` : `L’avoir ${signal.number} est contesté`} par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.`,
+        link: PAY_LINK,
+      };
+    // Coming due, important; overdue, urgent (ADR 0020 §2, « rouge facture » of Charles, 02/11): the penalties run.
+    case 'invoice_due':
+      return {
+        kind: 'notice',
+        topic: signal.overdue ? 'urgent' : 'important',
+        threadKey: null,
+        title: signal.overdue ? 'URGENT' : 'Important',
+        body: invoiceDueText(signal),
+        link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${signal.memberId}` },
+      };
+    // Important, not urgent: the owner asks the contractor for the new document before it is needed.
+    case 'contractor_document_expiring':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: contractorDocumentText(signal.document, signal.lastDay),
+        link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${signal.memberId}` },
+      };
+    case 'automatic_closed': {
+      // Important, not urgent: no fan is at risk, the agent just asks a human to approve again (ADR 0019).
+      const reasons = signal.missing.map(missingText);
+      const count = `${String(signal.conversations)} conversation${signal.conversations === 1 ? '' : 's'}`;
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: `Automatique refermé : l’agent est repassé en copilote sur ${count}. ${reasons.length === 1 ? 'Raison' : 'Raisons'} : ${reasons.join(' ; ')}.`,
+        link: { label: 'Ouvrir le Dashboard', path: '/' },
+      };
+    }
+    // Important (question 6 of CRM-04, Charles 03/11/2026): pay still reads the platform's net, the owner checks before
+    // closing. No amount: the check of Réglages › Ventes has them.
+    case 'sales_feed_mismatch':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: `mismatch:${signal.platform}:${signal.from}`,
+        title: 'Important',
+        body: `Ventes ${PLATFORM_NAMES[signal.platform]} : la vérification de ${periodText(signal.from)} ne concorde plus avec les statistiques de ${PLATFORM_NAMES[signal.platform]}, sur ${countText(signal.days, 'jour', 'jours')} et ${countText(signal.accounts, 'compte', 'comptes')}. La paie lit toujours le net de ${PLATFORM_NAMES[signal.platform]} : vérifie avant de clôturer.`,
+        link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
+      };
+    // Important (ADR 0069 § 5): nothing is deleted, the owner looks. No name, no id.
+    case 'sales_feed_model':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: `sales_feed_model:${signal.platform}:${signal.platformModelId}:${signal.change}`,
+        title: 'Important',
+        body:
+          signal.change === 'gone'
+            ? `Ventes ${PLATFORM_NAMES[signal.platform]} : une créatrice reliée n’apparaît plus dans la liste des modèles de ${PLATFORM_NAMES[signal.platform]}. Rien n’est supprimé : regarde sa fiche et ses ventes.`
+            : `Ventes ${PLATFORM_NAMES[signal.platform]} : une créatrice reliée est marquée bannie par ${PLATFORM_NAMES[signal.platform]}. Rien n’est supprimé : regarde sa fiche et ses ventes.`,
+        link: { label: 'Ouvrir Ventes', path: '/reglages/ventes' },
+      };
+    // Urgent (ADR 0046 § 8).
+    // Important (CRM-04 d3, ADR 0054 § 2): no amount, no
+    // percentage; one message per account and fortnight, whatever its currencies.
+    case 'agency_share_mismatch':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        oncePerThread: true,
+        threadKey: `agency_share:${signal.platformAccountId}:${signal.from}`,
+        title: 'Important',
+        body: `Part créatrice chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle s’écarte du pourcentage de l’agence réglé pour elle. À titre d’information.`,
+        link: {
+          label: 'Ouvrir le pourcentage',
+          path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
+        },
+      };
+    // Important (ADR 0054 § 5), as the gap above: no amount, no share, once per account and
+    // fortnight.
+    case 'agency_share_changed':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        oncePerThread: true,
+        threadKey: `agency_share_changed:${signal.platformAccountId}:${signal.from}`,
+        title: 'Important',
+        body: `Part de l’agence chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle a changé par rapport à la quinzaine d’avant. À titre d’information.`,
+        link: {
+          label: 'Ouvrir la part de l’agence',
+          path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
+        },
+      };
+    // Important to the owners (ADR 0094 § 3, ADR 0176): never to a chatter nor to her; once per account and créneau.
+    case 'account_uncovered':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        oncePerThread: true,
+        threadKey: `account_uncovered:${signal.platformAccountId}:${signal.slotStartsAt}`,
+        title: 'Important',
+        body: `Compte sans personne chez ${PLATFORM_NAMES[signal.platform]} : le créneau ${slotText(signal)} a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.`,
+        link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
+      };
+    case 'connection_down':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: connectionThreadKey(signal.service),
+        title: 'Important',
+        body: `${capitalized(CONNECTION_NAMES[signal.service])} est en panne : ${CONNECTION_REASON[signal.reason]} ${CONNECTION_EFFECT[signal.service]}`,
+        link: connectionLink(signal.service),
+      };
+    // Back: nothing rings, the Dashboard says it.
+    case 'connection_back':
+      return null;
+    case 'security_alert':
+      return {
+        kind: 'notice',
+        topic: 'urgent',
+        threadKey: null,
+        title: 'URGENT',
+        ...securityNotice(signal.alert),
+      };
+  }
+}

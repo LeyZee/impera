@@ -288,6 +288,8 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
       target: 1,
       done: 0,
       essential: true,
+      // Her video of the day is done by her coffre (ADR 0140, avenant du 27/11).
+      source: item === 'reveal_video' ? 'drop' : 'tick',
     });
     const agenda = agendaOf({ tasks: [], suggestions: [] });
     vi.stubGlobal(

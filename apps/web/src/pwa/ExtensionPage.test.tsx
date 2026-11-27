@@ -71,7 +71,7 @@ async function renderPage(page: JSX.Element): Promise<void> {
 
 async function renderAs(userAgent: string, watches = true): Promise<void> {
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
-  await renderPage(<ExtensionPage watches={watches} />);
+  await renderPage(<ExtensionPage watches={watches} security="/moi/securite" />);
 }
 
 describe('ExtensionPage', () => {
@@ -120,31 +120,44 @@ describe('ExtensionPage', () => {
     expect(screen.getAllByText('Le copilote sur Reveal').length).toBeGreaterThan(0);
   });
 
-  // ADR 0067, amendement du 19/11: nothing to type, the popup links itself from the CRM's own page.
-  it('leads each browser’s steps to the CRM’s link page, with no address to paste', async () => {
+  // Recette navigation du 27/11, CH-01: one « Relier l’extension », its parts in the order he makes them, the same word
+  // as the welcome's and Sécurité's; the copilot no longer explains it a second time.
+  it('links the extension in one step: this CRM, then his account, nothing to type', async () => {
     await renderAs(CHROME);
-    const links = screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' });
-    expect(links).toHaveLength(2);
-    expect(links[0]?.getAttribute('href')).toBe('/extension/lier');
+    const steps = screen.getByRole('heading', { name: 'Relier l’extension' }).closest('section');
+    expect(steps).not.toBeNull();
+    const crm = screen.getByRole('link', { name: 'Relier l’extension à ce CRM' });
+    expect(crm.getAttribute('href')).toBe('/extension/lier');
+    expect(screen.getByRole('link', { name: 'Ouvrir Sécurité' }).getAttribute('href')).toBe('/moi/securite');
+    expect(screen.getByText(/dans Sécurité, « Relier l’extension », puis « Copier le code »/u)).toBeDefined();
+    expect(screen.getByText(/colle le code dans la carte « Copilote »/u)).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
-    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+    // Once, not inside each browser's steps nor again under the copilot.
+    expect(screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' })).toHaveLength(1);
+    expect(screen.queryByText(/Relie l’extension une fois/u)).toBeNull();
   });
 
-  // ADR 0067, second amendement: the extension this CRM built knows its address, so there is nothing to link.
-  it('drops the link step when the served extension was built for this CRM', async () => {
+  // ADR 0067, second amendement: the extension this CRM built knows its address; only his account is left to link.
+  it('drops the CRM part when the served extension was built for this CRM', async () => {
     vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', window.location.origin);
     await renderAs(CHROME);
     expect(screen.queryByRole('link', { name: 'Relier l’extension à ce CRM' })).toBeNull();
-    // The last step says what to do, and no longer « alors » after a step that is gone (avis Design du 19/11).
     expect(screen.getAllByText('Clique sur l’icône Impera : elle affiche ton nom.')).toHaveLength(2);
-    expect(screen.queryByText(/l’extension affiche alors ton nom/u)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Ouvrir Sécurité' })).toBeDefined();
   });
 
-  it('keeps the link step when the extension was built for another address', async () => {
+  it('keeps the CRM part when the extension was built for another address', async () => {
     vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', 'https://autre.exemple.fr');
     await renderAs(CHROME);
-    expect(screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' })).toHaveLength(2);
-    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' })).toHaveLength(1);
     expect(screen.queryByText('Clique sur l’icône Impera : elle affiche ton nom.')).toBeNull();
+  });
+
+  it('sends the owner to his own Sécurité', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(CHROME);
+    await renderPage(<ExtensionPage watches security="/reglages/securite" />);
+    expect(screen.getByRole('link', { name: 'Ouvrir Sécurité' }).getAttribute('href')).toBe(
+      '/reglages/securite',
+    );
   });
 });

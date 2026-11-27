@@ -1,4 +1,4 @@
-import { normalise, type FanFlags } from '@impera/contracts';
+import { normalise, type CustomFormat, type CustomOrderReading, type FanFlags } from '@impera/contracts';
 
 import type { GuardViolation } from './guards';
 import { NO_SALE_RISKS } from './policy';
@@ -24,6 +24,11 @@ export interface CustomOrderContext {
   readonly ageConfirmed?: boolean;
   /** He asks for something she never does (`never_do`): declined softly, never « je vais y réfléchir » (M3). */
   readonly neverDoes?: boolean;
+  /**
+   * His request already says what he wants (`saysWhatHeWants`): until then, with nobody on shift, she talks modalities
+   * with him first and nothing is noted (Charles 27/11). A chatter on shift takes it as before and talks them himself.
+   */
+  readonly saysWhatHeWants: boolean;
 }
 
 export type CustomOrderDecision =
@@ -41,6 +46,13 @@ export const CUSTOM_ORDER_WAIT_BRIEF =
 /** His order already waits: she does not open it again, and still commits to nothing. */
 export const CUSTOM_ORDER_OPEN_BRIEF =
   'Il revient sur sa demande faite pour lui, qu’elle a déjà notée. Elle lui dit avec légèreté qu’elle ne l’a pas oubliée, sans dire oui ni non, sans aucun prix, sans aucun délai, sans rien promettre, puis elle reprend la conversation avec lui.';
+
+/**
+ * His request does not say yet what he wants (Charles 27/11): she checks he is serious by talking modalities, warmly,
+ * before anything is noted. One light question, the kind he imagines or what he would like to see.
+ */
+export const CUSTOM_ORDER_ASK_BRIEF =
+  'Il lui demande quelque chose fait pour lui, sans dire encore ce qu’il veut vraiment. Elle s’y intéresse avec chaleur et, pour voir s’il est sérieux, lui demande légèrement, comme une curiosité et jamais comme un formulaire, ce qu’il imagine : pour une cam, plutôt pour parler, habillée ou plus intime ; pour une vidéo, ce qu’il aimerait y voir. Sans dire oui ni non, sans aucun prix, sans aucun délai, sans rien promettre, puis elle reste avec lui dans la conversation.';
 
 /** No sale at all for him now (a risk, sales frozen): she answers without taking the order. */
 export const CUSTOM_ORDER_DECLINE_BRIEF =
@@ -61,8 +73,28 @@ export function customOrderDecision(context: CustomOrderContext): CustomOrderDec
   if (flags === undefined || context.ageConfirmed === false)
     return { kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: false };
   if (context.orderOpen) return { kind: 'reply', brief: CUSTOM_ORDER_OPEN_BRIEF, opens: false };
+  // A chatter on shift takes it as before (ADR 0090 § A) and talks the modalities himself.
   if (context.chatterOnShift) return { kind: 'handoff' };
+  // Modalities first (Charles 27/11): nothing is noted before he says what he wants.
+  if (!context.saysWhatHeWants) return { kind: 'reply', brief: CUSTOM_ORDER_ASK_BRIEF, opens: false };
   return { kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: true };
+}
+
+/**
+ * The formats where the kind alone does not say what he wants to see (Charles 27/11): a photo, a video, an intimate
+ * cam. A call or a cam to talk says it by its kind; a reaction or a rating by the photo he sends.
+ */
+const WHAT_TO_SEE_FORMATS: readonly CustomFormat[] = ['photo', 'video', 'video_call_sexual'];
+
+/**
+ * Whether his request, as the brain read it into its boxes (`CustomOrderReading`), says what he wants: its kind
+ * (`format`), and for a photo, a video or an intimate cam, at least one detail or supplement of his. Nothing read:
+ * not yet.
+ */
+export function saysWhatHeWants(reading: CustomOrderReading | undefined): boolean {
+  if (reading === undefined || reading.format === null) return false;
+  if (!WHAT_TO_SEE_FORMATS.includes(reading.format)) return true;
+  return Object.keys(reading.details).length > 0 || reading.supplements.length > 0;
 }
 
 /**

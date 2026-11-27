@@ -4,10 +4,8 @@ import {
   InvitationLinkTokenSchema,
   MeSchema,
   PASSWORD_RESET_PAGE,
-  PASSWORD_RESET_REQUESTED_MESSAGE,
   PasswordInvalidReasonSchema,
   PasswordResetPreviewSchema,
-  PasswordResetRequestedSchema,
   type ApiError,
   type InvitationLinkPreview,
   type InvitationLinkPurpose,
@@ -163,29 +161,7 @@ function refusedOf(
   return { kind: refusalOf(status, error) };
 }
 
-/* « Mot de passe oublié » (SEC-05 lot 3, ADR 0068): the link goes to the account's private Telegram chat. */
-
-export type ResetRequestResult =
-  | { readonly kind: 'requested'; readonly message: string }
-  | { readonly kind: 'too_many_attempts' | 'unavailable' };
-
-/**
- * Asks a link for this address. The answer is the same whoever asks (known account or not, linked chat or not): the
- * page shows its sentence as it is, and checks nothing of the address itself.
- */
-export async function requestPasswordReset(email: string): Promise<ResetRequestResult> {
-  const response = await post('/v1/auth/password-reset', { email });
-  if (response === null) return { kind: 'unavailable' };
-  if (response.ok) {
-    const parsed = PasswordResetRequestedSchema.safeParse(await response.json().catch(() => null));
-    return {
-      kind: 'requested',
-      message: parsed.success ? parsed.data.message : PASSWORD_RESET_REQUESTED_MESSAGE,
-    };
-  }
-  const refusal = refusalOf(response.status, await errorOf(response));
-  return { kind: refusal === 'too_many_attempts' ? 'too_many_attempts' : 'unavailable' };
-}
+/* « Mot de passe oublié » (SEC-05 lot 3, ADR 0068): the link comes from the agency or the server, never from here. */
 
 export type ResetInspectResult =
   { readonly kind: 'ok'; readonly preview: PasswordResetPreview } | { readonly kind: Refusal };

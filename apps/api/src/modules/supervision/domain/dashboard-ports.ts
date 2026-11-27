@@ -141,17 +141,6 @@ export interface AutomaticView {
   read(creatorId: CreatorId): Promise<{ readonly gate: AutomaticGate; readonly reading: LiveRateReading }>;
 }
 
-/** What the Dashboard shows of the Telegram alerts (module telegram, wired by the composition root). */
-export interface TelegramReading {
-  /** Urgent and important alerts of her night (20 h to 8 h in her time zone), or of the last one by day. */
-  readonly alertsTonight: number;
-  readonly urgentReachable: boolean;
-}
-
-export interface TelegramView {
-  read(creatorId: CreatorId): Promise<TelegramReading>;
-}
-
 /** What the sales panel reads of the platform's register (CRM-04 lot c), in one transaction of the reader. */
 export interface RevealSalesReading {
   /** The platforms of her accounts linked to the register, at least one. */

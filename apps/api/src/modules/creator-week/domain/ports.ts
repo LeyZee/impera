@@ -41,6 +41,12 @@ export interface WeekDraftStore {
 /** Her figures as read: her last script as an instant, made her day by the week's job in her zone. */
 type WeekFactsRead = Omit<WeekFacts, 'lastScriptOn'> & { readonly lastScriptAt: Date | null };
 
+/** The feed's videos arrived by day (`YYYY-MM-DD` in her zone), and those waiting in her coffre. */
+export interface VideoCover {
+  readonly byDay: ReadonlyMap<string, number>;
+  readonly inStock: number;
+}
+
 export interface WeekFactsReader {
   facts(creatorId: string, dueBy: string): Promise<WeekFactsRead>;
   /** The days of her shooting days of the week starting `week`, as she kept them. */
@@ -58,6 +64,22 @@ export interface WeekFactsReader {
     readonly byCategory: Readonly<Partial<Record<DropCategory, number>>>;
     readonly answered: ReadonlySet<string>;
   }>;
+  /**
+   * Her video of the day (avenant du 27/11): the feed's videos arrived each day of `window` in `timeZone`, and those
+   * waiting in her coffre now. In her own account, like `arrivals`.
+   */
+  videos(
+    userId: string,
+    window: { readonly from: Date; readonly to: Date },
+    timeZone: string,
+  ): Promise<VideoCover>;
+  /** The same, read by her owner or an active manager (`withTenantMember`), for « Où elle en est ». */
+  teamVideos(
+    creatorId: string,
+    userId: string,
+    window: { readonly from: Date; readonly to: Date },
+    timeZone: string,
+  ): Promise<VideoCover>;
   /** The same arrivals read by her owner or an active manager (`withTenantMember`), for « Où elle en est ». */
   teamArrivals(
     creatorId: string,
@@ -77,6 +99,7 @@ export type AcceptSuggestion = (userId: string, suggestionId: string, now: Date)
 interface DayTicksRead {
   readonly day: string;
   readonly today: string;
+  readonly timeZone: string;
   readonly done: Partial<Readonly<Record<DayItem, number>>>;
 }
 
@@ -96,6 +119,7 @@ export interface DayTickStore {
     now: Date,
   ): Promise<{
     readonly today: string;
+    readonly timeZone: string;
     readonly days: ReadonlyMap<string, Partial<Readonly<Record<DayItem, number>>>>;
   }>;
   /** How many of a line she did that day: today or yesterday in her zone, else `DayItemLate`; a replay changes nothing. */

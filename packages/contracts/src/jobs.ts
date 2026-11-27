@@ -47,6 +47,7 @@ export const JOB_NAMES = [
   'conversation.after_sale',
   'conversation.record_facts',
   'conversation.reopen',
+  'conversation.watch_keywords',
   'conversation.release_unavailable',
   'conversation.settle_placed',
   'connector.dispatch',
@@ -64,6 +65,8 @@ export const JOB_NAMES = [
   'ai_usage.check_credits',
   'notifications.recap',
   'alerts.route',
+  'alerts.agency',
+  'alerts.remind_safety',
   'notifications.creator_sale',
   'notifications.creator_notices',
   'creator_tasks.remind',
@@ -116,14 +119,8 @@ export const JOB_NAMES = [
   'connector.copy_avatar',
   'connector.read_daily_stats',
   'connector.read_link_hours',
-  'telegram.scan',
-  'telegram.flush_chat',
   'telegram.dispatch_polls',
   'telegram.poll_updates',
-  'telegram.morning_digest',
-  'telegram.evening_digest',
-  'telegram.connection_reminders',
-  'telegram.purge',
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -139,6 +136,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.after_sale': 'Mot d’après-achat',
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
+  'conversation.watch_keywords': 'Mots d’alerte lus quand l’IA ne répond pas',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
   'conversation.settle_placed': 'Brouillons placés dans Reveal',
   'connector.dispatch': 'Lecture des comptes Reveal',
@@ -156,6 +154,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
   'alerts.route': 'Alertes de l’équipe',
+  'alerts.agency': 'Alertes de l’agence',
+  'alerts.remind_safety': 'Relance des relais de sécurité',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'notifications.creator_notices': 'Demandes, propositions et semaine dites à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
@@ -208,14 +208,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.read_daily_stats': 'Statistiques quotidiennes Reveal',
   'connector.read_link_hours': 'Vues et clics des liens de redirection',
   'connector.copy_avatar': 'Copie de la photo d’une créatrice',
-  'telegram.scan': 'Alertes Telegram',
-  'telegram.flush_chat': 'Envoi des messages Telegram',
   'telegram.dispatch_polls': 'Lecture de Telegram',
   'telegram.poll_updates': 'Réponses reçues sur Telegram',
-  'telegram.morning_digest': 'Résumé Telegram du matin',
-  'telegram.evening_digest': 'Résumé Telegram du soir',
-  'telegram.connection_reminders': 'Rappels de connexion Telegram',
-  'telegram.purge': 'Nettoyage de Telegram',
 };
 
 /**
@@ -276,6 +270,12 @@ export const JOB_PAYLOADS = {
    * wait first. One per creator (`reopenJobKey`): every deferral out of her hours points at it.
    */
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
+  /**
+   * Her alert words read in what he wrote while the agent does not answer him: at once when a human holds him, her
+   * agent is off or her session expired, five minutes later otherwise (what the agent's turn did not reach). The team
+   * and she are told; nothing is paused or sent.
+   */
+  'conversation.watch_keywords': conversationJob,
   /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
   'conversation.release_unavailable': z.object({}),
   /**
@@ -337,6 +337,13 @@ export const JOB_PAYLOADS = {
    * chooses. Re-reading the window is harmless: a notification is once per account, reason and event.
    */
   'alerts.route': z.object({}),
+  /**
+   * The agency's alerts to its owners (27/11/2026, Telegram back to the channels only): each minute re-reads the last
+   * half hour of the outbox; a notification is once per account, reason and event.
+   */
+  'alerts.agency': z.object({}),
+  /** A safety relay nobody took rings again every 5 minutes for an hour; once per account and reminder. */
+  'alerts.remind_safety': z.object({}),
   /**
    * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
    * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
@@ -687,6 +694,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.after_sale': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
+  'conversation.watch_keywords': 3,
   // Each minute: the next run is the retry.
   'conversation.release_unavailable': 1,
   'conversation.settle_placed': 3,
@@ -711,6 +719,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.recap': 3,
   // The next minute re-reads the window: one try is enough.
   'alerts.route': 1,
+  'alerts.agency': 1,
+  'alerts.remind_safety': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
   // Every five minutes, and each notification rings once: the next run is the retry.
@@ -807,19 +817,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.read_daily_stats': 1,
   // Each hour as well: the next run is the retry, and an open hour is written over.
   'connector.read_link_hours': 1,
-  // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
-  // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
-  'telegram.scan': 25,
-  'telegram.flush_chat': 10,
   'telegram.dispatch_polls': 1,
   'telegram.poll_updates': 1,
-  // Its hour is 8 o'clock only: a failed run is retried within it, the key of her day keeps it once.
-  'telegram.morning_digest': 3,
-  // Its hour is 23 o'clock only: a failed run is retried within it, the key of her day keeps it once.
-  'telegram.evening_digest': 3,
-  // Every 10 minutes: the next run is the retry, the reminder's key keeps it once (P3-12).
-  'telegram.connection_reminders': 1,
-  'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 
 /**
@@ -894,5 +893,6 @@ export const TenantJobSchema = z.enum([
   'link_hours',
   'drop_media',
   'creator_decisions',
+  'ask_scripts',
 ]);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

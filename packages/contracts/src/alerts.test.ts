@@ -6,14 +6,10 @@ import {
   AlertTestBodySchema,
   AlertTestResultSchema,
   AlertTriggerSchema,
-  CUSTOM_ALERT_TOPIC,
   CustomAlertBodySchema,
   customAlertNameKey,
-  SYSTEM_ALERT_CODES,
-  SYSTEM_ALERT_TOPICS,
 } from './alerts';
 import { EventBodySchema } from './events';
-import { TelegramTopicSchema } from './telegram';
 
 const CREATOR = '01900000-0000-7000-8000-000000000010';
 const CONVERSATION = '01900000-0000-7000-8000-000000000020';
@@ -101,13 +97,6 @@ describe('custom alerts (P4-01)', () => {
     expect(alertKeywordKey('  Vidéo-PERSO ! ')).toBe('video perso');
     expect(alertKeywordKey('Rendez’vous')).toBe('rendez vous');
     expect(CustomAlertBodySchema.safeParse({ ...body, keywords: ['!!!'] }).success).toBe(false);
-  });
-
-  it('sends each alert to a Telegram topic that exists', () => {
-    for (const code of SYSTEM_ALERT_CODES) {
-      expect(TelegramTopicSchema.safeParse(SYSTEM_ALERT_TOPICS[code]).success).toBe(true);
-    }
-    expect(CUSTOM_ALERT_TOPIC).toBe('custom');
   });
 
   it('tries an alert being written on one message, and answers without the fan’s words', () => {

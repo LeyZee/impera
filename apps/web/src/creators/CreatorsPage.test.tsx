@@ -684,6 +684,8 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
 
   it('reopens her sheet from the menu on the tab left open last on this device', async () => {
     localStorage.clear();
+    // Opening her sheet no longer moves the selector (A1, 27/11): she is the one chosen in it.
+    localStorage.setItem('impera.creator-scope', ANNA.id);
     await serve([ANNA]);
     renderAt(owner, `/creatrices?onglet=agenda&vue=idees&creatrice=${ANNA.id}`);
     await screen.findByText('Ses idées du jour');
@@ -697,11 +699,22 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
     expect(menu?.getAttribute('href')).toContain(ANNA.id);
   });
 
+  it('opens her sheet without moving the menu’s selector (recette navigation 27/11, A1)', async () => {
+    localStorage.clear();
+    await serve([ANNA]);
+    renderAt(owner, `/creatrices?onglet=agenda&vue=idees&creatrice=${ANNA.id}`);
+    await screen.findByText('Ses idées du jour');
+    expect(localStorage.getItem('impera.creator-scope')).toBeNull();
+  });
+
   it('gives Trafic to the owner and to an active manager, who reads her links, and to nobody else', async () => {
+    localStorage.clear();
     await serve([ANNA]);
     renderAt(manager, `/trafic?creatrice=${ANNA.id}`);
     expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
     expect(screen.getByRole('region', { name: 'Liens' })).toBeDefined();
+    // Her links, and the selector left where it was (A1, 27/11).
+    expect(localStorage.getItem('impera.creator-scope')).toBeNull();
 
     cleanup();
     await serve([ANNA]);
@@ -800,7 +813,7 @@ describe('Créatrices, her « Mise en route » (pilotage plan W1)', () => {
     'agency_rate',
     'access',
     'pay_rules',
-    'telegram',
+    'night_alerts',
     'agent_hours',
     'shifts',
     'agent_mode',
