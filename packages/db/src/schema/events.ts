@@ -64,6 +64,10 @@ export const domainEvents = pgTable(
     uniqueIndex('domain_events_account_uncovered_unique')
       .on(sql`(${t.payload}->>'platformAccountId')`, sql`(${t.payload}->>'slotStartsAt')`)
       .where(sql`${t.type} = 'account_uncovered'`),
+    // « Chatteur pas là » (ADR 0094 § 1, lot b): one per shift, so that the job seen again publishes nothing more.
+    uniqueIndex('domain_events_shift_not_taken_unique')
+      .on(sql`(${t.payload}->>'shiftId')`)
+      .where(sql`${t.type} = 'shift_not_taken'`),
     // « Is this service down already? » of `publishConnectionState` (Telegram P3-12): the latest row of one service,
     // read through this index rather than across the whole outbox.
     index('domain_events_connection_state_idx')

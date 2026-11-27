@@ -1,6 +1,6 @@
 # 0170. Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach
 
-Statut : accepted (« ok relecture des shifts » de Charles, 26/11/2026, après le brainstorm du même jour). Amendée le 26/11/2026 (§§ 20 à 25 : le retour léger, « ok rapport léger » de Charles)
+Statut : accepted (« ok relecture des shifts » de Charles, 26/11/2026, après le brainstorm du même jour). Amendée le 26/11/2026 (§§ 20 à 25 : le retour léger, « ok rapport léger » de Charles ; §§ 26 à 32 : la carte de faute et les niveaux, « ok maquette bilan » de Charles)
 Date : 2026-11-26
 Précise : 0050 § 10 (le mini feedback), 0042 § 5 (les remontées lues par le topo de la créatrice), 0102 (la banque d'exemples), 0109 (la fiche du fan écrite depuis l'extension), 0025 (le chatteur chatte dans Reveal). Ne remplace rien.
 
@@ -80,3 +80,19 @@ Charles a validé la maquette le 26/11, puis demandé un retour obligatoire qui 
 23. **Un seul retour en attente.** Seul le dernier shift ouvert d'un membre prend un retour. Dès qu'un shift plus récent ouvre le sien, le précédent expire : il est refusé (`shift_feedback_expired_conflict`), compté « sans retour » dans Équipe › Rapports pour le propriétaire et les managers, et ne se rattrape jamais. Rien ne s'enlève de la paie.
 24. **Le rapport avec montant ne change pas.** Sur un compte dont la paie lit les rapports (source « déclarée »), le rapport de fin de shift garde son bouton et ses deux rappels (ADR 0077) : la paie le lit, il n'expire pas.
 25. **Lier à un fan** écrit la phrase dans sa fiche comme la note de « Rendre la main » (fait `operator_note`, avec son auteur), par la tâche des conversations, une fois par remontée.
+
+## Amendement du 26/11/2026 : la carte de faute et les niveaux
+
+Le 26/11 au soir, Charles a lu les vraies conversations de ses chatteurs analysées par Impera. Il a demandé un bilan qui relève tout ce qui nuit à l'achat ou à la relation, avec un retour constructif, et un ton plus ferme sur ce qui se répète ou qui est grave (« il faut vraiment coder ça »). Il a choisi sur carte d'afficher le manque à gagner en euros au chatteur, puis d'être alerté dès la première fois pour une sortie de plateforme. Il a validé la maquette (« ok maquette bilan ») et le catalogue des fautes avec leurs niveaux le même soir. Cet amendement précise les §§ 11, 12 et 15.
+
+26. **Une carte par faute.** Elle montre, dans cet ordre : son niveau, ce qu'elle a coûté, l'extrait redessiné, ce que le fan a ressenti à ce moment-là, « comment tu aurais pu la mener » en deux ou trois messages réécrits dans la voix de la créatrice, et la règle. Un point bien fait montre ce qu'il a rapporté, au même endroit. Les messages réécrits ne recopient jamais ceux du fan.
+27. **Le manque à gagner est montré en euros au chatteur**, sur chaque carte et en total du shift ou de la semaine. Il est calculé par le code au prix de l'étape suivante du script en cours, jamais écrit par le modèle. Quand il ne se chiffre pas (une promesse faite au nom de la créatrice), la carte dit ce qui est en jeu à la place. La commission n'apparaît jamais.
+28. **Quatre niveaux, fixés par le code de la faute.** Chaque faute a un code neutre. Son libellé et son niveau sont saisis hors dépôt, en base, comme la grille (§ 9). Le modèle ne choisit pas le niveau, et un niveau peut dépendre d'un fait lu par le code.
+    - 0 : un conseil, jamais compté.
+    - A : la règle du § 15. La première fois, une explication. Ensuite, un rappel ferme. À trois fois en deux semaines après l'explication, un dossier.
+    - B : une remarque ferme dès la première fois. Un dossier à la deuxième fois en deux semaines.
+    - C : un dossier pour le propriétaire dès la première fois, comme une fraude ou un problème de sécurité.
+29. **Le compteur est celui du code.** Une occurrence ne compte qu'une fois la faute expliquée au chatteur dans un bilan. Une occurrence contestée ne compte pas tant qu'elle n'est pas tranchée. Pendant les deux semaines d'accompagnement, seul le niveau C ouvre un dossier.
+30. **Le ton suit le niveau et le compteur**, jamais le prompt : gris pour une explication, ambre pour un rappel ferme, rouge pour une faute grave.
+31. **Rythme.** Le bilan hebdomadaire relit toutes les conversations de la semaine (§ 19). Pendant l'accompagnement, un court bilan suit chaque shift.
+32. **Partage du travail.** Le module `agent` relit les conversations et produit les remarques par occurrence, avec le code de la faute. Le module `team` garde les niveaux, compte les occurrences, ouvre les dossiers, reçoit les contestations et rend « Mon bilan ». Il lit les remarques par l'`index.ts` de l'agent.

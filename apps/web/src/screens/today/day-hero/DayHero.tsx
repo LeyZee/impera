@@ -59,7 +59,7 @@ export function DayHero({ today }: { today: string }): JSX.Element | null {
         </Donut>
         <div className="dh-text">
           <p className="dh-line">{hero.line}</p>
-          {hero.chips.length === 0 ? null : (
+          {hero.legend ? (
             <ul className="nv-breakdown dh-legend">
               {hero.chips.map((chip, i) => (
                 <li key={chip.part}>
@@ -78,7 +78,7 @@ export function DayHero({ today }: { today: string }): JSX.Element | null {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

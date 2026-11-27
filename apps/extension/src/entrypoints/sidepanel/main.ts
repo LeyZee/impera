@@ -79,6 +79,8 @@ let tab: PanelTab = 'essentials';
 let discoverOpen = false;
 /** « Où on en est » past its three signals: for this conversation only (ADR 0141). */
 let signalsOpen = false;
+/** The French of a draft in another language, unfolded: kept for the whole shift, a chatter who needs it needs it on every draft. */
+let translationOpen = false;
 let screen: PanelScreen = { kind: 'loading' };
 let drawn = '';
 /** Each read carries the turn it started on: a late answer for a conversation left since is dropped. */
@@ -162,6 +164,10 @@ const actions = {
   toggleDiscover: (open: boolean) => {
     // Kept without a redraw: the fold is already as he left it.
     discoverOpen = open;
+  },
+  toggleTranslation: (open: boolean) => {
+    // Kept without a redraw: the fold is already as he left it.
+    translationOpen = open;
   },
   showSignals: () => {
     signalsOpen = true;
@@ -266,6 +272,8 @@ function leftPart(): DraftPart | null {
   return {
     kind: 'ready',
     bubbles: done.bubbles,
+    translation: null,
+    translationOpen: false,
     placed: true,
     pending: false,
     mode: 'idle',
@@ -292,6 +300,8 @@ function draftPart(): DraftPart {
   return {
     kind: 'ready',
     bubbles: draft.bubbles,
+    translation: draft.translation?.bubbles ?? null,
+    translationOpen,
     placed: draft.placedAt !== null,
     pending: true,
     mode: gesture.mode,

@@ -15,6 +15,7 @@ import {
   dropName,
   dueOf,
   fileLine,
+  clockOf,
   lengthOf,
   matchResumed,
   measuredVideoRefusal,
@@ -296,6 +297,10 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
   it('names a chosen file by its kind and length, never by its name (CRE-16)', () => {
     expect(mediaLabel('image', null)).toBe('Photo');
     expect(mediaLabel('video', 8_200)).toBe('Vidéo · 8 s');
+    // On the thumbnail's corner, as her gallery writes it (Charles, 27/11).
+    expect(clockOf(8_200)).toBe('0:08');
+    expect(clockOf(65_000)).toBe('1:05');
+    expect(clockOf(200)).toBe('0:01');
     expect(mediaLabel('video', null)).toBe('Vidéo');
     expect(mediaLabel('audio', 65_000)).toBe('Vocal · 1 min 05');
     expect(mediaLabel(null, null)).toBe('Fichier');

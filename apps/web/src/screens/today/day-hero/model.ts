@@ -35,9 +35,22 @@ export interface DayHero {
   readonly title: string;
   readonly line: string;
   readonly chips: readonly DayHeroChip[];
+  /**
+   * The breakdown under the ring, only when it adds something: with one part alone it would repeat the ring's own
+   * count (audit 27/11, « 0/2 » four times on her phone), so the line names that part instead.
+   */
+  readonly legend: boolean;
 }
 
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
+
+/** What is left, named by its part when the day holds one part alone. */
+const leftOf = (left: number, only: DayHeroPart | undefined): string => {
+  if (only === 'essentials') return `${plural(left, 'chose', 'choses')} à poster`;
+  if (only === 'tasks') return plural(left, 'tâche', 'tâches');
+  if (only === 'toSend') return `${plural(left, 'envoi', 'envois')} à faire`;
+  return plural(left, 'chose', 'choses');
+};
 
 export function dayHeroOf(source: DayHeroSource): DayHero | null {
   const { essentials, tasks, toSend } = source;
@@ -77,6 +90,7 @@ export function dayHeroOf(source: DayHeroSource): DayHero | null {
       colour: 'var(--nv-series-3)',
     });
   const left = total - done;
+  const only = chips.length === 1 ? chips[0]?.part : undefined;
   return {
     done,
     total,
@@ -88,7 +102,8 @@ export function dayHeroOf(source: DayHeroSource): DayHero | null {
         ? 'Profite : rien ne t’attend pour l’instant.'
         : left === 0
           ? 'Ta journée est bouclée. Le bonus reste là si tu as envie.'
-          : `Encore ${plural(left, 'chose', 'choses')} pour boucler ta journée.`,
+          : `Encore ${leftOf(left, only)} pour boucler ta journée.`,
     chips,
+    legend: chips.length > 1,
   };
 }

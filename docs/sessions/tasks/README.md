@@ -97,6 +97,7 @@ Branche : task/<id>-<slug>
 | EQ-25 | « J'ai été décisif sur une vente » : le chatteur signale son shift, le manager répond | équipe | in_review | ADR 0101 §§ 18 à 22, EQ-22 |
 | EQ-26 | Dispos hebdomadaires, et qui est dispo sur chaque place libre | équipe | in_review | ADR 0171, EQ-02 |
 | EQ-27 | Retour de fin de shift léger | équipe | in_review | ADR 0170, EQ-23 |
+| EQ-28 | Mon bilan : cartes de faute, niveaux, contestation | équipe | in_review | ADR 0170, EQ-27 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
@@ -184,6 +185,7 @@ Branche : task/<id>-<slug>
 | EVAL-01 | Des fans simulés testent l'agent sur des semaines fictives | exploitation | in_progress | OPS-11, ADR 0103 |
 | OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
 | OPS-21 | Le prévisionnel du coût de l'IA | exploitation | review | OPS-08 |
+| OPS-22 | Un worker arrêté se voit de l'extérieur, et le compte de l'IA se corrige | exploitation | review | OPS-19 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
