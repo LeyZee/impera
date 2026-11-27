@@ -43,6 +43,7 @@ import { createConversationRoutes, type RequireRole } from './infra/http/routes'
 
 export { SendRefused } from './domain/errors';
 export { scriptRunsForTeam } from './infra/db/script-runs';
+export { conversationReadsForShifts } from './infra/db/shift-activity-reads';
 export type {
   BubbleGuard,
   CardReader,

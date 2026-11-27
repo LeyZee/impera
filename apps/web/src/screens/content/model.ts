@@ -36,6 +36,10 @@ export const CATEGORY_EMOJIS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: '🎞️',
   instagram_post: '🖼️',
   telegram_post: '📣',
+  whale_gift: '🎁',
+  voice_beep: '🎙️',
+  voice_real: '🎙️',
+  sale_video: '🎬',
 };
 
 /** What she puts in each category, in her words (ADR 0055 § 1, « Ce qu'elle y met »). */
@@ -49,6 +53,10 @@ export const CATEGORY_HINTS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: 'Une vidéo verticale',
   instagram_post: 'Une ou plusieurs photos',
   telegram_post: 'Une vidéo ou une photo',
+  whale_gift: 'Une photo ou une courte vidéo inédite, jamais nue',
+  voice_beep: 'Un vocal de 30 s au plus : « laisse-moi un message après le bip »',
+  voice_real: 'Un ou deux vocaux de 30 s au plus : la preuve que tu es bien réelle',
+  sale_video: 'Une vidéo de 10 min au plus, hors scripts, vendue à part',
 };
 
 /**
@@ -59,7 +67,21 @@ export const CATEGORY_HINTS: Readonly<Record<DropCategory, string>> = {
 export const DROP_OUTPUTS: readonly {
   readonly name: string;
   readonly categories: readonly DropCategory[];
-}[] = [{ name: 'Reveal', categories: ['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm'] }];
+}[] = [
+  {
+    name: 'Reveal',
+    categories: [
+      'feed_shoot',
+      'feed_video',
+      'reveal_story',
+      'mass_dm',
+      'whale_gift',
+      'sale_video',
+      'voice_beep',
+      'voice_real',
+    ],
+  },
+];
 
 /** The extensions a browser may give no type for (MKV often), read as the type they are (ADR 0070 § 2). */
 const MIME_BY_EXTENSION: Readonly<Record<string, DropMime>> = {
@@ -288,6 +310,10 @@ const OUT_WHERE: Readonly<Record<ContentDrop['category'], string>> = {
   instagram_reel: 'sur Instagram',
   instagram_post: 'sur Instagram',
   telegram_post: 'sur Telegram',
+  whale_gift: 'dans Reveal',
+  voice_beep: 'dans Reveal',
+  voice_real: 'dans Reveal',
+  sale_video: 'dans Reveal',
 };
 
 /** How a drop's state reads (ADR 0055 § 6). */

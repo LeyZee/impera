@@ -1,6 +1,6 @@
 # 0170. Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach
 
-Statut : accepted (« ok relecture des shifts » de Charles, 26/11/2026, après le brainstorm du même jour)
+Statut : accepted (« ok relecture des shifts » de Charles, 26/11/2026, après le brainstorm du même jour). Amendée le 26/11/2026 (§§ 20 à 25 : le retour léger, « ok rapport léger » de Charles)
 Date : 2026-11-26
 Précise : 0050 § 10 (le mini feedback), 0042 § 5 (les remontées lues par le topo de la créatrice), 0102 (la banque d'exemples), 0109 (la fiche du fan écrite depuis l'extension), 0025 (le chatteur chatte dans Reveal). Ne remplace rien.
 
@@ -69,3 +69,14 @@ Précise : 0050 § 10 (le mini feedback), 0042 § 5 (les remontées lues par le 
 - **Des captures d'écran des conversations** : ce sont des images de données réelles à stocker et à protéger, alors que l'extrait redessiné depuis la base suffit.
 - **Laisser l'agent poser le malus** : refusé, un humain décide toujours.
 - **Mettre la grille dans les prompts versionnés** : le dépôt est public.
+
+## Amendement du 26/11/2026 : le retour léger
+
+Charles a validé la maquette le 26/11, puis demandé un retour obligatoire qui ne s'accumule pas et ne contraint pas trop (« ok rapport léger », 26/11/2026). Il a choisi sur carte, le même jour, que le rapport avec montant n'est pas concerné. Cet amendement précise le § A et l'ADR 0050 § 10 : le mini feedback n'était jusqu'ici ni demandé ni rappelé.
+
+20. **Il ne sert qu'à ce qu'Impera ne voit pas** : ce qui s'est passé hors du chat, un souci de la plateforme, l'agent qui déraille, une idée. Les chiffres du shift sont lus par le code et montrés en lecture seule (§ 1) ; la qualité vient de la relecture (§ B).
+21. **Trente secondes au plus.** Tout est pré-rempli. « Rien à signaler » se fait en un geste, les catégories et les fans se choisissent, le texte libre est facultatif.
+22. **Demandé à la prise de poste.** « Je prends mon poste » est refusé tant que le retour du shift précédent manque (`shift_check_in_feedback_due_conflict`, avec le shift en cause), et l'écran l'ouvre tout de suite. Le retour reste possible dès 30 minutes avant la fin du shift.
+23. **Un seul retour en attente.** Seul le dernier shift ouvert d'un membre prend un retour. Dès qu'un shift plus récent ouvre le sien, le précédent expire : il est refusé (`shift_feedback_expired_conflict`), compté « sans retour » dans Équipe › Rapports pour le propriétaire et les managers, et ne se rattrape jamais. Rien ne s'enlève de la paie.
+24. **Le rapport avec montant ne change pas.** Sur un compte dont la paie lit les rapports (source « déclarée »), le rapport de fin de shift garde son bouton et ses deux rappels (ADR 0077) : la paie le lit, il n'expire pas.
+25. **Lier à un fan** écrit la phrase dans sa fiche comme la note de « Rendre la main » (fait `operator_note`, avec son auteur), par la tâche des conversations, une fois par remontée.

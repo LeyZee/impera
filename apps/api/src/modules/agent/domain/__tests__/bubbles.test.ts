@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bubbleBudget, bubbleDelays, fitBubbles } from '../bubbles';
+import { bubbleBudget, bubbleDelays, fitBubbles, saysSomething } from '../bubbles';
 
 const fan = (text: string) => ({ from: 'fan' as const, text });
 const her = (text: string) => ({ from: 'creator' as const, text });
@@ -37,6 +37,17 @@ describe('fitBubbles', () => {
   it('keeps the first bubbles and leaves out what goes past the budget, never gluing them', () => {
     expect(fitBubbles(['Coucou', 'ça va ?', 'moi trop'], 1)).toEqual(['Coucou']);
     expect(fitBubbles(['Coucou', 'ça va ?', 'moi trop'], 2)).toEqual(['Coucou', 'ça va ?']);
+  });
+
+  it('drops a bubble of punctuation only before the budget (passe 2, conversation 37)', () => {
+    expect(fitBubbles(['Trop fière de toi', '.'], 2)).toEqual(['Trop fière de toi']);
+    expect(fitBubbles(['.', ' … ', '', 'Raconte'], 1)).toEqual(['Raconte']);
+    expect(fitBubbles(['.', '!!'], 2)).toEqual([]);
+  });
+
+  it('keeps a bubble of a word, a number or an emoji alone', () => {
+    expect(['ok', '😏', '20 h ?', 'é'].every(saysSomething)).toBe(true);
+    expect(['.', '…', '  ', '?!', '*'].some(saysSomething)).toBe(false);
   });
 });
 

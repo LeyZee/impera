@@ -91,6 +91,11 @@ export function customOrderStop(
 const YES =
   /\b(oui|ok|okay|d'?accord|ca marche|pas de souci|pas de probleme|carrement|avec plaisir)\b.{0,30}\b(je (te |vous )?(la |le |les |l'|en )?(fais|ferai|fait|tourne|tournerai|envoie|enverrai|prepare|preparerai)|je peux (te |vous )?(la |le |les |l'|en )?(faire|tourner|envoyer|preparer))|\b(c'?est (d'accord|ok|bon|note pour toi)|marche conclu|deal)\b|\bje (te |vous )?(la |le |les |l')?(fais|ferai|tourne|tournerai|prepare|preparerai) (ca|cette|ce|ta|ton|tes|pour toi)\b|\bje peux (te |vous )?(la |le |les |l')?(faire|tourner|preparer) (ca|cette|ce|ta|ton|tes|pour toi)\b/;
 
+// A promise to do it later, said without a yes (passe 2 du 26/11, conversation 31): « je te le ferai quand je pourrai,
+// promis », « je vais te l'envoyer », « je te promets ». « Je te promets rien » commits to nothing.
+const PROMISE =
+  /\bje (te |t')(le |la |les |l'|l |en )?(ferai|enverrai|montrerai|tournerai|filmerai|prendrai|referai)\b|\bje vais (te |t')(le |la |les |l'|l |en )?(faire|envoyer|montrer|tourner|filmer)\b|\bpromis\b|\bje (te |t')(le |la )?promets?\b(?! (rien|pas))/;
+
 // A delay: « demain », « ce soir », « dans 2 jours », « d'ici vendredi », « cette semaine ».
 const DELAY =
   /\b(demain|apres-demain|ce soir|cette nuit|ce week-?end|cette semaine|la semaine prochaine|d'?ici (ce soir|demain|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|la fin|\d+|une|deux|trois|quelques)|dans (\d+|une|un|deux|trois|quelques|peu de) ?(minutes?|min|heures?|h|jours?|j|semaines?)|sous (\d+|une|un|deux|trois|quelques) ?(heures?|h|jours?|j|semaines?)|(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) (prochain|soir|matin))\b/;
@@ -103,14 +108,14 @@ const PRICE =
   /\d+([.,]\d{1,2})? ?(€|\$|(euros?|eur|balles|dollars?|usd)\b)|(€|\$) ?\d|\b(tarifs?|ca (te )?(coute|coutera|couterait)|prix (de|pour|special)|pour \d+)\b/;
 
 /**
- * Her waiting answer to a custom order commits to nothing (ADR 0090 § A): no yes, no price, no delay, no tip asked
+ * Her waiting answer to a custom order commits to nothing (ADR 0090 § A): no yes nor promise, no price, no delay, no tip asked
  * (ADR 0159 § A.4). Blocking: a human answers. Read only when that answer was asked of the voice, on each bubble and
  * on the whole message.
  */
 export function checkNoCommitment(bubbles: readonly string[]): GuardViolation[] {
   const violations: GuardViolation[] = [];
   const found = (text: string) =>
-    [YES, DELAY, PRICE, TIP].map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
+    [YES, PROMISE, DELAY, PRICE, TIP].map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
   bubbles.forEach((bubble, bubbleIndex) => {
     const match = found(normalise(bubble));
     if (match !== undefined)

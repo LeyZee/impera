@@ -4,6 +4,7 @@ import type {
   AgentHoursView,
   ArchivedCreator,
   CopilotSwitches,
+  FanTiersSetting,
   CreatorId,
   CreatorSummary,
   DayRange,
@@ -65,6 +66,10 @@ export interface CreatorDirectory {
     change: Partial<CopilotSwitches>,
     userId: string,
   ): Promise<CopilotSwitches | null>;
+  /** Her fans' tier thresholds (Charles, 21/11), the defaults when never set; `null` when she does not exist. */
+  fanTiers(id: CreatorId): Promise<FanTiersSetting | null>;
+  /** Sets all three, audited with the owner who set them; `null` when she does not exist. */
+  setFanTiers(id: CreatorId, tiers: FanTiersSetting, userId: string): Promise<FanTiersSetting | null>;
 }
 
 /**

@@ -388,6 +388,7 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
     expect([...document.querySelectorAll('.cr-account__card')].map((card) => card.id)).toEqual([
       'acces',
       'part',
+      'paliers',
       'profil',
       'telegram',
     ]);
@@ -455,7 +456,7 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(screen.getByRole('radiogroup', { name: 'Vue de ses médias' }))
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['Coffre', 'Dépôts']);
+    ).toEqual(['Coffre Reveal', 'Dépôts', 'Coffre Impera']);
     // Structures and her made-to-measure prices are the owner's; a manager reads her custom orders under « Sur mesure ».
     router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
     expect(

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { areaPath, chartPoints, linePath, nearestIndex, niceTicks } from '../index.js';
@@ -59,5 +61,23 @@ describe('niceTicks', () => {
     expect(niceTicks(940)).toEqual([0, 250, 500, 750, 1000]);
     expect(niceTicks(0.8)).toEqual([0, 0.2, 0.4, 0.6, 0.8]);
     expect(niceTicks(0)).toEqual([0]);
+  });
+});
+
+describe('nv-stat sparkline', () => {
+  const css = readFileSync(new URL('../styles/components.css', import.meta.url), 'utf8');
+
+  it('ends its draw on a pattern with no gap, so the line reaches the edge of a tile wider than its viewBox', () => {
+    const rule = /\.nv-stat__spark \.nv-draw \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(rule).toContain('animation: nv-stat-draw');
+    const end = /@keyframes nv-stat-draw \{\s*to \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(end).toContain('stroke-dasharray: 1 0;');
+    expect(end).toContain('stroke-dashoffset: 0;');
+  });
+
+  it('carries no dash at all without motion', () => {
+    const reduced = css.slice(css.lastIndexOf('animation: none !important;'));
+    const rule = /\n {2}\.nv-stat__spark \.nv-draw \{([^}]*)\}/u.exec(reduced)?.[1] ?? '';
+    expect(rule).toContain('stroke-dasharray: none;');
   });
 });

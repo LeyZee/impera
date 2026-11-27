@@ -161,6 +161,10 @@ export type PaySaleDecisionId = z.infer<typeof PaySaleDecisionIdSchema>;
 export const PaySaleSignalIdSchema = uuid.brand<'PaySaleSignalId'>();
 export type PaySaleSignalId = z.infer<typeof PaySaleSignalIdSchema>;
 
+/** A chatter's « J'ai été décisif sur une vente » on one of his shifts (ADR 0101 § 18, trou 15). */
+export const SaleClaimIdSchema = uuid.brand<'SaleClaimId'>();
+export type SaleClaimId = z.infer<typeof SaleClaimIdSchema>;
+
 /** What a validated statement carries to the next pay period instead of paying it (EQ-04). */
 export const CarryOverIdSchema = uuid.brand<'CarryOverId'>();
 export type CarryOverId = z.infer<typeof CarryOverIdSchema>;

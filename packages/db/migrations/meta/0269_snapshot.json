@@ -1,187 +1,9 @@
 {
-  "id": "2602838b-e625-427a-a917-0a5ef6593b4a",
+  "id": "ccf6c1f5-a726-4861-9ea3-f750a4cb34c4",
   "prevId": "18426be0-b95c-4e91-bb1b-c76bc16dbd17",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.agency_styles": {
-      "name": "agency_styles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "private_style": {
-          "name": "private_style",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "public_style": {
-          "name": "public_style",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "form": {
-          "name": "form",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "activated_by": {
-          "name": "activated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "activated_at": {
-          "name": "activated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "agency_styles_version_unique": {
-          "name": "agency_styles_version_unique",
-          "columns": [
-            {
-              "expression": "version",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agency_styles_one_active": {
-          "name": "agency_styles_one_active",
-          "columns": [
-            {
-              "expression": "is_active",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"agency_styles\".\"is_active\"",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "agency_styles_created_by_user_id_fk": {
-          "name": "agency_styles_created_by_user_id_fk",
-          "tableFrom": "agency_styles",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "agency_styles_activated_by_user_id_fk": {
-          "name": "agency_styles_activated_by_user_id_fk",
-          "tableFrom": "agency_styles",
-          "tableTo": "user",
-          "columnsFrom": ["activated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "owner_read": {
-          "name": "owner_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
-        },
-        "owner_insert": {
-          "name": "owner_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"agency_styles\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not \"agency_styles\".\"is_active\""
-        },
-        "owner_activate": {
-          "name": "owner_activate",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and (not \"agency_styles\".\"is_active\" or \"agency_styles\".\"activated_by\" = nullif(current_setting('app.user_id', true), ''))"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "agency_styles_version_check": {
-          "name": "agency_styles_version_check",
-          "value": "\"agency_styles\".\"version\" > 0"
-        },
-        "agency_styles_private_style_check": {
-          "name": "agency_styles_private_style_check",
-          "value": "char_length(\"agency_styles\".\"private_style\") <= 8000"
-        },
-        "agency_styles_public_style_check": {
-          "name": "agency_styles_public_style_check",
-          "value": "char_length(\"agency_styles\".\"public_style\") <= 4000"
-        },
-        "agency_styles_form_check": {
-          "name": "agency_styles_form_check",
-          "value": "jsonb_typeof(\"agency_styles\".\"form\") = 'object'"
-        },
-        "agency_styles_activated_check": {
-          "name": "agency_styles_activated_check",
-          "value": "not \"agency_styles\".\"is_active\" or (\"agency_styles\".\"activated_at\" is not null and \"agency_styles\".\"activated_by\" is not null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.agent_hour_exceptions": {
       "name": "agent_hour_exceptions",
       "schema": "",
@@ -2282,11 +2104,11 @@
       "checkConstraints": {
         "content_drops_category_check": {
           "name": "content_drops_category_check",
-          "value": "\"content_drops\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_drops\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
-          "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
@@ -2565,7 +2387,7 @@
       "checkConstraints": {
         "content_requests_category_check": {
           "name": "content_requests_category_check",
-          "value": "\"content_requests\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_requests\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_requests_origin_check": {
           "name": "content_requests_origin_check",
@@ -9738,26 +9560,27 @@
           "using": "\"media_descriptions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"media_descriptions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
         },
-        "creator_no_insert": {
-          "name": "creator_no_insert",
-          "as": "RESTRICTIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
-        "creator_no_update": {
-          "name": "creator_no_update",
-          "as": "RESTRICTIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
         "creator_no_delete": {
           "name": "creator_no_delete",
           "as": "RESTRICTIVE",
           "for": "DELETE",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' or (\"media_descriptions\".\"author\" = 'human' and \"media_descriptions\".\"model\" = 'human'\n        and \"media_descriptions\".\"validated_by\" = nullif(current_setting('app.user_id', true), '') and \"media_descriptions\".\"validated_at\" is not null and exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id\n       where f.media_asset_id = \"media_descriptions\".\"media_asset_id\" and d.creator_id = \"media_descriptions\".\"creator_id\"\n         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate'))\n        and not (cardinality(\"media_descriptions\".\"review_reasons\") > 0 or jsonb_array_length(coalesce(\"media_descriptions\".\"content\" -> 'flags', '[]'::jsonb)) > 0) and not exists (select 1 from media_descriptions w\n       where w.media_asset_id = \"media_descriptions\".\"media_asset_id\" and w.validated_at is null\n         and (cardinality(w.review_reasons) > 0\n              or jsonb_array_length(coalesce(w.content -> 'flags', '[]'::jsonb)) > 0)))"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' or (\"media_descriptions\".\"validated_at\" is null and exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id\n       where f.media_asset_id = \"media_descriptions\".\"media_asset_id\" and d.creator_id = \"media_descriptions\".\"creator_id\"\n         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate')) and not (cardinality(\"media_descriptions\".\"review_reasons\") > 0 or jsonb_array_length(coalesce(\"media_descriptions\".\"content\" -> 'flags', '[]'::jsonb)) > 0))",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' or (\"media_descriptions\".\"validated_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id\n       where f.media_asset_id = \"media_descriptions\".\"media_asset_id\" and d.creator_id = \"media_descriptions\".\"creator_id\"\n         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate')))"
         }
       },
       "checkConstraints": {
@@ -10145,6 +9968,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_sends_free_once_idx": {
+          "name": "media_sends_free_once_idx",
+          "columns": [
+            {
+              "expression": "fan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "media_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_sends\".\"price_minor\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -25468,7 +25313,7 @@
       "checkConstraints": {
         "content_ideas_category_check": {
           "name": "content_ideas_category_check",
-          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_ideas_suggestion_check": {
           "name": "content_ideas_suggestion_check",

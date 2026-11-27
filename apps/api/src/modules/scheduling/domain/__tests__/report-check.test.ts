@@ -23,6 +23,7 @@ const COMPLETE = at('2026-10-20T22:30:00Z');
 const read = (grossInclVatMinor: number, caughtUpAt: Date | null = COMPLETE): ShiftSalesRead => ({
   feed: 'read',
   grossInclVatMinor,
+  saleCount: 1,
   caughtUpAt,
 });
 

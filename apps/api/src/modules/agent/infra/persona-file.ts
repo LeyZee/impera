@@ -8,6 +8,8 @@ import {
   sectionAnswers,
   StoredPersonaSchema,
   type KycSlot,
+  type Language,
+  type LanguageExamples,
   type ObjectionReplies,
   type PersonaSheet,
   type PersonaStrategies,
@@ -66,6 +68,10 @@ export interface PersonaForModels {
    * in a prompt.
    */
   readonly objectionReplies: ObjectionReplies;
+  /** Her languages (`spoken_languages`), in her order: code decides the language of each answer among them (ADR 0168). */
+  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  /** Her messages per language (`agent.language_examples`), read by the voice only in that language (ADR 0168 § 3). */
+  readonly languageExamples?: LanguageExamples;
 }
 
 const isPlaceholder = (value: string): boolean => value.startsWith('<');
@@ -206,7 +212,15 @@ export function personaForModels(
     form: formOf(agent.behavior),
     kycSlots,
     objectionReplies: agent.objection_replies,
+    spokenLanguages: spokenOf(sheet.identity.spoken_languages),
+    languageExamples: agent.language_examples,
   };
+}
+
+/** Her languages as code reads them: the sheet requires one, French when a list arrives empty all the same. */
+function spokenOf(languages: readonly Language[]): readonly [Language, ...Language[]] {
+  const [first, ...rest] = languages;
+  return first === undefined ? ['french'] : [first, ...rest];
 }
 
 /** Her form settings as her persona sets them: only those she set, so a lower layer decides the rest. */

@@ -101,7 +101,8 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Publié' })).toBeNull();
     const tiles = [...document.querySelectorAll('.ct-tile__name')].map((tile) => tile.textContent);
-    expect(tiles).toHaveLength(4);
+    // Reveal's four, the whale gifts and the videos to sell (ADR 0163), and the AI's two voices.
+    expect(tiles).toHaveLength(8);
     expect(tiles.some((name) => name.includes('Script'))).toBe(false);
     expect(tiles.some((name) => name.includes('Insta'))).toBe(false);
   });

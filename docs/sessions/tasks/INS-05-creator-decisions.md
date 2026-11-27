@@ -1,5 +1,5 @@
 # INS-05 « À décider » : les cartes de décision de la créatrice
-Statut : in progress (lot a fusionné ; lot b1 fait : trois légendes proposées pour un Reel déposé ; lot b2 fait : « D'autres idées » et la notification ; reste l'écran du propriétaire)
+Statut : in progress (lot a fusionné ; lot b1 fait : trois légendes proposées pour un Reel déposé ; lot b2 fait : « D'autres idées » et la notification ; écran du propriétaire fait, en PR ; reste : ses anciennes légendes en exemples, la publication après le réglage Meta)
 Phase : Instagram (ADR 0164)
 Dépend de : ADR 0164 acceptée ; ADR 0042 (espace de la créatrice) ; captures « cartes-de-decision-2 » validées par Charles le 21/11/2026
 Branche : claude/project-thread-u073g5
@@ -23,7 +23,7 @@ Lot b, les légendes :
 - [x] Notification d'une question nouvelle, sous les plafonds de `notifications` (motif `decision`, lot b2).
 - [x] Premier code qui demande (lot b1) : trois légendes proposées pour une vidéo déposée, depuis la description du média ; son choix gardé. Module `instagram-captions`, tâche `instagram_captions.propose`, usage IA `instagram_caption`.
 - [x] « D'autres idées » (lot b2) : route, indications en puces et en mots, trois demandes au plus, jamais comptée quand rien ne vient ; appels au modèle comptés dans la conso IA (usage `instagram_caption`).
-- [ ] Écran du propriétaire pour répondre à sa place (captures d'abord).
+- [x] Écran du propriétaire pour répondre à sa place : pas de nouvelle page ; carte « N questions sans réponse » sur le Dashboard (« Toutes » et la créatrice choisie), en tête quand une question finit sous 2 h, sinon juste sous « Objectif du jour » ; elle reprend DecisionStack (`onLater` facultatif, `who`, `due`, `notice`) ; la question lue porte son `expiresAt`. Captures `repondre-a-sa-place-2`.
 
 Lot c, la publication (attend le compte professionnel et l'application Meta) :
 - [ ] Confirmation de l'heure, publication d'essai qui marche.

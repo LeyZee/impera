@@ -35,6 +35,14 @@ export const DROP_CATEGORIES = [
   'instagram_reel',
   'instagram_post',
   'telegram_post',
+  // Cadeaux baleines (ADR 0163 § 2): short, unseen, never nude, given to the biggest fans, never sold afterwards.
+  'whale_gift',
+  // For the AI to answer with her real voice (Charles, 21/11): the « leave a message after the beep » to a fan who
+  // calls her a bot, and the « I am real » proof. Never sold, once per fan.
+  'voice_beep',
+  'voice_real',
+  // Videos kept aside to sell, out of every script (Charles, 21/11): priced by the grid, never offered.
+  'sale_video',
 ] as const;
 export const DropCategorySchema = z.enum(DROP_CATEGORIES);
 export type DropCategory = z.infer<typeof DropCategorySchema>;
@@ -84,6 +92,10 @@ export const DROP_CATEGORY_LABELS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: 'Reel Insta',
   instagram_post: 'Photo Insta',
   telegram_post: 'Telegram',
+  whale_gift: 'Cadeaux baleines',
+  voice_beep: 'Vocal du bip',
+  voice_real: 'Vocal « bien réelle »',
+  sale_video: 'Vidéos à vendre',
 };
 
 export const DROP_MEDIA_KINDS = ['image', 'video', 'audio'] as const;
@@ -198,6 +210,36 @@ export const DROP_FORMAT_RULES: Readonly<Record<DropCategory, DropFormatRule>> =
   },
   telegram_post: {
     kinds: ['image', 'video'],
+    vertical: false,
+    maxVideoSeconds: 600,
+    maxAudioSeconds: null,
+    maxFiles: 10,
+  },
+  // Short on purpose (ADR 0163 § 2): an attention, never a script step.
+  whale_gift: {
+    kinds: ['image', 'video'],
+    vertical: false,
+    maxVideoSeconds: 60,
+    maxAudioSeconds: null,
+    maxFiles: 10,
+  },
+  // Her voice, short: one beep message, one or two proofs.
+  voice_beep: {
+    kinds: ['audio'],
+    vertical: false,
+    maxVideoSeconds: null,
+    maxAudioSeconds: 30,
+    maxFiles: 1,
+  },
+  voice_real: {
+    kinds: ['audio'],
+    vertical: false,
+    maxVideoSeconds: null,
+    maxAudioSeconds: 30,
+    maxFiles: 2,
+  },
+  sale_video: {
+    kinds: ['video'],
     vertical: false,
     maxVideoSeconds: 600,
     maxAudioSeconds: null,

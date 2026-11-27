@@ -79,6 +79,52 @@ body {
   line-height: var(--nv-text-callout-leading);
   font-weight: 500;
 }
+/* Who he is (avis Design, 26/11): his name and his tier on one line, the name cut first, never the tier; what he
+   spent right under. The badges keep the right of the first line and go under the block when the panel is narrow. */
+.cp-band__id {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cp-band__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cp-band__who .cp-band__fan {
+  margin-right: 0;
+}
+/* His tier, the same pills as in the CRM (Charles, 21/11). */
+.cp-band__tier {
+  --_tier: var(--nv-ink-muted);
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--_tier) 16%, transparent);
+  color: color-mix(in srgb, var(--_tier) 80%, var(--nv-ink));
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.cp-band__tier[data-tier='new'] {
+  --_tier: var(--nv-series-2);
+}
+.cp-band__tier[data-tier='good'] {
+  --_tier: var(--nv-series-1);
+}
+.cp-band__tier[data-tier='very_good'] {
+  --_tier: var(--nv-series-3);
+}
+.cp-band__tier[data-tier='whale'] {
+  --_tier: var(--nv-data-2);
+}
+.cp-band__money {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+}
 .cp-badges {
   display: flex;
   flex-wrap: wrap;

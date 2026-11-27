@@ -25,6 +25,7 @@ const caption: CreatorDecision = CreatorDecisionSchema.parse({
     { key: 'teasing', label: 'Taquine', text: 'Vingt minutes pour choisir.', noted: 'Ce sera la taquine.' },
   ],
   otherIdeasLeft: 2,
+  expiresAt: '2026-11-21T17:30:00.000Z',
 });
 
 const time: CreatorDecision = CreatorDecisionSchema.parse({
@@ -39,6 +40,7 @@ const time: CreatorDecision = CreatorDecisionSchema.parse({
     { key: 'change', label: 'Changer l’heure', text: null, noted: 'On change l’heure.' },
   ],
   otherIdeasLeft: 0,
+  expiresAt: '2026-11-21T17:30:00.000Z',
 });
 
 const quiet = { onAnswer: () => Promise.resolve('C’est noté.'), onLater: () => Promise.resolve() };
@@ -114,5 +116,30 @@ describe('« À décider », hers (ADR 0164)', () => {
     expect(await screen.findByText('Le miroir a dit oui.')).toBeTruthy();
     expect(onOtherIdeas).toHaveBeenCalledWith(caption, ['funnier'], 'Parle de samedi');
     expect(screen.queryByText('Robe noire ou robe rouge ?')).toBeNull();
+  });
+
+  it('looks as it always did for her: no name, no end, no notice in the head', () => {
+    const { container } = render(<DecisionStack decisions={[caption]} {...quiet} />);
+    expect(container.querySelector('.sc-ask__who')).toBeNull();
+    expect(container.querySelector('.sc-ask__due')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Plus tard' })).toBeTruthy();
+  });
+
+  it('lets the owner answer in her place: her name, the end as a tag, the notice, and no « Plus tard »', () => {
+    const { container } = render(
+      <DecisionStack
+        decisions={[caption]}
+        onAnswer={quiet.onAnswer}
+        who={() => ({ name: 'Nora' })}
+        due={() => ({ label: 'Plus que 40 min', soon: true })}
+        notice={() => <p className="nv-note">Tu réponds à la place de Nora.</p>}
+      />,
+    );
+    expect(container.querySelector('.sc-ask__who')?.textContent).toBe('NNora');
+    expect(screen.getByText('Plus que 40 min').className).toContain('nv-tag--tint');
+    expect(screen.getByText('Tu réponds à la place de Nora.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Plus tard' })).toBeNull();
+    // Nothing left in the foot: no empty footer keeps its margin.
+    expect(container.querySelector('.sc-ask__foot')).toBeNull();
   });
 });
