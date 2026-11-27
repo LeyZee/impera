@@ -68,11 +68,13 @@ describe('« Écrire à l’agence » (trous béants n° 13)', () => {
   it('comes into view once loaded when the answer’s notification opens it (MOD-05)', async () => {
     const seen = vi.fn();
     Element.prototype.scrollIntoView = seen;
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
     at.hash = 'agence';
     show([message(1, 'Oui, samedi')]);
     expect(await screen.findByText('Oui, samedi')).toBeTruthy();
     expect(document.getElementById('agence')?.tagName).toBe('SECTION');
-    expect(seen).toHaveBeenCalledTimes(1);
+    // « Réduire les animations » on: it jumps, it does not glide.
+    expect(seen).toHaveBeenCalledExactlyOnceWith({ block: 'start', behavior: 'auto' });
   });
 
   it('stays where it is on a plain visit to Aujourd’hui', async () => {

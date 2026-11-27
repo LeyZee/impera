@@ -33,7 +33,9 @@ export function ToAgencyCard(): JSX.Element | null {
   const aimed = useLocation({ select: (location) => location.hash === TO_AGENCY_ANCHOR });
   const loaded = read.data !== undefined;
   useEffect(() => {
-    if (aimed && loaded) card.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (!aimed || !loaded) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    card.current?.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
   }, [aimed, loaded]);
   if (read.data === undefined) return null;
   const lines = messageLines(read.data.messages);
