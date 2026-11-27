@@ -75,7 +75,7 @@ P = propriétaire, M = manager, C = chatteur, O = opérateur, Cr = créatrice.
 | `/reglages/modeles-ia` | Réglages › Modèles IA (Services : xAI, Google, Mistral, ElevenLabs) | ✓ | | | | | Bilan |
 | `/reglages/ventes` | Réglages › Ventes : clé CRM Reveal, liens des modèles et des chatteurs, webhook, vérification, import des créatrices, badge « N nouvelles » | ✓ | | | | | Bilan |
 | `/reglages/alertes` | Réglages › Alertes | ✓ | | | | | Agent |
-| `/reglages/telegram` | Réglages › Telegram : Qui est prévenu, Ventes, Validations, Bots et groupes, Mon chat privé | ✓ | | | | | Bilan |
+| `/reglages/telegram` | Réglages › Bots Telegram : Qui est prévenu, Ventes, Validations, Bots et groupes, Mon chat privé | ✓ | | | | | Bilan |
 | `/reglages/regles-de-paie` | Réglages › Règles de paie (minimum de versement, délai) | ✓ | | | | | Équipe |
 | `/reglages/facturation` | Réglages › Facturation (régimes, mentions légales) | ✓ | | | | | Équipe |
 | `/reglages/sauvegardes` | Réglages › Sauvegardes (lancer, test de restauration) | ✓ | | | | | Bilan |

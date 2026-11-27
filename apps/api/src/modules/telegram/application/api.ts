@@ -1,4 +1,11 @@
 import type {
+  ChannelGestureRefusalKind,
+  ChannelPlannedPost,
+  ChannelPlannedPostId,
+  ChannelPostGesture,
+  ChannelWeek,
+} from '@impera/contracts';
+import type {
   ChannelRefusal,
   ChannelTryRefusalKind,
   CreatorId,
@@ -19,6 +26,8 @@ import type {
   TriedChannelPost,
   TryChannelPostBody,
 } from '@impera/contracts';
+
+import type { Reviewer } from './channel-week';
 
 /** What the routes and other modules (the Dashboard) use; the jobs are separate (index.ts). */
 export interface TelegramApi {
@@ -60,4 +69,15 @@ export interface TelegramApi {
     creatorId: CreatorId,
     body: TryChannelPostBody,
   ): Promise<Result<TriedChannelPost, ChannelTryRefusalKind> | null>;
+  /** Her channel's week (ADR 0162); null when she does not exist or is archived. */
+  channelWeek(creatorId: CreatorId, week: string): Promise<ChannelWeek | null>;
+  /** A gesture of the review (§ 3.3); null when the post is not hers. */
+  channelGesture(
+    creatorId: CreatorId,
+    postId: ChannelPlannedPostId,
+    gesture: ChannelPostGesture,
+    reviewer: Reviewer,
+  ): Promise<Result<ChannelPlannedPost, ChannelGestureRefusalKind> | null>;
+  /** « Tout valider »: how many posts it validated. */
+  validateChannelWeek(creatorId: CreatorId, week: string, reviewer: Reviewer): Promise<number>;
 }

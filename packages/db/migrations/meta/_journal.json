@@ -1450,6 +1450,13 @@
       "when": 1795726556717,
       "tag": "0275_shift_feedback_draft_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "7",
+      "when": 1795740663341,
+      "tag": "0290_telegram_channel_posts",
+      "breakpoints": true
     }
   ]
 }

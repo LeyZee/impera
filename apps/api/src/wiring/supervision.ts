@@ -46,7 +46,7 @@ export function wireSupervision(
   const module = createSupervisionModule({
     db,
     adminDb,
-    // « Mise en route »: the coverage Réglages › Telegram shows, per creator; nothing when Telegram is off.
+    // « Mise en route »: the coverage Réglages › Bots Telegram shows, per creator; nothing when Telegram is off.
     telegramReach: async () => {
       if (telegram === null) return null;
       const { coverage } = await telegram.overview();

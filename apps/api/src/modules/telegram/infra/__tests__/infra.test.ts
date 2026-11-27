@@ -20,13 +20,31 @@ interface Call {
 /** Answers every call with the given status and body, and records what was asked. */
 function fakeFetch(status: number, body: unknown, calls: Call[] = []): PostLike {
   return (url, init) => {
-    const sent: unknown = JSON.parse(init.body);
+    const sent: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
     calls.push({ url, body: sent });
     return Promise.resolve({ status, text: () => Promise.resolve(JSON.stringify(body)) });
   };
 }
 
 describe('Telegram API adapter', () => {
+  it('uploads a visual of her channel with its caption, never an address (ADR 0162 § 5)', async () => {
+    const calls: Call[] = [];
+    const api = createTelegramApi({ fetch: fakeFetch(200, { ok: true, result: { message_id: 7 } }, calls) });
+    const sent = await api.publish('token', '-100', {
+      kind: 'video',
+      file: { bytes: new Uint8Array([1, 2, 3]), filename: 'video.mp4', mime: 'video/mp4' },
+      html: 'Coucou',
+    });
+    expect(sent).toEqual({ ok: true, value: { messageId: 7 } });
+    const [call] = calls;
+    expect(call?.url).toMatch(/\/sendVideo$/);
+    if (!(call?.body instanceof FormData)) throw new Error('not an upload');
+    expect(call.body.get('chat_id')).toBe('-100');
+    expect(call.body.get('caption')).toBe('Coucou');
+    const video = call.body.get('video');
+    expect(video instanceof Blob && video.size).toBe(3);
+  });
+
   it('sends HTML without link preview, silent when asked, as a reply when asked', async () => {
     const calls: Call[] = [];
     const api = createTelegramApi({ fetch: fakeFetch(200, { ok: true, result: { message_id: 42 } }, calls) });

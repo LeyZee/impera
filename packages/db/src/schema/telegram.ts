@@ -1,4 +1,8 @@
 import {
+  ChannelPlannedKindSchema,
+  ChannelPostStateSchema,
+  ChannelSlotRoleSchema,
+  ChannelThemeSchema,
   TelegramBotStateSchema,
   TelegramChatKindSchema,
   TelegramDeliveryStatusSchema,
@@ -6,21 +10,26 @@ import {
   TelegramMembershipSchema,
   TelegramTopicSchema,
 } from '@impera/contracts';
+import { sql, type SQL } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  check,
   customType,
+  date,
   index,
   integer,
   jsonb,
+  pgPolicy,
   pgTable,
   text,
   unique,
   uuid,
+  type PgColumn,
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
+import { createdAt, enumCheck, enumText, id, tenantJobRead, timestampTz, updatedAt } from './columns';
 import { creators } from './tenancy';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
@@ -228,4 +237,77 @@ export const telegramChannels = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [unique('telegram_channels_chat_unique').on(t.chatId)],
+);
+
+/**
+ * ADR 0162: the posts of her channel's week, planned on Saturday evening, reviewed by the owner and her, sent at their
+ * hour. One row per post; a post removed in the review stays, its replacement points at it. `plan_key` makes the plan
+ * replayable (one row per day and window, `:r<n>` for a replacement). `draft` is `ChannelPostDraftSchema`, `review`
+ * `ChannelReviewSchema`, both parsed on write and on read. Agency data like the other telegram tables: RLS forced
+ * without a policy, revoked from `nirvana_app`; the routes check who asks, then go through `withAdmin`.
+ */
+/** Her channel's week job, in her creator (ADR 0087 lot c, `withTenantJob`); no account's session sets `app.job`. */
+const telegramChannelJob = (creatorId: PgColumn): SQL =>
+  sql`${creatorId} = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'telegram_channel'`;
+
+export const telegramChannelPosts = pgTable(
+  'telegram_channel_posts',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id, { onDelete: 'cascade' }),
+    /** Her Monday, and the day of the post, on her calendar. */
+    week: date('week', { mode: 'string' }).notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    planKey: text('plan_key').notNull(),
+    windowFrom: integer('window_from').notNull(),
+    windowUntil: integer('window_until').notNull(),
+    at: timestampTz('at').notNull(),
+    role: enumText('role').notNull(),
+    kind: enumText('kind').notNull(),
+    theme: enumText('theme').notNull(),
+    draft: jsonb('draft'),
+    /** A media of her library (content drops); no foreign key: the media module owns it, a missing one is skipped. */
+    mediaId: uuid('media_id'),
+    why: text('why'),
+    repost: boolean('repost').notNull().default(false),
+    state: enumText('state').notNull().default('planned'),
+    locked: boolean('locked').notNull().default(false),
+    review: jsonb('review'),
+    reviewedBy: text('reviewed_by').references(() => user.id, { onDelete: 'set null' }),
+    replacesId: uuid('replaces_id'),
+    reason: text('reason'),
+    /** Telegram's id of the message once sent, and when; the reactions read at 48 h and the link's clicks. */
+    telegramMessageId: bigint('telegram_message_id', { mode: 'number' }),
+    sentAt: timestampTz('sent_at'),
+    reactions: integer('reactions'),
+    clicks: integer('clicks'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    enumCheck('telegram_channel_posts', t.role, ChannelSlotRoleSchema.options),
+    enumCheck('telegram_channel_posts', t.kind, ChannelPlannedKindSchema.options),
+    enumCheck('telegram_channel_posts', t.theme, ChannelThemeSchema.options),
+    enumCheck('telegram_channel_posts', t.state, ChannelPostStateSchema.options),
+    check('telegram_channel_posts_week_check', sql`extract(isodow from ${t.week}) = 1`),
+    check(
+      'telegram_channel_posts_window_check',
+      sql`${t.windowFrom} between 0 and 1439 and ${t.windowUntil} between ${t.windowFrom} and 1439`,
+    ),
+    check('telegram_channel_posts_sent_check', sql`(${t.state} = 'sent') = (${t.sentAt} is not null)`),
+    unique('telegram_channel_posts_plan_key_unique').on(t.creatorId, t.planKey),
+    index('telegram_channel_posts_due_idx').on(t.state, t.at),
+    index('telegram_channel_posts_week_idx').on(t.creatorId, t.week),
+    // Her week's jobs and the owner's routes, one creator at a time under the app role (`withTenantJob`, job
+    // `telegram_channel`): read, planned, changed; never deleted (a removed post stays, its replacement points at it).
+    tenantJobRead('telegram_channel_read', t.creatorId, 'telegram_channel'),
+    pgPolicy('telegram_channel_insert', { for: 'insert', withCheck: telegramChannelJob(t.creatorId) }),
+    pgPolicy('telegram_channel_update', {
+      for: 'update',
+      using: telegramChannelJob(t.creatorId),
+      withCheck: telegramChannelJob(t.creatorId),
+    }),
+  ],
 );

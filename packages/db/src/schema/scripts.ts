@@ -38,7 +38,16 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { closedToCreator, createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
+import {
+  closedToCreator,
+  createdAt,
+  enumCheck,
+  enumText,
+  id,
+  tenantJobRead,
+  timestampTz,
+  updatedAt,
+} from './columns';
 import { creators, platformAccounts } from './tenancy';
 
 /**
@@ -392,6 +401,8 @@ export const platformScriptStepMedia = pgTable(
       for: 'select',
       using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
     }),
+    // Her channel's week leaves out a medium of a script (ADR 0162 § 5.2, ADR 0145).
+    tenantJobRead('telegram_channel_read', t.creatorId, 'telegram_channel'),
     closedToCreator(),
   ],
 );

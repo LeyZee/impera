@@ -100,6 +100,7 @@ export * from './team-members';
 export * from './announcements';
 export * from './telegram';
 export * from './telegram-channel';
+export * from './telegram-channel-week';
 export * from './trends';
 export * from './trophy-case';
 export * from './vault';

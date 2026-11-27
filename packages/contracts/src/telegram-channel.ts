@@ -15,8 +15,11 @@ import { TelegramChatIdSchema, TelegramMembershipSchema } from './telegram';
 
 /** ADR 0080 § 1.1: at most four posts a day. */
 export const CHANNEL_POSTS_PER_DAY_MAX = 4;
-/** ADR 0080 § 1.3: two slots of one day are three hours apart at least. */
-export const CHANNEL_SLOT_GAP_MINUTES = 180;
+/**
+ * ADR 0162 § 2.2 (replaces the three hours of ADR 0080 § 1.3): two posts of one day are two hours apart at least, the
+ * end of a window and the start of the next one too.
+ */
+export const CHANNEL_SLOT_GAP_MINUTES = 120;
 export const CHANNEL_SLOTS_MAX = 12;
 export const REDIRECT_LINKS_MAX = 20;
 /** ADR 0080 § 2.2: the preview window, from 15 minutes to 4 hours. */
@@ -40,7 +43,13 @@ export const CHANNEL_MAIN_MINUTE = 19 * 60;
  * days are kept sorted and distinct.
  */
 export const ChannelSlotSchema = z.object({
+  /** The start of its window, or its exact hour when `untilMinute` is null. */
   minute: MinuteOfDaySchema,
+  /**
+   * ADR 0162 § 2.1: the end of its window; the post's hour is drawn between `minute` and this when the week is
+   * planned. Null, or absent from a setting saved before: an exact hour.
+   */
+  untilMinute: MinuteOfDaySchema.nullable().optional(),
   role: ChannelSlotRoleSchema,
   days: z
     .array(IsoDaySchema)
@@ -127,6 +136,11 @@ export const TelegramChannelConfigSchema = z
     previewMinutes: z.number().int().min(CHANNEL_PREVIEW_MIN).max(CHANNEL_PREVIEW_MAX),
     /** ADR 0080 § 2.6: on, a post goes out at its hour unless stopped; off, it waits for « Valider ». */
     publishWithoutValidation: z.boolean(),
+    /**
+     * ADR 0162 (Sécurité, 21/11/2026): whether her week is sent at all. Off by default and for every channel saved
+     * before: the week is planned and written, nothing goes out until the owner switches it on (recent sign-in).
+     */
+    publishing: z.boolean().default(false),
     linkForm: ChannelLinkFormSchema,
     /** The words that carry the link when `linkForm` is `label`; never an address. */
     /** Kept while `linkForm` is `bare`, so that going back to `label` finds it; required only for `label`. */
@@ -160,9 +174,15 @@ export type TelegramChannelConfig = z.infer<typeof TelegramChannelConfigSchema>;
 /** 19 h every day, shown an hour before, out on its own (Charles, 07/11/2026 12h26). */
 export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
   chatId: null,
-  slots: [{ minute: CHANNEL_MAIN_MINUTE, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true }],
+  // ADR 0162 § 1.1 and § 2.1 (Charles, 21/11/2026): a morning and an afternoon post of engagement, the main one at night.
+  slots: [
+    { minute: 9 * 60, untilMinute: 11 * 60, role: 'engagement', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
+    { minute: 13 * 60, untilMinute: 15 * 60, role: 'engagement', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
+    { minute: 18 * 60, untilMinute: 21 * 60, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
+  ],
   previewMinutes: 60,
   publishWithoutValidation: true,
+  publishing: false,
   linkForm: 'label',
   linkLabel: 'Viens me parler ✨',
   links: [],

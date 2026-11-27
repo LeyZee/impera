@@ -1,6 +1,6 @@
 # Module `telegram`
 
-**Rôle.** Prévenir l'équipe dans des groupes Telegram de ce qui demande son attention : les alertes (passage à l'humain, plafond IA, session expirée, arrêt de l'agent), puis les ventes, les mots-clés et les validations quand leurs événements existeront. Les bots se créent et se gèrent depuis Réglages › Telegram (ADR 0020, fiche P3-07).
+**Rôle.** Prévenir l'équipe dans des groupes Telegram de ce qui demande son attention : les alertes (passage à l'humain, plafond IA, session expirée, arrêt de l'agent), puis les ventes, les mots-clés et les validations quand leurs événements existeront. Les bots se créent et se gèrent depuis Réglages › Bots Telegram (ADR 0020, fiche P3-07).
 
 **Peut dépendre de.** Aucun module. `packages/contracts` ; l'infra lit l'outbox `domain_events`, les créatrices (`creators`), le nom des utilisateurs (`user`) et celui des membres (`team_members.display_name`, pour « vendue par … ») en lecture seule, et parle à l'API Bot de Telegram.
 

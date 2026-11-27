@@ -31,6 +31,7 @@ import type {
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
+import { createChannelVisualsReader, type ChannelVisualsReader } from './infra/db/channel-visuals';
 import { dropsOfMedium, mediaOfDrop, type DropOfMedium } from './infra/db/described-drops';
 import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
@@ -138,6 +139,11 @@ export interface ContentDropsModule {
     scriptSteps(creatorId: string, reader: ContentReader, dropId: string): Promise<ScriptSteps | null>;
   };
   /**
+   * Her Telegram channel's visuals (ADR 0162 § 5.2), for the Telegram module's jobs through the composition root: the
+   * media it may send, public and never in a script nor sold, and their files. Read in her creator, under the app role.
+   */
+  readonly channelVisuals: ChannelVisualsReader;
+  /**
    * What the AI sends from her coffre (ADR 0163 § 7), for the agent: a voice or a whale gift not sent to this fan yet,
    * and the send noted once the platform confirmed it (replayable). Never a medium's key nor its address.
    */
@@ -203,6 +209,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
     name: 'content-drops',
+    channelVisuals: createChannelVisualsReader(deps.db, storage, scratchDir),
     routes: async (app) => {
       await app.register(
         createContentDropRoutes(

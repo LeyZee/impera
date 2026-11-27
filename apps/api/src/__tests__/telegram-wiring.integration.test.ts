@@ -52,11 +52,11 @@ describe('Telegram wired in the app', () => {
 
   it('gives the worker a task for every Telegram job of the contract', () => {
     const telegramJobs = JOB_NAMES.filter((name) => name.startsWith('telegram.'));
-    expect(telegramJobs).toHaveLength(8);
+    expect(telegramJobs).toHaveLength(10);
     expect(Object.keys(withKeys.tasks)).toEqual(expect.arrayContaining(telegramJobs));
   });
 
-  it('serves Réglages › Telegram to a signed-in owner only', async () => {
+  it('serves Réglages › Bots Telegram to a signed-in owner only', async () => {
     expect(withKeys.modules.telegram).not.toBeNull();
     const response = await server.inject({ method: 'GET', url: '/v1/settings/telegram' });
     expect(response.statusCode).toBe(401);

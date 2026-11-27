@@ -112,6 +112,18 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '*/10 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.connection_reminders'] },
   },
+  // ADR 0162: her channel's week, planned from Saturday 18 h, refreshed the day before at 18 h, written ahead.
+  {
+    task: 'telegram.channel_week',
+    match: '5 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.channel_week'] },
+  },
+  // Its posts at their drawn minute.
+  {
+    task: 'telegram.channel_send',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.channel_send'] },
+  },
   {
     task: 'telegram.purge',
     match: '30 3 * * *',

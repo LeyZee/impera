@@ -2,6 +2,7 @@ import type { TelegramMembership } from '@impera/contracts';
 import { z } from 'zod';
 
 import type { ChannelFailure, ChannelResult, ChannelUpdate, NotificationChannel } from '../domain/ports';
+import type { ChannelFile } from '../domain/week-ports';
 
 /**
  * The Telegram Bot API adapter (ADR 0020 §1, §5). The token sits in the URL (`/bot<token>/…`): nothing here logs
@@ -10,7 +11,7 @@ import type { ChannelFailure, ChannelResult, ChannelUpdate, NotificationChannel 
 
 export type PostLike = (
   url: string,
-  init: { method: 'POST'; headers: Record<string, string>; body: string; signal: AbortSignal },
+  init: { method: 'POST'; headers?: Record<string, string>; body: string | FormData; signal: AbortSignal },
 ) => Promise<{ readonly status: number; text(): Promise<string> }>;
 
 export interface TelegramApiOptions {
@@ -20,6 +21,21 @@ export interface TelegramApiOptions {
 }
 
 const CALL_TIMEOUT_MS = 10_000;
+/** A photo or a video of her channel, up to 50 MB, uploaded: more time than a text. */
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/** A post with its visual, as a multipart upload: the file's bytes, never an address of our storage (ADR 0162 § 5). */
+function uploadOf(
+  telegramChatId: string,
+  message: { readonly kind: 'photo' | 'video'; readonly file: ChannelFile; readonly html: string },
+): FormData {
+  const form = new FormData();
+  form.set('chat_id', telegramChatId);
+  form.set(message.kind, new Blob([message.file.bytes], { type: message.file.mime }), message.file.filename);
+  form.set('caption', message.html);
+  form.set('parse_mode', 'HTML');
+  return form;
+}
 
 const ErrorSchema = z.object({
   ok: z.literal(false),
@@ -189,16 +205,18 @@ export function createTelegramApi(options: TelegramApiOptions): NotificationChan
   async function call(
     token: string,
     method: string,
-    body: object,
+    body: object | FormData,
     timeoutMs = CALL_TIMEOUT_MS,
   ): Promise<Call> {
     let status: number;
     let text: string;
     try {
+      // A file goes as an upload (multipart, its boundary set by fetch); everything else as JSON.
       const response = await options.fetch(`${baseUrl}/bot${token}/${method}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        ...(body instanceof FormData
+          ? { body }
+          : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(timeoutMs),
       });
       status = response.status;
@@ -274,6 +292,35 @@ export function createTelegramApi(options: TelegramApiOptions): NotificationChan
               reply_parameters: { message_id: message.replyToMessageId, allow_sending_without_reply: true },
             }),
       });
+      if (!result.ok) return fail(result.failure);
+      const sent = SentSchema.safeParse(result.result);
+      return sent.success
+        ? { ok: true, value: { messageId: sent.data.message_id } }
+        : fail({ kind: 'unreachable' });
+    },
+    async publish(token, telegramChatId, message) {
+      // A post of her channel (ADR 0162): no link preview under a text, the caption in Telegram's HTML.
+      const result =
+        message.kind === 'text'
+          ? await call(token, 'sendMessage', {
+              chat_id: telegramChatId,
+              text: message.html,
+              parse_mode: 'HTML',
+              link_preview_options: linkPreview,
+            })
+          : message.kind === 'poll'
+            ? await call(token, 'sendPoll', {
+                chat_id: telegramChatId,
+                question: message.question,
+                options: message.options.map((text) => ({ text })),
+                is_anonymous: true,
+              })
+            : await call(
+                token,
+                message.kind === 'photo' ? 'sendPhoto' : 'sendVideo',
+                uploadOf(telegramChatId, message),
+                UPLOAD_TIMEOUT_MS,
+              );
       if (!result.ok) return fail(result.failure);
       const sent = SentSchema.safeParse(result.result);
       return sent.success

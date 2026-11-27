@@ -7,6 +7,16 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { TelegramApi } from './application/api';
 import { channelView, saveChannel } from './application/channel';
 import { tryChannelPost } from './application/channel-post';
+import {
+  applyGesture,
+  channelWeek,
+  planWeeks,
+  refreshEve,
+  sendDue,
+  validateWeek,
+  writeTexts,
+  type ChannelWeekDeps,
+} from './application/channel-week';
 import { connectionReminders } from './application/connections';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
@@ -49,7 +59,9 @@ import type {
   UsdRateReader,
 } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
+import type { ChannelVisualsSource, ChannelWeekStore } from './domain/week-ports';
 import { channelVoiceOf } from './infra/channel-voice';
+import { createChannelWeekStore } from './infra/channel-week.store';
 import { createPostgresChannelsStore } from './infra/channels.store';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
 import {
@@ -63,6 +75,7 @@ import { createTelegramApi } from './infra/telegram-api';
 
 export { SCANNED_EVENT_TYPES } from './domain/classify';
 export type { ChannelLinksSource, ChannelPersonaSource } from './domain/ports';
+export type { ChannelVisualsSource } from './domain/week-ports';
 
 export interface TelegramDeps {
   readonly bots: BotsStore;
@@ -89,6 +102,9 @@ export interface TelegramDeps {
   readonly usdRate?: UsdRateReader;
   /** ADR 0080 § 5: her persona and the voice that write her channel's posts; without them, nothing is written. */
   readonly channelWriter?: ChannelWriter;
+  /** ADR 0162: her channel's week and the visuals the code allows; without them, nothing is planned or sent. */
+  readonly channelWeek?: ChannelWeekStore;
+  readonly channelVisuals?: ChannelVisualsSource;
 }
 
 /** Her persona with her guards (from `agent`) and the gateway's voice, wired by the composition root. */
@@ -107,6 +123,10 @@ interface TelegramJobs {
   eveningDigest(): Promise<number>;
   connectionReminders(): Promise<number>;
   purge(): Promise<number>;
+  /** ADR 0162, hourly: plans the weeks, refreshes the day before, writes the texts ahead. */
+  channelWeek(): Promise<number>;
+  /** ADR 0162, each minute: the posts whose hour has come. */
+  channelSend(): Promise<number>;
 }
 
 export interface TelegramModule extends TelegramApi {
@@ -140,6 +160,24 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
   const links = deps.channelLinks === undefined ? {} : { links: deps.channelLinks };
   const writer = deps.channelWriter;
   const privateLinks = deps.privateLinks;
+  const weekDeps: ChannelWeekDeps | null =
+    channels === undefined ||
+    writer === undefined ||
+    deps.channelWeek === undefined ||
+    deps.channelVisuals === undefined
+      ? null
+      : {
+          bots: deps.bots,
+          channels,
+          ...links,
+          persona: writer.persona,
+          voice: channelVoiceOf(writer.gateway),
+          week: deps.channelWeek,
+          telegram: deps.channel,
+          visuals: deps.channelVisuals,
+        };
+  const withWeek = <T>(run: (week: ChannelWeekDeps) => Promise<T>): Promise<T> =>
+    weekDeps === null ? Promise.reject(new TelegramChannelsUnavailable()) : run(weekDeps);
   const linking: PrivateLinkApi = {
     issueCode: (userId) =>
       privateLinks === undefined ? Promise.resolve(null) : issueLinkCode({ ...base, privateLinks }, userId),
@@ -190,6 +228,11 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
               creatorId,
               body,
             ),
+    channelWeek: (creatorId, week) => withWeek((wd) => channelWeek(wd, creatorId, week)),
+    channelGesture: (creatorId, postId, gesture, reviewer) =>
+      withWeek((wd) => applyGesture(wd, creatorId, postId, gesture, reviewer, clock.now())),
+    validateChannelWeek: (creatorId, week, reviewer) =>
+      withWeek((wd) => validateWeek(wd, creatorId, week, reviewer, clock.now())),
   };
   return {
     ...api,
@@ -214,6 +257,14 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
           : eveningDigest({ ...base, salesDay: deps.salesDay }),
       connectionReminders: () => connectionReminders({ ...base, webOrigin: deps.webOrigin }),
       purge: () => purge(base),
+      channelWeek: async () => {
+        if (weekDeps === null) return 0;
+        const now = clock.now();
+        const planned = await planWeeks(weekDeps, now);
+        const emptied = await refreshEve(weekDeps, now);
+        return planned + emptied + (await writeTexts(weekDeps, now));
+      },
+      channelSend: () => (weekDeps === null ? Promise.resolve(0) : sendDue(weekDeps, clock.now())),
     },
     start: () => deps.resealTokens?.() ?? Promise.resolve({ rewritten: 0, unreadable: [] }),
     routes: (options) => createTelegramRoutes(api, options),
@@ -224,6 +275,8 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
 
 export interface TelegramStartOptions {
   readonly adminDb: Database;
+  /** The app role: her channel's week, one creator at a time (`withTenantJob`, ADR 0162). */
+  readonly db: Database;
   /** CREDENTIALS_ENCRYPTION_KEYS: the bot tokens are sealed with the AI service keys' encryption keys. */
   readonly encryptionKeys: string;
   readonly webOrigin: string;
@@ -235,6 +288,8 @@ export interface TelegramStartOptions {
   readonly usdRate: UsdRateReader;
   readonly channelWriter?: ChannelWriter;
   readonly channelLinks?: ChannelLinksSource;
+  /** ADR 0162: her visuals the code allows on her channel (the media module). */
+  readonly channelVisuals?: ChannelVisualsSource;
 }
 
 /** Builds the module on Postgres and the Telegram Bot API, and re-seals the tokens of a past rotation. */
@@ -248,6 +303,8 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     deliveries: store.deliveries,
     privateLinks: createPostgresPrivateLinksStore(options.adminDb),
     channels: createPostgresChannelsStore(options.adminDb),
+    channelWeek: createChannelWeekStore(options.db),
+    ...(options.channelVisuals !== undefined && { channelVisuals: options.channelVisuals }),
     channel: createTelegramApi({ fetch }),
     webOrigin: options.webOrigin,
     onUncovered: options.onUncovered,

@@ -136,15 +136,15 @@ afterEach(() => {
 const save = (): HTMLElement => screen.getByRole('button', { name: 'Enregistrer' });
 
 describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
-  it('says what keeps her posts in, and offers 19 h every day', async () => {
+  it('says what keeps her posts in, and offers her three windows every day (ADR 0162 § 2)', async () => {
     serve({});
     renderSection();
     expect(await screen.findByText('Son canal Telegram')).toBeDefined();
     const missing = screen.getByRole('list', { name: 'Ce qui empêche les posts de partir' });
     expect(within(missing).getAllByRole('listitem')).toHaveLength(2);
     const slots = screen.getByRole('list', { name: 'Créneaux' });
-    expect(within(slots).getAllByRole('listitem')).toHaveLength(1);
-    const days = within(slots).getByRole('group', { name: /^Jours du créneau de 19/u });
+    expect(within(slots).getAllByRole('listitem')).toHaveLength(3);
+    const days = within(slots).getByRole('group', { name: /^Jours du créneau de 18/u });
     expect(within(days).getAllByRole('button', { pressed: true })).toHaveLength(7);
     expect(save()).toHaveProperty('disabled', true);
   });
@@ -154,8 +154,8 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     renderSection();
     choose(await screen.findByRole('combobox', { name: 'Son canal' }), /Canal de Nora/u);
     fireEvent.click(screen.getByRole('button', { name: /Ajouter un créneau/u }));
-    // The new one, three hours after 19 h: 22 h, on weekdays only.
-    const second = within(screen.getByRole('list', { name: 'Créneaux' })).getAllByRole('listitem')[1];
+    // The new one, two hours after 18 h: 20 h, on weekdays only.
+    const second = within(screen.getByRole('list', { name: 'Créneaux' })).getAllByRole('listitem')[3];
     if (second === undefined) throw new Error('no second slot');
     for (const day of ['samedi', 'dimanche'])
       fireEvent.click(within(second).getByRole('button', { name: day }));
@@ -175,8 +175,8 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     const sent = SaveTelegramChannelBodySchema.parse(puts[0]).config;
     expect(sent.chatId).toBe(CHANNEL);
     expect(sent.slots).toEqual([
-      { minute: 1140, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true },
-      { minute: 1320, role: 'engagement', days: [1, 2, 3, 4, 5], enabled: true },
+      ...DEFAULT_TELEGRAM_CHANNEL_CONFIG.slots,
+      { minute: 1200, role: 'engagement', days: [1, 2, 3, 4, 5], enabled: true },
     ]);
     // The links go back as they were read: the server refuses a save that changes them.
     expect(sent.links).toEqual(LINKS);
@@ -207,7 +207,7 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     serve({});
     renderSection();
     fireEvent.click(await screen.findByRole('button', { name: /Ajouter un créneau/u }));
-    const role = screen.getByRole('combobox', { name: /^Rôle du créneau de 22/u });
+    const role = screen.getByRole('combobox', { name: /^Rôle du créneau de 20/u });
     expect(role.textContent).toContain('Engagement');
     choose(role, 'Principal');
     expect(screen.getByText('Un seul post principal par jour.')).toBeDefined();

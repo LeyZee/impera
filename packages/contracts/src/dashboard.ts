@@ -268,8 +268,8 @@ export const DashboardSchema = z.object({
     telegramAlertsTonight: count.nullable(),
   }),
   /**
-   * Whether a Telegram group gets her urgent alerts, as Réglages › Telegram computes it. Null when Telegram is off
-   * (no encryption key): the screen sends to Réglages › Telegram instead of saying no urgent alert gets through.
+   * Whether a Telegram group gets her urgent alerts, as Réglages › Bots Telegram computes it. Null when Telegram is off
+   * (no encryption key): the screen sends to Réglages › Bots Telegram instead of saying no urgent alert gets through.
    */
   telegramCoverage: z.object({ urgentReachable: z.boolean() }).nullable(),
   budget: z.object({

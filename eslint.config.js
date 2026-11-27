@@ -25,7 +25,8 @@ const MODULE_DEPENDENCIES = {
   supervision: ['conversations', 'fans'],
   playground: ['agent'],
   providers: [],
-  telegram: [],
+  // ADR 0162: her channel's week is planned on her calendar and wall-clock time (`scheduling/pure.ts`).
+  telegram: ['scheduling'],
   team: [],
   backups: [],
   // EQ-18: the owner's journal reads `audit_log` and the names it shows; it imports no module.

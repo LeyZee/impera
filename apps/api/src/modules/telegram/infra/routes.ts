@@ -1,4 +1,12 @@
 import {
+  ChannelGestureRefusalBodySchema,
+  ChannelPlannedPostIdSchema,
+  ChannelPlannedPostSchema,
+  ChannelPostGestureSchema,
+  ChannelWeekQuerySchema,
+  ChannelWeekSchema,
+  TELEGRAM_CHANNEL_GESTURE_REFUSED,
+  type ChannelGestureRefusalKind,
   ChannelTryRefusalBodySchema,
   CreatorIdSchema,
   RefusalError,
@@ -51,6 +59,17 @@ export interface TelegramRoutesOptions {
 const BotParamsSchema = z.object({ id: TelegramBotIdSchema });
 const ChatParamsSchema = z.object({ id: TelegramChatIdSchema });
 const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
+const PostParamsSchema = z.object({ creatorId: CreatorIdSchema, postId: ChannelPlannedPostIdSchema });
+
+const GESTURE_REFUSALS: Readonly<Record<ChannelGestureRefusalKind, string>> = {
+  too_late: 'Son heure est passée : il est parti ou il part.',
+  not_planned: 'Il n’attend plus : il est parti, a été retiré ou sauté.',
+  no_other_visual: 'Il n’y a pas d’autre visuel permis pour ce post.',
+  not_a_text: 'Un sondage se réécrit, il ne se modifie pas à la main.',
+  llm_unavailable: 'Aucun modèle n’a répondu, ou le budget du jour est atteint. Réessaie plus tard.',
+  guarded:
+    'Ce texte ne passe pas les règles du canal (ses limites, une adresse, une fausse rareté, trop long) : corrige-le.',
+};
 
 const TRY_REFUSALS: Readonly<Record<ChannelTryRefusalKind, string>> = {
   no_persona: 'Elle n’a pas de persona active : active une version dans Créatrices › Persona.',
@@ -259,6 +278,74 @@ export function createTelegramRoutes(
           throw new RefusalError(TELEGRAM_CHANNEL_TRY_REFUSED, {
             kind: result.error,
             message: TRY_REFUSALS[result.error],
+          });
+        }
+        return result.value;
+      },
+    );
+
+    // ADR 0162: « Ma semaine à valider », the owner's side. Her own side comes with her screen.
+    app.get(
+      '/creators/:creatorId/telegram-channel/week',
+      {
+        schema: {
+          params: CreatorParamsSchema,
+          querystring: ChannelWeekQuerySchema,
+          response: { 200: ChannelWeekSchema },
+        },
+      },
+      async (request) => {
+        const week = await telegram.channelWeek(request.params.creatorId, request.query.week);
+        if (week === null) throw new TelegramChannelCreatorNotFound();
+        return week;
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/telegram-channel/week/validate',
+      {
+        schema: {
+          params: CreatorParamsSchema,
+          body: ChannelWeekQuerySchema,
+          response: { 200: z.object({ validated: z.number().int().nonnegative() }) },
+        },
+      },
+      async (request) => {
+        if (request.user === null) throw new Error('requireRole ran without a user');
+        const reviewer = { userId: request.user.id, name: request.user.name };
+        return {
+          validated: await telegram.validateChannelWeek(
+            request.params.creatorId,
+            request.body.week,
+            reviewer,
+          ),
+        };
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/telegram-channel/posts/:postId',
+      {
+        schema: {
+          params: PostParamsSchema,
+          body: ChannelPostGestureSchema,
+          response: { 200: ChannelPlannedPostSchema, 400: ChannelGestureRefusalBodySchema },
+        },
+      },
+      async (request) => {
+        if (request.user === null) throw new Error('requireRole ran without a user');
+        const reviewer = { userId: request.user.id, name: request.user.name };
+        const result = await telegram.channelGesture(
+          request.params.creatorId,
+          request.params.postId,
+          request.body,
+          reviewer,
+        );
+        if (result === null) throw new TelegramChannelCreatorNotFound();
+        if (!result.ok) {
+          throw new RefusalError(TELEGRAM_CHANNEL_GESTURE_REFUSED, {
+            kind: result.error,
+            message: GESTURE_REFUSALS[result.error],
           });
         }
         return result.value;

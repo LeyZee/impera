@@ -118,6 +118,8 @@ export const JOB_NAMES = [
   'telegram.evening_digest',
   'telegram.connection_reminders',
   'telegram.purge',
+  'telegram.channel_week',
+  'telegram.channel_send',
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -205,6 +207,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'telegram.evening_digest': 'Résumé Telegram du soir',
   'telegram.connection_reminders': 'Rappels de connexion Telegram',
   'telegram.purge': 'Nettoyage de Telegram',
+  'telegram.channel_week': 'Semaine du canal Telegram',
+  'telegram.channel_send': 'Posts du canal Telegram',
 };
 
 /**
@@ -770,6 +774,10 @@ export const JOB_MAX_ATTEMPTS = {
   // Every 10 minutes: the next run is the retry, the reminder's key keeps it once (P3-12).
   'telegram.connection_reminders': 1,
   'telegram.purge': 1,
+  // Each hour (ADR 0162): plans, refreshes and writes; replayable by its keys, the next run is the retry.
+  'telegram.channel_week': 1,
+  // Each minute: a post leaves `planned` before Telegram is called, so a retry never sends it twice.
+  'telegram.channel_send': 1,
 } as const satisfies Record<JobName, number>;
 
 /**
@@ -843,6 +851,7 @@ export const TenantJobSchema = z.enum([
   'media_insights',
   'link_hours',
   'drop_media',
+  'telegram_channel',
   'creator_decisions',
 ]);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

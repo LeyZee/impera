@@ -37,6 +37,17 @@ export function tenantPolicy(creatorId: PgColumn) {
  * Same, plus reading the rows that belong to nobody (global kill switch). A tenant reads them but never writes,
  * changes or removes one: a global row is written only with `withAdmin` (`pnpm ops:kill-switch`), revue 09.
  */
+/**
+ * A read for one background job in its creator (ADR 0087 lot c, `withTenantJob`): the creator of the transaction and
+ * the job's name, which no account's session sets. The name is one of `TenantJobSchema` (contracts).
+ */
+export function tenantJobRead(name: string, creatorId: PgColumn, job: string) {
+  return pgPolicy(name, {
+    for: 'select',
+    using: sql`${creatorId} = ${currentCreator} and nullif(current_setting('app.job', true), '') = ${sql.raw(`'${job}'`)}`,
+  });
+}
+
 export function tenantOrGlobalPolicy(creatorId: PgColumn) {
   return [
     tenantPolicy(creatorId),
