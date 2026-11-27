@@ -1,7 +1,5 @@
 import type { CreatorId, FanId } from '@impera/contracts';
 
-import type { TelegramNight } from '@/settings/telegram/NightBanner';
-
 /**
  * What the Dashboard shows, in the shape the screen needs: `GET /v1/dashboard` written in French (`live.ts`). Nothing
  * stands in for it: before any creator, the screen asks for one (DASH-13).
@@ -178,8 +176,6 @@ export interface Dashboard {
    * left out for want of one (`usdNote`). Absent when no dollar sale falls in the period, and on sample data.
    */
   readonly usdNote?: string;
-  /** Telegram's coverage of her night (`telegramNightOf`); absent on sample data. */
-  readonly telegram?: TelegramNight;
   /** What is the agency's, not hers: said once, apart from her agent's health (`AgencyStrip`). */
   readonly agency: AgencyState;
 }

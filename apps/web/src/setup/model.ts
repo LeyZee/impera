@@ -29,7 +29,7 @@ export type SetupTarget =
         | '/reglages/facturation'
         | '/reglages/ventes'
         | '/reglages/regles-de-paie'
-        | '/reglages/telegram'
+        | '/notifications'
         | '/equipe/planning'
         | '/equipe/reveal'
         | '/aide/extension';
@@ -63,10 +63,11 @@ const accounts = (note: SetupNote | null): string | null =>
 function scriptsHint(day: number, night: number): string {
   const count = (n: number, when: string) => `${String(n)} ${n > 1 ? 'scripts' : 'script'} de ${when}`;
   if (day > 0 && night > 0) return `${count(day, 'jour')} et ${count(night, 'nuit')} prêts dans Reveal.`;
-  if (day === 0 && night === 0) return 'Aucun script prêt dans Reveal : l’agent n’a rien à proposer.';
+  if (day === 0 && night === 0)
+    return 'Aucun script prêt dans Reveal : l’agent discute, mais n’a rien à vendre.';
   return day === 0
-    ? 'Aucun script de jour prêt dans Reveal : l’agent n’a rien à proposer le jour.'
-    : 'Aucun script de nuit prêt dans Reveal : l’agent n’a rien à proposer la nuit.';
+    ? 'Aucun script de jour prêt dans Reveal : l’agent n’a rien à vendre le jour.'
+    : 'Aucun script de nuit prêt dans Reveal : l’agent n’a rien à vendre la nuit.';
 }
 
 export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupStep[]): SetupLine[] {
@@ -145,15 +146,15 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
                 .join(' · '),
           { kind: 'page', to: '/reglages/regles-de-paie' },
         );
-      case 'telegram':
+      case 'night_alerts':
         return line(
-          'Un groupe Telegram pour ses alertes',
-          note?.kind === 'telegram_off'
-            ? 'Telegram n’est pas branché : personne n’est prévenu la nuit.'
+          'Un téléphone qui sonne la nuit pour ses urgences',
+          note?.kind === 'push_off'
+            ? 'Les notifications ne sont pas branchées sur ce serveur : personne n’est prévenu la nuit.'
             : done
               ? null
-              : 'Aucun groupe ne reçoit ses alertes urgentes : personne n’est prévenu la nuit.',
-          { kind: 'page', to: '/reglages/telegram' },
+              : 'Aucun propriétaire n’a activé les notifications sur un appareil : personne n’est prévenu la nuit.',
+          { kind: 'page', to: '/notifications' },
         );
       case 'agent_hours':
         return line(

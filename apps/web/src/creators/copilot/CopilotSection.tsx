@@ -79,7 +79,7 @@ function headline(
   return {
     text: switches.fanCard
       ? `Brouillons éteints\u00a0: les chatteurs de ${name} écrivent seuls, avec la fiche du fan.`
-      : `Copilote éteint\u00a0: les chatteurs de ${name} n’ont ni fiche ni brouillon dans l’extension.`,
+      : `Rien d’allumé\u00a0: les chatteurs de ${name} n’ont ni fiche ni brouillon.`,
     tone: 'off',
   };
 }

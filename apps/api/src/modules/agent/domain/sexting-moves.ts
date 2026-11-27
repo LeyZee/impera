@@ -108,3 +108,15 @@ const OTHER_WOMAN =
 export function mentionsOtherWoman(fanText: string): boolean {
   return OTHER_WOMAN.test(normalise(fanText));
 }
+
+// He wants more than her script sends him (Charles 27/11): a cam, a video made for him, something else to see, further.
+const MADE_FOR_HIM =
+  /\b(cams?|webcam|visio|facetime|en (live|direct)|personnalisee?s?|perso|sur mesure|rien que pour moi|juste pour moi|pour moi tout seul|faite? pour moi|voir autre chose|autre chose que (tes|les|ces) (videos?|photos?|medias?)|(aller|va|allons|on va) plus loin)\b/;
+
+/**
+ * He says he wants something her script does not send (Charles 27/11): a cam, a video made for him, something other
+ * than her videos, to go further. Read on the normalised text; in the middle of her script, once he bought a step.
+ */
+export function wantsMadeForHim(fanText: string): boolean {
+  return MADE_FOR_HIM.test(normalise(fanText));
+}

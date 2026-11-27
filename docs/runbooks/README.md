@@ -12,4 +12,5 @@ Procédures d'exploitation, écrites pour être suivies sous stress, par quelqu'
 | `reveal-capture-express.md` | La capture Reveal en une page, pour Charles |
 | `reveal-recording.md` | Capturer une session Reveal (HAR) et l'anonymiser avant de la partager (phase 1) |
 | `session-expired.md` | La session Reveal est expirée ou invalide |
-| `telegram.md` | Une notification Telegram arrive, ou n'arrive plus |
+| `alerts.md` | Une alerte de l'agence sonne, ou rien ne sonne la nuit ; un mot de passe oublié |
+| `telegram.md` | Un post du canal Telegram d'une créatrice ne part plus |

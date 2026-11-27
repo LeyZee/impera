@@ -49,7 +49,7 @@ describe('exportViewOf', () => {
     expect(exportViewOf(status(), NOW, PARIS)).toEqual({
       tone: 'ok',
       title: 'Sauvegardée le 27 octobre à 3\u00a0h\u00a012',
-      text: 'Chaque copie est gardée 30\u00a0jours. Après 26\u00a0h sans copie réussie, le Dashboard et Telegram te préviennent.',
+      text: 'Chaque copie est gardée 30\u00a0jours. Après 26\u00a0h sans copie réussie, le Dashboard et une notification te préviennent.',
       lastRun:
         'Dernière tentative réussie le 27 octobre, en 3\u00a0min\u00a030\u00a0s, 42,4\u00a0Mo chiffrés.',
     });

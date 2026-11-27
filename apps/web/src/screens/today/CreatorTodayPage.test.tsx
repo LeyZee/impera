@@ -279,6 +279,49 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     expect(send === null ? null : hero?.compareDocumentPosition(send)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  it('says her essentials once: no third card when nothing else is at the agenda (audit 27/11)', async () => {
+    const essential = (item: string, label: string) => ({
+      item,
+      platform: 'reveal',
+      label,
+      sheet: `${label} : une phrase.`,
+      target: 1,
+      done: 0,
+      essential: true,
+      // Her video of the day is done by her coffre (ADR 0140, avenant du 27/11).
+      source: item === 'reveal_video' ? 'drop' : 'tick',
+    });
+    const agenda = agendaOf({ tasks: [], suggestions: [] });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(
+          url === '/v1/creator-space/on-duty'
+            ? Response.json({ current: [], next: [] })
+            : url.startsWith('/v1/creator-space/agenda?')
+              ? Response.json(agenda)
+              : url === '/v1/creator-space/day'
+                ? Response.json({
+                    day: agenda.today,
+                    today: agenda.today,
+                    lines: [
+                      essential('reveal_video', 'Ta vidéo du jour sur Reveal'),
+                      essential('insta_cta_story', 'Ta story qui mène à Reveal'),
+                    ],
+                  })
+                : new Response('null', { status: 404 }),
+        ),
+      ),
+    );
+    show();
+    expect((await screen.findAllByText('Ta vidéo du jour sur Reveal')).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Ta journée' })).toBeNull();
+    });
+    expect(screen.queryByText(/juste au-dessus/u)).toBeNull();
+    expect(screen.queryByText(/puis tes chiffres/u)).toBeNull();
+  });
+
   it('counts what the agency waits on her for, and takes her to her week to answer', async () => {
     serve({ current: [], next: [] }, 200, agendaOf());
     show();

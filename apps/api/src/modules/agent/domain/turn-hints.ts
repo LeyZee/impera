@@ -23,6 +23,7 @@ import {
   CLOSE_TO_COMING_HINT,
   COMPLIMENT_HINT,
   CUSTOM_INSTEAD_HINT,
+  CUSTOM_MID_SCRIPT_HINT,
   DEGRADING_FROM_HIM_HINT,
   DISAPPOINTED_MEDIA_HINT,
   EXPLICIT_PHOTO_HINTS,
@@ -238,7 +239,11 @@ export function toneHintsOfTurn(facts: TurnHintFacts): string[] {
     ...(sexting.holdsBack ? [CLOSE_TO_COMING_HINT] : []),
     ...(sexting.gauge ? [GAUGE_HINT] : []),
     ...(sexting.projection ? [PROJECTION_HINT] : []),
-    ...(sexting.suggestsCustom ? [CUSTOM_INSTEAD_HINT] : []),
+    ...(sexting.customMidScript && !facts.moreTonight
+      ? [CUSTOM_MID_SCRIPT_HINT]
+      : sexting.suggestsCustom
+        ? [CUSTOM_INSTEAD_HINT]
+        : []),
     ...(sexting.opensItHerself ? [ONE_NOTCH_HINT] : []),
     ...(register === null ? [] : [REGISTER_HINTS[register]]),
     ...(register !== null && running !== null ? [NOT_SHOWN_YET_HINT] : []),

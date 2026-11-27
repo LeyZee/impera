@@ -45,6 +45,22 @@ describe('fromApi', () => {
     expect(hero.lead).toBe('Aucun modèle IA n’a répondu : 3 fans attendent un chatteur.');
   });
 
+  it('names an outage over « IA de retour », never « IA indisponible » above « L’IA répond de nouveau » (audit 27/11)', () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const back = (n: number): DashboardTodo => ({
+      ...first,
+      tone: 'warn',
+      kind: 'llm_unavailable',
+      voiceBack: true,
+      id: `back-${String(n)}`,
+      waitingMinutes: 10 + n,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000030${String(n)}`),
+    });
+    const { todos } = fromApi(apiDashboard({ todos: [back(1), back(2)] }));
+    expect(todos.map((t) => [t.kind, t.tone])).toEqual([['IA de retour', 'warn']]);
+  });
+
   it('writes the todos in the trade’s words, how long they wait, the hour at her time (DASH-11, DASH-26)', () => {
     const [todo] = fromApi(apiDashboard()).todos;
     expect(todo).toMatchObject({ kind: 'Mineur possible', title: 'Kévin', tone: 'bad' });
@@ -91,13 +107,10 @@ describe('fromApi', () => {
     expect(card('reveal')?.rows[0]).toEqual(['Dernière lecture', 'il y a 14 s']);
   });
 
-  it('lists only the handoffs that happened, and says when Telegram is off (DASH-16)', () => {
+  it('lists only the handoffs that happened, and says the team is told by notification (DASH-16)', () => {
     expect(card('relays')?.title).toBe('Passages à l’humain');
-    expect(card('relays')?.sub).toBe('Telegram éteint');
-    expect(card('relays')?.rows).toEqual([
-      ['Mineur possible', '1'],
-      ['Alertes Telegram cette nuit', 'Telegram éteint'],
-    ]);
+    expect(card('relays')?.sub).toBe('l’équipe est prévenue par notification');
+    expect(card('relays')?.rows).toEqual([['Mineur possible', '1']]);
   });
 
   it('counts only the guards, never a relay for the AI budget, a voice down, no active persona or no named reason', () => {
@@ -122,7 +135,6 @@ describe('fromApi', () => {
     expect(card('relays', data)?.rows.map(([label]) => label)).toEqual([
       'Mineur possible',
       'Alerte personnalisée',
-      'Alertes Telegram cette nuit',
     ]);
     expect(data.agent.foldSummary).toContain('2 passages à l’humain');
     expect(flat(data.agent.foldSummary)).toContain('64,5 % validés sans retouche, objectif 80 %');
@@ -162,12 +174,6 @@ describe('fromApi', () => {
       'Europe/Paris',
     ).creator.now.replace(/\s/gu, ' ');
     expect(now).toBe('dimanche 1er novembre, 14 h');
-  });
-
-  it('hands Telegram’s night coverage to the banner, off included', () => {
-    expect(fromApi(apiDashboard()).telegram).toEqual({ coverage: null });
-    const uncovered = apiDashboard({ telegramCoverage: { urgentReachable: false } });
-    expect(fromApi(uncovered).telegram).toEqual({ coverage: { urgentReachable: false } });
   });
 
   it('makes no sale up', () => {

@@ -36,13 +36,19 @@ describe('« Mise en route » words', () => {
     expect(extension?.verb).toBe('Le guide');
   });
 
-  it('says the mode in force, and Telegram off', () => {
-    const [mode, telegram] = creatorLines(ANNA, [
+  it('says the mode in force, and the notifications off', () => {
+    const [mode, night, none] = creatorLines(ANNA, [
       { key: 'agent_mode', state: 'done', note: { kind: 'agent_mode', mode: 'copilot' } },
-      { key: 'telegram', state: 'todo', note: { kind: 'telegram_off' } },
+      { key: 'night_alerts', state: 'todo', note: { kind: 'push_off' } },
+      { key: 'night_alerts', state: 'todo', note: null },
     ]);
     expect(mode?.hint).toBe('Copilote');
-    expect(telegram?.hint).toBe('Telegram n’est pas branché : personne n’est prévenu la nuit.');
+    expect(night?.hint).toBe(
+      'Les notifications ne sont pas branchées sur ce serveur : personne n’est prévenu la nuit.',
+    );
+    expect(none?.hint).toBe(
+      'Aucun propriétaire n’a activé les notifications sur un appareil : personne n’est prévenu la nuit.',
+    );
   });
 
   it('takes the agency’s share read at Reveal for the percentage, or asks for one of the two (ADR 0054 § 7)', () => {
@@ -62,8 +68,8 @@ describe('« Mise en route » words', () => {
       { key: 'scripts', state: 'todo', note: { kind: 'scripts', day: 0, night: 0 } },
     ]);
     expect(both?.hint).toBe('1 script de jour et 2 scripts de nuit prêts dans Reveal.');
-    expect(night?.hint).toBe('Aucun script de nuit prêt dans Reveal : l’agent n’a rien à proposer la nuit.');
-    expect(none?.hint).toBe('Aucun script prêt dans Reveal : l’agent n’a rien à proposer.');
+    expect(night?.hint).toBe('Aucun script de nuit prêt dans Reveal : l’agent n’a rien à vendre la nuit.');
+    expect(none?.hint).toBe('Aucun script prêt dans Reveal : l’agent discute, mais n’a rien à vendre.');
     expect(both?.target).toEqual({ kind: 'sheet', sheet: 'scripts', creatorId: ANNA });
     const [grid] = creatorLines(ANNA, [{ key: 'custom_prices', state: 'todo', note: null }]);
     expect(grid?.target).toEqual({ kind: 'sheet', sheet: 'custom', creatorId: ANNA });

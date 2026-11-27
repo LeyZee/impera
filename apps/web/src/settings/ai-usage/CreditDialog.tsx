@@ -141,9 +141,9 @@ export function CreditDialog({
         <Chips label="Ce que tu notes" value={kind} options={KINDS} onChange={setKind} />
         {isPlan ? (
           <p className="tm-hint">
-            Les appels passent sur le quota de ton abonnement : rien à décompter, Telegram te prévient s’il
-            est épuisé. Le quota se lit dans {USAGE_HINT[provider]} ; une recharge notée plus tard reprend le
-            décompte.
+            Les appels passent sur le quota de ton abonnement : rien à décompter, une notification te prévient
+            s’il est épuisé. Le quota se lit dans {USAGE_HINT[provider]} ; une recharge notée plus tard
+            reprend le décompte.
           </p>
         ) : (
           <>

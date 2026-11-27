@@ -89,7 +89,10 @@ export const CopilotNextMoveKindSchema = z.enum([
 ]);
 export type CopilotNextMoveKind = z.infer<typeof CopilotNextMoveKindSchema>;
 
-/** § 2: why the sale is blocked (the code's offer blocks). */
+/**
+ * § 2: why the sale is blocked (the code's offer blocks): the policy's, and his orgasm, after which nothing is sold that
+ * evening (ADR 0156 § 6).
+ */
 export const CopilotSaleBlockSchema = z.enum([
   'do_not_contact',
   'risk',
@@ -97,7 +100,9 @@ export const CopilotSaleBlockSchema = z.enum([
   'age_unconfirmed',
   'no_budget',
   'cooldown',
+  'after_purchase',
   'low_desire',
+  'he_came',
 ]);
 export type CopilotSaleBlock = z.infer<typeof CopilotSaleBlockSchema>;
 

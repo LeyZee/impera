@@ -86,6 +86,9 @@ export const DROP_OUTPUTS: readonly {
   },
 ];
 
+/** Every tile of her Contenu, in their order: what `?depot=` may open (recette MOD-06). */
+export const DROP_TILES: readonly DropCategory[] = DROP_OUTPUTS.flatMap((output) => output.categories);
+
 /** The extensions a browser may give no type for (MKV often), read as the type they are (ADR 0070 § 2). */
 const MIME_BY_EXTENSION: Readonly<Record<string, DropMime>> = {
   jpg: 'image/jpeg',
@@ -508,6 +511,12 @@ export function lengthOf(ms: number): string {
   const seconds = Math.max(1, Math.round(ms / 1000));
   if (seconds < 60) return `${String(seconds)} s`;
   return `${String(Math.floor(seconds / 60))} min ${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/** « 0:08 », « 1:05 »: a video's length on its thumbnail's corner, as her phone's gallery writes it (Charles, 27/11). */
+export function clockOf(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 /**

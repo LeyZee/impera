@@ -18,6 +18,17 @@ import { Panel, PanelSection } from '@/shell/layout';
 /** Three browsers at most (`EXTENSION_LINKS_LIVE_MAX` on the server). */
 export const EXTENSION_LINKS_MAX = 3;
 
+/**
+ * The panel's title is its answer, how many browsers are linked; the gesture keeps « Relier l’extension » (avis Design
+ * du 27/11: the same words were said three times, the state in small).
+ */
+export function linksTitle(links: readonly ExtensionLink[] | null): string {
+  if (links === null) return 'Navigateurs reliés';
+  if (links.length === 0) return 'Aucun navigateur relié';
+  const count = links.length === 1 ? '1 navigateur relié' : `${String(links.length)} navigateurs reliés`;
+  return `${count} sur ${String(EXTENSION_LINKS_MAX)}`;
+}
+
 /** « 21 novembre », « 1er décembre »: the long day of the rest of the app, never « 21/11/2026 » (recette CHAT-12). */
 const LINKED_ON = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 const linkedOnText = (at: string): string => withFirstOfMonth(LINKED_ON.formatToParts(new Date(at)));
@@ -127,7 +138,7 @@ export function ExtensionLinksPanel({ watches }: { readonly watches: boolean }):
   const full = links !== null && links.length >= EXTENSION_LINKS_MAX;
 
   return (
-    <Panel title="Relier l’extension" eyebrow="Extension Impera">
+    <Panel title={linksTitle(links)} eyebrow="Extension Impera">
       <PanelSection>
         <p className={MUTED}>
           {watches
@@ -141,9 +152,7 @@ export function ExtensionLinksPanel({ watches }: { readonly watches: boolean }):
           </p>
         ) : links === null ? (
           <p className={MUTED}>Chargement…</p>
-        ) : links.length === 0 ? (
-          <p className="text-sm">Aucun navigateur relié.</p>
-        ) : (
+        ) : links.length === 0 ? null : (
           <ul
             className="mt-2 flex flex-col divide-y divide-[var(--nv-hairline)]"
             aria-label="Navigateurs reliés"
@@ -309,7 +318,8 @@ export function ExtensionLinksPanel({ watches }: { readonly watches: boolean }):
                 setNotice(null);
               }}
             >
-              Relier un navigateur
+              {/* The guide's and the welcome's word (recette navigation du 27/11, CH-01). */}
+              Relier l’extension
             </button>
           )}
           <p className="text-sm empty:hidden" aria-live="polite">
@@ -333,8 +343,9 @@ function CreatedCode({
   return (
     <PanelSection label={`Code pour ${created.label}`}>
       <p className="text-sm">
-        Ouvre l’extension Impera dans ce navigateur, choisis «&nbsp;Relier&nbsp;» et colle ce code. Il ne sera
-        plus affiché&nbsp;: perdu, relie ce navigateur de nouveau.
+        Dans ce navigateur, ouvre Reveal, clique l’icône Impera et colle ce code dans la carte
+        «&nbsp;Copilote&nbsp;», puis «&nbsp;Relier&nbsp;». Il ne sera plus affiché&nbsp;: perdu, relie ce
+        navigateur de nouveau.
       </p>
       <code
         ref={shown}

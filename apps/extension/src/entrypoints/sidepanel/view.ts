@@ -124,6 +124,13 @@ export type DraftPart =
   | {
       readonly kind: 'ready';
       readonly bubbles: readonly string[];
+      /**
+       * Her draft in French, one bubble per bubble of hers, when she writes to him in another language (ADR 0168 § 9);
+       * null in French. Read by the chatter, never copied nor sent.
+       */
+      readonly translation: readonly string[] | null;
+      /** The translation unfolded: folded by default, then as he left it. */
+      readonly translationOpen: boolean;
       /** Placed in Reveal by a chatter, waiting for what leaves (§ 5). */
       readonly placed: boolean;
       /** Still waiting in the CRM: a gesture that did not count may be counted again (EXT-06). */
@@ -139,6 +146,8 @@ export interface PanelActions {
   readonly openCrm: () => void;
   readonly pickTab: (tab: PanelTab) => void;
   readonly toggleDiscover: (open: boolean) => void;
+  /** The French of a draft in another language, unfolded or folded. */
+  readonly toggleTranslation: (open: boolean) => void;
   /** « +N »: the signals past the first three badges. */
   readonly showSignals: () => void;
   /** `a`, or the retouched text with `e` (§ 4). */
@@ -1095,6 +1104,30 @@ const rowsOf = (text: string): number =>
     ),
   );
 
+/**
+ * Under a draft that is not in French, its French, folded (ADR 0168 § 9): one muted line that opens plain lines, never
+ * bubbles, so nothing there looks like a text to place.
+ */
+function translationFold(lines: readonly string[], open: boolean, actions: PanelActions): HTMLElement {
+  const details = h(
+    'details',
+    { class: 'cp-discover cp-translation', 'data-group': 'translation', open },
+    h(
+      'summary',
+      {},
+      h('span', { class: 'cp-line-icon', 'aria-hidden': 'true' }, icon('languages', 16)),
+      h('span', {}, 'Traduction en français'),
+      h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+    ),
+    h('ol', { class: 'cp-translation__lines' }, ...lines.map((line) => h('li', {}, line))),
+    h('p', { class: 'cp-translation__note' }, 'Pour toi seulement : c’est le brouillon du dessus qui part.'),
+  );
+  details.addEventListener('toggle', () => {
+    actions.toggleTranslation(details.open);
+  });
+  return details;
+}
+
 /** What « où on en est » forbids, as the draft reads it. */
 interface DraftStops {
   readonly withheld: Withheld | null;
@@ -1193,6 +1226,11 @@ function draftPart(
         : h('li', { class: 'cp-bubble' }, bubble),
     ),
   );
+  // Only next to the text it translates: a retouched or already used draft shows none.
+  const french =
+    draft.translation === null || draft.done !== null || draft.translation.length !== shown.length
+      ? null
+      : translationFold(draft.translation, draft.translationOpen, actions);
   if (draft.mode === 'rejecting') {
     const note = h('input', {
       type: 'text',
@@ -1206,6 +1244,7 @@ function draftPart(
     section.append(
       head,
       bubbles,
+      ...(french === null ? [] : [french]),
       h('p', { class: 'cp-draft__hint', id: 'cp-reject-question' }, 'Pourquoi tu le refuses ?'),
       h(
         'div',
@@ -1248,7 +1287,7 @@ function draftPart(
     );
     return section;
   }
-  section.append(head, bubbles);
+  section.append(head, bubbles, ...(french === null ? [] : [french]));
   if (draft.done !== null) {
     section.append(...doneLines(draft.done, salePrice, draft.pending));
     return section;
