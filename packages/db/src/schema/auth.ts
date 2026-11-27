@@ -26,6 +26,12 @@ export const user = pgTable(
       .default(sql`'{}'::uuid[]`),
     /** A verified authenticator code (ADR 0046 § 1); `false` until the first code is confirmed. */
     twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+    /**
+     * The first steps of an account, kept here so that a reload does not skip them: when its backup codes were said
+     * kept, and when its welcome was seen. `null` until then, whatever the device.
+     */
+    backupCodesKeptAt: tz('backup_codes_kept_at'),
+    welcomedAt: tz('welcomed_at'),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
   },

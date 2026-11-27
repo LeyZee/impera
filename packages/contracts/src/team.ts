@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { CurrentUserSchema, type UserRole } from './auth';
+import { CurrentUserSchema, FirstStepsSchema, type UserRole } from './auth';
 
 /** What a member does in the team (ADR 0023): distinct from the access role, which stays `operator` for both. */
 export const TEAM_ROLES = ['chatter', 'manager'] as const;
@@ -336,6 +336,11 @@ export type Me = z.infer<typeof MeSchema>;
 export const DashboardSessionSchema = z.discriminatedUnion('state', [
   z.object({ state: z.literal('signed_out') }),
   z.object({ state: z.literal('second_factor_required') }),
-  z.object({ state: z.literal('signed_in'), me: MeSchema }),
+  z.object({
+    state: z.literal('signed_in'),
+    me: MeSchema,
+    /** Both done when the answer does not say (a page older than the server never asks twice). */
+    firstSteps: FirstStepsSchema.default({ codesKept: true, welcomed: true }),
+  }),
 ]);
 export type DashboardSession = z.infer<typeof DashboardSessionSchema>;

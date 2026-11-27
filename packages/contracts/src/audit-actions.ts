@@ -253,6 +253,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
   }),
   'auth.session_closed': access('a fermé une de ses sessions'),
   'auth.backup_codes_regenerated': access('a régénéré ses codes de secours'),
+  'auth.backup_codes_shown_again': access('a revu ses codes de secours avant de les dire notés'),
   'auth.passkey_added': access('a ajouté une clé d’accès'),
   'auth.passkey_removed': access('a retiré une clé d’accès'),
   'auth.passkeys_removed': action(

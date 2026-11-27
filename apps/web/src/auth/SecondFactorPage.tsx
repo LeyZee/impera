@@ -5,10 +5,17 @@ import { BackupCodesList, CopyButton } from './BackupCodesList';
 import { PasskeyOffer } from './PasskeyOffer';
 import { PublicBrand } from './PublicBrand';
 import { QrCode } from './QrCode';
+import { activationStarted, clearActivationStarted, markActivationStarted } from './activation-started';
 import { chosenPassword, forgetChosenPassword } from './chosen-password';
 import { clearCodesUnconfirmed, markCodesUnconfirmed } from './codes-pending';
 import { deviceHoldsPasskeys, passkeyOffered } from './passkeys';
-import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
+import {
+  confirmActivation,
+  markFirstStep,
+  startActivation,
+  type ActivationStart,
+  type CodeResult,
+} from './session';
 
 type Step =
   | { readonly kind: 'password' }
@@ -19,6 +26,7 @@ type Step =
 
 const START_MESSAGES: Record<Exclude<ActivationStart['kind'], 'ok'>, string> = {
   wrong_password: 'Ce n’est pas le bon mot de passe.',
+  password_needed: 'Confirme ton mot de passe pour continuer.',
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
   too_many_attempts: 'Trop d’essais. Attends une minute avant de réessayer.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
@@ -56,11 +64,12 @@ export function SecondFactorPage({
   onSignOut: () => void;
 }): JSX.Element {
   const [step, setStep] = useState<Step>({ kind: 'password' });
-  // Just chosen on the link page: the first step only explains, and does not ask for it again (recette SEC-15).
-  // Only whether one is held: the password itself stays in its module, which lets it lapse (relecture #538).
-  const [isHeld, setIsHeld] = useState(() => chosenPassword() !== null);
+  // The first step only explains: the password just chosen on the link page serves (recette SEC-15), and without it
+  // the server takes a session that has just proven it (recette 27/11, A8). The field comes only when it asks.
+  const [asksPassword, setAsksPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
+  // A reload at the key, or a return from the authenticator app: the same key comes back, not the first step.
+  const [isBusy, setIsBusy] = useState(activationStarted);
   const keyRef = useRef<HTMLElement>(null);
   const stepRef = useRef<HTMLDivElement>(null);
 
@@ -71,34 +80,57 @@ export function SecondFactorPage({
     stepRef.current?.querySelector<HTMLElement>('h1')?.focus();
   }, [step.kind]);
 
-  async function sendPassword(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const held = isHeld ? chosenPassword() : null;
-    if (isHeld && held === null) {
-      // Lapsed while the page stood open: the field comes back, nothing was sent.
-      setIsHeld(false);
-      return;
-    }
-    const password = held ?? fieldOf(new FormData(event.currentTarget), 'password');
+  /** Asks for the key; `password` left out when none is at hand. Says what the first step must now show. */
+  async function start(password: string | undefined, isHeld: boolean): Promise<void> {
     setIsBusy(true);
     setError(null);
     const result = await startActivation(password).catch((): ActivationStart => ({ kind: 'unavailable' }));
     setIsBusy(false);
     if (result.kind === 'ok') {
       forgetChosenPassword();
+      markActivationStarted();
       setStep({ kind: 'scan', setup: result.setup });
       return;
     }
-    if (held !== null && result.kind === 'wrong_password') {
-      // No longer the account's (changed in between): the field comes back, with nothing to blame her for.
+    if (result.kind === 'password_needed' || (isHeld && result.kind === 'wrong_password')) {
+      // Proven too long ago, or no longer the account's (changed in between): the field comes, with nothing to
+      // blame her for.
       forgetChosenPassword();
-      setIsHeld(false);
+      setAsksPassword(true);
       return;
     }
     setError(START_MESSAGES[result.kind]);
   }
 
+  useEffect(() => {
+    if (!activationStarted()) return undefined;
+    let isGone = false;
+    void startActivation()
+      .catch((): ActivationStart => ({ kind: 'unavailable' }))
+      .then((result) => {
+        if (isGone) return;
+        setIsBusy(false);
+        if (result.kind === 'ok') setStep({ kind: 'scan', setup: result.setup });
+        else if (result.kind === 'password_needed') setAsksPassword(true);
+        else setError(START_MESSAGES[result.kind]);
+      });
+    return () => {
+      isGone = true;
+    };
+  }, []);
+
+  async function sendPassword(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (asksPassword) {
+      await start(fieldOf(new FormData(event.currentTarget), 'password'), false);
+      return;
+    }
+    const held = chosenPassword();
+    await start(held ?? undefined, held !== null);
+  }
+
   const signOut = (): void => {
+    clearActivationStarted();
     forgetChosenPassword();
     onSignOut();
   };
@@ -113,6 +145,7 @@ export function SecondFactorPage({
     );
     setIsBusy(false);
     if (result === 'ok') {
+      clearActivationStarted();
       setStep({ kind: 'codes', backupCodes: setup.backupCodes });
       return;
     }
@@ -123,6 +156,8 @@ export function SecondFactorPage({
 
   /** After the backup codes: the offer of a key, once per device and only on a device that holds keys. */
   async function codesKept(): Promise<void> {
+    // Said on the account: until then, a reload shows the codes again instead of opening the app.
+    await markFirstStep('codes-kept');
     if (!passkeyOffered() && (await deviceHoldsPasskeys())) setStep({ kind: 'offer' });
     else onActivated();
   }
@@ -169,10 +204,12 @@ export function SecondFactorPage({
                 Authenticator, Microsoft Authenticator, 1Password, Bitwarden…
               </p>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                {!isHeld ? 'Installe-la, puis confirme ton mot de passe.' : 'Installe-la, puis continue.'}
+                {asksPassword
+                  ? 'Installe-la, puis confirme ton mot de passe.'
+                  : 'Installe-la, puis continue.'}
               </p>
             </div>
-            {!isHeld ? (
+            {asksPassword ? (
               <label className="nv-field">
                 <span className="nv-field__label">Mot de passe</span>
                 <input
@@ -185,7 +222,7 @@ export function SecondFactorPage({
                 />
               </label>
             ) : null}
-            <button className="nv-btn nv-btn--neon" type="submit" disabled={isBusy} autoFocus={isHeld}>
+            <button className="nv-btn nv-btn--neon" type="submit" disabled={isBusy} autoFocus={!asksPassword}>
               {isBusy ? 'Préparation…' : 'Continuer'}
             </button>
           </form>
@@ -199,17 +236,25 @@ export function SecondFactorPage({
                 Ajoute Impera dans ton application
               </h1>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                Sur ton téléphone, touche le bouton. Sur un ordinateur, scanne le code avec l’application, ou
-                choisis « Saisir une clé » et recopie celle-ci.
+                <span className="sm:hidden">
+                  Touche le bouton pour ouvrir ton application, ou recopie la clé ci-dessous.
+                </span>
+                <span className="hidden sm:inline">
+                  Scanne le code avec l’application de ton téléphone, ou recopie la clé ci-dessous.
+                </span>
               </p>
             </div>
             {/* A computer's screen only: a phone cannot scan itself, its button opens the app (recette 27/11, G7). */}
             <div className="hidden justify-center sm:flex">
               <QrCode text={setup.totpURI} label="Code à scanner avec l’application" />
             </div>
-            <a className="nv-btn nv-btn--soft" href={setup.totpURI}>
-              Ouvrir dans l’application
-            </a>
+            {/* A phone's screen only: on a computer the address opens nothing (recette 27/11, CH-12). */}
+            {/* The wrapper hides, not the button: `.nv-btn` sets its own display and wins over the utility (Design, 27/11). */}
+            <div className="flex flex-col sm:hidden">
+              <a className="nv-btn nv-btn--soft" href={setup.totpURI}>
+                Ouvrir dans l’application
+              </a>
+            </div>
             <div className="flex flex-col gap-2">
               <span className="nv-field__label">Clé</span>
               <code
@@ -254,7 +299,19 @@ export function SecondFactorPage({
 }
 
 /** Ten backup codes, shown once (the shared list), and the person says they are kept before going on. */
-function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () => void }): JSX.Element {
+/** The hour the codes stop being shown again, as the reader's clock says it. */
+const HOUR = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+export function BackupCodes({
+  codes,
+  onDone,
+  shownUntil,
+}: {
+  codes: readonly string[];
+  onDone: () => void;
+  /** Shown again after a reload (recette 27/11, A8): until when the server still gives them. */
+  shownUntil?: Date;
+}): JSX.Element {
   const [kept, setKept] = useState(false);
   const leaving = useRef(false);
   // Until they are said kept: leaving asks first, and a reload leaves a mark Sécurité reads (COUV-08).
@@ -275,10 +332,21 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
           C’est actif. Note tes codes de secours
         </h1>
         <p className="text-sm text-[var(--nv-ink-muted)]">
-          Sans ton téléphone, chacun de ces codes remplace une fois le code de l’application. Ils ne seront
-          plus affichés : garde-les dans ton gestionnaire de mots de passe ou sur papier, jamais en photo.
+          Sans ton téléphone, chacun de ces codes remplace une fois le code de l’application.{' '}
+          {shownUntil === undefined ? 'Ils ne seront plus affichés : garde-les' : 'Garde-les'} dans ton
+          gestionnaire de mots de passe ou sur papier, jamais en photo.
         </p>
       </div>
+      {shownUntil === undefined ? null : (
+        <div className="nv-note nv-note--warn" role="status">
+          {/* One paragraph inside: the brick lays its children out in a column. */}
+          <p>
+            Tu avais quitté cette page avant de dire que tu les avais notés. Ils restent affichés{' '}
+            <strong>jusqu’à {HOUR.format(shownUntil)}</strong>&nbsp;; ensuite, il faudra en créer de nouveaux
+            dans Sécurité.
+          </p>
+        </div>
+      )}
       <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
         <input

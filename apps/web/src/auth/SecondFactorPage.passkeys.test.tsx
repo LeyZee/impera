@@ -35,11 +35,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The password, a first code, the codes kept: the end of the activation. */
+/** The first step, a first code, the codes kept: the end of the activation. */
 async function activate(): Promise<void> {
-  const password = screen.getByLabelText('Mot de passe');
-  fireEvent.change(password, { target: { value: 'staple battery horse' } });
-  fireEvent.submit(password.closest('form') ?? document.body);
+  fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
   const code = await screen.findByLabelText('Code affiché par l’application');
   fireEvent.change(code, { target: { value: '123456' } });
   fireEvent.submit(code.closest('form') ?? document.body);

@@ -57,3 +57,12 @@ Livraison en trois lots, dans cet ordre : (a) deuxième facteur, codes de secour
 ## Amendement du 27/11/2026 : les alertes de sécurité par notification (ADR 0176)
 
 Le § 8 n'envoie plus rien dans le groupe Telegram urgent : chaque alerte de sécurité sonne en notification Impera chez chaque propriétaire, motif `agency_urgent` (passe les heures calmes et le plafond du jour), avec les mêmes mots et les mêmes limites (ni nom, ni contenu, ni adresse IP complète). La sortie vers Telegram des Conséquences disparaît.
+
+## Avenant du 27/11/2026 : la première connexion survit à un rechargement
+
+Constat de la recette du 27/11 : au téléphone, la page se recharge souvent pendant l'activation (on part ouvrir l'application d'authentification). Chaque rechargement fabriquait une nouvelle clé, celle déjà ajoutée dans l'application ne marchait plus ; un rechargement sur les codes de secours les faisait perdre et sautait l'accueil.
+
+- **§ 1, la clé.** L'activation en attente est gardée par le serveur et rendue telle quelle jusqu'au premier code juste : même clé, mêmes codes de secours. Rien n'est gardé dans le navigateur, sauf une marque « activation commencée » sans valeur.
+- **§ 1, le mot de passe.** Il n'est pas redemandé tant que la session vient de le prouver : une session ouverte depuis moins de 10 minutes sur un compte sans code actif l'a forcément été par le mot de passe (connexion ou lien), aucune clé d'accès n'existe avant le code. Passé ce délai, il est redemandé, et la clé reste la même.
+- **§ 2, les codes de secours.** « Montrés une seule fois » devient : montrés à l'activation, et encore tant qu'ils n'ont pas été dits notés, sur la session qui vient de donner le mot de passe et le code, 10 minutes au plus. Ensuite ils ne sont plus jamais lus : on en refait dans Sécurité. Chaque réaffichage laisse une ligne d'audit (Charles, 27/11/2026 : « Oui, pendant 10 minutes »).
+- **Deux marqueurs sur le compte** (`user.backup_codes_kept_at`, `user.welcomed_at`) : les codes dits notés, l'accueil vu. L'accueil de première connexion s'affiche tant qu'il n'a pas été vu, quel que soit l'appareil.

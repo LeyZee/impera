@@ -20,7 +20,9 @@ import {
   REAUTHENTICATION_ERROR_CODE,
   ReauthenticateBodySchema,
   SECOND_FACTOR_ERROR_CODE,
+  UnkeptBackupCodesSchema,
   SecondFactorEnableBodySchema,
+  SecondFactorSetupSchema,
   SecondFactorVerifyBodySchema,
   SignInAnswerSchema,
   TeamMembershipSchema,
@@ -62,6 +64,7 @@ import {
 } from './passkeys';
 import type { PasswordBreachCheck } from './password-breaches';
 import { forgetCount } from './rate-limit-store';
+import { backupCodesOf, firstStepsOf, markFirstStep, pendingSetup } from './second-factor-setup';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
 import { ACTIVITY_REFRESH_MS, LONGEST_IDLE_MS, sessionEnd } from './session-lifetime';
 
@@ -207,6 +210,20 @@ class CodeStepExpired extends DomainError {
 class CodeLocked extends DomainError {
   constructor() {
     super('second_factor_limited', 'Trop de codes faux : réessaie dans un quart d’heure');
+  }
+}
+
+/** The backup codes are shown at the activation, and once more only until they are said kept. */
+class BackupCodesNoLongerShown extends DomainError {
+  constructor() {
+    super('backup_codes_gone', 'Ces codes ne sont plus affichés : refais-en dans Sécurité');
+  }
+}
+
+/** The activation asked without the password on a session that proved it too long ago: the page asks for it. */
+class PasswordMissing extends DomainError {
+  constructor() {
+    super('password_missing_forbidden', 'Confirme ton mot de passe pour continuer');
   }
 }
 
@@ -1353,7 +1370,10 @@ export function createAuthRoutes(
       });
 
     // The activation (ADR 0046 § 1), for a signed-in account whose second factor is not active yet: the password once
-    // more, then a secret and ten backup codes, shown once. Asking again before the first code restarts it.
+    // more, then a secret and ten backup codes. Asking again before the first code gives the same ones back, so the
+    // key already added to the authenticator app keeps working after a reload. The password may be left out while the
+    // session has just proven it: such a session was opened by the password itself (a sign-in or a link), no key can
+    // open one before the code is active.
     app.post(
       '/auth/two-factor/enable',
       {
@@ -1363,16 +1383,23 @@ export function createAuthRoutes(
           if ((await currentUser(auth, db, shiftCreators, request)) === null)
             throw new SessionUnauthenticated();
         },
-        schema: { body: SecondFactorEnableBodySchema },
+        schema: { body: SecondFactorEnableBodySchema, response: { 200: SecondFactorSetupSchema } },
       },
-      async (request, reply) => {
-        const session = await currentUser(auth, db, shiftCreators, request);
-        if (session === null) throw new SessionUnauthenticated();
-        if (session.secondFactorEnabled) throw new SecondFactorAlreadyActive();
-        return forward(request, reply, {
-          onUnauthorized: () => new SessionUnauthenticated(),
-          refusal: secondFactorRefusal,
-        });
+      async (request) => {
+        const current = await sessionOf(auth, db, request);
+        if (current === null) throw new SessionUnauthenticated();
+        if (current.user.twoFactorEnabled === true) throw new SecondFactorAlreadyActive();
+        const { password } = request.body;
+        if (password === undefined) {
+          const openedAt = current.session.createdAt.getTime();
+          if (Date.now() - openedAt > RECENT_LOGIN_MS) throw new PasswordMissing();
+        } else if (!(await passwordMatches(auth, current.user.id, password))) {
+          await refused(request, current.user.id, 'auth.reauthentication_refused');
+          throw new WrongPassword();
+        }
+        const setup = await pendingSetup(db, config.AUTH_SECRET, current.user);
+        if (setup === null) throw new SecondFactorAlreadyActive();
+        return setup;
       },
     );
 
@@ -1623,6 +1650,50 @@ export function createAuthRoutes(
         return savePreferences(db, request.user.id, request.body);
       },
     );
+    // The first steps of an account (its backup codes said kept, its welcome seen), said done by the account itself:
+    // kept on the account, so a reload or another device does not skip them, nor ask twice.
+    app.post(
+      '/me/first-steps/:step',
+      {
+        config: perIp,
+        preValidation: requireRole(...UserRoleSchema.options),
+        schema: { params: z.object({ step: z.enum(['codes-kept', 'welcomed']) }) },
+      },
+      async (request, reply) => {
+        if (request.user === null) throw new SessionUnauthenticated();
+        await markFirstStep(
+          db,
+          request.user.id,
+          request.params.step === 'welcomed' ? 'welcomed' : 'codesKept',
+        );
+        return reply.code(204).send();
+      },
+    );
+    // The backup codes once more, for the screen a reload closed before they were said kept: only until they are, and
+    // only on the session that has just given the password and the code (the activation's own, for 10 minutes).
+    // Afterwards they are never read again: new ones are made in Sécurité.
+    app.post(
+      '/me/first-steps/backup-codes',
+      {
+        config: perIp,
+        preValidation: requireRole(...UserRoleSchema.options),
+        schema: { response: { 200: UnkeptBackupCodesSchema } },
+      },
+      async (request) => {
+        if (request.user === null) throw new SessionUnauthenticated();
+        const current = await sessionOf(auth, db, request);
+        if (current === null) throw new SessionUnauthenticated();
+        const confirmedAt = current.session.codeConfirmedAt;
+        if (confirmedAt === null || confirmedAt === undefined) throw new BackupCodesNoLongerShown();
+        const shownUntil = confirmedAt.getTime() + RECENT_LOGIN_MS;
+        if (Date.now() > shownUntil || (await firstStepsOf(db, request.user.id)).codesKept)
+          throw new BackupCodesNoLongerShown();
+        const backupCodes = await backupCodesOf(db, config.AUTH_SECRET, request.user.id);
+        if (backupCodes === null) throw new BackupCodesNoLongerShown();
+        await audit(request, request.user.id, 'auth.backup_codes_shown_again');
+        return { backupCodes, shownUntil: new Date(shownUntil).toISOString() };
+      },
+    );
     // The dashboard's first read (recette 05/11, SEC-13): 200 with or without a session, so that every public page
     // does not log « 401 » in the console. It opens nothing: the guarded routes still refuse on their own.
     app.get('/session', { schema: { response: { 200: DashboardSessionSchema } } }, async (request, reply) => {
@@ -1634,7 +1705,7 @@ export function createAuthRoutes(
         ...(session.membership ?? (await membership(db, session.user.id))),
         preferences: await preferencesOf(db, session.user.id),
       };
-      return { state: 'signed_in' as const, me };
+      return { state: 'signed_in' as const, me, firstSteps: await firstStepsOf(db, session.user.id) };
     });
     return Promise.resolve();
   };

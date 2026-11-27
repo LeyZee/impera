@@ -76,8 +76,11 @@ export const SignInAnswerSchema = z.union([
 ]);
 export type SignInAnswer = z.infer<typeof SignInAnswerSchema>;
 
-/** `POST /v1/auth/two-factor/enable`: the password, once more, before a secret is made. */
-export const SecondFactorEnableBodySchema = z.object({ password: GivenPasswordSchema });
+/**
+ * `POST /v1/auth/two-factor/enable`: the password, once more, before the secret is shown. Left out when the session
+ * has just proven it (a sign-in or a link a few minutes ago): the server decides, and asks for it otherwise.
+ */
+export const SecondFactorEnableBodySchema = z.object({ password: GivenPasswordSchema.optional() });
 
 /** What the activation answers: the `otpauth://` address the authenticator app reads, and ten backup codes, shown once. */
 export const SecondFactorSetupSchema = z.object({
@@ -85,6 +88,13 @@ export const SecondFactorSetupSchema = z.object({
   backupCodes: z.array(z.string()).length(10),
 });
 export type SecondFactorSetup = z.infer<typeof SecondFactorSetupSchema>;
+
+/**
+ * The first steps of an account, kept by the server so that a reload does not skip them: whether its backup codes
+ * were said kept, and whether its welcome was seen.
+ */
+export const FirstStepsSchema = z.object({ codesKept: z.boolean(), welcomed: z.boolean() });
+export type FirstSteps = z.infer<typeof FirstStepsSchema>;
 
 /**
  * `POST /v1/auth/two-factor/verify-totp` and `verify-backup-code`: the code, and whether this device is trusted for 30
@@ -100,6 +110,15 @@ export const SecondFactorVerifyBodySchema = z.object({
  * confirmation (`ReauthenticateBodySchema`): ten new codes, shown once; the old ones stop working.
  */
 export const BackupCodesSchema = z.object({ backupCodes: z.array(z.string()).length(10) });
+
+/**
+ * `POST /v1/me/first-steps/backup-codes`: the activation's codes shown again after a reload, and until when the server
+ * still shows them, so that the screen says it (recette 27/11, A8).
+ */
+export const UnkeptBackupCodesSchema = BackupCodesSchema.extend({
+  shownUntil: z.iso.datetime({ offset: true }),
+});
+export type UnkeptBackupCodes = z.infer<typeof UnkeptBackupCodesSchema>;
 
 /**
  * `POST /v1/auth/reauthenticate`: the password and a code, before a sensitive action (ADR 0046 § 3). Valid 10 minutes
