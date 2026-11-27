@@ -144,6 +144,15 @@ export function moved<T>(list: readonly T[], index: number, step: -1 | 1): T[] {
   return next;
 }
 
+/** The item at `from` taken out and put back at `to` (her drag): the others keep their order. */
+export function movedTo<T>(list: readonly T[], from: number, to: number): T[] {
+  const item = list[from];
+  if (item === undefined || to < 0 || to >= list.length || from === to) return [...list];
+  const next = list.filter((_, index) => index !== from);
+  next.splice(to, 0, item);
+  return next;
+}
+
 /** The same file picked twice (same name, weight and date): it goes once. */
 export const sameFile = (
   a: { readonly name: string; readonly size: number; readonly lastModified: number },

@@ -71,6 +71,15 @@ describe('content-drops › Coffre Impera, her stock against the rhythm (ADR 016
     });
   });
 
+  it('asks no story of her: her Reveal story is the feed video with its own caption (Charles, 27/11)', () => {
+    expect(stockCategory('reveal_story', counts())).toMatchObject({
+      mode: 'bonus',
+      target: null,
+      lacking: 0,
+      status: 'ok',
+    });
+  });
+
   it('says empty, low (under half), short, then ok', () => {
     expect(statusOf(0, 7)).toBe('empty');
     expect(statusOf(3, 7)).toBe('low');

@@ -89,7 +89,7 @@ function deps(over: { frames?: boolean; arrived?: number } = {}): ProgressDeps {
           today: '2026-11-04',
           days: new Map([
             ['2026-11-02', { reveal_story: 1, reveal_video: 1, insta_cta_story: 1, insta_stories: 2 }],
-            ['2026-11-04', { reveal_story: 1 }],
+            ['2026-11-04', { reveal_video: 1 }],
           ]),
         }),
     },
@@ -109,7 +109,8 @@ describe('« Où elle en est » (trous béants n° 11)', () => {
       '2026-11-08',
     ]);
     const [monday, tuesday, wednesday, thursday] = progress.days;
-    expect(monday).toMatchObject({ essentialsDone: 3, essentialsAsked: 3, done: 5, ahead: false });
+    // A tick of a Reveal story from before 27/11 counts no more: her day no longer asks one.
+    expect(monday).toMatchObject({ essentialsDone: 2, essentialsAsked: 2, done: 4, ahead: false });
     expect(tuesday).toMatchObject({ essentialsDone: 0, done: 0, ahead: false });
     expect(wednesday).toMatchObject({ essentialsDone: 1, ahead: false });
     expect(thursday?.ahead).toBe(true);

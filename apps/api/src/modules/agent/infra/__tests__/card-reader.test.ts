@@ -52,6 +52,21 @@ describe('his card read by the agent (ADR 0085 § 7)', () => {
     expect(dropped).toEqual([1]);
   });
 
+  it('never reads a fantasy of his on minors into his card (Charles 26/11 at 23:45)', async () => {
+    const { gateway, inputs } = gatewayAnswering(ok({ output: { facts: [] }, meta: META }));
+    await createCardReader({ gateway }).read({
+      ...INPUT,
+      card: [],
+      messages: [
+        { number: 1, from: 'fan', text: 'je fantasme sur une vraie écolière', isNew: true },
+        { number: 2, from: 'fan', text: 'j’adore la lingerie noire', isNew: true },
+      ],
+    });
+    expect(inputs[0]?.messages).toEqual([
+      { number: 2, from: 'fan', text: 'j’adore la lingerie noire', isNew: true },
+    ]);
+  });
+
   it('reads nothing at the budget’s alert, nor when no model answered', async () => {
     const budget = gatewayAnswering(err({ code: 'budget_reached', attempts: [] }));
     expect(await createCardReader({ gateway: budget.gateway }).read(INPUT)).toEqual({

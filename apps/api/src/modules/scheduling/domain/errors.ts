@@ -620,3 +620,10 @@ export class SlotVersionInvalid extends DomainError {
     super('request_invalid', message);
   }
 }
+
+/** The same week of availability sent again with other plages, or for another member (ADR 0171). */
+export class AvailabilityConflict extends DomainError {
+  constructor() {
+    super('availability_conflict', 'Ces dispos existent déjà avec d’autres plages');
+  }
+}

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { decideLanguage, detectLanguage, languageWithout, translationOf } from '../language';
+import {
+  bareTeenReading,
+  decideLanguage,
+  detectLanguage,
+  hasUncoveredSentence,
+  languageWithout,
+  sentencesOf,
+  translationOf,
+  uncoveredSentences,
+} from '../language';
 
 // Messages invented for the test (ADR 0010): no real fan.
 describe('detectLanguage', () => {
@@ -159,5 +168,100 @@ describe('translationOf: her answer in French for the team (ADR 0168 § 9)', () 
     expect(translationOf('english', ['hey you', 'miss me?'], ['coucou toi'])).toBeNull();
     expect(translationOf('english', ['hey you'], ['  '])).toBeNull();
     expect(translationOf('english', ['hey you'], undefined)).toBeNull();
+  });
+});
+
+describe('uncoveredSentences: the language read sentence by sentence (ADR 0168 § 4, § 5, 27/11)', () => {
+  it('cuts at a sentence end, a line break or a colon, and keeps a time or a decimal whole', () => {
+    expect(sentencesOf('salut. ça va ?\nmoi : bien, à 15:30 ou 15.30')).toEqual([
+      'salut',
+      'ça va',
+      'moi',
+      'bien, à 15:30 ou 15.30',
+    ]);
+  });
+
+  it('finds the German sentence before a French ending', () => {
+    const text = 'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir';
+    expect(detectLanguage(text)).toBe('french');
+    expect(uncoveredSentences(text)).toEqual(['ich bin 15 und gehe zur schule']);
+  });
+
+  it('counts a short sentence that carries a number from 10 to 17, closed by default', () => {
+    expect(uncoveredSentences('ich bin 15. salut ça va, tu fais quoi ce soir')).toEqual(['ich bin 15']);
+    expect(uncoveredSentences('ich bin 15. salut')).toEqual(['ich bin 15']);
+    expect(uncoveredSentences('15 jahre. salut')).toEqual(['15 jahre']);
+  });
+
+  it.each([
+    'ciao bello, tu fais quoi ce soir ?',
+    'ciao bello. tu fais quoi ce soir ?',
+    'ok baby. j’ai fini le boulot, je suis crevé',
+    'Lukas. c’est mon prénom, et toi ?',
+    'Nike. j’ai acheté des baskets aujourd’hui',
+    'je rentre le 15',
+    'mdr 12',
+    'rdv à 15h. bisous',
+    'rdv le 15. bisous',
+    'à 16h. bisous',
+    'le 12 décembre. ciao',
+    'du 12 au 15. bisous',
+    '15/12. bisous',
+  ])('lets « %s » stay covered: a lone foreign word, a name, a brand, a short message', (text) => {
+    expect(hasUncoveredSentence(text)).toBe(false);
+  });
+
+  it('puts the draft for a human when one sentence of his run is not covered', () => {
+    const decision = decideLanguage({
+      fanTexts: ['ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir'],
+      kept: { value: 'french', source: 'detected' },
+      spoken: ['french', 'english'],
+    });
+    expect(decision).toMatchObject({ reply: 'french', humanOnly: true });
+  });
+
+  it('leaves a French run with a lone foreign word to the agent', () => {
+    const decision = decideLanguage({
+      fanTexts: ['ciao bello. tu fais quoi ce soir ?', 'ok baby'],
+      kept: { value: 'french', source: 'detected' },
+      spoken: ['french', 'english'],
+    });
+    expect(decision.humanOnly).toBe(false);
+  });
+});
+
+describe('bareTeenReading: a bare number from 10 to 17, two levels (ADR 0168 § 4, 27/11)', () => {
+  it.each(['salut. 15', 'lol. 17 !', 'ich bin 15. salut', '15 jahre. salut', 'mam 15. salut'])(
+    'reads « %s » as an age',
+    (text) => {
+      expect(bareTeenReading(text)).toBe('age');
+    },
+  );
+
+  it.each(['saison 12. tu regardes ?', 'niveau 15. trop dur ce jeu', 'ligne 13. quelle galère ce matin'])(
+    'gives « %s » to a human, without the age doubt',
+    (text) => {
+      expect(bareTeenReading(text)).toBe('human');
+    },
+  );
+
+  it.each(['rdv le 15. bisous', 'j’habite au 14. viens en rêve', 'à 16h. bisous', 'bah 15 mdr'])(
+    'reads nothing in « %s »',
+    (text) => {
+      expect(bareTeenReading(text)).toBeNull();
+    },
+  );
+
+  it('reads an age in any bare number that answers her question', () => {
+    expect(bareTeenReading('bah 15 mdr', true)).toBe('age');
+  });
+
+  it('puts « saison 12. tu regardes ? » for a human, with no freeze', () => {
+    const decision = decideLanguage({
+      fanTexts: ['saison 12. tu regardes ?'],
+      kept: { value: 'french', source: 'detected' },
+      spoken: ['french', 'english'],
+    });
+    expect(decision.humanOnly).toBe(true);
   });
 });

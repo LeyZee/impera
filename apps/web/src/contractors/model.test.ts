@@ -23,7 +23,6 @@ import {
   reminderText,
   suggestedVat,
   textStanding,
-  validationText,
   type ProfileDraft,
 } from './model';
 
@@ -68,8 +67,6 @@ describe('the regime of a file', () => {
     expect(regimesFor('MG', [FRANCE_REGIME, BENIN_REGIME]).map((regime) => regime.name)).toEqual([
       BENIN_REGIME.name,
     ]);
-    expect(validationText(BENIN_REGIME)).toBe('validé par le comptable le 30 octobre 2026');
-    expect(validationText(BENIN_DRAFT)).toMatch(/^pas encore validé par le comptable/u);
     expect(askedText(BENIN_REGIME)).toBe('attestation de résidence fiscale');
     expect(askedText({ documents: ['tax_residence', 'urssaf_vigilance'] })).toBe(
       'attestation de résidence fiscale et attestation de vigilance',

@@ -48,6 +48,20 @@ export const GUARD_CODES = [
   'language_not_covered',
   // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
   'minor_reference',
+  // Charles 26/11: in a sexual message, no word of youth for her or for anyone (« petite », « jeunette », « lolita »…).
+  'youth_word_in_sex',
+  // Charles 26/11 (sexto, lot 2): no degrading insult in her words, from the list of her persona (`degrading_words`).
+  'degrading_word',
+  // Charles 26/11: written sounds of pleasure only at the frankest rung (`very_explicit`); a regeneration below it.
+  'moan_below_peak',
+  // Charles 26/11: what kills a sexting while her script runs (her pets, his partner, another man, money trouble).
+  'mood_killer',
+  // Charles 26/11 at 23:44: never an extra (a gift, a bonus, a media offered) promised to unlock or close a purchase.
+  'purchase_sweetener',
+  // Charles 27/11: « petit garçon », « vilain garçon » said to him, soft; allowed when his desire map holds humiliation.
+  'belittling_name',
+  // Charles 27/11: « mon adresse » in words, soft; a real address, an e-mail or a number stays `contact_info`.
+  'address_word',
   // Charles 26/11 (« go voix »): her emojis, at the end of a bubble, one kind a message (two in a flirt), never three,
   // and not on every message. Soft: rewritten once, then her answer goes.
   'emoji_misuse',

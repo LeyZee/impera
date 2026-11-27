@@ -21,6 +21,7 @@ import { guardSettingsOf, languagesOf, type PersonaForModels } from './infra/per
 /** Public entry point of the `agent` module (ADR 0002). Other modules import this file only. */
 export {
   checkVoiceOutput,
+  checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
   type GuardSettings,
@@ -242,6 +243,7 @@ function composerFields(
       personaSheet: persona.personaSheet,
       guardSettings,
       splitMessages: persona.splitMessages,
+      playsJealous: persona.playsJealous,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(baseStyle !== null && {
         agencyStyle: { publicStyle: baseStyle.publicStyle, privateStyle: baseStyle.privateStyle },
