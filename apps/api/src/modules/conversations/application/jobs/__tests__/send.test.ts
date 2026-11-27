@@ -107,6 +107,7 @@ function world(send: OutboundSender['sendText']) {
       publish: () => Promise.resolve(),
       list: unused,
       alertsSince: unused,
+      fanSignsSince: unused,
       scriptsExhaustedSaid: unused,
       abandonTeases: unused,
       salesState: unused,

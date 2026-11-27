@@ -27,7 +27,14 @@ export interface StandingFacts {
   readonly lastSpentAt?: Date | null;
   /** Her scripts sent to him that he never entered. */
   readonly unenteredScripts: number;
+  /**
+   * How many times he asked her a proof she is real before this message (method § 10.25.1). Absent: never counted.
+   */
+  readonly proofAsksBefore?: number;
 }
+
+/** His third doubt after a proof (method § 10.25.1): no more proof, and a time-waster at once if he never paid. */
+const PROOF_ASKS_BEFORE_REFUSAL = 2;
 
 const HOUR_MS = 3_600_000;
 
@@ -43,6 +50,8 @@ export function paysNow(facts: StandingFacts, limits?: StandingLimits): boolean 
 
 export function fanStanding(facts: StandingFacts, limits?: StandingLimits): FanStanding {
   if (paysNow(facts, limits)) return 'payer';
+  if (facts.spentCents <= 0 && (facts.proofAsksBefore ?? 0) >= PROOF_ASKS_BEFORE_REFUSAL)
+    return 'proven_time_waster';
   if (limits === undefined || facts.unenteredScripts < limits.minUnenteredScripts) return 'new';
   return facts.knownHours >= limits.provenHours ? 'proven_time_waster' : 'time_waster';
 }
@@ -61,11 +70,15 @@ export function explicitPhotoAnswer(standing: FanStanding, ageConfirmed: boolean
 }
 
 /**
- * He asks her for a proof she is real (guide 26/11): free for a new fan, a payer, a big one; passed on or put off
- * lightly. Refused only to a proven time-waster, who gets nothing and an annoyed answer. Never a price.
+ * He asks her for a proof she is real (guide 26/11, method § 10.25.1): free for a new fan, a payer, a big one; passed
+ * on or put off lightly. Asked again after one, it wears her out but she may relay it once more. Refused to a proven
+ * time-waster and at the third doubt, whoever he is: nothing, and an annoyed answer. Never a price.
  */
-export type ProofAnswer = 'relay' | 'refuse';
+export type ProofAnswer = 'relay' | 'annoyed' | 'refuse';
 
-export function proofAnswer(standing: FanStanding): ProofAnswer {
-  return standing === 'proven_time_waster' ? 'refuse' : 'relay';
+export function proofAnswer(standing: FanStanding, proofAsksBefore = 0): ProofAnswer {
+  // Method § 10.25.1: the first doubt, a proof; the second after one, it wears her out and she may try once more; the
+  // third, it is over, for everyone.
+  if (standing === 'proven_time_waster' || proofAsksBefore >= PROOF_ASKS_BEFORE_REFUSAL) return 'refuse';
+  return proofAsksBefore >= 1 ? 'annoyed' : 'relay';
 }

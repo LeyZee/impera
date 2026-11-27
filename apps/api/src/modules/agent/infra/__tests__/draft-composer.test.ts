@@ -556,6 +556,16 @@ describe('createDraftComposer', () => {
     );
   });
 
+  it('reads the signs of a time-waster only, codes and never his words (ADR 0135, Charles 27/11)', async () => {
+    const haggling: Brief = { ...BRIEF, intent: 'price_objection' };
+    const slowed = composer({ brief: haggling });
+    const result = await slowed.draftComposer.compose({ ...INPUT, timeWaster: 'slowed' });
+    expect(result.fanSigns).toEqual(['haggles']);
+
+    const usual = composer({ brief: haggling });
+    expect((await usual.draftComposer.compose(INPUT)).fanSigns).toBeUndefined();
+  });
+
   it('is closer with those who count: girlfriend with a whale, close with a very good payer (ADR 0132, Charles 26/11)', async () => {
     const hintsFor = async (tier: 'whale' | 'very_good' | 'good' | null) => {
       const run = composer({ brief: BRIEF });
@@ -2970,6 +2980,29 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       customOrderOpened: true,
     });
     expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('counts each proof asked, wears her out at the second and refuses the third (method § 10.25.1)', async () => {
+    const proof: Brief = { ...BRIEF, intent: 'other', occasion: 'asks_proof' };
+    const first = ordering({ brief: proof, voice: { bubbles: ['t’es mignon toi 🙈'] } });
+    expect((await first.draftComposer.compose(INPUT)).fanSigns).toEqual(['asks_proof']);
+
+    const second = ordering({ brief: proof, voice: { bubbles: ['encore ? 🙄'] } });
+    expect(await second.draftComposer.compose({ ...INPUT, proofAsksBefore: 1 })).toMatchObject({
+      customOrderOpened: true,
+    });
+    expect(second.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('ça la saoule'))).toBe(
+      true,
+    );
+
+    const third = ordering({ brief: proof, voice: { bubbles: ['non là c’est bon 🙄'] } });
+    const refused = await third.draftComposer.compose({
+      ...INPUT,
+      proofAsksBefore: 2,
+      standing: 'proven_time_waster',
+    });
+    expect(refused).not.toMatchObject({ customOrderOpened: true });
+    expect(third.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('agacée'))).toBe(true);
   });
 
   it('with nobody on shift, keeps a proof without promising it, and holds a promise', async () => {

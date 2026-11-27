@@ -7,6 +7,7 @@ import type {
   CopilotTrace,
   DraftTranslation,
   FanFlags,
+  FanSign,
   FanTier,
   HandoffCause,
   Language,
@@ -64,7 +65,9 @@ import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
+import { fanSignsOf } from '../domain/signs';
 import { spenderRegisterOf } from '../domain/spender-register';
+import type { FanStanding } from '../domain/standing';
 import { handoffCauseOf } from '../domain/traps';
 
 import {
@@ -98,9 +101,17 @@ function withOriginNote(origin: MessageOrigin | null | undefined): { originNote?
   return note === undefined ? {} : { originNote: note };
 }
 
+/** A proof he asks her, whoever he is: counted for his third doubt (method § 10.25.1). */
+const proofAsked = (occasion: string | undefined): FanSign[] =>
+  occasion === 'asks_proof' ? ['asks_proof'] : [];
+
 export interface AgentComposeInput {
   /** He is a time-waster at this level (ADR 0135), read by code before the AI; absent, he is not. */
   readonly timeWaster?: TimeWasterLevel;
+  /** Where he stands, read by `conversations` with her rule (ADR 0135): one reading for the proof, his photo, her rhythm. */
+  readonly standing?: FanStanding;
+  /** His proofs asked before this message (method § 10.25.1). */
+  readonly proofAsksBefore?: number;
   readonly creatorId: string;
   readonly conversationId: string;
   readonly fanId: string;
@@ -295,6 +306,8 @@ type AgentComposeResult = (
   readonly saleTrouble?: SaleTroubleKind;
   /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
   readonly abandonTeased?: true;
+  /** What code read in a time-waster's turn (`fan_signs_seen`, ADR 0135, Charles 27/11); absent for anyone else. */
+  readonly fanSigns?: readonly FanSign[];
   /** What she answered in this draft to his asking to see her (Charles 21/11): the reason given, never twice. */
   readonly meetingAnswer?: MeetingAnswer;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
@@ -1297,6 +1310,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
         ...(input.timeWaster !== undefined && { timeWaster: input.timeWaster }),
+        ...(input.standing !== undefined && { standing: input.standing }),
+        ...(input.proofAsksBefore !== undefined && { proofAsksBefore: input.proofAsksBefore }),
         spenderRegister: spenderRegisterOf(input.fan.tier, {
           fragile: stop.flags?.fragile === true,
           care: careForced,
@@ -1387,8 +1402,23 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
-      const traced =
-        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(composed, scripts) } : settled;
+      // A proof asked is counted for everyone (§ 10.25.1); the other signs only once he is a time-waster (ADR 0135).
+      const fanSigns: FanSign[] =
+        composed.brief === undefined
+          ? []
+          : [
+              ...proofAsked(composed.brief.occasion),
+              ...(input.timeWaster === undefined
+                ? []
+                : fanSignsOf({
+                    intent: composed.brief.intent,
+                    occasion: composed.brief.occasion,
+                    risks: composed.brief.risks,
+                    fanText: ownText,
+                  })),
+            ];
+      const signed = fanSigns.length === 0 ? settled : { ...settled, fanSigns };
+      const traced = signed.kind === 'draft' ? { ...signed, copilot: copilotOf(composed, scripts) } : signed;
       const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
       const withAvailability =
         availability === undefined ? traced : { ...traced, fanAvailability: availability };

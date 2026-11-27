@@ -38,7 +38,7 @@ import { deferredRespondAt } from '../../domain/rules';
 import { closeAutomaticIfLocked } from '../automatic';
 import { readProposedFacts } from '../facts';
 import { appendEvent } from '../journal';
-import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
+import { ALL_SIGNS_SINCE, DEFAULT_TIME_ZONE, proofAsksOf, standingOf, timeWasterWait } from '../time-waster';
 
 export interface RespondDeps {
   readonly uow: UnitOfWork;
@@ -473,11 +473,12 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         flags: await tx.gate.fanFlags(conversation),
         unboughtRuns: await tx.scriptRuns.unbought(conversation.id),
         stalledRuns: await tx.scriptRuns.stalled(conversation.id),
+        fanSigns: await tx.events.fanSignsSince(conversation.id, ALL_SIGNS_SINCE),
       };
     });
     if (read === null) return;
     // A time-waster waits his turn (ADR 0135 § 6), before any call to the AI: his next messages join this wait.
-    const wait = timeWasterWait({
+    const waitRead = {
       now: clock.now(),
       timeZone: hours?.timeZone ?? DEFAULT_TIME_ZONE,
       conversationId: read.conversation.id,
@@ -489,8 +490,10 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       lastPurchaseAt: read.stats.lastPurchaseAt,
       unboughtRuns: read.unboughtRuns,
       stalledRuns: read.stalledRuns,
+      fanSigns: read.fanSigns,
       history: read.history,
-    });
+    };
+    const wait = timeWasterWait(waitRead);
     if (wait?.until != null) {
       const until = wait.until;
       await uow.inTenant(payload.creatorId, async (tx) => {
@@ -516,6 +519,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       ...(wait !== null && { timeWaster: wait.level }),
+      // One reading of where he stands, for her rhythm above and the proof and his photo in the composer.
+      standing: standingOf(waitRead),
+      proofAsksBefore: proofAsksOf(waitRead),
       ...(waitedFor !== null && { waited: 1 }),
       ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
       ...(read.conversation.desireScore !== null &&
@@ -560,6 +566,15 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         result,
         meta,
       );
+      // A time-waster's signs (ADR 0135), whatever the answer becomes: codes only, never his words.
+      if (result.fanSigns !== undefined && result.fanSigns.length > 0) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'fan_signs_seen', payload: { signs: [...result.fanSigns] } },
+          meta,
+        );
+      }
       // Her alerts that only let a human know (P4-01), whatever the answer becomes: named, never his words. One
       // already sounded since her last answer (a second pass after a wait, another message of his) is not again.
       const sounded =

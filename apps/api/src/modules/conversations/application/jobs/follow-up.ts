@@ -19,7 +19,7 @@ import { followUpIdempotencyKey, followUpRetry } from '../../domain/rules';
 import { readProposedFacts } from '../facts';
 import { enqueueFollowUp, followUpJobKey } from '../follow-ups';
 import { appendEvent } from '../journal';
-import { DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
+import { ALL_SIGNS_SINCE, DEFAULT_TIME_ZONE, timeWasterWait } from '../time-waster';
 
 import { DEFAULT_CAUSES, fanNotesOf, handoffDetail, HISTORY_LIMIT } from './respond';
 
@@ -127,6 +127,7 @@ export function createFollowUpJob({ uow, clock, fans, composer, followUps, reply
         lastPurchaseAt: stats.lastPurchaseAt,
         unboughtRuns: await tx.scriptRuns.unbought(conversation.id),
         stalledRuns: await tx.scriptRuns.stalled(conversation.id),
+        fanSigns: await tx.events.fanSignsSince(conversation.id, ALL_SIGNS_SINCE),
         history,
       });
       if (timeWaster !== null) {
