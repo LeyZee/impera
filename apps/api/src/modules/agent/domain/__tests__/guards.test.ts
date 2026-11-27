@@ -477,6 +477,10 @@ describe('voice guards', () => {
       '4 bis avenue Foch',
       '3 impasse du Moulin',
       '8 place de la Mairie',
+      '3 allée des Tilleuls',
+      '7 chemin d’en Haut',
+      '8 avenue Foch',
+      '12 Rue des Lilas',
       'écris à lina@exemple.test',
       'mon 06 12 34 56 78',
     ])
@@ -486,6 +490,9 @@ describe('voice guards', () => {
       'j’ai 2 cours demain matin',
       'garde moi 1 place à côté de toi',
       'il me reste 3 route à faire',
+      '2 avenue c’est trop loin',
+      'j’ai fait 10 allée retour',
+      '5 chemin différents',
     ])
       expect(read(bubble), bubble).not.toContainEqual(['contact_info', 'blocking']);
   });

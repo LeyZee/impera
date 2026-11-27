@@ -191,6 +191,22 @@ const SCHOOL_OUTFIT =
 // garçon », « comme un petit garçon »), never a role where he is a child: both stay `minor_reference`.
 const BOY_NAME =
   /(?<!\b(celle|celui|ceux|celles|taille|l'?air|digne) d'? ?(une? )?|\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix) (de|d'?) ?(une? )?|\bon dirait (une? )?|\bcomme (une? )?)\b(petit|vilain) garcon\b/g;
+// A street that is also a common word (« 2 avenue c'est trop loin », « 10 allée retour », « 5 chemin différents »)
+// is an address only with « de / du / des / d' » or a capital after it (Sécurité, #1054): « 8 avenue Foch », « 3 allée
+// des Tilleuls ». Read on the bubble as written, where the capital still is.
+const STREET_WORD =
+  /\b\d{1,4}(?: ?(?:bis|ter))?,? (?:avenue|allée|allee|chemin|place|cours|route|square|quai|street|avenida) (\S+)/giu;
+
+/** A street address with a street that is also a common word: the words, or `undefined`. */
+function streetAddressOf(bubble: string): string | undefined {
+  for (const match of bubble.matchAll(STREET_WORD)) {
+    const next = match[1] ?? '';
+    if (/^(?:(?:de|du|des)$|d['’])/iu.test(next) || (next !== next.toLowerCase() && /^\p{Lu}/u.test(next)))
+      return match[0];
+  }
+  return undefined;
+}
+
 // She says she is under 18, in any message (Sécurité, #1054): « j'ai 14 ans », « en tenue de collégienne j'ai 14
 // ans », « I'm 16 », « ho 16 anni », « tengo 16 años ». Not a length of time (« j'ai 15 ans d'expérience »), not her
 // past (« à 16 ans j'étais… », « quand j'avais 16 ans »).
@@ -384,7 +400,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'contact_info',
     pattern:
-      /\b\d{1,4}( ?(bis|ter))?,? ((rue|avenue|bd|boulevard|allee|impasse|chemin|street|calle|avenida) (de la |de l'|des |du |de |d')?[a-z]|(place|cours|route|square|quai) (de la |de l'|des |du |de |d')[a-z])/,
+      /\b\d{1,4}( ?(bis|ter))?,? (rue|bd|boulevard|impasse|calle) (de la |de l'|des |du |de |d')?[a-z]/,
   },
   // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
   // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there
@@ -1235,6 +1251,12 @@ export function checkVoiceOutput(
         violations.push({ code: 'pet_name', severity: 'soft', bubbleIndex, match: slip });
     }
     const guilt = GUILT_TRIP.exec(text);
+    const street = streetAddressOf(bubble);
+    if (
+      street !== undefined &&
+      !violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'contact_info')
+    )
+      violations.push({ code: 'contact_info', severity: 'blocking', bubbleIndex, match: street });
     const address = ADDRESS_WORD.exec(text)?.[0];
     if (
       address !== undefined &&
