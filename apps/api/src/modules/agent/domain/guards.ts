@@ -189,6 +189,16 @@ const SCHOOL_OUTFIT =
 // garçon », « comme un petit garçon »), never a role where he is a child: both stay `minor_reference`.
 const BOY_NAME =
   /(?<!\b(celle|celui|ceux|celles|taille|l'?air|digne) d'? ?(une? )?|\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix) (de|d'?) ?(une? )?|\bon dirait (une? )?|\bcomme (une? )?)\b(petit|vilain) garcon\b/g;
+// She says she is under 18, in any message (Sécurité, #1054): « j'ai 14 ans », « en tenue de collégienne j'ai 14
+// ans », « I'm 16 », « ho 16 anni », « tengo 16 años ». Not a length of time (« j'ai 15 ans d'expérience »), not her
+// past (« à 16 ans j'étais… », « quand j'avais 16 ans »).
+const HER_MINOR_AGE = new RegExp(
+  [
+    "\\b(j'?ai|j ai|moi,?|ho|tengo) (1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix[ -]?sept|diciassette|sedici|quindici|quattordici|tredici|dodici|undici|diecisiete|dieciseis|quince|catorce|trece|doce|once) ?(ans?|piges?|balais|berges|anni|anos)\\b(?! ?(d'|de |d |que |qu'|di |fa\\b|en |dans |depuis|ensemble|avec))",
+    "\\b(i'?m|i am) (1[0-7]|[1-9]|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)( years? old| yo)?(?= ?($|[,.!?;]|and\\b|et\\b|btw\\b))",
+  ].join('|'),
+);
+
 // His body, or a part of it, compared to a child's (Sécurité, #1054): « t'as un corps de petit garçon », « des mains
 // d'enfant ». Blocking, a `minor_reference`, whatever his desire map.
 const CHILD_BODY =
@@ -1153,7 +1163,10 @@ export function checkVoiceOutput(
       : meetingCommitment(bubble, context.fanLastMessage);
     if (committed !== undefined)
       violations.push({ code: 'meeting_promise', severity: 'blocking', bubbleIndex, match: committed });
-    const compared = MINOR_COMPARISON.exec(withoutBoyName(text))?.[0] ?? CHILD_BODY.exec(text)?.[0];
+    const compared =
+      MINOR_COMPARISON.exec(withoutBoyName(text))?.[0] ??
+      CHILD_BODY.exec(text)?.[0] ??
+      HER_MINOR_AGE.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
     // « Petit garçon » said to him: soft, his game when his map holds humiliation; blocking once he is a child in a

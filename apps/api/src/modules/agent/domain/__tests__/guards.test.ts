@@ -496,6 +496,27 @@ describe('voice guards', () => {
     ).toEqual([]);
   });
 
+  it('never lets her say she is under 18, and lets a length of time or her past through (Sécurité, #1054)', () => {
+    for (const bubble of [
+      'j’ai 14 ans',
+      'j’ai 16 ans tu sais',
+      'en tenue de collégienne j’ai 14 ans',
+      'I’m 16',
+      'ho 16 anni',
+      'tengo 16 años',
+    ])
+      expect(codes([bubble]), bubble).toContain('minor_reference');
+    for (const bubble of [
+      'j’ai 15 ans d’expérience',
+      'à 16 ans j’étais timide',
+      'quand j’avais 16 ans, je dansais',
+      'j’ai 16 ans de boîte',
+      'j’ai 25 ans',
+      'I’m 5 minutes away',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('minor_reference');
+  });
+
   it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
     for (const text of ['c’est mignon, t’as zoomé ? 😂', 'range ça, je cherche encore 😅'])
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);

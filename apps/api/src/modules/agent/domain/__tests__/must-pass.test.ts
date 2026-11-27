@@ -47,6 +47,9 @@ describe('permitted phrases that must always pass, output guards', () => {
     't’étais comment enfant ?',
     'mon enfance à la campagne',
     'have you got kids?',
+    'j’ai 15 ans d’expérience',
+    'à 16 ans j’étais timide',
+    'quand j’avais 16 ans, je dansais',
     'hai figli?',
     '¿tienes hijos?',
   ])('minor_reference lets « %s » through', (bubble) => {
