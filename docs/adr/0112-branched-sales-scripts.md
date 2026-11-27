@@ -81,6 +81,7 @@ Le 15/11/2026 au soir, Charles veut que l'IA vende par des scripts à branches, 
 13. **Créé inactif, avec la liste de ce qui manque** (repris de l'éditeur concurrent) : nom, description du script, et pour chaque branche ses médias, ses descriptions validées, son texte d'offre, son prix si elle est payante. Un bouton mène au premier manque. Un script ne s'active que sans manque et par un humain.
 
 14. **Refusé à l'activation** : un même média deux fois sur un chemin, un mélange Jour et Nuit, une branche qui touche un dégoût de la persona, une condition structurée hors de la liste, deux branches par défaut dans une étape. **Avertissements** (pas des refus) : prix de P6-01 (plus du double de l'étape payante précédente, plus de 40 € TTC) calculés chemin par chemin ; une étape sans branche par défaut.
+   *Avenant du 27/11/2026 (Charles, carte « Prix fixe, escalier gardé » et précision de 13 h 40 ; ADR 0098, avenant du même jour) :* refusée aussi, comme un manque (`price_not_above_previous`), une branche payante qui ne coûte pas **strictement plus** que la dernière étape payante de son chemin, chemin par chemin, ponts et étapes offertes sautés ; rien de plus n'est exigé. L'avertissement « plus du double » est inchangé. *Avenant du 27/11/2026, 15 h 47 (Charles, méthode § 10.27, Q2) :* l'avertissement de prix au-dessus du plus haut conseillé est **retiré** (son code `price_above_ceiling` aussi) : le prix de chaque étape est saisi par l'agence, aucun montant conseillé n'est écrit dans le code.
 
 ### E. Écrire un script
 

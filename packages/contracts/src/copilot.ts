@@ -4,6 +4,7 @@ import { PlatformSchema } from './enums';
 import { DraftTranslationSchema } from './fan-language';
 import { ConversationIdSchema, CreatorIdSchema, DraftIdSchema, FanIdSchema } from './ids';
 import { RejectReasonSchema } from './playground';
+import { StepPriceReasonSchema } from './step-price';
 import { FanStandingSchema } from './to-talk';
 
 /**
@@ -224,6 +225,18 @@ export const CopilotAssistSchema = z.strictObject({
   clicksLeftToday: z.number().int().nonnegative(),
   /** § 4 bis; null under a cut, absent from a server that does not send it yet. */
   saleMoment: SaleMomentSchema.nullable().exactOptional(),
+  /**
+   * The staircase's decision on the paid step of the draft (ADR 0098, avenant du 27/11/2026): « Étape N », its price
+   * (`null` when none goes) and why. Absent without a draft, under a cut, or from an older trace.
+   */
+  stepPrice: z
+    .strictObject({
+      stepName: CopilotLabelSchema,
+      priceMinor: z.number().int().positive().nullable(),
+      reason: StepPriceReasonSchema,
+      label: CopilotLabelSchema,
+    })
+    .exactOptional(),
 });
 export type CopilotAssist = z.infer<typeof CopilotAssistSchema>;
 

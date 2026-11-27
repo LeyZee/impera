@@ -266,6 +266,9 @@ const SCRIPTED: Readonly<Record<Exclude<EngineRefusal, OfferRefusal>, Said>> = {
   no_script: { move: 'reply', block: null, verdict: 'not_yet' },
   scripts_exhausted: { move: 'reply', block: null, verdict: 'not_yet' },
   price_mismatch: { move: 'reply', block: null, verdict: 'not_yet' },
+  // The staircase: no paid step above his last one tonight, or none under the cap at the start.
+  limit_reached: { move: 'reply', block: null, verdict: 'not_yet' },
+  capped_at_start: { move: 'reply', block: null, verdict: 'not_yet' },
   // Her pick only: the engine itself refuses nothing.
   no_pick: { move: 'reply', block: null, verdict: 'good' },
   // The hot session ended with his heat: it comes back within the session.
@@ -367,5 +370,41 @@ describe('the panel says what the engine decided, for every refusal (audit 27/11
       copilotTrace({ ...plain, scriptStart: { open: false, missing: ['not_sexualizing'] } }).saleMoment
         ?.verdict,
     ).toBe('soon');
+  });
+});
+
+describe('the staircase in the trace (ADR 0098, avenant du 27/11/2026)', () => {
+  it('keeps the paid step decided, its price and why', () => {
+    const scripts = scriptTurn({ ...turnInput, latest: teased, history: history([0]) });
+    const trace = copilotTrace({ ...plain, scripts, latest: teased });
+    expect(trace.stepPrice).toEqual({
+      stepIndex: 1,
+      priceMinor: 1_500,
+      reason: 'next_step',
+      previousPaidMinor: null,
+      capMinor: null,
+    });
+    expect(CopilotTraceSchema.parse(trace)).toEqual(trace);
+  });
+
+  it('says the cap at the start when the first paid step is above it', () => {
+    const scripts = scriptTurn({
+      ...turnInput,
+      latest: teased,
+      history: history([0]),
+      pricing: { biggestPurchaseMinor: 800, setting: { startCapMultiple: 1.25 } },
+    });
+    const trace = copilotTrace({ ...plain, scripts, latest: teased });
+    expect(trace.stepPrice).toEqual({
+      stepIndex: 1,
+      priceMinor: null,
+      reason: 'capped_at_start',
+      previousPaidMinor: null,
+      capMinor: 1_000,
+    });
+  });
+
+  it('carries nothing when no paid step is decided', () => {
+    expect(copilotTrace(plain).stepPrice).toBeUndefined();
   });
 });

@@ -355,6 +355,12 @@ export const NO_MOANS_HINT = 'pas de bruits de plaisir écrits à ce stade';
 /** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
 export const IN_TENSION_HINT =
   'il vient d’ouvrir ce qu’elle lui a envoyé : elle s’assure qu’il a aimé et qu’il est toujours chaud, reste dans la tension, sans rien proposer encore';
+/**
+ * His staircase is at its top (ADR 0098, avenant du 27/11/2026): nothing of her script is strictly above what he last
+ * bought. No paid step tonight; she ends the sexting with him, warmly, in words.
+ */
+export const STAIRCASE_TOP_HINT =
+  'elle ne lui propose plus rien ce soir : elle finit le jeu avec lui, chaleureuse et complice, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
 /** She opens it herself with a fan who does not go there (passe 17, guide 26/11). */
 export const ONE_NOTCH_HINT =
   'il n’y vient pas de lui-même : elle peut tenter une ouverture, une seule ce soir, un cran à la fois ; s’il ne suit pas, elle laisse tomber pour ce soir';

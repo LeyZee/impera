@@ -4,6 +4,7 @@ import {
   ArchivedCreatorSchema,
   CopilotSwitchesSchema,
   FanTiersSettingSchema,
+  StaircaseSettingSchema,
   CreatorIdSchema,
   CreatorListSchema,
   CreatorSummarySchema,
@@ -211,6 +212,41 @@ export function createCreatorRoutes(
         const tiers = await directory.setFanTiers(request.params.id, request.body, user.id);
         if (tiers === null) throw new CreatorNotFound();
         return tiers;
+      },
+    );
+
+    // Créatrices › (elle) › Compte › Paliers de ses fans: the cap at a script's start (ADR 0098, avenant du 27/11/2026),
+    // the agency's number, entered by the owner alone; none in the repository.
+    app.get(
+      '/creators/:id/staircase',
+      {
+        preValidation: requireRole('owner'),
+        schema: { params: CreatorParamsSchema, response: { 200: StaircaseSettingSchema } },
+      },
+      async (request) => {
+        const setting = await directory.staircase(request.params.id);
+        if (setting === null) throw new CreatorNotFound();
+        return setting;
+      },
+    );
+
+    app.put(
+      '/creators/:id/staircase',
+      {
+        // Money: the owner's call, with a recent sign-in, like her other money settings.
+        preValidation: [requireRole('owner'), recentLogin],
+        schema: {
+          params: CreatorParamsSchema,
+          body: StaircaseSettingSchema,
+          response: { 200: StaircaseSettingSchema },
+        },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const setting = await directory.setStaircase(request.params.id, request.body, user.id);
+        if (setting === null) throw new CreatorNotFound();
+        return setting;
       },
     );
     return Promise.resolve();

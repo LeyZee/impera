@@ -154,6 +154,8 @@ const GAP_TEXTS: Readonly<Record<PreparedScriptGap['code'], string>> = {
   branch_two_defaults: 'deux branches par défaut, une seule permise',
   branch_cheaper_on_spend: 'une condition de dépense mène à une branche moins chère que celle par défaut',
   branch_previous_unknown: 'la branche suivie n’existe plus',
+  price_not_above_previous:
+    'prix pas plus haut que l’étape payante d’avant\u00a0: monte le prix de cette branche',
   media_twice: 'le même média est vendu deux fois',
   disgust: 'un texte touche une de ses limites',
   condition_text_missing: 'la phrase que l’IA vérifie est vide',
@@ -168,7 +170,6 @@ export function gapText(content: PreparedScriptContent, gap: PreparedScriptGap):
 
 const WARNING_TEXTS: Readonly<Record<PreparedScriptWarning['code'], string>> = {
   price_more_than_double: 'plus du double de l’étape payante d’avant',
-  price_above_ceiling: 'au-dessus du prix le plus haut conseillé',
   step_without_default: 'aucune branche par défaut : un fan sans condition remplie ne reçoit rien',
 };
 

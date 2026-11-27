@@ -10,6 +10,7 @@ import { offerSignals, sameEvening, type OfferContext } from './policy';
 import {
   mayOpenScript,
   permittedScripts,
+  type NextScriptStepInput,
   type PlatformScriptView,
   type ScriptHistoryView,
   type ScriptRun,
@@ -36,6 +37,8 @@ export interface ScriptsInput {
   readonly earlier?: readonly ScriptRun[];
   /** How many times she already teased him about `latest`, a run he left. Absent: never. */
   readonly teased?: number;
+  /** What the staircase of paid steps reads of him (ADR 0098, avenant du 27/11/2026). Absent: no cap, not a whale. */
+  readonly pricing?: NextScriptStepInput['pricing'];
 }
 
 /** A script the brain may pick, by the short id it answers with, and what of his desire map it meets. */
@@ -103,6 +106,7 @@ export function scriptChoices(
     moment: isNight(situation) ? 'night' : 'day',
     history: scripts.history,
     language,
+    ...(scripts.pricing !== undefined && { pricing: scripts.pricing }),
   });
   const { ranked, uncovered } = rankByFantasy(permitted, map);
   // No script may open at this message (recette REV-13): none to pick, his fantasies without a script still said.
@@ -265,6 +269,7 @@ export function scriptsTurnOf(facts: {
     heCame: facts.heCame,
     hisMessagesAt: facts.hisMessagesAt,
     mayAct: facts.mayAct,
+    ...(scripts.pricing !== undefined && { pricing: scripts.pricing }),
   });
 }
 

@@ -5,6 +5,7 @@ import type {
   ArchivedCreator,
   CopilotSwitches,
   FanTiersSetting,
+  StaircaseSetting,
   CreatorId,
   CreatorSummary,
   DayRange,
@@ -70,6 +71,13 @@ export interface CreatorDirectory {
   fanTiers(id: CreatorId): Promise<FanTiersSetting | null>;
   /** Sets all three, audited with the owner who set them; `null` when she does not exist. */
   setFanTiers(id: CreatorId, tiers: FanTiersSetting, userId: string): Promise<FanTiersSetting | null>;
+  /**
+   * Her staircase settings (ADR 0098, avenant du 27/11/2026), empty when never set (all off); `null` when she does not
+   * exist.
+   */
+  staircase(id: CreatorId): Promise<StaircaseSetting | null>;
+  /** Replaces them whole, audited with the owner who set them; `null` when she does not exist. */
+  setStaircase(id: CreatorId, setting: StaircaseSetting, userId: string): Promise<StaircaseSetting | null>;
 }
 
 /**

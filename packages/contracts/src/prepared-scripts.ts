@@ -114,6 +114,11 @@ export const PREPARED_SCRIPT_GAP_CODES = [
   'branch_two_defaults',
   'branch_cheaper_on_spend',
   'branch_previous_unknown',
+  /**
+   * A paid branch that costs no more than the paid step before it (ADR 0098 and ADR 0112 § 14, avenant du 27/11/2026):
+   * each paid step costs strictly more than the one before, never the same.
+   */
+  'price_not_above_previous',
   'media_twice',
   /** A text touches what she never says, never does, or what disgusts her (her active persona). */
   'disgust',

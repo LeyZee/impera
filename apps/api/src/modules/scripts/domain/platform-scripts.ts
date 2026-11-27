@@ -21,13 +21,7 @@ import { byRankThenRef } from './branches';
  * run or a reward may still name it); one back again is active again.
  */
 
-/**
- * The warning ceiling of a step's price: 40 € VAT included, in minor units (P6-01; unit confirmed by Charles on
- * 14/11/2026). A warning to the agency at import, never a refusal: the price stays the platform's.
- */
-const PLATFORM_SCRIPT_PRICE_CEILING_MINOR = 4000;
-
-type PlatformScriptWarningCode = 'price_more_than_double' | 'price_above_ceiling' | 'step_without_default';
+type PlatformScriptWarningCode = 'price_more_than_double' | 'step_without_default';
 
 /** A step whose price the agency should look at; `position` counts from 0, as the platform's `stepIndex`. */
 export interface PlatformScriptWarning {
@@ -43,40 +37,60 @@ interface PricedStep {
 }
 
 /**
- * P6-01, path by path (ADR 0112 § 14): a paid step that costs more than twice the paid step before it on some path
- * (tripling cut the old bot's sales short), or more than the ceiling. Free steps neither warn nor reset the comparison:
- * the step before is the last paid one of the path. A change of currency between two paid steps compares nothing.
- * Without branches, a path is the script.
+ * Each paid step with the last paid step before it on every path that reaches it (ADR 0112 § 14), path by path:
+ * free steps (price 0, a bridge or an offered step) neither count nor reset the comparison; a paid step of a path with
+ * none paid before it has no previous. Without branches, a path is the script. Shared by the price warnings and the
+ * staircase (`priceNotAbovePrevious`).
  */
-export function priceWarnings(steps: readonly PricedStep[]): PlatformScriptWarning[] {
-  const warnings: PlatformScriptWarning[] = [];
+function paidStepsWithPrevious<T extends PricedStep>(
+  steps: readonly T[],
+): { readonly step: T; readonly position: number; readonly previous: readonly T[] }[] {
+  const paid: { readonly step: T; readonly position: number; readonly previous: readonly T[] }[] = [];
   const ranks = [...new Set(steps.map((step) => step.platformIndex))].sort((a, b) => a - b);
   // The last paid step of the paths that reach this rank, each once; `null` for a path with none paid yet.
-  let before: ReadonlySet<PricedStep | null> = new Set([null]);
+  let before: ReadonlySet<T | null> = new Set([null]);
   for (const rank of ranks) {
-    const after = new Set<PricedStep | null>();
+    const after = new Set<T | null>();
     steps.forEach((step, position) => {
       if (step.platformIndex !== rank) return;
       if (step.priceMinor === 0) {
         for (const previous of before) after.add(previous);
         return;
       }
-      if (
-        [...before].some(
-          (previous) =>
-            previous !== null &&
-            previous.currency === step.currency &&
-            step.priceMinor > 2 * previous.priceMinor,
-        )
-      )
-        warnings.push({ code: 'price_more_than_double', position });
-      if (step.currency === 'EUR' && step.priceMinor > PLATFORM_SCRIPT_PRICE_CEILING_MINOR)
-        warnings.push({ code: 'price_above_ceiling', position });
+      // A change of currency between two paid steps compares nothing.
+      const previous = [...before].filter((one): one is T => one !== null && one.currency === step.currency);
+      paid.push({ step, position, previous });
       after.add(step);
     });
     before = after;
   }
+  return paid;
+}
+
+/**
+ * P6-01, path by path (ADR 0112 § 14): a paid step that costs more than twice the paid step before it on some path
+ * (tripling cut the old bot's sales short). Free steps neither warn nor reset the comparison:
+ * the step before is the last paid one of the path. A change of currency between two paid steps compares nothing.
+ * Without branches, a path is the script.
+ */
+export function priceWarnings(steps: readonly PricedStep[]): PlatformScriptWarning[] {
+  const warnings: PlatformScriptWarning[] = [];
+  for (const { step, position, previous } of paidStepsWithPrevious(steps)) {
+    if (previous.some((one) => step.priceMinor > 2 * one.priceMinor))
+      warnings.push({ code: 'price_more_than_double', position });
+  }
   return warnings.sort((a, b) => a.position - b.position);
+}
+
+/**
+ * The staircase (ADR 0098 and ADR 0112 § 14, avenant du 27/11/2026): the positions of the paid steps that cost no more
+ * than the paid step before them on some path. Each paid step costs strictly more than the last paid one, never the
+ * same; nothing more is asked.
+ */
+export function priceNotAbovePrevious(steps: readonly PricedStep[]): number[] {
+  return paidStepsWithPrevious(steps)
+    .filter(({ step, previous }) => previous.some((one) => step.priceMinor <= one.priceMinor))
+    .map(({ position }) => position);
 }
 
 /**

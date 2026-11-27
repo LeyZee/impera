@@ -193,6 +193,25 @@ describe('the price warnings of a script in preparation', () => {
   });
 });
 
+describe('the staircase of a script in preparation (avenant du 27/11/2026)', () => {
+  it('refuses a paid branch that costs no more than the paid step before it, free bridges skipped', () => {
+    const content = script([
+      [branch(1, { priceMinor: 1_000 })],
+      [branch(2)],
+      [branch(3, { priceMinor: 1_000 })],
+    ]);
+    expect(preparedScriptGaps(content, described(['m1', 'm2', 'm3']), noLimits)).toEqual([
+      { code: 'price_not_above_previous', step: 2, branch: key(3), term: null },
+    ]);
+    const climbing = script([
+      [branch(1, { priceMinor: 1_000 })],
+      [branch(2)],
+      [branch(3, { priceMinor: 1_100 })],
+    ]);
+    expect(preparedScriptGaps(climbing, described(['m1', 'm2', 'm3']), noLimits)).toEqual([]);
+  });
+});
+
 describe('the states of a script in preparation', () => {
   it('becomes ready only without a gap, and goes back to editing on a save', () => {
     expect(preparedTransition('editing', 'ready', 0)).toEqual({ ok: true, next: 'ready_to_copy' });
