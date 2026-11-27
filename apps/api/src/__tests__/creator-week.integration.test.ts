@@ -211,7 +211,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   // Each stage brings her week there from wherever the tests before left it, so that any test also runs alone (`-t`).
   /** Computed by the Sunday evening's job. */
   const computed = async () => {
-    if ((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode === 404)
+    if ((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode === 204)
       await app.modules.creatorWeek.jobs.plan(sundayEvening);
   };
   /** Validated by the owner, with his corrections. */
@@ -243,7 +243,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       outcomes: {},
       failed: [],
     });
-    expect((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode).toBe(404);
+    expect((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode).toBe(204);
     expect(await app.modules.creatorWeek.jobs.plan(sundayEvening)).toEqual({
       outcomes: { written: 2 },
       failed: [],
