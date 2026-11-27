@@ -224,6 +224,11 @@ const HER_MINOR_AGE = new RegExp(
 const CHILD_BODY = new RegExp(
   `\\b(corps|mains?|bras|jambes?|torse|visage|tete|epaules?|physique|silhouette|peau|cuisses?|pieds?|doigts?|morphologie|carrure|voix|${INTIMATE_PARTS}) (de|d'?) ?(une? |petit |petite )?(petit garcon|petite fille|enfants?|gamine?s?|gosses?|fillettes?|ados?|adolescente?s?)\\b`,
 );
+// In English the child comes first (Sécurité, #1054): « your little boy body », « a kid's body », « little girl » before
+// an intimate part. The shared lexicon again, with plain body words.
+const CHILD_BODY_EN = new RegExp(
+  `\\b(little (boy|girl)|kid|child|children|teen(ager)?|young (boy|girl))('?s)? (body|hands?|face|skin|legs?|feet|voice|chest|figure|privates|private parts|${INTIMATE_PARTS})\\b`,
+);
 const CHILD_ROLE_FOR_HIM =
   /\b(joue|jouer|joues|jouons|sois|seras|serais|deviens|devenir|redeviens|comme si t'? ?etais|fais|faire) (le |mon |un |ton |notre )?(petit|vilain) garcon\b|\b(maman|mommy|mummy|mama|mami)\b[^.!?]{0,40}\b(petit|vilain) garcon\b|\b(petit|vilain) garcon\b[^.!?]{0,40}\b(maman|mommy|mummy|mama|mami)\b/;
 
@@ -1189,6 +1194,7 @@ export function checkVoiceOutput(
     const compared =
       MINOR_COMPARISON.exec(withoutBoyName(text))?.[0] ??
       CHILD_BODY.exec(text)?.[0] ??
+      CHILD_BODY_EN.exec(text)?.[0] ??
       HER_MINOR_AGE.exec(text)?.[0];
     if (compared !== undefined)
       violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });

@@ -511,11 +511,15 @@ describe('voice guards', () => {
       'ton sexe de petit garçon',
       't’as un sexe d’enfant',
       'tes fesses de petite fille',
+      'ton zizi de petit garçon',
+      'your little boy body',
+      'you have a kid’s body',
+      "a kid's body",
     ]) {
       expect(codes([bubble]), bubble).toContain('minor_reference');
       expect(isBlocked(checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS)), bubble).toBe(true);
     }
-    for (const bubble of ['tes petites fesses', 'ton petit sexe 😏']) {
+    for (const bubble of ['tes petites fesses', 'ton petit sexe 😏', 'your little body']) {
       expect(codes([bubble]), bubble).not.toContain('minor_reference');
       expect(checkYouthWords([bubble], true), bubble).toEqual([]);
     }
