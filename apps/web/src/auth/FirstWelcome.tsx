@@ -206,7 +206,7 @@ function ChatterWelcome({ name, onGo }: { name: string; onGo: (to: string) => vo
         <Step
           n={2}
           title="Relie-la à ton compte"
-          text="Un code à coller dans l’extension, une seule fois par navigateur."
+          text="Dans Sécurité, « Relier l’extension » : un code à coller dans l’extension, une fois par navigateur."
           action="Relier"
           onClick={() => {
             onGo('/moi/securite');
