@@ -159,6 +159,25 @@ describe('safetySigns (recette AGT-01)', () => {
     expect(safetySigns(text)).toEqual(['self_harm']);
   });
 
+  // ADR 0168 § 4, read sentence by sentence (27/11): a sentence in a language the guards do not read keeps its number.
+  it.each([
+    'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir',
+    'ich bin 15. salut ça va, tu fais quoi ce soir',
+    'jestem 15 i chodze do szkoly. coucou toi, tu fais quoi ce soir ?',
+  ])('reads the bare number of a sentence the guards do not read in « %s »', (text) => {
+    expect(safetySigns(text, new Date(), 'french')).toEqual(['minor_suspected']);
+  });
+
+  it.each([
+    'ciao bello. tu fais quoi ce soir ? on se parle à 15h',
+    'ok baby. j’ai fini le boulot, je suis crevé',
+    'Lukas. c’est mon prénom, et toi ?',
+    'danke. je rentre le 15, tu seras là ?',
+    'ich bin müde und gehe schlafen. bonne nuit ma belle',
+  ])('lets « %s » through: a lone foreign word, a name, no number in the other sentence', (text) => {
+    expect(safetySigns(text, new Date(), 'french')).toEqual([]);
+  });
+
   it('says both, the minor first, when he says both', () => {
     expect(safetySigns('j’ai 15 ans et je veux mourir')).toEqual(['minor_suspected', 'self_harm']);
   });

@@ -165,6 +165,46 @@ export function detectLanguage(text: string): DetectedLanguage {
   return words.length >= UNKNOWN_FROM_WORDS ? 'unknown' : null;
 }
 
+/**
+ * The sentences of a message: cut at a full stop, a question or exclamation mark, a semicolon or an ellipsis followed
+ * by a space or the end, at a line break, or at a colon followed by a space. « 15.30 » or « 15:30 » stay whole.
+ */
+export function sentencesOf(text: string): string[] {
+  return text
+    .split(/[.!?;…]+(?=\s|$)|\n+|:\s/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== '');
+}
+
+/**
+ * A number from 10 to 17 standing alone in a sentence: not part of a longer number, a time, a sum or a minute count
+ * (« 15h », « 15€ », « 15 min »). The age net reads it further (`safetySigns`).
+ */
+const TEEN_IN_SENTENCE =
+  /(?<![\p{N}.,:/+\-#€$£])1[0-7](?![\p{N}.,:/]|\s?(?:h|min|mn|€|\$|£|%|eur|euros?)(?!\p{L}))/u;
+
+/**
+ * The sentences of his message that the guards do not read (ADR 0168 § 4 and § 5, read sentence by sentence on 27/11):
+ * a sentence read plainly as `'unknown'`, as a language outside `GUARDED_LANGUAGES`, or in another script. A sentence
+ * too short to be read plainly (« ciao bello », « ok baby », a first name, a brand) is not one of them, unless the
+ * message has other sentences and this one carries a number from 10 to 17 (« ich bin 15. salut ça va, tu fais quoi ce
+ * soir »): closed by default. A message of one sentence too short to be read is left to the reading of the whole
+ * message (his kept language). The single source for the age net and for `humanOnly`; the translation reads it too.
+ */
+export function uncoveredSentences(text: string): string[] {
+  const sentences = sentencesOf(text);
+  return sentences.filter((sentence) => {
+    const read = detectLanguage(sentence);
+    if (read === null) return sentences.length > 1 && TEEN_IN_SENTENCE.test(sentence);
+    return read === 'unknown' || !isGuardedLanguage(read);
+  });
+}
+
+/** Whether one sentence of his message is enough to treat it as one the guards do not read (ADR 0168 § 5). */
+export function hasUncoveredSentence(text: string): boolean {
+  return uncoveredSentences(text).length > 0;
+}
+
 /** How many words of the text code reads as words (Latin letters): what the output guard measures. */
 export function latinWordCount(text: string): number {
   return wordsOf(text).filter((word) => LATIN.test(word)).length;
@@ -251,7 +291,10 @@ export function decideLanguage(input: LanguageDecisionInput): LanguageDecision {
   const earlier = input.earlierFanText === undefined ? null : detectLanguage(input.earlierFanText);
   const notSpoken = fan === null || speaks(fan) || earlier === fan ? null : fan;
   const humanOnly =
-    fan === 'unknown' || (fan !== null && !isGuardedLanguage(fan)) || !isGuardedLanguage(reply);
+    fan === 'unknown' ||
+    (fan !== null && !isGuardedLanguage(fan)) ||
+    !isGuardedLanguage(reply) ||
+    input.fanTexts.some(hasUncoveredSentence);
   return { reply, fan, notSpoken, keep, humanOnly };
 }
 

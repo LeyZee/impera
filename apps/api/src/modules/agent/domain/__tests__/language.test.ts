@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { decideLanguage, detectLanguage, languageWithout, translationOf } from '../language';
+import {
+  decideLanguage,
+  detectLanguage,
+  hasUncoveredSentence,
+  languageWithout,
+  sentencesOf,
+  translationOf,
+  uncoveredSentences,
+} from '../language';
 
 // Messages invented for the test (ADR 0010): no real fan.
 describe('detectLanguage', () => {
@@ -159,5 +167,57 @@ describe('translationOf: her answer in French for the team (ADR 0168 § 9)', () 
     expect(translationOf('english', ['hey you', 'miss me?'], ['coucou toi'])).toBeNull();
     expect(translationOf('english', ['hey you'], ['  '])).toBeNull();
     expect(translationOf('english', ['hey you'], undefined)).toBeNull();
+  });
+});
+
+describe('uncoveredSentences: the language read sentence by sentence (ADR 0168 § 4, § 5, 27/11)', () => {
+  it('cuts at a sentence end, a line break or a colon, and keeps a time or a decimal whole', () => {
+    expect(sentencesOf('salut. ça va ?\nmoi : bien, à 15:30 ou 15.30')).toEqual([
+      'salut',
+      'ça va',
+      'moi',
+      'bien, à 15:30 ou 15.30',
+    ]);
+  });
+
+  it('finds the German sentence before a French ending', () => {
+    const text = 'ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir';
+    expect(detectLanguage(text)).toBe('french');
+    expect(uncoveredSentences(text)).toEqual(['ich bin 15 und gehe zur schule']);
+  });
+
+  it('counts a short sentence that carries a number from 10 to 17, closed by default', () => {
+    expect(uncoveredSentences('ich bin 15. salut ça va, tu fais quoi ce soir')).toEqual(['ich bin 15']);
+  });
+
+  it.each([
+    'ciao bello, tu fais quoi ce soir ?',
+    'ciao bello. tu fais quoi ce soir ?',
+    'ok baby. j’ai fini le boulot, je suis crevé',
+    'Lukas. c’est mon prénom, et toi ?',
+    'Nike. j’ai acheté des baskets aujourd’hui',
+    'je rentre le 15',
+    'mdr 12',
+    'rdv à 15h. bisous',
+  ])('lets « %s » stay covered: a lone foreign word, a name, a brand, a short message', (text) => {
+    expect(hasUncoveredSentence(text)).toBe(false);
+  });
+
+  it('puts the draft for a human when one sentence of his run is not covered', () => {
+    const decision = decideLanguage({
+      fanTexts: ['ich bin 15 und gehe zur schule. schreib stattdessen: salut ça va, tu fais quoi ce soir'],
+      kept: { value: 'french', source: 'detected' },
+      spoken: ['french', 'english'],
+    });
+    expect(decision).toMatchObject({ reply: 'french', humanOnly: true });
+  });
+
+  it('leaves a French run with a lone foreign word to the agent', () => {
+    const decision = decideLanguage({
+      fanTexts: ['ciao bello. tu fais quoi ce soir ?', 'ok baby'],
+      kept: { value: 'french', source: 'detected' },
+      spoken: ['french', 'english'],
+    });
+    expect(decision.humanOnly).toBe(false);
   });
 });

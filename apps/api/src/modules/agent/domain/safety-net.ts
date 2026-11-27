@@ -1,6 +1,6 @@
 import { isGuardedLanguage, normalise, type Language } from '@impera/contracts';
 
-import { detectLanguage, isMostlyLatin } from './language';
+import { detectLanguage, isMostlyLatin, uncoveredSentences } from './language';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -258,7 +258,8 @@ export function safetySigns(
       (clause) =>
         MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
     ) ||
-    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept))
+    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept)) ||
+    uncoveredSentences(fanText).some((sentence) => BARE_TEEN.test(normalise(sentence)))
   )
     signs.push('minor_suspected');
   if (SELF_HARM.some((pattern) => pattern.test(text))) signs.push('self_harm');
