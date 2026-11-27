@@ -1499,6 +1499,20 @@
       "when": 1795764894828,
       "tag": "0282_invoice_without_accountant_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 214,
+      "version": "7",
+      "when": 1795782734429,
+      "tag": "0283_chatter_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 215,
+      "version": "7",
+      "when": 1795784811699,
+      "tag": "0284_shift_not_taken",
+      "breakpoints": true
     }
   ]
 }
