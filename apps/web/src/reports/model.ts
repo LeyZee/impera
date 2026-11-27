@@ -563,6 +563,52 @@ export function awaitsDecision(report: ShiftReport, now: Date): boolean {
   return !(report.check?.state === 'complete' && report.check.verdict === 'within');
 }
 
+/**
+ * Why the counts of Équipe › Rapports differ (recette MAN-09, G12), in one line under « N rapports attendent »: what
+ * is the reader's, split between « Tout valider » and the gaps read one by one, then the reports that are not his to
+ * decide (his own shifts, a gap waiting for its member). `null` when every waiting report is his and goes in the lot:
+ * the numbers then say the same thing.
+ */
+export function waitingSplit(
+  waiting: readonly ShiftReport[],
+  held: ReadonlySet<string>,
+  now: Date,
+): string | null {
+  const mine = waiting.filter((one) => one.canReview && !held.has(one.id) && !gapWaits(one, now));
+  const gaps = mine.filter(hasGap).length;
+  const lot = mine.length - gaps;
+  const own = waiting.filter((one) => !one.canReview).length;
+  const explaining = waiting.filter((one) => one.canReview && gapWaits(one, now)).length;
+  if (gaps === 0 && own === 0 && explaining === 0) return null;
+  const parts: string[] = [];
+  if (mine.length > 0) {
+    parts.push(
+      gaps === 0
+        ? `${String(mine.length)} pour toi`
+        : lot === 0
+          ? `${String(gaps)} ${gaps === 1 ? 'écart' : 'écarts'} pour toi, à relire un par un`
+          : `${String(mine.length)} pour toi : ${String(lot)} dans « Tout valider », ${String(gaps)} ${
+              gaps === 1 ? 'écart à relire' : 'écarts à relire un par un'
+            }`,
+    );
+  }
+  if (own > 0) {
+    parts.push(
+      own === 1
+        ? '1 est le tien, un autre membre le valide'
+        : `${String(own)} sont les tiens, un autre membre les valide`,
+    );
+  }
+  if (explaining > 0) {
+    parts.push(
+      explaining === 1
+        ? '1 écart attend l’explication de son membre'
+        : `${String(explaining)} écarts attendent l’explication de leur membre`,
+    );
+  }
+  return parts.join(' · ');
+}
+
 /** « 3 à décider maintenant » : what the tab Équipe › Rapports counts and the page says under its waiting reports. */
 export const toDecideText = (count: number): string => `${String(count)} à décider maintenant`;
 

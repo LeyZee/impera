@@ -177,7 +177,13 @@ function PeriodView({
   const confirm = useConfirmAgain();
   const refresh = useRefreshPayroll();
   const latest = useLatestPayPeriod();
-  const [unchecked, setUnchecked] = useState<ReadonlySet<string>>(new Set());
+  // What is ticked: everything for the owner, nothing for a manager (recette MAN-11: the first statement validated
+  // closes the fortnight for the whole team, a gesture never prepared for him); `flipped` are the ones changed since.
+  const [choice, setChoice] = useState<{
+    readonly byDefault: boolean;
+    readonly flipped: ReadonlySet<string>;
+  }>(() => ({ byDefault: owner, flipped: new Set() }));
+  const isChecked = (id: string): boolean => choice.byDefault !== choice.flipped.has(id);
   const [sending, setSending] = useState<ReadonlySet<string>>(new Set());
   const [refusals, setRefusals] = useState<ReadonlyMap<string, PayRefusal>>(new Map());
   const [stopped, setStopped] = useState<Stopped | null>(null);
@@ -224,7 +230,7 @@ function PeriodView({
   const computing = data?.blocked ?? null;
   const blocked = computing !== null || block !== null || stop !== null;
   const pickable = data === undefined || blocked ? [] : validatable({ ended: data.ended, statements: rows });
-  const chosen = pickable.filter((one) => !unchecked.has(one.id) && !sending.has(one.id));
+  const chosen = pickable.filter((one) => isChecked(one.id) && !sending.has(one.id));
   const reread = rows.find((one) => {
     const refusal = refusals.get(one.id);
     return refusal?.kind === 'refused' && refusal.code === 'commission_statement_changed_conflict';
@@ -526,7 +532,7 @@ function PeriodView({
                 held={pickable.filter((one) => sending.has(one.id)).length}
                 of={pickable.length}
                 onAll={() => {
-                  setUnchecked(allChecked ? new Set(pickable.map((one) => one.id)) : new Set());
+                  setChoice({ byDefault: !allChecked, flipped: new Set() });
                 }}
                 onValidate={() => {
                   validate(chosen);
@@ -562,7 +568,7 @@ function PeriodView({
                       own={member.userId === me.id}
                       column={pickable.length > 0}
                       pick={pick}
-                      checked={pick && !unchecked.has(statement.id)}
+                      checked={pick && isChecked(statement.id)}
                       sending={sending.has(statement.id)}
                       who={(userId) => whoName(userId, me, names.members)}
                       refusal={
@@ -578,11 +584,11 @@ function PeriodView({
                       }
                       canSettle={owner}
                       onCheck={(on) => {
-                        setUnchecked((was) => {
-                          const next = new Set(was);
-                          if (on) next.delete(statement.id);
-                          else next.add(statement.id);
-                          return next;
+                        setChoice((was) => {
+                          const flipped = new Set(was.flipped);
+                          if (on === was.byDefault) flipped.delete(statement.id);
+                          else flipped.add(statement.id);
+                          return { ...was, flipped };
                         });
                       }}
                       onOpen={(paying) => {
@@ -857,7 +863,18 @@ function Summary({
       {data.beforeFirstClosing ? null : (
         <div className="py-sum__body">
           {data.ended ? (
-            <EndedHero statements={statements} paid={phase === 'paid'} rate={rate} stale={stale} />
+            <EndedHero
+              statements={statements}
+              paid={phase === 'paid'}
+              rate={rate}
+              stale={stale}
+              // The reader's own, which another member validates (recette MAN-09): said beside the count.
+              mine={
+                statements.filter(
+                  (one) => one.status === 'draft' && names.member(one.memberId).userId === me.id,
+                ).length
+              }
+            />
           ) : (
             <div className="py-hero">
               <p className="py-hero__label">
@@ -910,6 +927,10 @@ const sumOf = (statements: readonly CommissionStatement[]): number =>
 
 const statementsWord = (count: number): string => `${String(count)} relevé${count > 1 ? 's' : ''}`;
 
+/** « , dont le tien : un autre membre le valide »: why « Valider (N) » counts fewer (recette MAN-09). */
+const ownWords = (mine: number): string =>
+  mine === 0 ? '' : `, dont le tien : un autre membre de l’agence le valide`;
+
 /**
  * An ended period's one amount, never what is not validated counted as owed: what is paid once all is paid; what is
  * left to send of the validated statements once one is; before, what the drafts would pay once validated.
@@ -919,12 +940,15 @@ function EndedHero({
   paid,
   rate,
   stale,
+  mine = 0,
 }: {
   statements: readonly CommissionStatement[];
   paid: boolean;
   rate: boolean;
   /** The figures are those of the last computation that passed: said so, never shown as the truth. */
   stale: boolean;
+  /** Drafts of the reader's own: counted, never his to validate (recette MAN-09). */
+  mine?: number;
 }): JSX.Element {
   const drafts = statements.filter((one) => one.status === 'draft');
   const validated = statements.filter((one) => one.status === 'validated');
@@ -953,8 +977,8 @@ function EndedHero({
         drafts.length === 0
           ? null
           : validated.length + payments.length === 0
-            ? `${statementsWord(drafts.length)} à valider`
-            : `hors ce montant : ${amountText(sumOf(drafts), 'EUR')} encore à valider (${statementsWord(drafts.length)})`,
+            ? `${statementsWord(drafts.length)} à valider${ownWords(mine)}`
+            : `hors ce montant : ${amountText(sumOf(drafts), 'EUR')} encore à valider (${statementsWord(drafts.length)}${ownWords(mine)})`,
         paid && statements.length > 0
           ? `${statementsWord(payments.length)} payé${payments.length > 1 ? 's' : ''}`
           : null,

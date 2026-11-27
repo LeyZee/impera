@@ -571,6 +571,30 @@ describe('Paie › Quinzaine', () => {
     expect(within(dialog).getByRole('button', { name: 'Clore et valider le relevé' })).toBeTruthy();
   });
 
+  it('opens a manager’s fortnight with nothing ticked: the first validation closes it for the team (recette MAN-11)', async () => {
+    periods[OCT2] = periodOf(OCT2, [
+      statementOf(BASILE, OCT2),
+      statementOf(LOU, OCT2),
+      statementOf(IRIS, OCT2, { canValidate: false }),
+    ]);
+    renderPage(IRIS_ME);
+    const all = await screen.findByRole('checkbox', { name: /Tout sélectionner/u });
+    // Three to validate, his own among them, which another member validates (recette MAN-09).
+    expect(document.body.textContent).toContain(
+      '3 relevés à valider, dont le tien : un autre membre de l’agence le valide',
+    );
+    const ticked = (box: HTMLElement): boolean => box instanceof HTMLInputElement && box.checked;
+    expect(ticked(all)).toBe(false);
+    const ones = screen.getAllByRole('checkbox').filter((box) => box !== all);
+    expect(ones.map(ticked)).toEqual([false, false, false]);
+    expect(screen.queryByRole('button', { name: /^Valider \(/u })).toBeNull();
+    const [first] = ones;
+    if (first === undefined) throw new Error('No row to tick');
+    fireEvent.click(first);
+    expect(await screen.findByRole('button', { name: 'Valider (1)' })).toBeTruthy();
+    expect(writes).toEqual([]);
+  });
+
   it('says what blocks the period, and offers nothing to validate meanwhile, the manager’s own row locked', async () => {
     periods[OCT2] = endedOctober({}, false);
     reports = [
