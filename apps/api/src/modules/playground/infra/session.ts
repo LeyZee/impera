@@ -278,6 +278,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   let lastExchange: PlaygroundExchange | undefined;
   // When the policy last let her offer, on the simulated clock: the cooldown is tested with `advance`.
   let lastOfferAt: Date | null = null;
+  // His last fictive purchase on the simulated clock: the pause after a purchase (ADR 0128 § 1) is tested with `advance`.
+  let lastPurchaseAt: Date | null = null;
   // His age, unknown until he states an adult one, as for a real fan (P3-09).
   let ageConfirmedAt: Date | null = null;
   // ADR 0090: an order of his waits once she answered it; the replies of her bank he already received.
@@ -416,6 +418,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       : {
           now,
           lastOfferAt,
+          lastPurchaseAt,
           hasNoBudget: false,
           flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
           limits: deps.offerLimits,
@@ -456,6 +459,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       fanNotes.length = 0;
       lastExchange = undefined;
       lastOfferAt = null;
+      lastPurchaseAt = null;
       ageConfirmedAt = null;
       lastFanAt = null;
       followUpsSince = 0;
@@ -524,6 +528,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       });
       if (!bought.ok) return 'nothing_waiting';
       played(open.run.scriptRef).bought.add(open.step.stepIndex);
+      lastPurchaseAt = situation.now;
       moveRun(bought.run);
       const price = open.step.priceMinor ?? 0;
       scripts = { ...scripts, fictiveSpentCents: scripts.fictiveSpentCents + price };
