@@ -286,6 +286,39 @@ async function answersOnPlatform(
   return !history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
 }
 
+/**
+ * The watch waits this long when the agent is expected to answer him: its own turn reads her words first and pauses
+ * for them; the watch only catches what it did not reach (her hours closed, a time-waster's wait, a failure). Past the
+ * agent's own slowest pace (one answer every three minutes).
+ */
+const KEYWORD_WATCH_FALLBACK_MS = 5 * 60_000;
+
+/**
+ * Her alert words, read whoever answers him (`conversation.watch_keywords`): at once when the agent will not answer
+ * him (a human holds him, her agent is off, her session expired), else a while later in case it did not get to him.
+ * An archived creator's conversations are not watched (ADR 0071).
+ */
+async function watchKeywords(
+  tx: Transaction,
+  conversation: Conversation,
+  correlationId: string,
+  at: Date,
+): Promise<void> {
+  const blocked = await tx.gate.blockedReason(conversation);
+  if (blocked === 'creator_archived') return;
+  const agentAnswers = conversation.state === 'pending' && blocked === null;
+  await tx.jobs.enqueue(
+    'conversation.watch_keywords',
+    { creatorId: conversation.creatorId, conversationId: conversation.id, correlationId },
+    {
+      jobKey: jobKeyFor('conversation.watch_keywords', conversation.id),
+      runAt: agentAnswers ? new Date(at.getTime() + KEYWORD_WATCH_FALLBACK_MS) : at,
+      // A burst of his keeps the first fallback; a watch at once replaces a later one.
+      jobKeyMode: agentAnswers ? 'preserve_run_at' : 'replace',
+    },
+  );
+}
+
 /** Opens the lock and holds it for the transaction, or refuses Automatique with what is missing. */
 async function requireAutomaticOpen(tx: Transaction, voice: DraftVoice): Promise<void> {
   const gate = await readAutomaticGate(tx, voice);
@@ -457,6 +490,7 @@ export function createConversationCommands({
               },
             );
           }
+          if (isFresh) await watchKeywords(tx, conversation, input.correlationId, at);
         }
         return { conversationId: conversation.id, isNew: true };
       });

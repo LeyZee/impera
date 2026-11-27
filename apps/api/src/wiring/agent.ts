@@ -9,6 +9,7 @@ import {
   startCardReader,
   startDraftComposer,
   startFollowUpPlan,
+  startKeywordWatch,
   startKycSlots,
   startPersonaLanguages,
   type ActivePersonaSource,
@@ -16,7 +17,7 @@ import {
 } from '../modules/agent';
 import type { AlertsModule } from '../modules/alerts';
 import type { ConnectorsModule } from '../modules/connectors';
-import type { BubbleGuard, CardReader, DraftComposer } from '../modules/conversations';
+import type { BubbleGuard, CardReader, DraftComposer, KeywordWatch } from '../modules/conversations';
 import type { CustomOrdersModule } from '../modules/custom-orders';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
@@ -33,6 +34,8 @@ export interface WiredAgent {
   /** Undefined beside a composer plugged by a test: it would answer his last message again. */
   readonly followUps: ReturnType<typeof startFollowUpPlan> | undefined;
   readonly guard: BubbleGuard;
+  /** Her alert words read in what he wrote while the agent does not answer him, in code: no gateway. */
+  readonly keywordWatch: KeywordWatch;
   /** His card read in his messages (ADR 0085 § 7), on the app's gateway, whoever answers him. */
   readonly cardReader: CardReader;
   /** The canvas lines her active persona collects, for « À apprendre » in the Suivi (P5-01); every line without one. */
@@ -64,6 +67,12 @@ export function wireAgent(
 ): WiredAgent {
   const { logger } = shared;
   const { activePersona, persona, alerts, scheduling } = deps;
+  // Her alerts that are on, and the system's on for her (P4-01).
+  const alertsOf = async (creatorId: string) => {
+    const id = CreatorIdSchema.parse(creatorId);
+    const [custom, systemOn] = await Promise.all([alerts.store.activeFor(id), alerts.store.systemOn(id)]);
+    return { custom, systemOn };
+  };
   // Her scripts on the platform and his history there (ADR 0098): without them she sells nothing.
   const scriptReads = {
     scripts: deps.scripts.forJobs,
@@ -88,12 +97,7 @@ export function wireAgent(
       onLimitsNotSaved: (event) => {
         logger.warn(event, 'fan limit not saved');
       },
-      // Her alerts that are on, and the system's on for her (P4-01).
-      alertsOf: async (creatorId) => {
-        const id = CreatorIdSchema.parse(creatorId);
-        const [custom, systemOn] = await Promise.all([alerts.store.activeFor(id), alerts.store.systemOn(id)]);
-        return { custom, systemOn };
-      },
+      alertsOf,
       // A doubt on who she is goes to a chatter on shift now, without the margin (P4-01).
       chatterOnShift: async (creatorId, at) =>
         (await scheduling.onShift(CreatorIdSchema.parse(creatorId), at)).length > 0,
@@ -137,6 +141,7 @@ export function wireAgent(
     composer,
     followUps,
     guard,
+    keywordWatch: startKeywordWatch({ activePersona, alertsOf }),
     cardReader: startCardReader({
       gateway: deps.llm.gateway,
       onDroppedNotes: (event) => {

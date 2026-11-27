@@ -31,6 +31,7 @@ function harness(options: {
     managers: () => Promise.resolve([{ userId: 'manager', timeZone: 'Europe/Paris', creatorIds: [NORA] }]),
     members: (ids) =>
       Promise.resolve(ids.map((id) => ({ userId: `user-of-${id}`, timeZone: 'Europe/Paris' }))),
+    creatorAccounts: () => Promise.reject(new Error('not read here')),
   };
   const deps = {
     reads,

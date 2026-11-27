@@ -38,6 +38,65 @@ describe('alertKeywordsIn (P4-01)', () => {
   });
 });
 
+describe('alertKeywordsIn: typos and plurals (27/11/2026)', () => {
+  // Invented names and places, never hers (ADR 0010).
+  const HERS = [
+    'Brévanne',
+    'Castelmoure',
+    'Lunaria',
+    'Kerjean',
+    'Valentine',
+    'Saint-Aubrac',
+    'Martin',
+    'Ondine',
+  ];
+
+  it('finds a long word of hers mistyped or in the plural', () => {
+    expect(alertKeywordsIn('tu viens de brevane ?', HERS)).toEqual(['Brévanne']);
+    expect(alertKeywordsIn('les Brévannes', HERS)).toEqual(['Brévanne']);
+    expect(alertKeywordsIn('castlemoure', HERS)).toEqual(['Castelmoure']);
+    expect(alertKeywordsIn('castelmore', HERS)).toEqual(['Castelmoure']);
+    expect(alertKeywordsIn('lunarya', HERS)).toEqual(['Lunaria']);
+    expect(alertKeywordsIn('kerjan', HERS)).toEqual(['Kerjean']);
+    expect(alertKeywordsIn('saint aubracs', HERS)).toEqual(['Saint-Aubrac']);
+    expect(alertKeywordsIn('valentinne', HERS)).toEqual(['Valentine']);
+    expect(alertKeywordsIn('ondines', HERS)).toEqual(['Ondine']);
+  });
+
+  it('keeps a short word, a typo on the first letter and a final « e » alone as written', () => {
+    expect(alertKeywordsIn('kastelmoure', HERS)).toEqual([]);
+    expect(alertKeywordsIn('ondinne', HERS)).toEqual([]);
+    expect(alertKeywordsIn('mon pote valentin', HERS)).toEqual([]);
+    expect(alertKeywordsIn('tu bois un martini ?', HERS)).toEqual([]);
+    expect(alertKeywordsIn('les robots de cuisine', ['Robot'])).toEqual([]);
+    expect(alertKeywordsIn('69002', ['69001'])).toEqual([]);
+  });
+
+  it('never takes the words of an ordinary adult conversation for hers', () => {
+    const ordinary = [
+      't’es trop belle ce soir',
+      'j’ai passé une journée de malade au boulot',
+      'tu fais quoi ce week-end ?',
+      'je rentre du sport, je suis crevé',
+      'j’adore ta photo en robe rouge',
+      'c’est la saint valentin bientôt',
+      'je travaille dans la charpente',
+      'tu as un accent charmant',
+      'le marteau est tombé sur mon pied',
+      'je t’envoie un pourboire',
+      'envoie moi une vidéo coquine',
+      'je suis en déplacement à bordeaux',
+      'la lune est belle ce soir, lunaire même',
+      'je suis infirmier de nuit',
+      'je kiffe ta voix',
+      'j’ai envie de te voir en lingerie',
+      'mon fils joue au foot',
+      'je me sens seul ce soir',
+    ];
+    for (const line of ordinary) expect(alertKeywordsIn(line, HERS), line).toEqual([]);
+  });
+});
+
 describe('her alerts (P4-01)', () => {
   const VIDEO = CustomAlertIdSchema.parse('6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b');
   const JOB = CustomAlertIdSchema.parse('7a2d3b4c-5e6f-4a71-9b8c-0d1e2f3a4b5c');

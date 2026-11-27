@@ -9,7 +9,7 @@ import {
 
 import { classifyEvent } from '../domain/classify';
 import { creatorAlertLines } from '../domain/creator-alerts';
-import { agencyModesFor, alertMessage, modesFor, reachedRoles } from '../domain/route';
+import { agencyModesFor, alertMessage, herWordsNotice, modesFor, reachedRoles } from '../domain/route';
 
 /** One event of the outbox, as the router reads it (the service role, every creator). */
 export interface RoutedEventRow {
@@ -61,6 +61,11 @@ export interface RouterReads {
   managers(): Promise<readonly Manager[]>;
   /** The accounts of these team members, active ones only, each in his own time zone. */
   members(memberIds: readonly string[]): Promise<readonly Recipient[]>;
+  /**
+   * Her own accounts (role `creator`, given her and only her), in her time zone: told of her persona's words only
+   * (relecture Sécurité: an account given several creators is never hers).
+   */
+  creatorAccounts(creatorId: CreatorId): Promise<readonly Recipient[]>;
 }
 
 export interface RouterDeps {
@@ -165,8 +170,10 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
       }
     }
     const creatorName = event.creatorId === null ? null : (nameOf.get(event.creatorId) ?? null);
-    // A safety relay rings through the quiet hours and outside the daily cap (ADR 0150 § 6: « partent toujours »).
-    const reason = isCreatorAlertLocked(alert.code) ? 'safety_alert' : 'creator_alert';
+    // A safety relay rings through the quiet hours and outside the daily cap (ADR 0150 § 6: « partent toujours »), and
+    // so does a word of her persona: her name or her places written by a fan wait for nobody's morning (27/11/2026).
+    const reason =
+      isCreatorAlertLocked(alert.code) || alert.herWords === true ? 'safety_alert' : 'creator_alert';
     for (const { recipient, silent } of loudest.values()) {
       try {
         await deps.notify(
@@ -182,6 +189,28 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
         asked += 1;
       } catch (error) {
         deps.onFailure?.('notify', error);
+      }
+    }
+    // Her persona's words tell her too, whatever her tab says: never the fan, never the word (27/11/2026).
+    if (alert.herWords === true && event.creatorId !== null) {
+      const hers = await deps.reads.creatorAccounts(event.creatorId).catch(failed('creator_accounts'));
+      for (const recipient of hers) {
+        if (loudest.has(recipient.userId)) continue;
+        try {
+          await deps.notify(
+            {
+              userId: recipient.userId,
+              reason: 'safety_alert',
+              objectKey: event.id,
+              timeZone: recipient.timeZone,
+              message: herWordsNotice(),
+            },
+            now,
+          );
+          asked += 1;
+        } catch (error) {
+          deps.onFailure?.('notify', error);
+        }
       }
     }
   }

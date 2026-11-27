@@ -727,7 +727,7 @@ export function NotificationsTab({
           label="Mots-clés d’alerte"
           labelHidden
           id={`${id}-kw`}
-          hint="Toujours actifs : un fan qui en écrit un met l’agent en pause pour lui et prévient un humain."
+          hint="Toujours actifs, même avec une faute de frappe ou au pluriel pour un mot long : un fan qui en écrit un met l’agent en pause pour lui, et l’équipe et la créatrice sont prévenues, même la nuit."
           path="notifications.alert_keywords"
         >
           <Entries
