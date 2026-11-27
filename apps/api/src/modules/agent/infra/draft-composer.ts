@@ -1230,7 +1230,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
             },
           });
       const french = frenchOf(translated);
-      const signs = mergeSigns(originalSigns, french === null ? [] : safetySigns(french, input.now));
+      // The French is read as French: a short message of it is read by the French patterns (ADR 0168 § 4).
+      const signs = mergeSigns(
+        originalSigns,
+        french === null ? [] : safetySigns(french, input.now, 'french'),
+      );
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
