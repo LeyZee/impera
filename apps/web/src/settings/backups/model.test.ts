@@ -188,10 +188,12 @@ describe('restoreViewOf', () => {
     const view = restoreViewOf(status({ lastRestoreTest: null, restoreTestFresh: false }), NOW, PARIS);
     expect(view.tone).toBe('warn');
     expect(view.title).toBe('Aucun essai de restauration noté');
-    expect(view.text).toMatch(/moins de 90\u00a0jours\.$/u);
+    expect(view.text).toMatch(
+      /tous les 90\u00a0jours ; rien n’est bloqué en attendant, ni la paie ni les ventes\.$/u,
+    );
   });
 
-  it('says a test that missed rows holds the pay back, whatever its age', () => {
+  it('says a test that missed rows, and that nothing is blocked meanwhile (recette 27/11, C5)', () => {
     const view = restoreViewOf(
       status({
         lastRestoreTest: {
@@ -208,7 +210,7 @@ describe('restoreViewOf', () => {
     expect(view).toEqual({
       tone: 'warn',
       title: 'L’essai du 20 octobre n’a pas tout retrouvé',
-      text: 'Sauvegarde du 20 octobre restaurée en 52\u00a0s, mais 2\u00a0tables n’avaient pas le bon nombre de lignes. La paie attend un essai réussi de moins de 90\u00a0jours.',
+      text: 'Sauvegarde du 20 octobre restaurée en 52\u00a0s, mais 2\u00a0tables n’avaient pas le bon nombre de lignes. Un essai réussi tous les 90\u00a0jours ; rien n’est bloqué en attendant, ni la paie ni les ventes.',
       validity: null,
     });
   });
@@ -229,7 +231,7 @@ describe('restoreViewOf', () => {
     );
     expect(view.title).toBe('Le dernier essai date du 20 décembre 2025');
     expect(view.text).toBe(
-      'Sauvegarde du 19 décembre 2025 restaurée en 1\u00a0h\u00a005\u00a0min, toutes les lignes retrouvées. Il a plus de 90\u00a0jours : la paie attend un nouvel essai réussi.',
+      'Sauvegarde du 19 décembre 2025 restaurée en 1\u00a0h\u00a005\u00a0min, toutes les lignes retrouvées. Il a plus de 90\u00a0jours : refais un essai. Rien n’est bloqué en attendant.',
     );
   });
 });

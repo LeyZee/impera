@@ -475,7 +475,9 @@ function CheckFields({
           label="Tables qui diffèrent"
           hint={
             draft.rowCountMismatches.trim() !== '' && Number.isInteger(mismatches) && mismatches > 0 ? (
-              <span className="bk-hint--warn">Noté, mais la paie attendra un essai réussi.</span>
+              <span className="bk-hint--warn">
+                Noté. Refais un essai qui retrouve tout ; rien n’est bloqué en attendant.
+              </span>
             ) : (
               '0 quand toutes correspondent.'
             )
@@ -524,7 +526,7 @@ function Done({ test, onClose }: { test: RestoreTest; onClose: () => void }): JS
         />
         {test.rowCountMismatches === 0
           ? `Essai du ${day} : restauré en ${durationOf(test.durationSeconds)}, toutes les lignes retrouvées.`
-          : `Essai du ${day} : ${String(test.rowCountMismatches)} ${test.rowCountMismatches > 1 ? 'tables différaient' : 'table différait'}. La paie attend un essai réussi.`}
+          : `Essai du ${day} : ${String(test.rowCountMismatches)} ${test.rowCountMismatches > 1 ? 'tables différaient' : 'table différait'}. Refais un essai ; rien n’est bloqué en attendant.`}
       </p>
       <div className="bk-dialog__foot">
         <button type="button" className="nv-btn nv-btn--soft" onClick={onClose}>
