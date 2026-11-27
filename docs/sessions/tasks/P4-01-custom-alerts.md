@@ -1,5 +1,5 @@
 # P4-01 Alertes personnalisées, demandes de service et historique des alertes
-Statut : in_progress (ID validé par Charles le 27/10 à 20h37, carte « Les 5 sans capture, désir en tête »)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress (ID validé par Charles le 27/10 à 20h37, carte « Les 5 sans capture, désir en tête »)
 Phase : 4 (supervision)
 Dépend de : P3-07 (Telegram, routage par sujet ; à caler avec le fil Telegram), persona (`notifications.alert_keywords`), cerveau (`BriefSchema`), ADR 0020, ADR 0024 (rails)
 Branche : task/P4-01-custom-alerts

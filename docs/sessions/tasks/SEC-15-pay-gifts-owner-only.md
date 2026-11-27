@@ -1,5 +1,5 @@
 # SEC-15 Primes et ajustements réservés au propriétaire
-Statut : in_progress
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : le code de ce que la fiche liste est sur main ; vérifier en recette ce qui n'a pas été vu avec Charles) ; statut précédent : in_progress
 Phase : exploitation
 Dépend de : EQ-04, EQ-05
 Branche : claude/project-thread-bfbfaz (fil « Sécurité »), après SEC-14

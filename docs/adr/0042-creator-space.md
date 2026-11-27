@@ -1,5 +1,17 @@
 # 0042. Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0054 · Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule](0054-creator-earnings-read-from-platform.md) : Remplace : dans l'ADR 0042 § 6, la phrase « La source des ventes est celle de la paie pour ce compte (ADR 0023, ADR 0043) : les ventes saisies par les chatteurs, puis les ventes détectées. »
+>
+> - [0063 · La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base](0063-no-fan-notes-for-the-creator.md) : Remplace : dans l'ADR 0042 § 2, la phrase « **Elle voit tout son compte**, en lecture : ses ventes avec le fan qui a acheté, ses fans (pseudo, dépenses, notes), les conversations de ses comptes, ses médias et leurs descriptions, les publications prévues et passées, qui est en poste sur elle (nom affiché et créneau). »
+>
+> - [0065 · La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans](0065-creator-sees-who-wrote-and-fan-figures.md) : Remplace : dans l'ADR 0042 § 2, la phrase « l'auteur d'un message envoyé (chatteur ou agent, ADR 0021). Elle voit le message, jamais qui l'a écrit. » ; dans l'ADR 0063 § 3, les mots « sans jamais voir qui a écrit un message (ADR 0021) ».
+>
+> Toutes les décisions du même sujet : [`docs/regles/creatrice-et-contenu.md`](../regles/creatrice-et-contenu.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 02/11/2026 16h17, « ok 0042 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles ») ; § 6, la phrase sur la source des ventes remplacée par l'ADR 0054 ; § 2, la phrase « Elle voit tout son compte » remplacée par l'ADR 0063 ; § 2, la phrase sur l'auteur d'un message envoyé remplacée par l'ADR 0065
 Date : 2026-11-02
 Remplace :

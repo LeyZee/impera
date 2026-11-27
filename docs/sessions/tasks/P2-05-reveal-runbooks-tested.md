@@ -1,6 +1,6 @@
 # P2-05 Runbooks Reveal testés sur le compte de test
 
-Statut : todo
+Statut : todo (prioritaire avant le premier shift réel ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo
 Phase : 2
 Dépend de : P2-03
 Branche : task/p2-05-reveal-runbooks-tested

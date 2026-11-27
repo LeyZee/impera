@@ -20,7 +20,7 @@ Référence visuelle de départ : l'ancienne bannière violette du README (fond 
 
 ## Livrables attendus (tâche D-01)
 
-- **Tokens** : couleurs (fonds profonds, halos, surfaces vitrées à 3 niveaux d'opacité, texte, accents sémantiques succès/alerte/danger/vente), rayons, ombres et bords lumineux, flous, typographie (échelle), espacements, durées et courbes d'animation. Exprimés en CSS `@theme` Tailwind v4 dans `apps/web/src/styles/tokens.css`.
+- **Tokens** : couleurs (fonds profonds, halos, surfaces vitrées à 3 niveaux d'opacité, texte, accents sémantiques succès/alerte/danger/vente), rayons, ombres et bords lumineux, flous, typographie (échelle), espacements, durées et courbes d'animation. Exprimés en CSS `@theme` Tailwind v4 dans `packages/design-system/src/styles/tokens.css`.
 - **Composants** : barre latérale vitrée, carte de conversation, bulle de message (fan / Messa / brouillon), panneau de draft avec brief et traces, badge d'état, interrupteur (kill switch), toast de notification, fiche fan, graphiques de métriques (sobres).
 - **Écrans** : inbox copilote, conversation, fan, supervision, persona (phase 5), écran mobile de notification de vente.
 - **Guide** : `docs/design/README.md` expliquant les règles du verre (où oui, où non), les états (hover, focus, actif, désactivé) et les animations.

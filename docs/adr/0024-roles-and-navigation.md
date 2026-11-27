@@ -1,5 +1,13 @@
 # 0024. Rôles et navigation : chacun ne voit que ce qui le concerne
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0025 · Le chatteur chatte dans Reveal ; dans Nirvana, il traite sa créatrice pendant son shift, et rien hors shift](0025-chatter-access-during-shift.md) : Remplace : dans l'ADR 0024, le point qui réduit le Suivi du chatteur aux passations `sale` qui lui sont routées ; dans l'ADR 0023 (§ Mode hybride), le point « Gardes sur les messages du chatteur » qui faisait vendre le chatteur depuis Suivi
+>
+> Toutes les décisions du même sujet : [`docs/regles/equipe.md`](../regles/equipe.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 27/10/2026) ; le Suivi du chatteur est remplacé par l'ADR 0025
 Date : 2026-10-27
 Remplace : le § Navigation de l'ADR 0023 ; précise ses § Rôles et § Données et RLS (scope `owner`, statut `active`)
