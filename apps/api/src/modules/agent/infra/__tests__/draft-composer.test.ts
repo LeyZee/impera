@@ -3019,6 +3019,47 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
     expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('n’entre pas dans cette demande');
   });
 
+  it('after asking what he imagines, declines a theme she never does, noting nothing (Charles 27/11)', async () => {
+    // Her invented limit: never dressed as a clown.
+    const neverDo = ['déguisée en clown'];
+    const asked = ordering({
+      neverDo,
+      voice: { bubbles: ['mmh tu l’imagines comment ? 😏'] },
+      brief: { ...ORDER, customOrder: { format: null, supplements: [], minutes: null, details: {} } },
+    });
+    const first = await asked.draftComposer.compose({
+      ...INPUT,
+      history: [{ direction: 'inbound', text: 'Tu fais des vidéos perso ?', at: INPUT.now }],
+    });
+    expect(first).not.toHaveProperty('customOrderOpened');
+    expect(asked.seen.voiceInputs?.[0]?.brief.replyBrief).toContain('ce qu’il imagine');
+
+    const answered = ordering({
+      neverDo,
+      voice: { bubbles: ['ça c’est pas mon truc 🙈'] },
+      brief: {
+        ...ORDER,
+        customOrder: {
+          format: 'video',
+          supplements: [],
+          minutes: null,
+          details: { what: 'déguisée en clown' },
+        },
+      },
+    });
+    const second = await answered.draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'Tu fais des vidéos perso ?', at: INPUT.now },
+        { direction: 'outbound', text: 'mmh tu l’imagines comment ? 😏', at: INPUT.now },
+        { direction: 'inbound', text: 'Une vidéo de toi déguisée en clown', at: INPUT.now },
+      ],
+    });
+    expect(second).toMatchObject({ kind: 'draft' });
+    expect(second).not.toHaveProperty('customOrderOpened');
+    expect(answered.seen.voiceInputs?.[0]?.brief.replyBrief).toContain('n’entre pas dans cette demande');
+  });
+
   it('opens no second order while one waits', async () => {
     const { draftComposer, seen } = ordering({
       chatter: true,
