@@ -72,8 +72,13 @@ export function TimeField({
         const minute = minuteOfInput(event.target.value);
         if (minute !== null) onChange(minute);
       }}
-      onFocus={() => {
+      onFocus={(event) => {
         setFocused(true);
+        // The whole hour chosen, once it reads HH:MM: what is typed replaces it, never lands in its middle (recette MOD-07).
+        const input = event.currentTarget;
+        requestAnimationFrame(() => {
+          input.select();
+        });
       }}
       onBlur={() => {
         setFocused(false);

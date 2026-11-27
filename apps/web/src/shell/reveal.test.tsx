@@ -58,7 +58,8 @@ describe('useRevealAlerts', () => {
 
     rerender(<Panel failed />);
     await vi.waitFor(() => {
-      expect(scrollTo).toHaveBeenCalledWith({ top: 76, behavior: 'auto' });
+      // The test setup's `matchMedia` answers no to every query, so motion is not reduced.
+      expect(scrollTo).toHaveBeenCalledWith({ top: 76, behavior: 'smooth' });
     });
   });
 });

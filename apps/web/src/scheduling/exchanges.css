@@ -514,3 +514,156 @@
 .sc-fold__ask {
   align-self: flex-start;
 }
+
+/* ── « Mes dispos » (ADR 0171, trou 16): his week drawn, a line a day, a track from 0 h to 24 h ── */
+.sc-dispo-week {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-dispo-week__day {
+  display: contents;
+}
+.sc-dispo-week__name {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.sc-dispo-week__ranges {
+  color: var(--nv-ink-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.sc-dispo-week__day[data-empty='true'] > span {
+  color: var(--nv-ink-faint);
+  font-weight: 400;
+}
+/* The track of nv-meter, a bar per plage at its hour, in his calendar colour. */
+.sc-dispo-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+}
+.sc-dispo-track__bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--_x);
+  width: var(--_w);
+  border-radius: var(--nv-radius-full);
+  background: var(--sc-color, var(--nv-data-1));
+  transform-origin: left;
+  animation: nv-widen var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
+}
+@media (max-width: 520px) {
+  /* A phone: the hours under the track, the day and its track on the first line. */
+  .sc-dispo-week {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+  .sc-dispo-week__ranges {
+    grid-column: 2;
+    text-align: left;
+    white-space: normal;
+    margin-top: calc(var(--nv-space-1) * -1);
+  }
+}
+.sc-dispo__stale {
+  margin: 0;
+  color: var(--nv-warning);
+}
+
+/* The editor: the day, its plages side by side, « Ajouter » at the end of the line, as the creator's hours. */
+.sc-dispo-dialog {
+  width: min(720px, 100%);
+}
+.sc-dispo-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sc-dispo-day {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.sc-dispo-day:first-child {
+  border-top: 0;
+}
+.sc-dispo-day__name {
+  padding-top: 12px;
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.sc-dispo-day__ranges {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sc-dispo-day[data-empty='true'] .sc-dispo-day__ranges {
+  padding-top: 13px;
+}
+.sc-dispo-day__add {
+  margin-top: 6px;
+}
+.sc-dispo-range {
+  display: grid;
+  grid-template-columns: minmax(0, 120px) auto minmax(0, 120px) 36px;
+  align-items: center;
+  justify-content: start;
+  gap: var(--nv-space-1) var(--nv-space-2);
+  min-width: 0;
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+/* « le lendemain » just under the end hour; the close keeps the end of the line. */
+.sc-dispo-range__next {
+  grid-row: 2;
+  grid-column: 3;
+}
+.sc-dispo-range__remove {
+  grid-row: 1;
+  grid-column: 4;
+}
+
+/* A phone: the day and « Ajouter » on one line, its plages under them. */
+@media (max-width: 520px) {
+  .sc-dispo-day {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name add'
+      'ranges ranges';
+  }
+  .sc-dispo-day__name {
+    grid-area: name;
+    padding-top: 6px;
+  }
+  .sc-dispo-day__add {
+    grid-area: add;
+    margin-top: 0;
+  }
+  .sc-dispo-day__ranges {
+    grid-area: ranges;
+  }
+  .sc-dispo-day[data-empty='true'] .sc-dispo-day__ranges {
+    padding-top: 0;
+  }
+  .sc-dispo-range {
+    grid-template-columns: minmax(0, 96px) auto minmax(0, 96px) 36px;
+  }
+}
+.sc-dispo-range .sc-dispo-range__time {
+  width: 100%;
+}

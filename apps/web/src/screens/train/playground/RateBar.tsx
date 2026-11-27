@@ -91,10 +91,18 @@ export function RateBar({ state, isDemo }: { state: PlaygroundState; isDemo: boo
       ) : null}
       {/* With no key, a model name and a zero cost would read as a voice ready to write: the bar says the one thing. */}
       {state.voice.reachable ? (
-        <span className="pg-bar__meta" title="La voix qui écrit, et ce que cette session a coûté">
-          <span className="pg-mono">
-            Voix {state.version.voicePrompt} · {state.version.voiceModel}
-          </span>
+        <span
+          className="pg-bar__meta"
+          title={
+            asOwner ? 'La voix qui écrit, et ce que cette session a coûté' : 'Ce que cette session a coûté'
+          }
+        >
+          {/* Her prompt's version and the model are the owner's settings (IA-04): a manager reads the cost only. */}
+          {asOwner ? (
+            <span className="pg-mono">
+              Voix {state.version.voicePrompt} · {state.version.voiceModel}
+            </span>
+          ) : null}
           <span>{euros(state.sessionCostEur)} cette session</span>
         </span>
       ) : asOwner ? (

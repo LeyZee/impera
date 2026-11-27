@@ -60,6 +60,11 @@ export function reportLines(shifts: readonly ValidatedShift[], lines: readonly F
             netMinor,
             occurredAt: shift.startsAt,
             saleType: null,
+            chain: {
+              grossMinor: shift.grossMinor,
+              vatBps: shift.vatBps,
+              platformFeeBps: shift.platformFeeBps,
+            },
           },
         ];
   });

@@ -27,6 +27,7 @@ import {
   customOrderBlock,
   profileBioBlock,
   agencyStyleBlock,
+  publicStyleBlock,
   scriptsBlock,
   toMessages,
 } from './conversation-messages';
@@ -245,6 +246,9 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           input.scriptStep,
           input.maxBubbles,
           input.waitingStep,
+          input.fantasy,
+          input.currentStepSheet,
+          input.boughtMediaSheet,
         ),
         canary,
       });
@@ -392,6 +396,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     async instagramComment(input) {
       const system = renderPrompt(instagramCommentPrompt, {
         creator_name: input.creatorName,
+        agency_public_style: publicStyleBlock(input.publicStyle),
         persona_sheet: input.personaSheet,
         examples:
           input.examples.length === 0

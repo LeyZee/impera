@@ -1,5 +1,5 @@
 ---
-version: 1.0.0
+version: 1.1.0
 role: brain
 model_hint: grok-4.7
 output_schema: FanCardRead
@@ -30,7 +30,9 @@ Une case a un code, et rien hors de cette liste :
 - dislikes_about_her : ce qu'il ne veut pas voir d'elle. Liste.
 - outfits : les tenues qu'il aime la voir porter (lingerie, cosplay, nue…). Liste.
 - desires : ses fantasmes. Liste.
+- words_that_work : les mots, les expressions qui l'excitent quand elle les lui dit ou les écrit, tels qu'il les cite ou qu'ils l'ont fait réagir. Liste.
 - limits : ce qu'il ne veut pas, dans l'intimité (« je n'aime pas… »). Liste.
+- cools_him : ce qui le refroidit, casse son envie ou le fait décrocher, sans être un refus net. Liste.
 - intensity : l'intensité qu'il cherche, exactement une de ces valeurs : soft, naughty, very_explicit. Une valeur.
 - lead : s'il aime qu'elle mène, qu'elle se laisse mener, ou les deux, exactement une de ces valeurs : she_leads, she_follows, both. Une valeur.
 

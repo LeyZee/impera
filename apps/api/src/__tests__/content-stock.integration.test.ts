@@ -6,6 +6,8 @@ import {
   ContentStockSchema,
   CreatorIdSchema,
   DropDescriptionsReviewSchema,
+  emptyCustomPriceGrid,
+  ReadyVideoTypesSchema,
   MEDIA_VOCABULARY_VERSION,
   newId,
   TeamMemberIdSchema,
@@ -69,7 +71,7 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
     manager: '',
     chatter: '',
   };
-  const call = (method: 'GET' | 'POST', url: string, who: keyof typeof cookies, body?: object) =>
+  const call = (method: 'GET' | 'POST' | 'PATCH', url: string, who: keyof typeof cookies, body?: object) =>
     server.inject({
       method,
       url,
@@ -401,5 +403,65 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
       },
     );
     expect(lifted.statusCode, lifted.body).toBe(200);
+  });
+
+  it('gives a video to sell a type the owner still offers, names only, and keeps it in its category', async () => {
+    // Invented lines of the owner's « Vidéos déjà tournées »: one offered, one he stopped selling.
+    await test.admin.db.insert(schema.customPriceGrids).values({
+      creatorId: nora,
+      version: 1,
+      grid: {
+        ...emptyCustomPriceGrid(),
+        readyVideos: [
+          { id: 'rv_0000000a', label: 'Type A', offered: true, minMinor: 3000, maxMinor: 5000 },
+          { id: 'rv_0000000b', label: 'Type B', offered: false, minMinor: 3000, maxMinor: 5000 },
+        ],
+      },
+    });
+    const types = { types: [{ id: 'rv_0000000a', label: 'Type A' }] };
+    for (const who of ['nora', 'owner', 'manager'] as const) {
+      const url = who === 'nora' ? '/v1/creator-space/ready-videos' : `/v1/creators/${nora}/ready-videos`;
+      const answer = await call('GET', url, who);
+      expect(answer.statusCode, answer.body).toBe(200);
+      expect(ReadyVideoTypesSchema.parse(answer.json())).toEqual(types);
+      expect(answer.body).not.toContain('3000');
+    }
+    expect((await call('GET', `/v1/creators/${nora}/ready-videos`, 'chatter')).statusCode).toBe(403);
+    expect((await call('GET', `/v1/creators/${nora}/ready-videos`, 'managerElsewhere')).statusCode).toBe(403);
+    expect((await call('GET', '/v1/creator-space/ready-videos', 'ines')).json()).toEqual({ types: [] });
+
+    const video = (readyVideoId: string | null, category: DropCategory = 'sale_video') => ({
+      id: newId(ContentDropIdSchema),
+      category,
+      readyVideoId,
+      files: [{ id: newId(ContentDropFileIdSchema), mime: 'video/mp4', bytes: 1000 }],
+    });
+    const refused = async (body: object) => {
+      const answer = await call('POST', '/v1/creator-space/drops', 'nora', body);
+      expect(answer.statusCode, answer.body).toBe(422);
+      expect(answer.json()).toMatchObject({ error: { code: 'content_drop_ready_video_unprocessable' } });
+    };
+    await refused(video(null));
+    await refused(video('rv_0000000b'));
+    await refused(video('rv_0000000c'));
+    await refused(video('rv_0000000a', 'feed_video'));
+    const typed = video('rv_0000000a');
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', typed)).statusCode).toBe(200);
+    // Replayed with another type, it is another drop under the same id.
+    expect(
+      (await call('POST', '/v1/creator-space/drops', 'nora', { ...typed, readyVideoId: null })).statusCode,
+    ).toBe(409);
+    const moved = await call('PATCH', `/v1/creators/${nora}/drops/${typed.id}`, 'owner', {
+      category: 'feed_video',
+    });
+    expect(moved.statusCode, moved.body).toBe(422);
+    // Nor does a drop become a video to sell by a correction: it would have no type.
+    const plain = video(null, 'feed_video');
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', plain)).statusCode).toBe(200);
+    const intoSale = await call('PATCH', `/v1/creators/${nora}/drops/${plain.id}`, 'owner', {
+      category: 'sale_video',
+    });
+    expect(intoSale.statusCode, intoSale.body).toBe(422);
+    expect(intoSale.json()).toMatchObject({ error: { code: 'content_drop_ready_video_unprocessable' } });
   });
 });

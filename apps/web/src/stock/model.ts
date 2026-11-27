@@ -35,7 +35,7 @@ export const STOCK_NAMES: Readonly<Record<DropCategory, string>> = {
 export const STOCK_USES: Readonly<Record<DropCategory, string>> = {
   feed_video: 'Une vidéo courte par jour sur le feed public. Le soir, la même part sur Telegram.',
   feed_shoot: 'Trois par semaine. Chaque séance nourrit les posts du feed, les relances et les cadeaux.',
-  reveal_story: 'Une par jour, pour attirer en message privé.',
+  reveal_story: 'En bonus : sa story reprend la vidéo du feed, avec sa propre légende.',
   mass_dm: 'Les médias offerts des relances : jamais payants, trois par semaine et par fan au plus.',
   script: 'Ce que l’IA vend. Il en faut trois jouables, plus un d’avance.',
   whale_gift: 'Courts, inédits, jamais de nu. Offerts aux gros fans, jamais revendus.',

@@ -31,6 +31,7 @@ import type { ShiftFactsForPay } from './domain/reports';
 import { calendarDayIn } from './domain/time';
 import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
 import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/agency-share-check';
+import { createDrizzleAvailabilityStore } from './infra/availability-store';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
@@ -324,6 +325,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       async () => (await deps.creators.list()).map((creator) => creator.id),
       now,
     ),
+    availability: createDrizzleAvailabilityStore(deps.db),
     swaps: createSwapService(
       createDrizzleSwapStore(deps.db, deps.adminDb, colleagues),
       colleagues,

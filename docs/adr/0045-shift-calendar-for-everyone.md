@@ -1,5 +1,13 @@
 # 0045. Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0049 · Créneaux libres, plusieurs chatteurs sur un compte, fans confiés ; la créatrice sans notification de shift](0049-free-slots-seats-and-shared-fans.md) : Remplace : le contrat `SchedulingSettingsSchema` (`slotStartMinute` et `slotLengthMinutes`, des créneaux tous de la même durée) ; la contrainte `shifts_account_overlap_excl` (migration 0021), qui interdit deux shifts qui se chevauchent sur un compte ; dans l'ADR 0045 § 4, la puce « La créatrice choisit dans Moi si elle veut être prévenue des shifts de ses comptes ; par défaut, non » ; dans l'ADR 0025 § « Un humain qui écrit dans Reveal », « le membre en poste sur ce compte (l'auteur Reveal si la capture montre quel membre a écrit) » quand plusieurs membres y sont en poste. Précise l'ADR 0045 § 2 et § 3, l'ADR 0048 § 1 (« IA seule ») et l'ADR 0043 (à qui revient une vente).
+>
+> Toutes les décisions du même sujet : [`docs/regles/equipe.md`](../regles/equipe.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 02/11/2026 17h03, « ok vas y » en réponse à la demande de « ok 0045 », après les accords de Bilan et Équipe ; décisions du même jour à 16h44, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Remplace : dans l'ADR 0031 § Échanges, la phrase « C'est la seule porte par laquelle un chatteur lit le planning d'un autre. » Précise l'ADR 0024 (le Planning du chatteur montre « le sien, celui de l'équipe »), l'ADR 0042 § 2 et § 4 (ce que la créatrice voit de qui est en poste), et les fiches EQ-02, EQ-12 et EQ-14.

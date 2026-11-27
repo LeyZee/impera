@@ -82,7 +82,7 @@ const NO_EARNINGS = {
 function serve(routes: Served): ReturnType<typeof vi.fn> {
   const fetcher = vi.fn((url: string) => {
     const path = url.split('?')[0] ?? url;
-    // « Qui sont tes fans » sits above her fans on every test of the page.
+    // « Qui sont tes fans » sits under her fans on every test of the page.
     const route =
       routes[path] ??
       (path === '/v1/creator-space/fan-insights'
@@ -153,9 +153,14 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     expect(screen.getByText('vince.r')).toBeDefined();
     expect(screen.queryByRole('button', { name: /vince\.r/u })).toBeNull();
     expect(screen.getByText(/pas encore de conversation/u)).toBeDefined();
-    // A fan who unlocked nothing has no amount, not a dash (recette visuelle 16/11, CRE-02).
-    expect(document.querySelectorAll('.vt-row__amount')).toHaveLength(1);
+    // A fan who unlocked nothing says it on the right, never a dash (choice of 21/11, recette CRE-02).
+    expect(document.querySelectorAll('.vt-row__amount')).toHaveLength(2);
+    expect(screen.getByText('rien débloqué')).toBeDefined();
     expect(screen.queryByText('—')).toBeNull();
+    // Her fans first, « Qui sont tes fans » after them (choice of 21/11).
+    const panel = await screen.findByText('Qui sont tes fans');
+    const list = screen.getByText('Tes fans');
+    expect(list.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // No figure of hers is said yet: never a price before shares shown as what she earned.
     expect(document.body.textContent).not.toMatch(/gagné|ta part/u);
     // Before a fan is chosen, the reading side says so on a plate of its own (recette CRE-04).

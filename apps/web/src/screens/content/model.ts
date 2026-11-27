@@ -7,6 +7,7 @@ import {
   WITHDRAWABLE_DROP_STATES,
   headRefusal,
   kindOfMime,
+  probedFileRefusal,
   scriptDropCode,
   type ContentDrop,
   type ContentDropFile,
@@ -17,6 +18,8 @@ import {
   type DropState,
   type RedoneDrop,
 } from '@impera/contracts';
+
+import type { MediaFacts } from './media-length';
 
 import { MOMENT_EMOJIS, MOMENT_LABELS } from '@/creators/scripts/model';
 
@@ -141,6 +144,15 @@ export function moved<T>(list: readonly T[], index: number, step: -1 | 1): T[] {
   return next;
 }
 
+/** The item at `from` taken out and put back at `to` (her drag): the others keep their order. */
+export function movedTo<T>(list: readonly T[], from: number, to: number): T[] {
+  const item = list[from];
+  if (item === undefined || to < 0 || to >= list.length || from === to) return [...list];
+  const next = list.filter((_, index) => index !== from);
+  next.splice(to, 0, item);
+  return next;
+}
+
 /** The same file picked twice (same name, weight and date): it goes once. */
 export const sameFile = (
   a: { readonly name: string; readonly size: number; readonly lastModified: number },
@@ -152,6 +164,21 @@ export const UNKNOWN_TYPE = 'Ce type de fichier n’est pas pris : choisis une p
 
 /** What her gallery gave cannot be read here: said rather than guessed, the server would refuse it anyway. */
 export const UNREADABLE_HERE = 'Ce fichier ne s’ouvre pas : renvoie-le depuis ta galerie';
+
+/**
+ * Why a video her phone has measured would be refused once arrived (upright, length: the server's own rule), said
+ * before it goes up rather than after the whole file is sent (recette MED-04); `null` when it fits or when her phone
+ * could not read its size or its length (the server reads them).
+ */
+export function measuredVideoRefusal(category: DropCategory, facts: MediaFacts): string | null {
+  if (facts.width === null || facts.height === null || facts.ms === null) return null;
+  return probedFileRefusal(category, {
+    kind: 'video',
+    width: facts.width,
+    height: facts.height,
+    durationMs: facts.ms,
+  });
+}
 
 /**
  * Whether the first bytes of a file she picked are what its type says (recette CRE-12): a text renamed `.jpg` is

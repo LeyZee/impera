@@ -1,5 +1,13 @@
 # 0005. Postgres + Drizzle + RLS par `creator_id`
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0152 · Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs](0152-hosting-hostinger-vps-and-supabase.md) : Remplace : l'ADR 0027 sur le lieu (le VPS Hetzner) et l'ADR 0005 sur la base de production (Neon). Le reste de ces deux ADR ne change pas.
+>
+> Toutes les décisions du même sujet : [`docs/regles/fondations.md`](../regles/fondations.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted
 Date : 2026-10-16
 

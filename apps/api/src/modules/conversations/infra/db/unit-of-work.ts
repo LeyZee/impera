@@ -351,6 +351,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
       async insert({
         bubbles,
         softViolations,
+        retried,
         voice,
         personaVersionId,
         facts,
@@ -367,7 +368,10 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
-          guardTrace: { softViolations: [...(softViolations ?? [])] },
+          guardTrace: {
+            softViolations: [...(softViolations ?? [])],
+            ...(retried !== undefined && retried.length > 0 && { retried: [...retried] }),
+          },
           ...(voice !== undefined && {
             promptHashes: { ...voice },
             personaVersionId: personaVersionId ?? activePersona,

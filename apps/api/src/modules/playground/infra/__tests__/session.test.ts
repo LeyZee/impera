@@ -359,6 +359,15 @@ describe('playground session, calibration', () => {
     expect(comparison?.bubbles).toEqual(['Hey toi']);
     expect(session.history).toHaveLength(2);
   });
+
+  it('guards a compared voice as the main answer: her words of youth too (Sécurité, #1043)', async () => {
+    const session = make();
+    await session.handleFanMessage('Salut');
+    expect(session.lastExchange?.sexualTurn).toBe(false);
+    const comparison = await session.compareVoice(fakeGateway({ bubbles: ['ta jeunette toute nue'] }));
+    expect(comparison?.violations.map((v) => v.code)).toContain('youth_word_in_sex');
+    expect(comparison?.isBlocked).toBe(true);
+  });
 });
 
 const PHOTO: MediaDescription = {
@@ -691,6 +700,15 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(playground.desireTrail[1]?.weightsVersion).toMatch(/^desire-/);
     playground.branchAt(2);
     expect(playground.desireTrail).toHaveLength(1);
+  });
+
+  it('reads his second message from a first score of 0, never as a second first score (IA-10)', async () => {
+    const playground = session([], true, 0, BRIEF);
+    await playground.handleFanMessage('Salut');
+    await playground.handleFanMessage('Ça va ?');
+    expect(playground.desireTrail[0]?.before).toBeNull();
+    expect(playground.desireTrail[0]?.score).toBe(0);
+    expect(playground.desireTrail[1]?.before).toBe(0);
   });
 
   it('says why the policy refused an offer, and what the cursor decided', async () => {

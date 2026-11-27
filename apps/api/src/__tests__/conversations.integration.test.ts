@@ -28,6 +28,7 @@ import {
   createConversationsModule,
   type Clock,
   type ConversationsModule,
+  MAX_SEND_ATTEMPTS,
   SendRefused,
   type GuardReadContext,
   type OutboundSender,
@@ -819,6 +820,14 @@ describe('conversations module (P0-05)', () => {
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
   });
 
+  it('never takes an older message of hers, read after his, for an answer (recette REV-04)', async () => {
+    const before = new Date(clock.now().getTime() - 86_400_000).toISOString();
+    const { conversationId } = await ingest('c-late-history');
+    clock.advance(5);
+    await ingest('c-late-history', { ...teamMessage('c-late-history'), createdAt: before });
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
+  });
+
   it('drops the pending answer when the platform answered before the debounce ended (ADR 0110 § 2)', async () => {
     const { conversationId } = await ingest('c-auto-reply');
     clock.advance(5);
@@ -868,12 +877,12 @@ describe('conversations module (P0-05)', () => {
     const { conversationId } = await ingest('c-error');
     const draftId = await respond(conversationId);
     await conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] });
-    sender.failures = 3;
+    sender.failures = MAX_SEND_ATTEMPTS;
     const payload = { creatorId, conversationId, draftId, correlationId: 'test' };
-    for (const attempt of [1, 2]) {
+    for (let attempt = 1; attempt < MAX_SEND_ATTEMPTS; attempt += 1) {
       await expect(conversations.jobs.send(payload, NO_LOG, attempt)).rejects.toThrow();
     }
-    await conversations.jobs.send(payload, NO_LOG, 3);
+    await conversations.jobs.send(payload, NO_LOG, MAX_SEND_ATTEMPTS);
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'error' });
     await conversations.release(command(conversationId));
     expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
@@ -881,7 +890,7 @@ describe('conversations module (P0-05)', () => {
     const published = await outboxOf(conversationId);
     const failures = published.filter((event) => event.type === 'send_failed');
     expect(failures).toHaveLength(1);
-    expect(failures[0]?.payload).toMatchObject({ attempt: 3, isFinal: true });
+    expect(failures[0]?.payload).toMatchObject({ attempt: MAX_SEND_ATTEMPTS, isFinal: true });
     expect(published.map((event) => event.type)).toContain('takeover_ended');
   });
 

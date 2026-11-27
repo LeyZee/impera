@@ -132,6 +132,14 @@ describe('PersonaV2Schema', () => {
     p.agent.rules.never_say = ['?'];
     expect(issuePaths(p)).toEqual(['agent.rules.never_say.0']);
   });
+
+  it('leaves her not jealous unless her settings say so (Charles 27/11)', () => {
+    const latest = PersonaV2Schema.parse(personaFile('demo/v0.5.0.yaml'));
+    expect(latest.agent.behavior.plays_jealous ?? false).toBe(false);
+    const p = demo();
+    p.agent.behavior.plays_jealous = true;
+    expect(issuePaths(p)).toEqual([]);
+  });
 });
 
 describe('the voice guide and the objection replies (ADR 0090)', () => {

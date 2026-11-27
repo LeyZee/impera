@@ -1,5 +1,5 @@
 # SC-08 Photo d'exemple par étape
-Statut : todo (idée acceptée par Charles le 03/11/2026, 13 h 38)
+Statut : todo (plus tard : après l'ouverture au premier chatteur ; relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre ») ; statut précédent : todo (idée acceptée par Charles le 03/11/2026, 13 h 38)
 Phase : scripts (ADR 0056)
 Dépend de : SC-03 (médiathèque des scripts), CR-06 (stockage objet)
 Branche : task/sc-08-stage-example-photo

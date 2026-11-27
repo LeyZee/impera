@@ -1,9 +1,10 @@
 import type { SecondFactorSetup } from '@impera/contracts';
-import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { BackupCodesList, CopyButton } from './BackupCodesList';
 import { PublicBrand } from './PublicBrand';
 import { chosenPassword, forgetChosenPassword } from './chosen-password';
+import { clearCodesUnconfirmed, markCodesUnconfirmed } from './codes-pending';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
 
 type Step =
@@ -229,6 +230,18 @@ export function SecondFactorPage({
 /** Ten backup codes, shown once (the shared list), and the person says they are kept before going on. */
 function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () => void }): JSX.Element {
   const [kept, setKept] = useState(false);
+  const leaving = useRef(false);
+  // Until they are said kept: leaving asks first, and a reload leaves a mark Sécurité reads (COUV-08).
+  useEffect(() => {
+    markCodesUnconfirmed();
+    const warn = (event: BeforeUnloadEvent): void => {
+      if (!leaving.current) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+    };
+  }, []);
   return (
     <>
       <div className="nv-enter flex flex-col gap-2">
@@ -243,7 +256,7 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
       <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
         <input
-          className="mt-1"
+          className="nv-check"
           type="checkbox"
           checked={kept}
           onChange={(event) => {
@@ -252,7 +265,16 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
         />
         <span>J’ai mis ces codes en lieu sûr.</span>
       </label>
-      <button type="button" className="nv-btn nv-btn--neon" disabled={!kept} onClick={onDone}>
+      <button
+        type="button"
+        className="nv-btn nv-btn--neon"
+        disabled={!kept}
+        onClick={() => {
+          leaving.current = true;
+          clearCodesUnconfirmed();
+          onDone();
+        }}
+      >
         Ouvrir Impera
       </button>
     </>

@@ -1,4 +1,10 @@
-import type { VaultChoicesView, VaultFolderView, VaultMediaView, VaultView } from '@impera/contracts';
+import type {
+  PreparedScriptMoment,
+  VaultChoicesView,
+  VaultFolderView,
+  VaultMediaView,
+  VaultView,
+} from '@impera/contracts';
 
 import { choiceIndex, choiceOf } from '@/creators/vault/choice';
 import { folderName } from '@/creators/vault/model';
@@ -16,6 +22,8 @@ export interface EditorMedia {
   readonly described: boolean;
   /** The beginning of its description, plain text; `null` while it has none. */
   readonly excerpt: string | null;
+  /** Its place in its folder, from 1, in the platform's order: where to find it in Reveal (REV-09). */
+  readonly rank: number;
 }
 
 const keyOf = (folder: VaultFolderView): string => `${folder.platformAccountId}:${folder.folderRef ?? ''}`;
@@ -27,7 +35,7 @@ export function editorMedia(
   const index = choiceIndex(choices);
   const all = new Map<string, EditorMedia>();
   for (const folder of vault?.folders ?? [])
-    for (const media of folder.media) {
+    for (const [at, media] of folder.media.entries()) {
       const choice = choiceOf(index, folder, media);
       all.set(media.platformMediaId, {
         media,
@@ -36,6 +44,7 @@ export function editorMedia(
         imported: choice.imported,
         described: choice.description === 'described',
         excerpt: choice.excerpt,
+        rank: at + 1,
       });
     }
   return all;
@@ -45,16 +54,47 @@ export function editorMedia(
 export const sellable = (item: EditorMedia): boolean =>
   item.imported && item.described && !item.media.removed && item.media.kind !== 'audio';
 
-/** Her folders in the vault's order, for the picker's chips: key and name. */
-export function pickerFolders(
-  vault: VaultView | undefined,
-): readonly { readonly key: string; readonly name: string }[] {
+/** One of her folders as the picker's chips show it. */
+export interface PickerFolder {
+  readonly key: string;
+  readonly name: string;
+  readonly moment: VaultFolderView['moment'];
+}
+
+/** Her folders in the vault's order, for the picker's chips: key, name and moment. */
+export function pickerFolders(vault: VaultView | undefined): readonly PickerFolder[] {
   return (vault?.folders ?? [])
     .filter((folder) => folder.media.length > 0)
-    .map((folder) => ({ key: keyOf(folder), name: folderName(folder) }));
+    .map((folder) => ({ key: keyOf(folder), name: folderName(folder), moment: folder.moment }));
+}
+
+/**
+ * The folder the picker opens on (PRO1-11): the first with a media in Impera and of the script's moment, else the first
+ * with a media in Impera, else the first. A script of both moments takes either.
+ */
+export function startFolder(
+  folders: readonly PickerFolder[],
+  media: ReadonlyMap<string, EditorMedia>,
+  moment: PreparedScriptMoment,
+): string {
+  const withImported = new Set(
+    [...media.values()].filter((item) => item.imported).map((item) => item.folderKey),
+  );
+  const imported = folders.filter((folder) => withImported.has(folder.key));
+  const fits = imported.find((folder) => moment === 'both' || folder.moment === moment);
+  return (fits ?? imported[0] ?? folders[0])?.key ?? '';
 }
 
 /** The accounts a new script can be written for: those her vault was read from. */
 export function vaultAccounts(vault: VaultView | undefined): readonly VaultFolderView['platformAccountId'][] {
   return [...new Set((vault?.folders ?? []).map((folder) => folder.platformAccountId))];
+}
+
+/**
+ * Where to find a media in her Reveal vault, under « À copier dans Reveal » (REV-09): « Matin ☀️, 3e média »,
+ * « Hors dossier, 1er média ». `null` for a media her vault does not list.
+ */
+export function placeLine(item: EditorMedia | null | undefined): string | null {
+  if (item === null || item === undefined) return null;
+  return `${item.folder}, ${String(item.rank)}${item.rank === 1 ? 'er' : 'e'} média`;
 }

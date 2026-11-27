@@ -141,6 +141,8 @@ interface Data {
   reportsDown: number;
   /** Tuesday's report waits for him instead: 120,00 € declared, 108,00 € read by Reveal (ADR 0073 § 5). */
   gap: boolean;
+  /** Tuesday's report sent and waiting for the agency, with no gap (recette CHAT-09). */
+  pending?: boolean;
   /** A shift on Monday 2 November, 16 h – 22 h at the reader's hour: the week after this one (CHA-04). */
   nextWeek?: boolean;
   /** Basile's Friday shift, offered to Théo: the server's planning carries it (recette 05/11, CHAT-05). */
@@ -192,6 +194,8 @@ const GAPPED = {
   },
 };
 
+const PENDING = { ...VALIDATED, status: 'submitted', reviewedAt: null };
+
 const weeks: string[] = [];
 const calendars: string[] = [];
 
@@ -232,6 +236,7 @@ function serve(
     lastWeek: data.lastWeek ?? false,
     reportsDown: data.reportsDown ?? 0,
     gap: data.gap ?? false,
+    pending: data.pending ?? false,
     offered: data.offered ?? false,
     meZone: data.meZone ?? null,
     nextWeek: data.nextWeek ?? false,
@@ -304,7 +309,9 @@ function serve(
             : {
                 status: 200,
                 body: {
-                  reports: state.earlier ? [state.gap ? GAPPED : VALIDATED] : [],
+                  reports: state.earlier
+                    ? [state.gap ? GAPPED : state.pending === true ? PENDING : VALIDATED]
+                    : [],
                   shifts: state.earlier ? EARLIER : [],
                   accounts: [account],
                   members: [people[0]],
@@ -454,6 +461,17 @@ describe('the chatter’s Planning', () => {
     );
     fireEvent.click(within(monday).getByRole('button', { name: /^Faire mon rapport du lundi 26 octobre/u }));
     expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('says a report sent and waiting as sent, never as one to make (CHAT-09)', async () => {
+    serve({ earlier: true, pending: true });
+    renderPage();
+    const fold = await screen.findByText('Plus tôt cette semaine (2)');
+    const tuesday = within(fold.closest('details') ?? document.body).getByRole('region', {
+      name: 'Mardi 27 octobre',
+    });
+    const chip = await within(tuesday).findByRole('button', { name: /Rapport du .* : En attente/u });
+    expect(chip.textContent).toBe('Rapport envoyé · en attente');
   });
 
   it('says in amber a report whose gap with Reveal waits for him (ADR 0073 § 5)', async () => {
@@ -668,6 +686,30 @@ describe('the chatter’s Planning', () => {
       targetShiftId: null,
       message: 'Tu peux me remplacer ?',
     });
+  });
+
+  it('marks « Déjà proposé » a colleague who already has this shift to answer (CHAT-06)', async () => {
+    serve({
+      swaps: [swap({ requesterId: THEO, targetMemberId: BASILE, shiftId: THURSDAY })],
+      candidates: {
+        candidates: [
+          { member: people[1], freeThen: true, shifts: [] },
+          { member: people[2], freeThen: true, shifts: [] },
+        ],
+        accounts: [account],
+      },
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /^Échanger ton shift du jeudi 29 octobre/u }));
+    const panel = await screen.findByRole('dialog', { name: 'Proposer un échange' });
+    const basile = await within(panel).findByRole('radio', { name: /^Basile/u });
+    await waitFor(() => {
+      expect(text(basile)).toContain('Déjà proposé');
+    });
+    expect(basile.hasAttribute('disabled')).toBe(true);
+    const lou = within(panel).getByRole('radio', { name: /^Lou/u });
+    expect(text(lou)).toContain('Libre à ces heures');
+    expect(lou.hasAttribute('disabled')).toBe(false);
   });
 
   it('lets a busy colleague take a shift only against theirs, and words a refusal without their shift', async () => {
