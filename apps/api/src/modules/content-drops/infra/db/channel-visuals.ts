@@ -82,7 +82,7 @@ async function candidates(
            (d.category = 'feed_video' and d.state in ('ready', 'scheduled', 'published'))
            or (d.category <> 'feed_video' and d.state in ('ready', 'scheduled') and d.exported_at is null)
          )
-         and f.state in ('kept', 'duplicate') and f.replaced_at is null
+         and f.state in ('kept', 'duplicate') and f.replaced_at is null and f.redo_sentence is null
          and a.kind in ('image', 'video') and a.erased_at is null
          and (a.expires_at is null or a.expires_at > ${ask.keptUntil})
          ${ask.mediaId === undefined ? sql`` : sql`and a.id = ${ask.mediaId}`}

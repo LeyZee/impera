@@ -9,7 +9,7 @@ import {
   MediaAssetIdSchema,
   newId,
 } from '@impera/contracts';
-import { schema } from '@impera/db';
+import { eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -195,6 +195,23 @@ describe('her channel’s visuals on Postgres', () => {
     const offered = (await reader().eveningCandidates(nora, '2026-11-23')).map((one) => one.mediaId);
     expect(offered).not.toContain(assets.inScript);
     expect(await reader().file(nora, assets.inScript)).toBe('gone');
+  });
+
+  it('never offers a medium the agency asked her to redo', async () => {
+    const file = eq(schema.contentDropFiles.mediaAssetId, assets.stock);
+    await test.admin.db
+      .update(schema.contentDropFiles)
+      .set({ redoSentence: 'Refais-la.', redoAt: new Date(), redoBy: 'owner-visuals' })
+      .where(file);
+    try {
+      expect(await reader().telegramStock(nora)).toEqual([]);
+      expect(await reader().file(nora, assets.stock)).toBe('gone');
+    } finally {
+      await test.admin.db
+        .update(schema.contentDropFiles)
+        .set({ redoSentence: null, redoAt: null, redoBy: null })
+        .where(file);
+    }
   });
 
   it('reads nothing of hers under another creator', async () => {
