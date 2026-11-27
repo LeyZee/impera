@@ -42,7 +42,7 @@ Prérequis : Node 22 (`.nvmrc`), pnpm 10, Docker (Postgres de dev et Testcontain
 
 ```
 pnpm install            # installe aussi les hooks git (lefthook)
-docker compose up -d    # Postgres 16 de dev (packages/db/docker/init.sql)
+docker compose up -d    # Postgres 17 de dev (packages/db/docker/init.sql)
 pnpm check              # statique : typecheck + lint (frontières) + prettier + knip + check-repo
 pnpm test               # tests unitaires
 pnpm test:integration   # Testcontainers Postgres (Docker requis)
