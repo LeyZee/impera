@@ -25,7 +25,8 @@ import { DESIRE_WORDS, type Standing } from './standing';
  * One tone per state (§ 12, Design 16/11): red for what the top line says in red, « Âge contesté », « Ne plus lui
  * écrire » and « Ventes gelées »; amber when the sale is blocked otherwise.
  */
-export type AssistTone = 'neutral' | 'amber' | 'red';
+/** `good`: the moment to sell, in the green of success (Design 21/11). */
+export type AssistTone = 'neutral' | 'good' | 'amber' | 'red';
 
 const REREAD = 'Relis le brouillon avant de l’envoyer.';
 
@@ -105,6 +106,8 @@ export interface MoveLines {
 export interface MoveContext {
   readonly band: DesireBand | null;
   readonly sale: CopilotSaleState | null;
+  /** The code's verdict on the moment to sell (§ 4 bis), when the server says it. */
+  readonly moment?: SaleMomentVerdict | null;
 }
 
 const capital = (text: string): string => text.charAt(0).toLocaleUpperCase('fr-FR') + text.slice(1);
@@ -137,6 +140,15 @@ export function moveLines(
     ...(lead === null ? [] : [lead]),
     ...reasons.filter(({ code }) => !DRAFT_NOTES.has(code)).map(({ label }) => label),
   ];
+  // The moment to sell, said as the title with the step and its price of the code (maquette v4, 27/11): the chatter has
+  // nothing to work out. Only when the code offers the step and says the moment is good.
+  const next = context.sale?.nextStep ?? null;
+  if (move.kind === 'offer_step' && context.moment === 'good' && next !== null)
+    return {
+      what: `C’est le moment\u00a0: ${step(next.name)} à ${eurosOf(next.priceMinor)}`,
+      why: why.length === 0 ? null : why.join(' · '),
+      tone: 'good',
+    };
   return {
     what: move.label,
     why: why.length === 0 ? null : why.join(' · '),
@@ -275,6 +287,12 @@ const MISSING_WORDS: Readonly<Record<SaleCondition, string>> = {
   fan_messages: 'des messages de lui',
   fan_asks_for_paid: 'sa demande',
 };
+
+/** The first missing condition as a short noun group (« sa dispo »), for the line of his desire; null when none is. */
+export function missingWords(moment: SaleMoment): string | null {
+  const first = moment.conditions.find(({ met }) => !met);
+  return first === undefined ? null : MISSING_WORDS[first.code];
+}
 
 type SaleMomentCondition = SaleMoment['conditions'][number];
 

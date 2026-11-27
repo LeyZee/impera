@@ -75,6 +75,14 @@
   --nv-warning: #ffa340;
   --nv-danger: #ff5a45;
   --nv-sale: #e8c37a;
+  /* A fan's desire as fire (copilot, Charles 27/11): cold to burning. A clear orange at the hot end, never red, so
+     « il est brûlant » never reads as a stop. `fire-word` is the burning word on the ground. */
+  --nv-fire-cold: #6e7e96;
+  --nv-fire-warm: #f5c542;
+  --nv-fire-hot: #ffaa28;
+  --nv-fire-burn: #ff8a00;
+  --nv-fire-word: #ff9214;
+  --nv-fire-spark: #ffd36b;
   /* The agent (ADR 0048, CR-12): one violet, never the brand's red, for everything that says the AI. */
   --nv-agent: #b9a2ff;
   --nv-agent-soft: rgba(185, 162, 255, 0.14);
@@ -226,6 +234,12 @@
   --nv-warning: #9a4a00;
   --nv-danger: #c42a12;
   --nv-sale: #7a5a12;
+  --nv-fire-cold: #6e7e96;
+  --nv-fire-warm: #f5c542;
+  --nv-fire-hot: #ffaa28;
+  --nv-fire-burn: #ff8a00;
+  --nv-fire-word: #a85400;
+  --nv-fire-spark: #ffb02e;
   --nv-agent: #5b34c9;
   --nv-agent-soft: rgba(91, 52, 201, 0.1);
 

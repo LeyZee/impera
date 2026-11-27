@@ -70,6 +70,8 @@ export function bandBadges(
   assist: CopilotAssist | null,
   cut: CopilotCut | null,
   open: boolean,
+  /** False when the fire under his name says his desire (maquette v4, 27/11): no badge says it a second time. */
+  withDesire = true,
 ): { readonly badges: readonly Badge[]; readonly hidden: number } {
   const held = [
     ...standing.stops.map((words) => badge('stop', 'red', 'ban', words)),
@@ -87,7 +89,7 @@ export function bandBadges(
     shownDesire === null || (held.length === 0 && cut === null)
       ? shownDesire
       : { ...shownDesire, band: null };
-  const parts = desire === null ? held : [...held, desire];
+  const parts = desire === null || !withDesire ? held : [...held, desire];
   const signals = [
     ...(lively?.signals.followUpDue === true ? [badge('signal', 'neutral', 'clock', 'Relance due')] : []),
     ...(lively?.sale?.offerPending === true
