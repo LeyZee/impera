@@ -1016,10 +1016,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-}
-.ag-weekdays__head .nv-chip {
-  min-height: 32px;
+  gap: var(--nv-space-3);
+  margin-bottom: var(--nv-space-2);
 }
 .ag-weekdays .nv-chip {
   justify-content: center;
