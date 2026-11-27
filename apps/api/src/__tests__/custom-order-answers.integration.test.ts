@@ -75,7 +75,7 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     format: 'video_call_talk',
     supplements: [],
     minutes: 30,
-    details: { duration: 'test', availability: 'test' },
+    details: { what: 'test', duration: 'test', availability: 'test' },
   };
 
   /** The agent's turn opens his order and sends her the card (a video unless said, every essential box filled). */
@@ -269,14 +269,23 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     expect(dispo.statusCode).toBe(200);
     const paidCam = async (): Promise<unknown> => {
       const id = await cardReady(CAM);
+      // Before her yes, no slot exists for him: no hour can reach him (Charles, 26/11).
+      expect(await app.modules.customOrders.camProposal(nora, fan, new Date())).toBeNull();
       const yes = await call('POST', `${nora}/custom-orders/${id}/decision`, 'owner', {
         decision: 'yes',
         priceMinor: 5000,
       });
       // A video call is paid in full first.
       expect(CustomOrderViewSchema.parse(yes.json())).toMatchObject({ depositMinor: 5000, cam: null });
+      // Her yes given: the slot the code would book, the one the agent proposes.
+      const proposal = await app.modules.customOrders.camProposal(nora, fan, new Date());
+      expect(proposal?.cam).toEqual({ orderId: id, camKind: 'talk', minutes: 30 });
       const paid = await call('POST', `${nora}/custom-orders/${id}/advance`, 'owner', { to: 'deposit_paid' });
-      return CustomOrderViewSchema.parse(paid.json()).cam;
+      const booked = CustomOrderViewSchema.parse(paid.json()).cam;
+      expect(booked?.startsAt).toBe(proposal?.slot?.startsAt.toISOString());
+      // Paid: nothing left to propose.
+      expect(await app.modules.customOrders.camProposal(nora, fan, new Date())).toBeNull();
+      return booked;
     };
     const at = (minutes: number): string => new Date(opens.getTime() + minutes * 60_000).toISOString();
     expect(await paidCam()).toEqual({ startsAt: at(0), endsAt: at(30) });

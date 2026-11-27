@@ -1,12 +1,17 @@
 import {
+  CustomFormatSchema,
   CustomOrderIdSchema,
+  camKindOf,
+  isPerMinute,
+  type CamKind,
+  type CustomOrderId,
   OpenCustomOrderSchema,
   newId,
   type CreatorId,
   type FanId,
   type OpenCustomOrder,
 } from '@impera/contracts';
-import { and, eq, inArray, schema, type Transaction } from '@impera/db';
+import { and, eq, inArray, schema, sql, type Transaction } from '@impera/db';
 
 import type { CustomOrderTurn } from '../../domain/turn';
 
@@ -40,6 +45,46 @@ export interface CustomOrderStore {
    * null after a decline). A turn with nothing about an order, or a message already recorded, changes nothing.
    */
   record(tx: Transaction, record: CustomOrderRecord): Promise<void>;
+}
+
+/** @public His cam she said yes to and he has not paid yet: what the agent may propose a slot for. */
+export interface AgreedCam {
+  readonly orderId: CustomOrderId;
+  /** A video call's kind; null for a voice call. */
+  readonly camKind: CamKind | null;
+  readonly minutes: number;
+}
+
+/**
+ * His latest call or video call in `creator_yes` (ADR 0159 § 5): her yes given, not paid yet. Before her yes there is
+ * none, so no slot can ever be proposed to him (Charles, 26/11 : « toujours avec l'accord de la modèle »).
+ */
+export async function agreedCamOf(
+  tx: Transaction,
+  creatorId: CreatorId,
+  fanId: FanId,
+): Promise<AgreedCam | null> {
+  const rows = await tx
+    .select({ id: customOrders.id, format: customOrders.format, minutes: customOrders.minutes })
+    .from(customOrders)
+    .where(
+      and(
+        eq(customOrders.creatorId, creatorId),
+        eq(customOrders.fanId, fanId),
+        eq(customOrders.state, 'creator_yes'),
+      ),
+    )
+    .orderBy(sql`${customOrders.decidedAt} desc nulls last`);
+  for (const row of rows) {
+    const format = CustomFormatSchema.safeParse(row.format);
+    if (!format.success || !isPerMinute(format.data) || row.minutes === null) continue;
+    return {
+      orderId: CustomOrderIdSchema.parse(row.id),
+      camKind: camKindOf(format.data),
+      minutes: row.minutes,
+    };
+  }
+  return null;
 }
 
 async function openRow(tx: Transaction, creatorId: CreatorId, fanId: FanId) {

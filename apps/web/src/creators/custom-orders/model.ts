@@ -55,6 +55,7 @@ export const DETAIL_LABELS: Readonly<Record<CustomDetailKey, string>> = {
   photo_received: 'Sa photo',
   tone: 'Ton',
   availability: 'Ses disponibilités',
+  instagram: 'Son Instagram',
 };
 
 export interface OrderStep {

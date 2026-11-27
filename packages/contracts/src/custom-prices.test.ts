@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CUSTOM_FORMATS,
+  camKindOf,
   CUSTOM_PRICE_ERROR_CODES,
   CustomPriceGridSchema,
+  StoredCustomPriceGridSchema,
   emptyCustomPriceGrid,
   quoteCustomOrder,
   readyVideoPriceMinor,
@@ -161,5 +164,27 @@ describe('the videos already shot (ADR 0159 § C)', () => {
     expect(readyVideoPriceMinor(range, 'a')).toBe(drawn[0]);
     expect(readyVideoPriceMinor({ minMinor: 1_000, maxMinor: 1_000 }, 'x')).toBe(1_000);
     expect(readyVideoPriceMinor({ minMinor: 1_020, maxMinor: 1_080 }, 'x')).toBe(1_020);
+  });
+});
+
+describe('the dressed cam (Charles, 27/11)', () => {
+  it('reads each video call’s kind; anything else is no cam', () => {
+    expect(camKindOf('video_call_talk')).toBe('talk');
+    expect(camKindOf('video_call_dressed')).toBe('dressed');
+    expect(camKindOf('video_call_sexual')).toBe('sexual');
+    expect(camKindOf('call')).toBeNull();
+    expect(camKindOf(null)).toBeNull();
+  });
+
+  it('a grid saved before it reads with it, not offered and unpriced, in its place', () => {
+    const saved = emptyCustomPriceGrid();
+    const old = { ...saved, formats: saved.formats.filter((line) => line.format !== 'video_call_dressed') };
+    expect(CustomPriceGridSchema.safeParse(old).success).toBe(false);
+    const grid = StoredCustomPriceGridSchema.parse(old);
+    expect(grid.formats.map((line) => line.format)).toEqual([...CUSTOM_FORMATS]);
+    expect(grid.formats.find((line) => line.format === 'video_call_dressed')).toMatchObject({
+      offered: false,
+      priceMinor: null,
+    });
   });
 });

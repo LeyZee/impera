@@ -17,14 +17,33 @@ export const CUSTOM_FORMATS = [
   'rating',
   'call',
   'video_call_talk',
+  'video_call_dressed',
   'video_call_sexual',
 ] as const;
 export const CustomFormatSchema = z.enum(CUSTOM_FORMATS);
 export type CustomFormat = z.infer<typeof CustomFormatSchema>;
 
 /** The formats priced by the minute, with a minimum (a call, a video call): paid in full first (ADR 0159 § D). */
-export const PER_MINUTE_FORMATS: readonly CustomFormat[] = ['call', 'video_call_talk', 'video_call_sexual'];
+export const PER_MINUTE_FORMATS: readonly CustomFormat[] = [
+  'call',
+  'video_call_talk',
+  'video_call_dressed',
+  'video_call_sexual',
+];
 export const isPerMinute = (format: CustomFormat): boolean => PER_MINUTE_FORMATS.includes(format);
+
+/**
+ * The kind of cam a video call is (Charles, 27/11): just talk, dressed, or sexual. She always reads it before her yes;
+ * null, not a cam.
+ */
+export type CamKind = 'talk' | 'dressed' | 'sexual';
+const CAM_KINDS: Readonly<Partial<Record<CustomFormat, CamKind>>> = {
+  video_call_talk: 'talk',
+  video_call_dressed: 'dressed',
+  video_call_sexual: 'sexual',
+};
+export const camKindOf = (format: CustomFormat | null): CamKind | null =>
+  format === null ? null : (CAM_KINDS[format] ?? null);
 
 /** Highest price of a line, in minor units (10 000 €): above it, a typing slip rather than a price. */
 export const CUSTOM_PRICE_MAX_MINOR = 1_000_000;
@@ -114,6 +133,27 @@ export const ReadyVideoLineSchema = z
   });
 export type ReadyVideoLine = z.infer<typeof ReadyVideoLineSchema>;
 
+/** Each format of `CUSTOM_FORMATS` missing from a saved list, inserted in its place, not offered and unpriced. */
+function withEveryFormat(raw: unknown): unknown {
+  if (!Array.isArray(raw)) return raw;
+  const lines: readonly unknown[] = raw;
+  const formatOf = (line: unknown): unknown =>
+    typeof line === 'object' && line !== null && 'format' in line ? line.format : undefined;
+  const present = new Set(lines.map(formatOf));
+  if (CUSTOM_FORMATS.every((format) => present.has(format))) return raw;
+  return CUSTOM_FORMATS.map(
+    (format) =>
+      lines.find((line) => formatOf(line) === format) ?? {
+        format,
+        offered: false,
+        priceMinor: null,
+        minMinutes: null,
+        includedMinutes: null,
+        extraMinutePercent: null,
+      },
+  );
+}
+
 /**
  * Her whole grid: every format once, in `CUSTOM_FORMATS` order; then the supplements the owner added, in his order;
  * then the videos already shot, in his order. A grid saved before that list existed reads with none.
@@ -148,6 +188,19 @@ export const CustomPriceGridSchema = z
     { message: 'Deux vidéos portent le même nom', path: ['readyVideos'] },
   );
 export type CustomPriceGrid = z.infer<typeof CustomPriceGridSchema>;
+
+/**
+ * Her grid as stored: one saved before a format existed reads with it, not offered and with no price, in its place
+ * (the dressed cam, 27/11), and the owner turns it on and types its price himself. For reading rows only, never on
+ * the wire.
+ */
+export const StoredCustomPriceGridSchema = z.preprocess(
+  (raw) =>
+    typeof raw === 'object' && raw !== null && 'formats' in raw
+      ? { ...raw, formats: withEveryFormat(raw.formats) }
+      : raw,
+  CustomPriceGridSchema,
+);
 
 /** A grid never filled in: every format there, offered, with no price; no supplement yet. */
 export function emptyCustomPriceGrid(): CustomPriceGrid {

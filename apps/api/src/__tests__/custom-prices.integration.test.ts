@@ -148,7 +148,7 @@ describe('/v1/creators/:creatorId/custom-prices', () => {
       .select({ details: schema.auditLog.details })
       .from(schema.auditLog)
       .where(eq(schema.auditLog.action, 'custom_price_grid.save'));
-    expect(audit).toEqual([{ details: { version: 1, formatsOffered: 7, supplements: 2 } }]);
+    expect(audit).toEqual([{ details: { version: 1, formatsOffered: 8, supplements: 2 } }]);
 
     // The agent's turn reads her grid in force as the service role, one creator at a time.
     const gridOf = createCustomPriceGridReader(test.service.db);

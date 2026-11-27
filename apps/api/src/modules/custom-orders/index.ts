@@ -1,5 +1,5 @@
 /** Public entry point of the `custom-orders` module (ADR 0159). Other modules import this file only. */
-import type { CreatorId, CustomPriceGrid } from '@impera/contracts';
+import type { CreatorId, CustomPriceGrid, FanId } from '@impera/contracts';
 import { withTenant, type Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -22,13 +22,18 @@ import {
   type CamAgenda,
 } from './infra/db/agency-store';
 import { createCustomPriceGridReader, createDrizzleCustomPriceGridStore } from './infra/db/grid-store';
-import { createDrizzleCustomOrderStore, type CustomOrderStore } from './infra/db/order-store';
+import {
+  agreedCamOf,
+  createDrizzleCustomOrderStore,
+  type AgreedCam,
+  type CustomOrderStore,
+} from './infra/db/order-store';
 import { createCustomOrderRoutes, createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
 
 /** @public A cam's slot as the code proposes it. */
 export type { CamSlot } from './domain/cam';
 /** @public His orders for the agent's turn: read and written in the turn's own transaction, under her RLS. */
-export type { CustomOrderRecord, CustomOrderStore } from './infra/db/order-store';
+export type { AgreedCam, CustomOrderRecord, CustomOrderStore } from './infra/db/order-store';
 
 export interface CustomOrdersModule {
   readonly name: 'custom-orders';
@@ -39,10 +44,15 @@ export interface CustomOrdersModule {
   /** His open order and what the turn decided about it (ADR 0159 § A), in the turn's transaction. */
   readonly orders: CustomOrderStore;
   /**
-   * The slot a call or a video call of `minutes` would take now in her dispos cam (ADR 0159 § 5): soon (« tout de
-   * suite ») or later, or null when none has room. Read only: the slot is booked with his full payment.
+   * His cam she said yes to and the slot it would take now in her dispos cam (ADR 0159 § 5): soon (« tout de suite »)
+   * or later, or `slot` null when none has room. Null when she has not said yes to a cam of his: no hour ever goes to
+   * him before her yes. Read only, under her tenant: the slot is booked with his full payment.
    */
-  readonly camSlot: (creatorId: CreatorId, minutes: number, now: Date) => Promise<CamSlot | null>;
+  readonly camProposal: (
+    creatorId: CreatorId,
+    fanId: FanId,
+    now: Date,
+  ) => Promise<{ readonly cam: AgreedCam; readonly slot: CamSlot | null } | null>;
   /** Her cams booked with fans that meet `[from, to)`, for her agenda: when and the fan's pseudo, under her tenant. */
   readonly bookedCamsOf: (
     creatorId: string,
@@ -79,15 +89,19 @@ export function createCustomOrdersModule(deps: CustomOrdersDeps): CustomOrdersMo
     orders: createDrizzleCustomOrderStore(),
     bookedCamsOf: (creatorId, from, to) =>
       withTenant(deps.db, creatorId, (tx) => bookedCamsBetween(tx, creatorId, from, to)),
-    camSlot: (creatorId, minutes, now) =>
-      camSlotOf(
+    camProposal: async (creatorId, fanId, now) => {
+      const cam = await withTenant(deps.db, creatorId, (tx) => agreedCamOf(tx, creatorId, fanId));
+      if (cam === null) return null;
+      const slot = await camSlotOf(
         {
           room: (ask) => deps.camAgenda.room(creatorId, ask),
           absence: (at) => deps.camAgenda.absence(creatorId, at),
           booked: () => withTenant(deps.db, creatorId, (tx) => bookedCams(tx, creatorId, now)),
         },
-        minutes,
+        cam.minutes,
         now,
-      ),
+      );
+      return { cam, slot };
+    },
   };
 }

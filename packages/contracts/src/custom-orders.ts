@@ -43,6 +43,11 @@ export const CUSTOM_DETAIL_KEYS = [
   'tone',
   /** When he is free, for a call or a video call. */
   'availability',
+  /**
+   * His Instagram pseudo, for a cam once he paid it all (Charles, 26/11): she calls him there. Never asked before, shown
+   * on the order's card only.
+   */
+  'instagram',
 ] as const;
 export const CustomDetailKeySchema = z.enum(CUSTOM_DETAIL_KEYS);
 export type CustomDetailKey = z.infer<typeof CustomDetailKeySchema>;
@@ -113,8 +118,10 @@ export const ESSENTIAL_DETAILS: Readonly<Record<CustomFormat, readonly CustomDet
   reaction_video: ['photo_received', 'tone'],
   rating: ['photo_received', 'tone'],
   call: ['duration', 'availability'],
-  video_call_talk: ['duration', 'availability'],
-  video_call_sexual: ['duration', 'availability'],
+  // A cam: what he wants of it too, which she reads before her yes (Charles, 27/11).
+  video_call_talk: ['what', 'duration', 'availability'],
+  video_call_dressed: ['what', 'duration', 'availability'],
+  video_call_sexual: ['what', 'duration', 'availability'],
 };
 
 /** At most this many questions about his order; past them the card goes to the owner as it is (ADR 0159 § A.2 bis). */

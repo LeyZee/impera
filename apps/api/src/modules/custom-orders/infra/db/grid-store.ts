@@ -1,6 +1,7 @@
 import {
   AuditEntryIdSchema,
   CustomPriceGridSchema,
+  StoredCustomPriceGridSchema,
   emptyCustomPriceGrid,
   newId,
   type CreatorId,
@@ -43,7 +44,7 @@ function viewOf(creatorId: CreatorId, row: GridRow | undefined): CustomPriceGrid
     : {
         creatorId,
         version: row.version,
-        grid: CustomPriceGridSchema.parse(row.grid),
+        grid: StoredCustomPriceGridSchema.parse(row.grid),
         updatedAt: row.createdAt.toISOString(),
       };
 }
@@ -88,7 +89,7 @@ export function createDrizzleCustomPriceGridStore(db: Database): CustomPriceGrid
           current !== undefined &&
           currentVersion === baseVersion + 1 &&
           current.createdBy === actor.userId &&
-          sameGrid(CustomPriceGridSchema.parse(current.grid), grid)
+          sameGrid(StoredCustomPriceGridSchema.parse(current.grid), grid)
         )
           return { kind: 'saved', view: viewOf(creatorId, current) };
         if (currentVersion !== baseVersion) return { kind: 'conflict', current: currentVersion };
@@ -132,6 +133,6 @@ export function createCustomPriceGridReader(
   return (creatorId) =>
     withAdmin(adminDb, async (tx) => {
       const row = await latest(tx, creatorId);
-      return row === undefined ? null : CustomPriceGridSchema.parse(row.grid);
+      return row === undefined ? null : StoredCustomPriceGridSchema.parse(row.grid);
     });
 }

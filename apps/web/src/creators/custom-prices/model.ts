@@ -23,6 +23,7 @@ export const FORMAT_LABELS: Readonly<Record<CustomFormat, string>> = {
   rating: 'Note de sa photo',
   call: 'Appel',
   video_call_talk: 'Visio pour parler',
+  video_call_dressed: 'Visio habillée',
   video_call_sexual: 'Visio sexuelle',
 };
 
@@ -33,6 +34,7 @@ export const FORMAT_HINTS: Readonly<Record<CustomFormat, string>> = {
   rating: 'Une note et quelques mots sur la photo qu’il envoie.',
   call: 'À la minute, payé en entier d’avance. Elle le passe elle-même.',
   video_call_talk: 'À la minute, payé en entier d’avance. Elle la passe elle-même.',
+  video_call_dressed: 'À la minute, payé en entier d’avance. Elle la passe elle-même, habillée.',
   video_call_sexual: 'À la minute, payé en entier d’avance. Elle la passe elle-même.',
 };
 

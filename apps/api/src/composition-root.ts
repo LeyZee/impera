@@ -45,6 +45,7 @@ import type { ConversationsModule, DraftComposer } from './modules/conversations
 import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './modules/creator-decisions';
 import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { CreatorWeekModule } from './modules/creator-week';
+import type { CustomOrdersModule } from './modules/custom-orders';
 import type { FansModule } from './modules/fans';
 import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
@@ -124,6 +125,8 @@ interface Modules {
   readonly creatorWeek: CreatorWeekModule;
   /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
   readonly creatorDecisions: CreatorDecisionsModule;
+  /** Custom orders (ADR 0159): its cam proposal, read by the agent, called by the tests. */
+  readonly customOrders: CustomOrdersModule;
   /** The captions proposed for her Reels (ADR 0164 § 9): its job, called by the tests. */
   readonly instagramCaptions: InstagramCaptionsModule;
   readonly supervision: SupervisionModule;
@@ -595,6 +598,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     creatorTasks: creatorTasks.module,
     creatorWeek: creatorWeek.module,
     creatorDecisions,
+    customOrders: customOrders.module,
     instagramCaptions: instagramCaptions.module,
     supervision: supervision.module,
     providers: providers.module,

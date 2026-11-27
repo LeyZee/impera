@@ -119,6 +119,8 @@ const ASK: Readonly<Record<CustomDetailKey | 'format', string>> = {
   photo_received: 'la photo à laquelle il pense, s’il veut la lui montrer',
   tone: 'le ton qu’il aimerait : tendre, joueuse, sans filtre',
   availability: 'les moments où il est libre',
+  // Never essential: asked once a cam is paid in full, never before (Charles, 26/11).
+  instagram: 'son pseudo Instagram, pour qu’elle l’appelle',
 };
 
 const askBrief = (key: CustomDetailKey | 'format'): string =>
