@@ -912,6 +912,30 @@ body {
   }
 }
 
+/* ───────────── The draft's French (ADR 0168 § 9) ───────────── */
+
+/* The same muted line as « à découvrir », under the bubbles: plain lines, never bubbles, nothing there is to place. */
+.cp-translation__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: 0 var(--nv-space-1);
+  list-style: none;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.cp-translation__note {
+  margin: var(--nv-space-1) 0 0;
+  padding: 0 var(--nv-space-1) var(--nv-space-2);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+
 /* ───────────── The tabs (Charles 21/11, piste C; Design's corrections) ───────────── */
 
 /* Under the draft, they do not scroll: an icon and a count each, the word only on the open one, which takes more room. */

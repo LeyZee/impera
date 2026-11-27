@@ -82,7 +82,7 @@ export const BillingRegimeSchema = z.object({
   mentions: z.array(InvoiceMentionSchema).max(INVOICE_MENTIONS_MAX),
   documents: z.array(ContractorDocumentKindSchema),
   taxIdRequired: z.boolean(),
-  /** The day the accountant validated it, recorded by the owner; a regime not validated issues no invoice. */
+  /** The day the accountant validated it, recorded by the owner: a note no invoice waits for, shown on no screen. */
   validatedOn: CalendarDaySchema.nullable(),
   createdAt: z.iso.datetime(),
 });

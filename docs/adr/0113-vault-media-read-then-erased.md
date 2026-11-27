@@ -1,5 +1,13 @@
 # 0113. Les fichiers du coffre : lus le temps de la description, jamais gardés
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0145 · Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed, le code lit le rôle et jamais le nom](0145-vault-folders-by-role.md) : Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR. Avenant du 17/11 : amende aussi l'ADR 0113 § 5 (la description du coffre ne part plus seule, par lots, mais sur une sélection confirmée) et l'ADR 0083 § 9 (plus d'interrupteur des descriptions : un dépôt est décrit à son arrivée).
+>
+> Toutes les décisions du même sujet : [`docs/regles/vente-et-scripts.md`](../regles/vente-et-scripts.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (« ok 0113 » de Charles le 16/11/2026, 12 h 48 heure de Paris, fil de coordination ; numéro attribué par le coordinateur ; fiche `PROPOSED-vault-fetch-media.md` ; relecture Sécurité et Médias)
 Date : 2026-11-16
 Précise : l'ADR 0018 (`fetchMedia`, drapeau `mediaDownload`), l'ADR 0030 § 3 et § 4 (l'original est lu puis effacé, la vignette reste), l'ADR 0099 § 4, § 5 et § 7 (description par lots dans le budget, la description de la plateforme est un point de départ). Ne remplace rien.

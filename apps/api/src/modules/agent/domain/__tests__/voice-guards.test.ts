@@ -5,7 +5,10 @@ import { checkCare, checkHelpNumber } from '../care';
 import { checkNoCommitment } from '../custom-order';
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
+  checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   previousTurnsOf,
   type GuardCode,
@@ -189,7 +192,12 @@ describe('voice guards (P3-13)', () => {
   });
 
   it('emits only codes of GUARD_CODES, and each one not obsolete has a case that emits it', () => {
-    const settings = { ...DEFAULT_GUARD_SETTINGS, forbiddenTerms: ['brocoli'], petNames: ['loulou'] };
+    const settings = {
+      ...DEFAULT_GUARD_SETTINGS,
+      forbiddenTerms: ['brocoli'],
+      petNames: ['loulou'],
+      degradingWords: ['motinterdit'],
+    };
     const read = (bubbles: string[], context: GuardContext = {}) =>
       checkVoiceOutput(bubbles, settings, context).map((v) => v.code);
     const emitted = new Set<string>([
@@ -204,6 +212,7 @@ describe('voice guards (P3-13)', () => {
       ...read(['Envoie-moi des nudes', 'sale radin', 'rien à payer', 'je te fais un petit prix']),
       ...read(['tu me déçois', '*sourit*', 'j’ai besoin d’argent']),
       ...read(['T’es qu’un gamin toi']),
+      ...read(['vilain garçon va', 'mon adresse ? non']),
       ...read(['paye moi sur paypal', 'elle est à 5 €']),
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
       ...read(['hallo schatz, was machst du heute abend?']),
@@ -211,7 +220,16 @@ describe('voice guards (P3-13)', () => {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],
       }),
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
+      ...read(['😏 coucou', 'à demain.'], { previousTurns: [] }),
+      ...checkVoiceOutput(['bonne nuit mon cœur'], {
+        ...settings,
+        closeOnlyWords: [{ words: ['mon cœur'], minTier: 4 }],
+      }).map((v) => v.code),
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
+      ...checkYouthWords(['ta jeunette t’attend'], true).map((v) => v.code),
+      ...read(['espèce de motinterdit', 'si tu la prends je t’en offre une autre']),
+      ...checkMoans(['mmmh'], false).map((v) => v.code),
+      ...checkMoodKillers(['mon chat me regarde'], false).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkHelpNumber(['appelle le 988']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),

@@ -33,7 +33,8 @@ import {
   type DayBar,
   type HeatCell,
 } from '@/payroll/my-figures';
-import { amountText, periodLine } from '@/reports/model';
+import { useReports } from '@/reports/api';
+import { amountText, periodLine, periodSums } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
 import { cityOf, dayNumber, longDay } from '@/scheduling/time';
@@ -263,6 +264,8 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
   const current = useCurrentPeriod();
   const period = usePayPeriod(current).data;
   const tip = useFloatingTip();
+  // His own reports only: a manager's list holds the team's (the card is the reader's).
+  const myReports = useReports(current, current !== null && !manager).data;
   if (figures === undefined || !hasFortnight(figures, period)) return null;
   const currency = figuresCurrency(figures);
   const statement = period?.statements[0];
@@ -270,6 +273,13 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
   const tiers = manager ? [] : tiersOf(period);
   const net = netIn(figures.nets, currency);
   const sales = figures.days.reduce((sum, day) => sum + day.sales, 0);
+  // Sales he reported that wait for the agency: not in the gain yet, said beside it so that the big figure never reads
+  // as all he made, and no comparison on a fortnight half counted (recette 27/11, G8).
+  const waiting = manager
+    ? []
+    : periodSums(
+        (myReports?.reports ?? []).filter((one) => one.period === current && one.correctsId === null),
+      ).filter((sum) => sum.waiting > 0);
   const reports = figures.days.reduce((sum, day) => sum + day.reports, 0);
   return (
     <Panel
@@ -326,7 +336,14 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
               <p className="mf-figure__parts nv-num">{partsOf(statement)}</p>
             </>
           )}
-          <Change change={fortnightChange(figures, currency)} />
+          {waiting.length === 0 ? (
+            <Change change={fortnightChange(figures, currency)} />
+          ) : (
+            <p className="mf-figure__waiting nv-num">
+              + {waiting.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' et ')} de ventes en
+              attente de validation : ton gain montera avec elles.
+            </p>
+          )}
           {recordToday(figures) ? (
             <p className="mf-record-now">Ton meilleur jour, c’est aujourd’hui.</p>
           ) : null}

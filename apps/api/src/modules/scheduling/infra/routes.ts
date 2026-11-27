@@ -1,4 +1,8 @@
 import {
+  AvailabilityMemberParamsSchema,
+  MemberAvailabilitySchema,
+  SetAvailabilityBodySchema,
+  TeamAvailabilitySchema,
   AccountPayRulesListSchema,
   AccountPayRulesSchema,
   CreateCreatorAgencyRateBodySchema,
@@ -30,6 +34,7 @@ import {
   PlanningSchema,
   PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
+  NotTakenDelaySchema,
   ReportGapThresholdSchema,
   SchedulingSettingsInputSchema,
   SchedulingSettingsQuerySchema,
@@ -79,7 +84,7 @@ import type { PayRulesService } from '../application/pay-rules';
 import type { ShiftReportService } from '../application/reports';
 import type { SchedulingService } from '../application/scheduling';
 import type { SwapService } from '../application/swaps';
-import type { Actor } from '../domain/ports';
+import type { Actor, AvailabilityStore } from '../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -117,6 +122,7 @@ export function createSchedulingRoutes(
     calendar,
     calendarLinks,
     leaves,
+    availability,
     swaps,
     reports,
     feedback,
@@ -127,6 +133,7 @@ export function createSchedulingRoutes(
     calendar: CalendarService;
     calendarLinks: CalendarLinkService;
     leaves: LeaveService;
+    availability: AvailabilityStore;
     swaps: SwapService;
     reports: ShiftReportService;
     feedback: ShiftFeedbackService;
@@ -333,6 +340,55 @@ export function createSchedulingRoutes(
       async (request, reply) => {
         await scheduling.endTemplate(actorOf(request), request.params.templateId);
         return reply.code(204).send();
+      },
+    );
+
+    // ADR 0171 (trou 16): his own week for any member; every active member's for the owner and an active manager.
+    app.get(
+      '/scheduling/availability/mine',
+      { preValidation: ownerOrMember, schema: { response: { 200: MemberAvailabilitySchema } } },
+      (request) => availability.mine(userOf(request)),
+    );
+
+    app.get(
+      '/scheduling/availability',
+      { preValidation: ownerOrMember, schema: { response: { 200: TeamAvailabilitySchema } } },
+      (request) => availability.team(userOf(request)),
+    );
+
+    // 200 when the same week was already recorded: a retry of the form records one.
+    app.put(
+      '/scheduling/availability/mine',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          body: SetAvailabilityBodySchema,
+          response: { 200: MemberAvailabilitySchema, 201: MemberAvailabilitySchema },
+        },
+      },
+      async (request, reply) => {
+        const { value, created } = await availability.set(actorOf(request), 'self', request.body);
+        return reply.code(created ? 201 : 200).send(value);
+      },
+    );
+
+    app.put(
+      '/scheduling/availability/:memberId',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: AvailabilityMemberParamsSchema,
+          body: SetAvailabilityBodySchema,
+          response: { 200: MemberAvailabilitySchema, 201: MemberAvailabilitySchema },
+        },
+      },
+      async (request, reply) => {
+        const { value, created } = await availability.set(
+          actorOf(request),
+          request.params.memberId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(value);
       },
     );
 
@@ -580,6 +636,20 @@ export function createSchedulingRoutes(
         schema: { body: ReportGapThresholdSchema, response: { 200: ReportGapThresholdSchema } },
       },
       (request) => reports.saveReportGap(actorOf(request), request.body),
+    );
+
+    // « Chatteur pas là » (ADR 0094 § 1, lot b): the agency's delay, read by the agency, set by the owner. An alert's
+    // delay, not a rate: no password asked again.
+    app.get(
+      '/scheduling/not-taken-delay',
+      { preValidation: ownerOrMember, schema: { response: { 200: NotTakenDelaySchema } } },
+      (request) => reports.notTakenDelay(userOf(request)),
+    );
+
+    app.put(
+      '/scheduling/not-taken-delay',
+      { preValidation: owner, schema: { body: NotTakenDelaySchema, response: { 200: NotTakenDelaySchema } } },
+      (request) => reports.saveNotTakenDelay(actorOf(request), request.body),
     );
 
     // The accounts' pay rules, which the reports read in their own transaction, at the address the contract gives.

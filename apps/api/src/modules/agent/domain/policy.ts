@@ -145,16 +145,54 @@ export function inPauseAfterPurchase(
 }
 
 /**
- * He asks for more paid content within the evening of her last script (passe 18, Charles 21/11): nothing more is
+ * He asks for more paid content the evening he bought a step of her script (passe 18, Charles 21/11): nothing more is
  * offered tonight; she steers him to a custom request instead, never a yes nor a price before the creator agrees.
+ * Read from his last purchase of a paid step (`boughtAt`), never from her last offer: a script only offered or refused
+ * tonight, or bought another evening, leaves the turn to its normal flow (eval asks-for-media-no-budget, 27/11).
  */
 export function asksMoreSameEvening(
-  context: Pick<OfferContext, 'now' | 'lastOfferAt' | 'fanAsksForPaid' | 'limits' | 'timeZone'>,
+  context: Pick<OfferContext, 'now' | 'fanAsksForPaid' | 'limits' | 'timeZone'> & {
+    readonly boughtAt: Date | null;
+  },
 ): boolean {
   return (
     context.fanAsksForPaid &&
-    context.lastOfferAt !== null &&
-    sameEvening(context.now, context.lastOfferAt, context.limits.cooldownHours, context.timeZone)
+    context.boughtAt !== null &&
+    sameEvening(context.now, context.boughtAt, context.limits.cooldownHours, context.timeZone)
+  );
+}
+
+/**
+ * He says he has no money right now (eval asks-for-media-no-budget, 27/11): the brain reads « à sec » (`no_budget`) or
+ * money trouble on this message, or money trouble froze her sales. Then nothing paid is pushed at him: no script, and
+ * no custom video nor cam suggested in its place. His own asking lifts the stored no-budget mark for a script he asks
+ * for (`offerDecision`), never what he says on this very message.
+ */
+export function saysNoMoneyNow(context: {
+  readonly risks: readonly string[];
+  readonly flags?: FanFlags;
+}): boolean {
+  return (
+    context.risks.includes('no_budget') ||
+    context.risks.includes('money_trouble') ||
+    context.flags?.salesFrozen?.reason === 'money_trouble'
+  );
+}
+
+/**
+ * Whether she may steer him to something made for him (a custom video, a cam) instead of a script: never to a fan
+ * nobody may sell to (« Ne plus lui écrire », sales frozen, a risk where selling is out), nor one with no money now.
+ */
+export function maySuggestCustom(context: {
+  readonly risks: readonly string[];
+  readonly flags: FanFlags;
+}): boolean {
+  const { flags } = context;
+  return (
+    flags.doNotContact !== true &&
+    flags.salesFrozen === undefined &&
+    !context.risks.some((risk) => NO_SALE_RISKS.includes(risk)) &&
+    !saysNoMoneyNow(context)
   );
 }
 

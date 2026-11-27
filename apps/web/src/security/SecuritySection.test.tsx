@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SecuritySection } from './SecuritySection';
 import { ago, closedText, sessionGroups, sessionsText } from './view';
 
+import { codesUnconfirmed, markCodesUnconfirmed } from '@/auth/codes-pending';
+
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', () => ({
   confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
@@ -281,6 +283,15 @@ describe('SecuritySection (SEC-04)', () => {
     });
   });
 
+  it('says « l’autre session » when there is only one (recette PRO2-07)', async () => {
+    serve({ 'GET /auth/sessions': sessionsRoute(SESSIONS.slice(0, 2)) });
+    render(<SecuritySection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Fermer toutes les autres' }));
+    expect(screen.getByRole('group').textContent).toContain(
+      'L’autre session sera fermée, et tes autres appareils',
+    );
+  });
+
   it('gives new backup codes against the password and a code, and says a refusal', async () => {
     const codes = Array.from({ length: 10 }, (_, index) => `code-${String(index).padStart(2, '0')}`);
     const calls = serve({
@@ -290,7 +301,10 @@ describe('SecuritySection (SEC-04)', () => {
           ? { status: 200, body: { backupCodes: codes } }
           : { status: 401, body: apiError('reauthentication_unauthenticated') },
     });
+    // The activation's codes were left without being said kept (recette COUV-08).
+    markCodesUnconfirmed();
     render(<SecuritySection />);
+    expect(screen.getByText(/Tes codes de secours n’ont pas été confirmés/u)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Créer de nouveaux codes' }));
     const password = screen.getByLabelText('Mot de passe');
@@ -317,6 +331,8 @@ describe('SecuritySection (SEC-04)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Je les ai mis en lieu sûr' }));
     expect(screen.queryByText('code-00')).toBeNull();
     expect(screen.getByRole('button', { name: 'Créer de nouveaux codes' })).toBeTruthy();
+    expect(screen.queryByText(/Tes codes de secours n’ont pas été confirmés/u)).toBeNull();
+    expect(codesUnconfirmed()).toBe(false);
   });
 
   it('asks for the code before sending, and says too many attempts', async () => {

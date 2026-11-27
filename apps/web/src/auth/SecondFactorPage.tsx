@@ -1,15 +1,21 @@
 import type { SecondFactorSetup } from '@impera/contracts';
-import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { BackupCodesList, CopyButton } from './BackupCodesList';
+import { PasskeyOffer } from './PasskeyOffer';
 import { PublicBrand } from './PublicBrand';
+import { QrCode } from './QrCode';
 import { chosenPassword, forgetChosenPassword } from './chosen-password';
+import { clearCodesUnconfirmed, markCodesUnconfirmed } from './codes-pending';
+import { deviceHoldsPasskeys, passkeyOffered } from './passkeys';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
 
 type Step =
   | { readonly kind: 'password' }
   | { readonly kind: 'scan'; readonly setup: SecondFactorSetup }
-  | { readonly kind: 'codes'; readonly backupCodes: readonly string[] };
+  | { readonly kind: 'codes'; readonly backupCodes: readonly string[] }
+  /** Face ID offered right away (recette 27/11, P2): the app to install was the hard part, the gesture is the easy one. */
+  | { readonly kind: 'offer' };
 
 const START_MESSAGES: Record<Exclude<ActivationStart['kind'], 'ok'>, string> = {
   wrong_password: 'Ce n’est pas le bon mot de passe.',
@@ -115,6 +121,20 @@ export function SecondFactorPage({
     setError(CODE_MESSAGES[result]);
   }
 
+  /** After the backup codes: the offer of a key, once per device and only on a device that holds keys. */
+  async function codesKept(): Promise<void> {
+    if (!passkeyOffered() && (await deviceHoldsPasskeys())) setStep({ kind: 'offer' });
+    else onActivated();
+  }
+
+  if (step.kind === 'offer') {
+    return (
+      <main className="nv-aura grid min-h-dvh place-items-center px-4 py-10">
+        <PasskeyOffer page="Validation en deux étapes" onDone={onActivated} />
+      </main>
+    );
+  }
+
   return (
     <main className="nv-aura grid min-h-dvh place-items-center px-4 py-10">
       <div className="nv-plate nv-plate--pad flex w-full max-w-md flex-col gap-6">
@@ -179,9 +199,13 @@ export function SecondFactorPage({
                 Ajoute Impera dans ton application
               </h1>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                Sur ton téléphone, touche le bouton. Sur un ordinateur, choisis « Saisir une clé » dans
-                l’application et recopie celle-ci.
+                Sur ton téléphone, touche le bouton. Sur un ordinateur, scanne le code avec l’application, ou
+                choisis « Saisir une clé » et recopie celle-ci.
               </p>
+            </div>
+            {/* A computer's screen only: a phone cannot scan itself, its button opens the app (recette 27/11, G7). */}
+            <div className="hidden justify-center sm:flex">
+              <QrCode text={setup.totpURI} label="Code à scanner avec l’application" />
             </div>
             <a className="nv-btn nv-btn--soft" href={setup.totpURI}>
               Ouvrir dans l’application
@@ -221,7 +245,10 @@ export function SecondFactorPage({
         );
       }
       case 'codes':
-        return <BackupCodes codes={step.backupCodes} onDone={onActivated} />;
+        return <BackupCodes codes={step.backupCodes} onDone={() => void codesKept()} />;
+      case 'offer':
+        // Drawn on its own page above.
+        return <></>;
     }
   }
 }
@@ -229,6 +256,18 @@ export function SecondFactorPage({
 /** Ten backup codes, shown once (the shared list), and the person says they are kept before going on. */
 function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () => void }): JSX.Element {
   const [kept, setKept] = useState(false);
+  const leaving = useRef(false);
+  // Until they are said kept: leaving asks first, and a reload leaves a mark Sécurité reads (COUV-08).
+  useEffect(() => {
+    markCodesUnconfirmed();
+    const warn = (event: BeforeUnloadEvent): void => {
+      if (!leaving.current) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+    };
+  }, []);
   return (
     <>
       <div className="nv-enter flex flex-col gap-2">
@@ -243,7 +282,7 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
       <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
         <input
-          className="mt-1"
+          className="nv-check"
           type="checkbox"
           checked={kept}
           onChange={(event) => {
@@ -252,7 +291,16 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
         />
         <span>J’ai mis ces codes en lieu sûr.</span>
       </label>
-      <button type="button" className="nv-btn nv-btn--neon" disabled={!kept} onClick={onDone}>
+      <button
+        type="button"
+        className="nv-btn nv-btn--neon"
+        disabled={!kept}
+        onClick={() => {
+          leaving.current = true;
+          clearCodesUnconfirmed();
+          onDone();
+        }}
+      >
         Ouvrir Impera
       </button>
     </>

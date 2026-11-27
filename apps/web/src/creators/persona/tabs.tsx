@@ -111,6 +111,24 @@ export function AgentBehaviorTab({ value: b, onChange }: TabProps<AgentBehavior>
           set('split_messages', v);
         }}
       />
+      <SwitchRow
+        label="Elle peut jouer la jalouse"
+        path="behavior.plays_jealous"
+        detail="Quand il parle d’une autre femme. Désactivé : elle n’est pas jalouse."
+        checked={b.plays_jealous ?? false}
+        onChange={(v) => {
+          set('plays_jealous', v);
+        }}
+      />
+      <SwitchRow
+        label="Elle écrit des didascalies"
+        path="behavior.stage_directions"
+        detail="« *rougit* », « (rires) ». Désactivé : elle n’en écrit pas."
+        checked={b.stage_directions ?? false}
+        onChange={(v) => {
+          set('stage_directions', v);
+        }}
+      />
       <Field
         label="Surnoms"
         id={`${id}-pet`}
@@ -728,7 +746,7 @@ export function NotificationsTab({
 }
 
 const RULES: readonly {
-  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden'>;
+  readonly field: Exclude<keyof PersonaAgentRules, 'emojis_forbidden' | 'close_only_words'>;
   readonly label: string;
   readonly placeholder: string;
   readonly hint?: string;
@@ -755,6 +773,13 @@ const RULES: readonly {
     hint: 'Variantes comprises.',
     max: 120,
   },
+  {
+    field: 'degrading_words',
+    label: 'Les insultes qu’elle n’écrit jamais',
+    placeholder: 'Ajouter une insulte',
+    hint: 'Même dans le feu de l’action. Si le fan en emploie une envers elle, elle le recadre gentiment.',
+    max: 120,
+  },
 ];
 
 /**
@@ -778,7 +803,7 @@ export function RulesTab({ value: r, onChange }: TabProps<PersonaAgentRules>): J
         >
           <Entries
             id={`${id}-${item.field}`}
-            values={r[item.field]}
+            values={r[item.field] ?? []}
             maxLength={item.max}
             placeholder={item.placeholder}
             onChange={(values) => {

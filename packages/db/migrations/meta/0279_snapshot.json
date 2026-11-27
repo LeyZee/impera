@@ -1,9 +1,187 @@
 {
-  "id": "91747e25-9814-4792-9819-143d724332ce",
-  "prevId": "d4cea7f1-ed14-4b3a-94dc-343f27565cb0",
+  "id": "aafb5bd5-b38e-4234-ab23-f1ffc1f0699d",
+  "prevId": "a3ca4056-22ed-4373-98f0-5eb6425d0b18",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.agency_styles": {
+      "name": "agency_styles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "private_style": {
+          "name": "private_style",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_style": {
+          "name": "public_style",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form": {
+          "name": "form",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "activated_by": {
+          "name": "activated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "agency_styles_version_unique": {
+          "name": "agency_styles_version_unique",
+          "columns": [
+            {
+              "expression": "version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agency_styles_one_active": {
+          "name": "agency_styles_one_active",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agency_styles\".\"is_active\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agency_styles_created_by_user_id_fk": {
+          "name": "agency_styles_created_by_user_id_fk",
+          "tableFrom": "agency_styles",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "agency_styles_activated_by_user_id_fk": {
+          "name": "agency_styles_activated_by_user_id_fk",
+          "tableFrom": "agency_styles",
+          "tableTo": "user",
+          "columnsFrom": ["activated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "owner_read": {
+          "name": "owner_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"agency_styles\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not \"agency_styles\".\"is_active\""
+        },
+        "owner_activate": {
+          "name": "owner_activate",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and (not \"agency_styles\".\"is_active\" or \"agency_styles\".\"activated_by\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "agency_styles_version_check": {
+          "name": "agency_styles_version_check",
+          "value": "\"agency_styles\".\"version\" > 0"
+        },
+        "agency_styles_private_style_check": {
+          "name": "agency_styles_private_style_check",
+          "value": "char_length(\"agency_styles\".\"private_style\") <= 8000"
+        },
+        "agency_styles_public_style_check": {
+          "name": "agency_styles_public_style_check",
+          "value": "char_length(\"agency_styles\".\"public_style\") <= 4000"
+        },
+        "agency_styles_form_check": {
+          "name": "agency_styles_form_check",
+          "value": "jsonb_typeof(\"agency_styles\".\"form\") = 'object'"
+        },
+        "agency_styles_activated_check": {
+          "name": "agency_styles_activated_check",
+          "value": "not \"agency_styles\".\"is_active\" or (\"agency_styles\".\"activated_at\" is not null and \"agency_styles\".\"activated_by\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.agent_hour_exceptions": {
       "name": "agent_hour_exceptions",
       "schema": "",
@@ -306,7 +484,7 @@
       "checkConstraints": {
         "creator_alert_routes_alert_code_check": {
           "name": "creator_alert_routes_alert_code_check",
-          "value": "\"creator_alert_routes\".\"alert_code\" in ('safety_handoff', 'identity_doubt', 'sale', 'offer_proposed', 'script_price', 'scripts_exhausted', 'her_alerts', 'ai_budget', 'session_expired')"
+          "value": "\"creator_alert_routes\".\"alert_code\" in ('safety_handoff', 'identity_doubt', 'sale', 'offer_proposed', 'script_price', 'scripts_exhausted', 'her_alerts', 'ai_budget', 'session_expired', 'uncovered_account')"
         },
         "creator_alert_routes_role_check": {
           "name": "creator_alert_routes_role_check",
@@ -319,6 +497,10 @@
         "creator_alert_routes_locked_check": {
           "name": "creator_alert_routes_locked_check",
           "value": "\"creator_alert_routes\".\"alert_code\" not in ('safety_handoff') or \"creator_alert_routes\".\"mode\" = 'deliver'"
+        },
+        "creator_alert_routes_chatters_closed_check": {
+          "name": "creator_alert_routes_chatters_closed_check",
+          "value": "\"creator_alert_routes\".\"alert_code\" not in ('uncovered_account') or \"creator_alert_routes\".\"role\" <> 'chatter_on_shift' or \"creator_alert_routes\".\"mode\" = 'off'"
         }
       },
       "isRLSEnabled": false
@@ -1908,6 +2090,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "ready_video_id": {
+          "name": "ready_video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2109,6 +2297,10 @@
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
           "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
+        },
+        "content_drops_ready_video_check": {
+          "name": "content_drops_ready_video_check",
+          "value": "\"content_drops\".\"ready_video_id\" is null or (\"content_drops\".\"category\" = 'sale_video' and \"content_drops\".\"ready_video_id\" ~ '^rv_[0-9a-f]{8}$')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
@@ -2923,7 +3115,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'account_uncovered', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -3584,6 +3776,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "messages_account_fan_recent_idx": {
+          "name": "messages_account_fan_recent_idx",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"messages\".\"direction\" = 'inbound'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6346,6 +6560,28 @@
           "method": "btree",
           "with": {}
         },
+        "domain_events_account_uncovered_unique": {
+          "name": "domain_events_account_uncovered_unique",
+          "columns": [
+            {
+              "expression": "(\"payload\"->>'platformAccountId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "(\"payload\"->>'slotStartsAt')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"domain_events\".\"type\" = 'account_uncovered'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "domain_events_connection_state_idx": {
           "name": "domain_events_connection_state_idx",
           "columns": [
@@ -6424,7 +6660,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'sale_trouble', 'script_abandon_teased', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'account_uncovered', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -8990,6 +9226,128 @@
       },
       "isRLSEnabled": false
     },
+    "public.payout_destinations": {
+      "name": "payout_destinations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "name": "method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "details_ciphertext": {
+          "name": "details_ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resealed": {
+          "name": "resealed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payout_destinations_member_idx": {
+          "name": "payout_destinations_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payout_destinations_member_id_team_members_id_fk": {
+          "name": "payout_destinations_member_id_team_members_id_fk",
+          "tableFrom": "payout_destinations",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "payout_destinations_created_by_user_id_fk": {
+          "name": "payout_destinations_created_by_user_id_fk",
+          "tableFrom": "payout_destinations",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "owner_or_self_select": {
+          "name": "owner_or_self_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or exists (select 1 from team_members m where m.id = \"payout_destinations\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "self_insert": {
+          "name": "self_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "exists (select 1 from team_members m where m.id = \"payout_destinations\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"payout_destinations\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not \"payout_destinations\".\"resealed\" and \"payout_destinations\".\"created_at\" = now()"
+        }
+      },
+      "checkConstraints": {
+        "payout_destinations_method_check": {
+          "name": "payout_destinations_method_check",
+          "value": "\"payout_destinations\".\"method\" in ('mobile_money', 'bank_account', 'cash_pickup')"
+        },
+        "payout_destinations_size_check": {
+          "name": "payout_destinations_size_check",
+          "value": "octet_length(\"payout_destinations\".\"details_ciphertext\") between 1 and 4096"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.link_service_credentials": {
       "name": "link_service_credentials",
       "schema": "",
@@ -11396,7 +11754,74 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.notification_kind_preferences": {
+      "name": "notification_kind_preferences",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notification_kind_preferences_user_id_user_id_fk": {
+          "name": "notification_kind_preferences_user_id_user_id_fk",
+          "tableFrom": "notification_kind_preferences",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "notification_kind_preferences_user_id_kind_pk": {
+          "name": "notification_kind_preferences_user_id_kind_pk",
+          "columns": ["user_id", "kind"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "own_rows": {
+          "name": "own_rows",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"notification_kind_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')",
+          "withCheck": "\"notification_kind_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "notification_kind_preferences_kind_check": {
+          "name": "notification_kind_preferences_kind_check",
+          "value": "\"notification_kind_preferences\".\"kind\" in ('agency_request', 'week_to_validate', 'earnings', 'lives')"
         }
       },
       "isRLSEnabled": false
@@ -22033,28 +22458,6 @@
           "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
           "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_cadences\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
         },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
-        "job_insert": {
-          "name": "job_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts' and \"script_cadences\".\"updated_by\" is null"
-        },
-        "job_update": {
-          "name": "job_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'",
-          "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
         "creator_closed": {
           "name": "creator_closed",
           "as": "RESTRICTIVE",
@@ -22419,28 +22822,6 @@
           "to": ["public"],
           "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
         },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
-        "job_delete": {
-          "name": "job_delete",
-          "as": "PERMISSIVE",
-          "for": "DELETE",
-          "to": ["public"],
-          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
-        "job_update": {
-          "name": "job_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'",
-          "withCheck": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
         "creator_closed": {
           "name": "creator_closed",
           "as": "RESTRICTIVE",
@@ -22568,13 +22949,6 @@
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
         },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.job', true), '') = 'ask_scripts' and exists (select 1 from script_structures s where s.id = \"script_structure_versions\".\"structure_id\"\n        and (s.reserved_creator_id is null or s.reserved_creator_id = nullif(current_setting('app.creator_id', true), '')::uuid))"
-        },
         "owner_insert": {
           "name": "owner_insert",
           "as": "PERMISSIVE",
@@ -22688,13 +23062,6 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
-        },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.job', true), '') = 'ask_scripts' and (\"script_structures\".\"reserved_creator_id\" is null or \"script_structures\".\"reserved_creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid)"
         },
         "owner_insert": {
           "name": "owner_insert",

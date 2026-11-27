@@ -22,7 +22,7 @@ export type RequestPasswordResetBody = z.infer<typeof RequestPasswordResetBodySc
  * this sentence as it is.
  */
 export const PASSWORD_RESET_REQUESTED_MESSAGE =
-  'Si cette adresse a un compte relié à Telegram, le lien vient d’y partir ; il vaut 15 minutes. Sinon, demande à un autre propriétaire.';
+  'Si cette adresse a un compte relié à Telegram, le lien vient d’y partir ; il vaut 15 minutes. Sinon, demande au propriétaire de l’agence.';
 export const PasswordResetRequestedSchema = z.object({
   message: z.literal(PASSWORD_RESET_REQUESTED_MESSAGE),
 });

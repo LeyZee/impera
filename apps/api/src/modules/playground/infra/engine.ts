@@ -19,6 +19,7 @@ import {
   desireSignalPoints,
   checkVoiceOutput,
   guardSettingsOf,
+  languagesOf,
   isNight,
   isTimeZone,
   nextLocalTime,
@@ -230,6 +231,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
+    languages: languagesOf(deps.persona),
     // Her examples only when her own version is played: never the invented persona's, never another creator's.
     voiceExamples:
       deps.played === undefined

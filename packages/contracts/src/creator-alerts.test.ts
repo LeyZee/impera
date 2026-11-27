@@ -7,6 +7,8 @@ import {
   CREATOR_ALERT_ERROR_CODES,
   CREATOR_ALERT_FAMILY,
   CREATOR_ALERT_ROLES,
+  CHATTER_CLOSED_CREATOR_ALERTS,
+  isClosedToChatters,
   isCreatorAlertLocked,
   LOCKED_CREATOR_ALERTS,
   SetCreatorAlertBodySchema,
@@ -30,6 +32,21 @@ describe('creator alerts (ADR 0150)', () => {
         }
       }
     }
+  });
+
+  it('shuts the steering alerts to the chatters, defaults included (ADR 0094 § 3)', () => {
+    expect(CHATTER_CLOSED_CREATOR_ALERTS).toEqual(['uncovered_account', 'shift_not_taken']);
+    expect(CREATOR_ALERT_FAMILY.uncovered_account).toBe('steering');
+    expect(CREATOR_ALERT_FAMILY.shift_not_taken).toBe('steering');
+    for (const code of CHATTER_CLOSED_CREATOR_ALERTS) {
+      expect(acceptsRouting(code, CREATOR_ALERT_DEFAULTS[code])).toBe(true);
+      expect(CREATOR_ALERT_DEFAULTS[code].chatter_on_shift).toBe('off');
+      for (const mode of ['deliver', 'muted'] as const) {
+        expect(acceptsRouting(code, { ...CREATOR_ALERT_DEFAULTS[code], chatter_on_shift: mode })).toBe(false);
+      }
+      expect(acceptsRouting(code, { owner: 'muted', manager: 'off', chatter_on_shift: 'off' })).toBe(true);
+    }
+    expect(CREATOR_ALERT_CODES.filter(isClosedToChatters)).toEqual(['uncovered_account', 'shift_not_taken']);
   });
 
   it('lets any other alert be muted or switched off for any role', () => {

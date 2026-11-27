@@ -88,6 +88,8 @@ describe('ops:check-keys', () => {
       expect.objectContaining({ keys: 'CREDENTIALS_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
       expect.objectContaining({ keys: 'CREDENTIALS_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
       expect.objectContaining({ keys: 'CREDENTIALS_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
+      // « Où te verser » (ADR 0165): none written here; its own test seals and re-seals some.
+      expect.objectContaining({ label: 'Coordonnées de versement', total: 0, unreadable: [] }),
     ]);
   });
 
@@ -98,6 +100,7 @@ describe('ops:check-keys', () => {
       ['xai'],
       ['impera_demo_bot'],
       ['reveal'],
+      [],
     ]);
     expect(JSON.stringify(families)).not.toContain('FAKE');
     expect(JSON.stringify(families)).not.toContain('invented');

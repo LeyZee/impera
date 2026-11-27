@@ -26,7 +26,12 @@ import { parse } from 'yaml';
 import { testConfig } from '../../../../__tests__/support/config';
 import { createLogger } from '../../../../logger';
 import { buildServer } from '../../../../server';
-import type { CalibrationRecord, CalibrationStore, VoiceExample } from '../../../agent/index';
+import {
+  FRENCH_ONLY,
+  type CalibrationRecord,
+  type CalibrationStore,
+  type VoiceExample,
+} from '../../../agent/index';
 import { createPlaygroundModule, type HerScriptsSource } from '../../index';
 import type { VoiceBankStore } from '../db/rating-store';
 
@@ -178,11 +183,15 @@ async function server(
       sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
       followUps: { delaysHours: [12, 24], spirit: null },
       splitMessages: true,
+      playsJealous: false,
+      stageDirections: false,
       petNames: [],
       alertKeywords: [],
       forbiddenEmojis: [],
       kycSlots: [],
       objectionReplies: {},
+      spokenLanguages: FRENCH_ONLY,
+      languageExamples: {},
     },
     // « Tester » reads her active persona; none here: the words are read, the phrase needs no persona to be refused.
     activePersona: () => Promise.resolve(null),

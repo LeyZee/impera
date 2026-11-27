@@ -1,5 +1,13 @@
 # 0036. Factures : ce qu'une quinzaine doit rendre devient un avoir sur une facture déjà émise
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0039 · Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main](0039-upheld-contest-corrected-by-payroll.md) : Remplace : dans l'ADR 0036, la phrase « Seul l'avoir qui répond à une contestation fait passer la facture en « créditée » » ; précise l'ADR 0023 (§ Factures : l'acceptation, la correction d'une facture)
+>
+> Toutes les décisions du même sujet : [`docs/regles/paie-et-factures.md`](../regles/paie-et-factures.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 31/10/2026 11h39, « ok 0036 »)
 Date : 2026-10-28
 Précise : ADR 0023 § Factures (le report, l'erreur corrigée par un avoir)

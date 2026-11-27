@@ -50,4 +50,11 @@ describe('Équipe › Planning (recette visuelle 16/11)', () => {
       /@media \(min-width: 1280px\) \{\s*\.sc-grid \{\s*grid-template-columns: calc\(160px \+/u,
     );
   });
+
+  it('never cuts a « suite » name mid-word, and drops « Libre » before the hours of a narrow créneau (CHAT-04)', () => {
+    const cont = /\.cal-chip--cont \.sc-chip__name \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(cont).toContain('white-space: nowrap');
+    expect(cont).toContain('text-overflow: ellipsis');
+    expect(css).toMatch(/@container \(max-width: [^)]+\) \{\s*\.cal-free__word \{\s*display: none;/u);
+  });
 });

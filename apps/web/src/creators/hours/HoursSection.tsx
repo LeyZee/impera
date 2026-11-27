@@ -170,6 +170,9 @@ function HoursForm({
       // The defaults are stored as none: she then follows them as they are, today and after.
       const saved = await saveAgentHours(creatorId, isDefaultHours(draft) ? null : sortedHours(draft));
       queryClient.setQueryData(hoursQueryKey(creatorId), saved);
+      // Her switch in the header says whether she is in her hours: read again at once, not a minute later (CODE-03).
+      void queryClient.invalidateQueries({ queryKey: ['dashboard', 'creators'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard', creatorId] });
       const sorted = sortedHours(saved.hours);
       setStored({ ...saved, hours: sorted });
       setDraft(sorted);

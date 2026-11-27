@@ -43,7 +43,10 @@ export interface FunnelStep {
   readonly count: number;
   /** Bar width in % of the first step (`--nv-w` of `.nv-funnel__track`). */
   readonly width: number;
-  /** % of the step before that made it here, rounded; `null` for the first step. */
+  /**
+   * % of the step before that made it here, rounded; `null` for the first step, and for a step that holds more
+   * than the one before: the two counts are then not the same fans, so no rate is said (never « 1 500 % »).
+   */
   readonly rate: number | null;
   /** Change of `rate` against the previous period, in points; `null` when there is nothing to compare. */
   readonly delta: number | null;
@@ -66,7 +69,7 @@ export function funnelSteps(counts: readonly number[], previous?: readonly numbe
     const before = previous === undefined || i === 0 ? null : passRate(previous, i);
     return {
       count,
-      width: first > 0 ? round((count / first) * 100) : 0,
+      width: first > 0 ? Math.min(100, round((count / first) * 100)) : 0,
       rate,
       delta: rate === null || before === null ? null : rate - before,
     };
@@ -108,6 +111,7 @@ function passRate(counts: readonly number[], i: number): number | null {
   const before = counts[i - 1];
   const here = counts[i];
   if (before === undefined || here === undefined) return null;
+  if (here > before) return null;
   return before > 0 ? Math.round((here / before) * 100) : 0;
 }
 

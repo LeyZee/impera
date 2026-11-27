@@ -7,6 +7,7 @@ import {
   createContentDropsModule,
   type ContentDropsModule,
   type DropStorage,
+  type ReadyVideoLines,
   type ScriptVersions,
 } from '../modules/content-drops';
 import { createDropDescriptions } from '../modules/media';
@@ -44,6 +45,8 @@ export function wireContentDrops(
     readonly storage?: DropStorage;
     /** Told each time a medium of hers is described (ADR 0164 § 9): whoever proposes something from it. */
     readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
+    /** The owner's « Vidéos déjà tournées » (custom orders): the types a video to sell takes (ADR 0163 § 7). */
+    readonly readyVideos?: ReadyVideoLines;
   },
 ): WiredContentDrops {
   const module = createContentDropsModule({
@@ -56,6 +59,7 @@ export function wireContentDrops(
     brain: deps.brain,
     ...(deps.storage !== undefined && { storage: deps.storage }),
     ...(deps.onDescribed !== undefined && { onDescribed: deps.onDescribed }),
+    ...(deps.readyVideos !== undefined && { readyVideos: deps.readyVideos }),
   });
   return {
     module,

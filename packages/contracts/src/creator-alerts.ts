@@ -28,11 +28,21 @@ export const CREATOR_ALERT_CODES = [
   'ai_budget',
   /** The platform session expired. */
   'session_expired',
+  /**
+   * A créneau began on one of her accounts with nobody answering: no chatter in post, the agent not in Automatique,
+   * and a fan wrote in the 24 hours before (ADR 0094 § 1, « compte sans personne »). Never to a chatter.
+   */
+  'uncovered_account',
+  /**
+   * A shift on one of her accounts began a while ago (the agency's delay, Réglages › Planning) and its member has not
+   * taken it (« Je prends mon poste », EQ-12) (ADR 0094 § 1, « chatteur pas là »). Never to a chatter.
+   */
+  'shift_not_taken',
 ] as const;
 export const CreatorAlertCodeSchema = z.enum(CREATOR_ALERT_CODES);
 export type CreatorAlertCode = z.infer<typeof CreatorAlertCodeSchema>;
 
-export const CREATOR_ALERT_FAMILIES = ['safety', 'sales', 'conversation', 'system'] as const;
+export const CREATOR_ALERT_FAMILIES = ['safety', 'sales', 'conversation', 'steering', 'system'] as const;
 export const CreatorAlertFamilySchema = z.enum(CREATOR_ALERT_FAMILIES);
 export type CreatorAlertFamily = z.infer<typeof CreatorAlertFamilySchema>;
 
@@ -46,6 +56,8 @@ export const CREATOR_ALERT_FAMILY: Readonly<Record<CreatorAlertCode, CreatorAler
   her_alerts: 'conversation',
   ai_budget: 'system',
   session_expired: 'system',
+  uncovered_account: 'steering',
+  shift_not_taken: 'steering',
 };
 
 /** Who an alert may reach. `chatter_on_shift`: the chatters whose shift covers her at the time of the alert. */
@@ -82,6 +94,8 @@ export const CREATOR_ALERT_DEFAULTS: Readonly<Record<CreatorAlertCode, CreatorAl
   her_alerts: routing('deliver', 'muted', 'deliver'),
   ai_budget: routing('deliver', 'deliver', 'off'),
   session_expired: routing('deliver', 'deliver', 'muted'),
+  uncovered_account: routing('deliver', 'deliver', 'off'),
+  shift_not_taken: routing('deliver', 'deliver', 'off'),
 };
 
 /** Always delivered to every role (ADR 0150 § 6): no mute, no off. These rules come before any setting. */
@@ -91,8 +105,22 @@ export function isCreatorAlertLocked(code: CreatorAlertCode): boolean {
   return LOCKED_CREATOR_ALERTS.includes(code);
 }
 
-/** A routing a locked alert accepts: every role on `deliver`. */
+/**
+ * Never to a chatter (ADR 0094 § 3): the steering alerts are for the owner and the managers. Their « chatteur en
+ * shift » is closed on `off`, whatever is asked; the code decides, never a setting.
+ */
+export const CHATTER_CLOSED_CREATOR_ALERTS: readonly CreatorAlertCode[] = [
+  'uncovered_account',
+  'shift_not_taken',
+];
+
+export function isClosedToChatters(code: CreatorAlertCode): boolean {
+  return CHATTER_CLOSED_CREATOR_ALERTS.includes(code);
+}
+
+/** A routing the alert accepts: a locked one has every role on `deliver`, one closed to chatters has theirs `off`. */
 export function acceptsRouting(code: CreatorAlertCode, routes: CreatorAlertRouting): boolean {
+  if (isClosedToChatters(code) && routes.chatter_on_shift !== 'off') return false;
   return !isCreatorAlertLocked(code) || CREATOR_ALERT_ROLES.every((role) => routes[role] === 'deliver');
 }
 
@@ -101,6 +129,8 @@ export const CreatorAlertLineSchema = z.object({
   code: CreatorAlertCodeSchema,
   family: CreatorAlertFamilySchema,
   locked: z.boolean(),
+  /** Its « chatteur en shift » is closed on `off` (ADR 0094 § 3): the tab shows it shut. */
+  chattersClosed: z.boolean(),
   routes: CreatorAlertRoutingSchema,
   /** No row stored for any role: the defaults of the code apply. */
   isDefault: z.boolean(),
@@ -121,7 +151,7 @@ export type SetCreatorAlertBody = z.infer<typeof SetCreatorAlertBodySchema>;
 export const CREATOR_ALERT_ERROR_CODES = [
   /** No such creator, or archived. */
   'creator_alert_creator_not_found',
-  /** A locked alert set to anything but `deliver`. */
+  /** A locked alert set to anything but `deliver`, or one closed to chatters opened to them. */
   'creator_alert_locked_unprocessable',
 ] as const;
 export type CreatorAlertErrorCode = (typeof CREATOR_ALERT_ERROR_CODES)[number];

@@ -25,7 +25,7 @@ export function NotFoundPage(): JSX.Element {
         title="Cette page n’existe pas"
         action={
           <Link to={home} className="nv-btn nv-btn--soft">
-            Revenir à {sectionLabel(home)}
+            Retour : {sectionLabel(home)}
           </Link>
         }
       >

@@ -503,8 +503,7 @@ function ToValidate({
         )}
         {unread ? (
           <p className="rp-validate__unread">
-            Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se
-            valide à la main.
+            Les ventes de Reveal ne sont pas encore lues : rien n’est validé sans toi.
           </p>
         ) : null}
         {unlinked.map((line) => (

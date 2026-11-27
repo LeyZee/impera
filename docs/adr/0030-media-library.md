@@ -1,5 +1,15 @@
 # 0030. Médiathèque : un média, ses liaisons par plateforme, le coffre fait foi
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0044 · Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine](0044-content-drops-feed-and-mass-dm.md) : Remplace : dans l'ADR 0030 § 2, les mots « Nirvana ne téléverse rien vers une plateforme et n'a pas de dossier à lui », et dans l'ADR 0030 § 4, la règle « Fichiers : on garde le minimum », **pour le seul contenu déposé pour le feed et les Mass DM**. Pour tout le reste (scripts, médias privés vendus en message), l'ADR 0030 s'applique telle quelle : le coffre de la plateforme fait foi. L'ADR 0030 reste telle quelle ; l'index des ADR renvoie d'elle à celle-ci.
+>
+> - [0056 · Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse](0056-scripts-shot-by-the-creator-with-cards.md) : Remplace : dans l'ADR 0030 § 2, les mots « Nirvana ne téléverse rien vers une plateforme et n'a pas de dossier à lui », et dans l'ADR 0030 § 4, la règle « Fichiers : on garde le minimum », **pour les seuls scripts déposés par la créatrice** ; dans la fiche P6-01, la phrase qui fait de Reveal le seul lieu où l'on crée un script. L'ADR 0030 reste vraie pour tout le reste, et Reveal fait toujours foi pour ce qui a été envoyé à un fan (ADR 0018 § 5, ADR 0030 § 5).
+>
+> Toutes les décisions du même sujet : [`docs/regles/creatrice-et-contenu.md`](../regles/creatrice-et-contenu.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 27/10 20h37, carte « J'accepte, vignette seule » ; texte précisé avant fusion à la relecture de Bilan, § 1, § 3 et § 5, sans changer la décision acceptée ; § 3 amendé le 08/11/2026 : `validated_by` vise le compte de la personne qui valide, le propriétaire n'ayant pas de fiche d'équipe, phrase lue et acceptée par Charles à 21h03, « ok phrases 0030 » ; § 4 amendé le 08/11/2026 (SC-04 lot c4) : la vignette a sa propre clé `thumbnail_key`, `storage_key` ne désigne que l'original, phrase lue et acceptée par Charles à 23h05, « ok phrases 0030 »)
 Date : 2026-10-27
 

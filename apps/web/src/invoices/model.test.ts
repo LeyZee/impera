@@ -1,4 +1,4 @@
-import { INVOICE_ERROR_CODES, PayPeriodSchema } from '@impera/contracts';
+import { INVOICE_ERROR_CODES, PAY_AMOUNT_MAX_MINOR, PayPeriodSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,6 +14,7 @@ import {
   olderYear,
   periodText,
   readsAgain,
+  settleAmountMax,
   settlementText,
   yearRange,
   yearSlices,
@@ -161,6 +162,18 @@ describe('the contests first', () => {
     const b = invoiceOf(2, LOU, NOV1, { acceptance: contested });
     const c = invoiceOf(3, THEO, NOV1);
     expect(contestsFirst([a, b, c]).map((one) => one.number)).toEqual([b.number, a.number, c.number]);
+  });
+});
+
+describe('the amount of an upheld contest (recette MED-05)', () => {
+  it('never lets a credit in the agency’s favour go beyond its invoice', () => {
+    const invoice = invoiceOf(1, LOU, NOV1, { exclVatMinor: 11_895 });
+    expect(settleAmountMax(invoice, 'agency')).toBe(11_895);
+    expect(settleAmountMax(invoice, 'contractor')).toBe(PAY_AMOUNT_MAX_MINOR);
+    expect(settleAmountMax(invoice, null)).toBe(PAY_AMOUNT_MAX_MINOR);
+    expect(settleAmountMax({ kind: 'credit_note', exclVatMinor: -2_500 }, 'agency')).toBe(
+      PAY_AMOUNT_MAX_MINOR,
+    );
   });
 });
 

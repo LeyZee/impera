@@ -124,8 +124,17 @@ export type DraftPart =
   | {
       readonly kind: 'ready';
       readonly bubbles: readonly string[];
+      /**
+       * Her draft in French, one bubble per bubble of hers, when she writes to him in another language (ADR 0168 § 9);
+       * null in French. Read by the chatter, never copied nor sent.
+       */
+      readonly translation: readonly string[] | null;
+      /** The translation unfolded: folded by default, then as he left it. */
+      readonly translationOpen: boolean;
       /** Placed in Reveal by a chatter, waiting for what leaves (§ 5). */
       readonly placed: boolean;
+      /** Still waiting in the CRM: a gesture that did not count may be counted again (EXT-06). */
+      readonly pending: boolean;
       readonly mode: 'idle' | 'editing' | 'rejecting';
       /** The text being retouched, one bubble per line. */
       readonly text: string;
@@ -137,12 +146,16 @@ export interface PanelActions {
   readonly openCrm: () => void;
   readonly pickTab: (tab: PanelTab) => void;
   readonly toggleDiscover: (open: boolean) => void;
+  /** The French of a draft in another language, unfolded or folded. */
+  readonly toggleTranslation: (open: boolean) => void;
   /** « +N »: the signals past the first three badges. */
   readonly showSignals: () => void;
   /** `a`, or the retouched text with `e` (§ 4). */
   readonly place: (edited: boolean) => void;
   /** `a` again: the next bubble of what was placed. */
   readonly copyNext: () => void;
+  /** The gesture sent again, once the extension is linked or the CRM answers (EXT-06). */
+  readonly recount: () => void;
   readonly edit: () => void;
   readonly editText: (text: string) => void;
   readonly reject: () => void;
@@ -987,7 +1000,7 @@ const mediaLine = (price: number): HTMLElement =>
  * What a gesture left, in one or two quiet lines: the next step in Reveal, and whether it counted (§ 5, § 8). Several
  * bubbles go one at a time, as Reveal sends them (EXT-13): the next one waits on its button, under `a`.
  */
-function doneLines(done: GestureDone, salePrice: number | null): HTMLElement[] {
+function doneLines(done: GestureDone, salePrice: number | null, pending: boolean): HTMLElement[] {
   const lines: HTMLElement[] = [];
   const total = done.bubbles.length;
   if (done.outcome === 'rejected')
@@ -1041,6 +1054,19 @@ function doneLines(done: GestureDone, salePrice: number | null): HTMLElement[] {
   };
   const text = status[done.sent];
   if (text !== null) lines.push(h('p', { class: 'cp-draft__warn', role: 'status' }, text));
+  // Not counted, and the draft still waits: it can be counted once linked, or once the CRM answers (EXT-06).
+  if (pending && (done.sent === 'unlinked' || done.sent === 'unreachable'))
+    lines.push(
+      h(
+        'div',
+        { class: 'cp-draft__actions' },
+        h(
+          'button',
+          { type: 'button', class: 'nv-btn nv-btn--soft nv-btn--sm', 'data-gesture': 'recount' },
+          'Compter ce geste',
+        ),
+      ),
+    );
   return lines;
 }
 
@@ -1077,6 +1103,30 @@ const rowsOf = (text: string): number =>
       text.split('\n').reduce((rows, line) => rows + Math.max(1, Math.ceil(line.length / 32)), 0),
     ),
   );
+
+/**
+ * Under a draft that is not in French, its French, folded (ADR 0168 § 9): one muted line that opens plain lines, never
+ * bubbles, so nothing there looks like a text to place.
+ */
+function translationFold(lines: readonly string[], open: boolean, actions: PanelActions): HTMLElement {
+  const details = h(
+    'details',
+    { class: 'cp-discover cp-translation', 'data-group': 'translation', open },
+    h(
+      'summary',
+      {},
+      h('span', { class: 'cp-line-icon', 'aria-hidden': 'true' }, icon('languages', 16)),
+      h('span', {}, 'Traduction en français'),
+      h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+    ),
+    h('ol', { class: 'cp-translation__lines' }, ...lines.map((line) => h('li', {}, line))),
+    h('p', { class: 'cp-translation__note' }, 'Pour toi seulement : c’est le brouillon du dessus qui part.'),
+  );
+  details.addEventListener('toggle', () => {
+    actions.toggleTranslation(details.open);
+  });
+  return details;
+}
 
 /** What « où on en est » forbids, as the draft reads it. */
 interface DraftStops {
@@ -1176,6 +1226,11 @@ function draftPart(
         : h('li', { class: 'cp-bubble' }, bubble),
     ),
   );
+  // Only next to the text it translates: a retouched or already used draft shows none.
+  const french =
+    draft.translation === null || draft.done !== null || draft.translation.length !== shown.length
+      ? null
+      : translationFold(draft.translation, draft.translationOpen, actions);
   if (draft.mode === 'rejecting') {
     const note = h('input', {
       type: 'text',
@@ -1189,6 +1244,7 @@ function draftPart(
     section.append(
       head,
       bubbles,
+      ...(french === null ? [] : [french]),
       h('p', { class: 'cp-draft__hint', id: 'cp-reject-question' }, 'Pourquoi tu le refuses ?'),
       h(
         'div',
@@ -1231,9 +1287,9 @@ function draftPart(
     );
     return section;
   }
-  section.append(head, bubbles);
+  section.append(head, bubbles, ...(french === null ? [] : [french]));
   if (draft.done !== null) {
-    section.append(...doneLines(draft.done, salePrice));
+    section.append(...doneLines(draft.done, salePrice, draft.pending));
     return section;
   }
   if (draft.placed) {
@@ -1327,6 +1383,7 @@ function wire(root: ParentNode, actions: PanelActions): void {
     actions.place(true);
   });
   on('copy-next', actions.copyNext);
+  on('recount', actions.recount);
   on('edit', actions.edit);
   on('reject', actions.reject);
   on('cancel', actions.cancel);

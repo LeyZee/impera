@@ -13,11 +13,16 @@ const AMOUNT: Readonly<Record<Currency, Intl.NumberFormat>> = {
 /** Her Ventes screen, the tab of her bar (ADR 0042 § 8). */
 const SALES_SCREEN = '/ventes';
 
-/** « Nouvelle vente », « 12,40 € pour toi »: her part, cents always shown. No tag, so two sales show as two. */
+/**
+ * « Nouvelle vente · 12,40 € pour toi »: her part, cents always shown, in the title, which is what her list of
+ * notifications keeps (fourteen « Nouvelle vente » alike said nothing, recette 27/11, G4). No tag, so two sales show
+ * as two.
+ */
 export function creatorSaleMessage(creatorMinor: number, currency: Currency): PushMessage {
+  const part = `${AMOUNT[currency].format(creatorMinor / 100)} pour toi`;
   return {
-    title: 'Nouvelle vente',
-    body: `${AMOUNT[currency].format(creatorMinor / 100)} pour toi`,
+    title: `Nouvelle vente · ${part}`,
+    body: 'Le détail est dans tes ventes.',
     url: SALES_SCREEN,
   };
 }

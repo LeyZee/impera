@@ -1,5 +1,5 @@
 # EQ-10 Connexion et premier accès du chatteur
-Statut : todo (demandée par Charles le 27/10/2026 : « il faut travailler l'interface chatteur, le login pour chaque chatteur »)
+Statut : done (relevé du 27/11/2026, décidé par Charles sur recommandation du fil « Remettre la documentation au propre » : la connexion du chatteur existe ; l'écran « Apparence » de la fiche n'est pas fait, il ira dans une nouvelle fiche si on le veut) ; statut précédent : todo (demandée par Charles le 27/10/2026 : « il faut travailler l'interface chatteur, le login pour chaque chatteur »)
 Phase : équipe (ADR 0023, ADR 0024)
 Dépend de : EQ-01 (le compte et la fiche du membre), EQ-11 (le shell par rôle), le filtre des conversations routées (ci-dessous) ; les étapes contrat, mandat et dossier se branchent sur EQ-06 quand elle existe
 Branche : task/eq-10-chatter-sign-in

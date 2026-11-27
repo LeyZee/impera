@@ -132,6 +132,22 @@ describe('PersonaV2Schema', () => {
     p.agent.rules.never_say = ['?'];
     expect(issuePaths(p)).toEqual(['agent.rules.never_say.0']);
   });
+
+  it('leaves her not jealous unless her settings say so (Charles 27/11)', () => {
+    const latest = PersonaV2Schema.parse(personaFile('demo/v0.5.0.yaml'));
+    expect(latest.agent.behavior.plays_jealous ?? false).toBe(false);
+    const p = demo();
+    p.agent.behavior.plays_jealous = true;
+    expect(issuePaths(p)).toEqual([]);
+  });
+
+  it('leaves stage directions out unless her settings allow them (Charles 27/11)', () => {
+    const latest = PersonaV2Schema.parse(personaFile('demo/v0.5.0.yaml'));
+    expect(latest.agent.behavior.stage_directions ?? false).toBe(false);
+    const p = demo();
+    p.agent.behavior.stage_directions = true;
+    expect(issuePaths(p)).toEqual([]);
+  });
 });
 
 describe('the voice guide and the objection replies (ADR 0090)', () => {
@@ -258,5 +274,52 @@ describe('corrections', () => {
     for (const section of [...PERSONA_CORRECTION_SECTIONS, ...PERSONA_SHEET_SECTION_KEYS]) {
       expect(PersonaCorrectionSectionSchema.safeParse(section).success, section).toBe(true);
     }
+  });
+});
+
+describe('her close-only words and her emoji streak (Charles 26/11)', () => {
+  it('reads the demo example, invented words only', () => {
+    const persona = PersonaV2Schema.parse(personaFile('demo/v0.7.0.yaml'));
+    expect(persona.agent.rules.close_only_words).toEqual([
+      { words: ['Mon cœur'], min_tier: 4 },
+      { words: ['Mon trésor', 'Ma moitié'], min_tier: 5 },
+    ]);
+    expect(persona.agent.behavior.emoji_streak_max).toBe(3);
+  });
+
+  it('keeps both optional: a persona without them still reads', () => {
+    const persona = demo();
+    expect(persona.agent.rules.close_only_words).toBeUndefined();
+    expect(persona.agent.behavior.emoji_streak_max).toBeUndefined();
+  });
+
+  it('refuses a tier out of range, an empty group, an entry without a letter and a streak of zero', () => {
+    const raw = demo();
+    const withRules = (close_only_words: unknown) =>
+      PersonaV2Schema.safeParse({
+        ...raw,
+        agent: { ...raw.agent, rules: { ...raw.agent.rules, close_only_words } },
+      }).success;
+    expect(withRules([{ words: ['mon cœur'], min_tier: 3 }])).toBe(true);
+    expect(withRules([{ words: ['mon cœur'], min_tier: 0 }])).toBe(false);
+    expect(withRules([{ words: ['mon cœur'], min_tier: 6 }])).toBe(false);
+    expect(withRules([{ words: [], min_tier: 3 }])).toBe(false);
+    expect(withRules([{ words: ['?!'], min_tier: 3 }])).toBe(false);
+    expect(
+      PersonaV2Schema.safeParse({
+        ...raw,
+        agent: { ...raw.agent, behavior: { ...raw.agent.behavior, emoji_streak_max: 0 } },
+      }).success,
+    ).toBe(false);
+    const withBehavior = (extra: Record<string, unknown>) =>
+      PersonaV2Schema.safeParse({
+        ...raw,
+        agent: { ...raw.agent, behavior: { ...raw.agent.behavior, ...extra } },
+      }).success;
+    expect(
+      withBehavior({ capitalization: 'lowercase', strip_final_period: false, mark_spacing: 'space' }),
+    ).toBe(true);
+    expect(withBehavior({ capitalization: 'shout' })).toBe(false);
+    expect(withBehavior({ mark_spacing: 'thin' })).toBe(false);
   });
 });

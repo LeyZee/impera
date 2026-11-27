@@ -18,6 +18,8 @@ export const INVOICE_ERROR_CODES = [
   'billing_regime_country_unprocessable',
   /** The same id sent again with another regime. */
   'billing_regime_id_conflict',
+  /** Another regime has this name already: two of one name could not be told apart. */
+  'billing_regime_name_conflict',
   'billing_regime_not_found',
   /** The accountant's validation is recorded already, on another day: it is recorded once. */
   'billing_regime_validated_conflict',

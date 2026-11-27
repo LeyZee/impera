@@ -51,6 +51,11 @@ const bodiesFor = (
     confirm: null,
     idempotencyKey: newId(PlatformAccountIdSchema),
   },
+  'POST /v1/creators/:creatorId/vault/media/:platformMediaId/description': {
+    kind: 'validate',
+    platformAccountId: newId(PlatformAccountIdSchema),
+    descriptionId: newId(PlatformAccountIdSchema),
+  },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
   'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
@@ -80,6 +85,7 @@ const bodiesFor = (
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
   'POST /v1/team/members/:memberId/notes': { body: 'Note inventée' },
   'POST /v1/scheduling/shift-feedback/:shiftFeedbackId/incident': { step: 'seen' },
+  'POST /v1/team/review/shifts/:shiftId/seen': { creatorId: ids.creator },
   'PUT /v1/scheduling/shifts/:shiftId/feedback': {
     id: newId(ShiftFeedbackIdSchema),
     nothingToReport: true,
@@ -192,8 +198,14 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
 const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/alerts/triggers/:id/seen': 'a trigger of the person’s own alerts',
   'POST /v1/team/announcements/:announcementId/read': 'an announcement to the team: announcements tests',
+  'POST /v1/team/review/remarks/:remarkId/contest': 'a remark of the agent’s review: chatter review tests',
+  'POST /v1/team/review/remarks/:remarkId/ruling': 'a remark of the agent’s review: chatter review tests',
   'GET /v1/team/announcements/:announcementId/readers': 'an announcement to the team: announcements tests',
   'POST /v1/team/announcements/:announcementId/withdraw': 'an announcement to the team: announcements tests',
+  'POST /v1/team/departures/:departureId/cancel':
+    'a member’s departure, the owner’s only: team-departures tests',
+  'POST /v1/team/departures/:departureId/reveal-removed':
+    'a member’s departure, the owner’s only: team-departures tests',
   'DELETE /v1/scheduling/settings/versions/:id': 'an agency planning version',
   'DELETE /v1/scheduling/swap-requests/:shiftSwapRequestId': 'swap requests: leaves-swaps tests',
   'POST /v1/scheduling/swap-requests/:shiftSwapRequestId/answer': 'swap requests: leaves-swaps tests',

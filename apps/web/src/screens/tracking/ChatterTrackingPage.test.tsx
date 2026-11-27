@@ -22,6 +22,7 @@ vi.mock('@/scheduling/time', async (importOriginal) => ({
 
 /* An invented creator (ADR 0010). Paris is UTC+1 after 25/10: 22:00Z is 23 h. */
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
+const USER = id(71);
 const tomorrow = {
   id: id(102),
   creatorId: id(1),
@@ -59,7 +60,7 @@ const taken = ConversationSummarySchema.parse({
  * The chatter's shifts and what Suivi lists off shift (ADR 0025): no creator, or only the one whose handover he
  * took, with that conversation alone.
  */
-function serve(shifts: unknown, handover = false): void {
+function serve(shifts: unknown, handover = false, members: unknown = null): void {
   const creators = handover ? [{ id: id(1), displayName: 'Nora Vidal', timezone: 'Europe/Paris' }] : [];
   vi.stubGlobal(
     'fetch',
@@ -74,7 +75,9 @@ function serve(shifts: unknown, handover = false): void {
               ? { items: [taken], nextCursor: null }
               : path === '/v1/dashboard/todos'
                 ? { items: [], creators: [] }
-                : null;
+                : path === '/v1/team/members'
+                  ? members
+                  : null;
       return Promise.resolve(new Response(JSON.stringify(body), { status: body === null ? 404 : 200 }));
     }),
   );
@@ -91,6 +94,7 @@ function renderPage(away: MyAwayStatus | null = null): void {
         onSelect={() => undefined}
         canDecide
         canAddCreator={false}
+        userId={USER}
         away={away}
       />
     ),
@@ -129,6 +133,35 @@ describe('Suivi of a chatter (EQ-13)', () => {
     expect(off.closest('section')?.textContent).not.toContain('s’ouvrent');
     expect(screen.getByRole('link', { name: 'Mon planning' }).getAttribute('href')).toBe('/planning');
     expect(screen.queryByText('Rien pour toi pour l’instant')).toBeNull();
+  });
+
+  it('reads his next shift in his record’s zone, as Aujourd’hui does, not the device’s (CHAT-01)', async () => {
+    const me = {
+      id: id(21),
+      userId: USER,
+      email: 'theo@example.test',
+      firstName: 'Théo',
+      lastName: 'Martin',
+      displayName: 'Théo',
+      teamRole: 'chatter',
+      status: 'active',
+      country: 'IS',
+      timeZone: 'Atlantic/Reykjavik',
+      color: '#c2410c',
+      joinedOn: '2026-09-01',
+      creatorIds: [id(1)],
+      commission: null,
+      invitationPending: false,
+      invitationExpiresAt: null,
+    };
+    serve({ current: null, next: tomorrow, ended: null }, false, { members: [me] });
+    renderPage();
+    const off = await screen.findByRole('heading', { name: 'Tu n’es pas en poste' });
+    await vi.waitFor(() => {
+      expect(off.closest('section')?.textContent).toContain(
+        'Prochain shift aujourd’hui, 22 h – 4 h sur Nora Vidal.',
+      );
+    });
   });
 
   it('promises nothing to read, unless he took a handover he has not given back', async () => {

@@ -56,10 +56,10 @@ function serve(trophyCase: TrophyCase): { readonly marked: string[][]; readonly 
   return { marked, urls };
 }
 
-const mount = (user: Me) =>
+const mount = (user: Me, held = false) =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RewardRevealGate user={user} />
+      <RewardRevealGate user={user} held={held} />
     </QueryClientProvider>,
   );
 
@@ -140,6 +140,16 @@ describe('RewardRevealGate (ADR 0104 § 12)', () => {
     expect(marked).toEqual([['level:3', 'first_sale', 'level:1', 'level:2']]);
   });
 
+  it('waits while his shift is to take or under way, and marks nothing as seen (recette 27/11, G10)', async () => {
+    const { marked, urls } = serve(CASE);
+    mount({ ...THEO_ME, preferences: { sounds: false } }, true);
+    await waitFor(() => {
+      expect(urls).toContain('/v1/rewards/my-trophy-case');
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(marked).toEqual([]);
+  });
+
   it('shows nothing when every gain was already revealed, or none is earned', async () => {
     const { urls } = serve({
       ...CASE,
@@ -161,6 +171,15 @@ describe('RewardRevealGate (ADR 0104 § 12)', () => {
       cleanup();
     }
     expect(urls.filter((url) => url.startsWith('/v1/rewards'))).toEqual([]);
+  });
+
+  it('plays nothing for a member who is not active, and marks nothing seen (CHAT-13)', async () => {
+    const { urls, marked } = serve(CASE);
+    mount({ ...THEO_ME, team: { role: 'chatter', status: 'suspended' } });
+    await Promise.resolve();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(urls.filter((url) => url.startsWith('/v1/rewards'))).toEqual([]);
+    expect(marked).toEqual([]);
   });
 
   it('marks a kind it cannot draw as seen without a show: with what is shown, or alone at once', async () => {

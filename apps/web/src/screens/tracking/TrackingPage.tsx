@@ -1,6 +1,6 @@
 import type { ConversationSummary, CreatorTodo } from '@impera/contracts';
 import { placeSegmentThumb } from '@impera/design-system';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   useEffect,
@@ -14,7 +14,7 @@ import {
 
 import { Reader } from './Reader';
 import { suiviEyebrow } from './SuiviNav';
-import { fetchConversations, fetchSendingStop, todosAcrossQuery } from './api';
+import { fetchConversations, fetchSendingStop, giveBack, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
   duration,
@@ -41,6 +41,7 @@ import './tracking.css';
 
 import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queue';
 import { useCreators } from '@/creators/api';
+import { creatorsOverviewQuery } from '@/creators/overview/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { ChatArt, CrownArt } from '@/shell/art/EmptyArt';
@@ -127,6 +128,9 @@ export function TrackingPage({
   const isStopped = (creatorId: string): boolean =>
     stoppedCreators.some((creator) => creator.id === creatorId);
   const stoppedNames = stoppedCreators.map((creator) => creator.displayName);
+  // The general stop, or only her AI cut (PRO1-12): unread, the stop is said as the general one, as before.
+  const overview = useQuery({ ...creatorsOverviewQuery, enabled: stoppedCreators.length > 0 });
+  const generalStop = overview.data === undefined || overview.data.some((card) => card.globalStop);
   // An unread stop is never silent: « Valider » may be refused without the screen having said why (relecture #597).
   const stopUnread = stops.some((stop) => stop.isError);
   // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09).
@@ -204,6 +208,8 @@ export function TrackingPage({
       {offShift?.(lines.length > 0)}
       {stoppedNames.length === 0 ? null : (
         <StopBanner
+          general={generalStop}
+          stoppedNames={stoppedNames}
           names={creators.length > 1 ? stoppedNames : []}
           liftsStop={liftsStop}
           creatorId={stoppedCreators.length === 1 ? stoppedCreators[0]?.id : undefined}
@@ -285,6 +291,7 @@ export function TrackingPage({
                       <QueueGroupRow
                         key={`group-${entry.oldest.creatorId}-${entry.cause}`}
                         group={entry}
+                        canGiveBack={canDecide && !selfScope}
                         withCreator={showsCreator}
                         isOpen={isOpenEntry(entry)}
                         onOpen={() => {
@@ -561,18 +568,21 @@ function QueueRow({
  */
 function QueueGroupRow({
   group,
+  canGiveBack,
   withCreator,
   isOpen,
   onOpen,
 }: {
   group: Extract<QueueEntry<CreatorTodo>, { kind: 'group' }>;
+  /** The owner or a manager: the agent's hand given back to every fan behind an outage at once (recette 27/11, G14). */
+  canGiveBack: boolean;
   withCreator: boolean;
   isOpen: boolean;
   onOpen: () => void;
 }): JSX.Element {
   const { oldest } = group;
   return (
-    <li>
+    <li className="tr-group">
       <button
         type="button"
         className="nv-convo tr-row tr-row--open"
@@ -592,7 +602,54 @@ function QueueGroupRow({
         </span>
         <span className="nv-convo__side tr-wait">{duration(oldest.waitingMinutes)}</span>
       </button>
+      {canGiveBack && GIVEN_BACK_AT_ONCE.has(group.cause) ? <GiveBackAll todos={group.todos} /> : null}
     </li>
+  );
+}
+
+/** The outages whose fans wait for nothing but the agent: once it answers again, its hand goes back to all of them. */
+const GIVEN_BACK_AT_ONCE: ReadonlySet<CreatorTodo['kind']> = new Set(['llm_unavailable', 'budget']);
+
+/**
+ * « Rendre la main à l'agent » for every fan an outage gave the chatters (recette 27/11, G14): one by one, as the
+ * reader does, the count said as it goes. A fan a chatter already answers keeps his hand: the server refuses it.
+ */
+function GiveBackAll({ todos }: { todos: readonly CreatorTodo[] }): JSX.Element {
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<{ readonly done: number; readonly refused: number } | null>(null);
+  const running = state !== null && state.done + state.refused < todos.length;
+  const run = async (): Promise<void> => {
+    let done = 0;
+    let refused = 0;
+    setState({ done, refused });
+    for (const todo of todos) {
+      const decision = await giveBack(todo.creatorId, todo.conversationId);
+      if (decision.ok) done += 1;
+      else refused += 1;
+      setState({ done, refused });
+    }
+    await queryClient.invalidateQueries();
+  };
+  return (
+    <div className="tr-group__act">
+      <p className="tr-group__note">
+        {state === null
+          ? 'L’IA répond de nouveau ? Rends-lui la main d’un coup : elle répondra à chaque fan à son prochain message.'
+          : running
+            ? `Main rendue à ${String(state.done)} sur ${String(todos.length)}…`
+            : `Main rendue à ${String(state.done)} fan${state.done > 1 ? 's' : ''}${state.refused > 0 ? `, ${String(state.refused)} gardé${state.refused > 1 ? 's' : ''} par un chatteur` : ''}.`}
+      </p>
+      {state !== null && !running ? null : (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm"
+          disabled={running}
+          onClick={() => void run()}
+        >
+          {`Rendre la main à l’agent (${String(todos.length)})`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -748,10 +805,16 @@ function useNow(): Date {
  * do about it. `names` lists the creators it holds when Suivi shows several; empty for one creator, or all of them.
  */
 function StopBanner({
+  general,
+  stoppedNames,
   names,
   liftsStop,
   creatorId,
 }: {
+  /** The agency's general stop; otherwise only her AI is cut, and it is said so, never « arrêt d'urgence » (PRO1-12). */
+  general: boolean;
+  /** Every creator stopped, for a cut that is hers alone. */
+  stoppedNames: readonly string[];
   names: readonly string[];
   liftsStop: boolean;
   /** The one creator stopped: the link opens her Dashboard, where her stop is lifted. */
@@ -765,10 +828,16 @@ function StopBanner({
       <p className="tr-stop__in" role="status">
         <span className="nv-orb nv-tone--warn" aria-hidden="true" />
         <span>
-          <strong>L’arrêt d’urgence est actif{whom}.</strong>{' '}
+          <strong>
+            {general
+              ? `L’arrêt d’urgence est actif${whom}.`
+              : `L’IA est coupée pour ${stoppedNames.join(', ')}.`}
+          </strong>{' '}
           {liftsStop ? (
             <>
-              Rien ne part tant qu’il n’est pas levé sur le{' '}
+              {general
+                ? 'Rien ne part tant qu’il n’est pas levé sur le'
+                : 'Rien ne part tant qu’elle n’est pas rallumée sur le'}{' '}
               <Link to="/" search={dashboardSearch('day', creatorId)} className="tr-stop__link">
                 Dashboard
               </Link>

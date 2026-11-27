@@ -4,6 +4,7 @@ import {
   ContentDropSchema,
   CreatorContentSchema,
   DropFileUploadSchema,
+  ReadyVideoTypesSchema,
   ScriptDropSchema,
   type CompleteDropFileBody,
   type ContentDrop,
@@ -14,6 +15,7 @@ import {
   type CreatorContent,
   type DropFileUpload,
   type FillScriptSlotBody,
+  type ReadyVideoTypes,
   type ReplaceDropFileBody,
   type ScriptDrop,
   type ScriptVariantLetter,
@@ -46,6 +48,23 @@ export function useContent(): UseQueryResult<CreatorContent> {
       return CreatorContentSchema.parse(await response.json());
     },
     refetchInterval: (query) => (isMoving(query.state.data) ? 5_000 : 60_000),
+    retry: 1,
+  });
+}
+
+/**
+ * `GET /v1/creator-space/ready-videos`: the types she gives a video to sell (the owner's lines still offered), read
+ * only when she drops one.
+ */
+export function useReadyVideoTypes(enabled: boolean): UseQueryResult<ReadyVideoTypes> {
+  return useQuery({
+    queryKey: ['creator-space', 'ready-videos'] as const,
+    queryFn: async () => {
+      const response = await fetch(`${BASE}/ready-videos`, { credentials: 'include' });
+      if (!response.ok) throw new Error(`GET ${BASE}/ready-videos: ${String(response.status)}`);
+      return ReadyVideoTypesSchema.parse(await response.json());
+    },
+    enabled,
     retry: 1,
   });
 }

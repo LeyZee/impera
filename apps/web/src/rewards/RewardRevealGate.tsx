@@ -21,8 +21,20 @@ const ALSO_SIZE = 44;
  * own. Several ranks owed at once (thresholds set over a history) are one gain: the highest. Closing it marks
  * everything owed as seen, and it plays once. Nothing here for a manager, the owner or a creator.
  */
-export function RewardRevealGate({ user }: { user: Me }): JSX.Element | null {
-  const plays = playsTheGame(user);
+export function RewardRevealGate({
+  user,
+  held = false,
+}: {
+  user: Me;
+  /**
+   * His shift is about to start or under way: the reveal waits, never between him and « Je prends mon poste » or a
+   * fan (recette 27/11, G10). It plays on his next visit off shift, or on Commissions.
+   */
+  held?: boolean;
+}): JSX.Element | null {
+  // A member away from the team (suspended…) is greeted by that, never by a ceremony: his gains wait in Moi ›
+  // Trophées (recette CHAT-13).
+  const plays = playsTheGame(user) && user.team?.status === 'active';
   const trophyCase = useMyTrophyCase(plays).data;
   const mark = useMarkRevealed();
   const { preferences } = usePreferences(user);
@@ -77,7 +89,7 @@ export function RewardRevealGate({ user }: { user: Me }): JSX.Element | null {
     skip.current(kinds);
   }, [skipped, first]);
 
-  if (first === undefined || words === null) return null;
+  if (held || first === undefined || words === null) return null;
   return (
     <RewardReveal
       key={first}

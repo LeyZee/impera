@@ -70,6 +70,11 @@ const FanSheetSchema = z
     /** He pays a waiting step only above these, and with the money: the code decides, not the fan model. */
     buys_from: z.object({ desire: Level, trust: Level }).strict(),
     sessions: z.array(SessionSchema).min(1),
+    /**
+     * A fan whose every word is allowed between adults (Charles 26/11: an adult fantasy played to the end, his school
+     * days told in the past): any hold, block or minor signal on him is a fault of hers, counted by the code.
+     */
+    false_alarm_test: z.boolean().default(false),
   })
   .strict()
   .refine(
