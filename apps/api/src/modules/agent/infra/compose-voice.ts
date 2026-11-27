@@ -18,6 +18,7 @@ import {
   type GuardViolation,
 } from '../domain/guards';
 import { translationOf } from '../domain/language';
+import { resolveAccountTokens } from '../domain/own-accounts';
 import type { ScriptTurn } from '../domain/script-turn';
 import { checkWelcome } from '../domain/sexualization';
 import { withoutEmojiIfDue } from '../domain/turn-briefs';
@@ -181,7 +182,13 @@ export async function writeAnswer(
 ): Promise<WrittenAnswer> {
   const attempt = async (asked: VoiceInput) => {
     const voice = await gateway.voice(asked);
-    const written = voice.ok ? fitBubbles(voice.value.output.bubbles, guards.budget) : [];
+    // The voice writes her accounts as tokens; code puts her handle in, from her active version, only for an account
+    // open now (Sécurité, 27/11). The guards read the answer as it leaves: a token left blocks it.
+    const written = resolveAccountTokens(
+      voice.ok ? fitBubbles(voice.value.output.bubbles, guards.budget) : [],
+      persona.guardSettings.ownAccounts,
+      guards.context.ownAccountsOpen,
+    );
     const violations = [
       ...checkVoiceOutput(
         written,

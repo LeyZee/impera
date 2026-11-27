@@ -5,6 +5,7 @@ import { checkExplicit } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { decideLanguage, quietLanguage, type LanguageDecision } from '../domain/language';
 import { relationshipTier } from '../domain/meeting';
+import { maskOwnHandles } from '../domain/own-accounts';
 import { describeMoment, earlierFanTexts, relationshipOf, withTimeNotes } from '../domain/turn-history';
 
 import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
@@ -99,17 +100,24 @@ export function prepareTurn(persona: ComposerPersona, input: ComposeTurnInput): 
   const language = languageOfTurn(persona, input);
   const voiceLanguage = voiceLanguageOf(persona, language);
   // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
+  // Her handles never enter a prompt (Sécurité, 27/11): wherever one is written, its token stands instead.
+  const masked = (text: string): string => maskOwnHandles(text, persona.guardSettings.ownAccounts);
   const base = {
     creatorName: persona.creatorName,
-    personaSheet: withExamples(
-      persona.personaSheet,
-      examples.map((e) => e.text),
+    personaSheet: masked(
+      withExamples(
+        persona.personaSheet,
+        examples.map((e) => e.text),
+      ),
     ),
-    ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
+    ...(bio.kept.trim() !== '' && { profileBio: masked(bio.kept) }),
     ...(persona.agencyStyle !== undefined && { agencyStyle: persona.agencyStyle }),
-    fanNotes: notes.kept,
+    fanNotes: masked(notes.kept),
     situation: describeMoment(input.situation, input.history),
-    history: withTimeNotes(input.history, input.situation.timeZone),
+    history: withTimeNotes(input.history, input.situation.timeZone).map((turn) => ({
+      ...turn,
+      text: masked(turn.text),
+    })),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
   // His meeting tier, only when her settings let code compute it: otherwise none, and her close-only words stay closed.

@@ -76,7 +76,7 @@ describe('describeBrief, the bubbles she may write', () => {
     expect(describeBrief(brief)).not.toContain('waiting_step');
   });
 
-  it('gives her own accounts code opens in a typed block, with their use, and nothing else (Charles 27/11)', () => {
+  it('gives the accounts code opens by their token, never a handle (Charles 27/11, Sécurité)', () => {
     const described = describeBrief(
       brief,
       undefined,
@@ -86,11 +86,12 @@ describe('describeBrief, the bubbles she may write', () => {
       undefined,
       undefined,
       undefined,
-      [{ platform: 'instagram', handle: 'exemple.fictif' }],
+      ['instagram'],
     );
     expect(described).toContain(
-      '<her_accounts>\ninstagram (sa wishlist en story à la une, une cam) : @exemple.fictif\n</her_accounts>',
+      '<her_accounts>\ninstagram (sa wishlist en story à la une, une cam) : écris exactement {{son_instagram}}\n</her_accounts>',
     );
+    expect(described).not.toContain('@');
     expect(described).not.toContain('tiktok');
     expect(describeBrief(brief)).not.toContain('her_accounts');
     expect(

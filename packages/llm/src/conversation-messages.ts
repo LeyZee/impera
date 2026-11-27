@@ -8,7 +8,7 @@ import type {
   BrainScript,
   BuyerType,
   ConversationTurn,
-  HerAccount,
+  HerAccountPlatform,
   JudgeSituation,
   TurnMedia,
   VoiceFantasy,
@@ -178,16 +178,18 @@ export function describeLanguage(language: VoiceLanguage | undefined): string {
   return lines.join('\n');
 }
 
-const ACCOUNT_USES: Readonly<Record<HerAccount['platform'], string>> = {
-  instagram: 'instagram (sa wishlist en story à la une, une cam)',
-  tiktok: 'tiktok (ses lives)',
+const ACCOUNT_LINES: Readonly<Record<HerAccountPlatform, string>> = {
+  instagram: 'instagram (sa wishlist en story à la une, une cam) : écris exactement {{son_instagram}}',
+  tiktok: 'tiktok (ses lives) : écris exactement {{son_tiktok}}',
 };
 
-/** Her own accounts code opens this turn (Charles 27/11), one line each: the platform, its use, the handle. */
-function herAccountsBlock(accounts: readonly HerAccount[] | undefined): string {
+/**
+ * Her own accounts code opens this turn (Charles 27/11), one line each: the platform, its use, and the fixed token the
+ * voice writes in its place. Never the handle (Sécurité, 27/11): code puts it in after the voice.
+ */
+function herAccountsBlock(accounts: readonly HerAccountPlatform[] | undefined): string {
   if (accounts === undefined || accounts.length === 0) return '';
-  const lines = accounts.map((account) => `${ACCOUNT_USES[account.platform]} : @${account.handle}`);
-  return wrapUntrusted('her_accounts', lines.join('\n'));
+  return wrapUntrusted('her_accounts', accounts.map((platform) => ACCOUNT_LINES[platform]).join('\n'));
 }
 
 export function describeBrief(
@@ -199,7 +201,7 @@ export function describeBrief(
   fantasy?: VoiceFantasy,
   currentStepSheet?: string,
   boughtMediaSheet?: string,
-  herAccounts?: readonly HerAccount[],
+  openAccounts?: readonly HerAccountPlatform[],
 ): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
@@ -222,7 +224,7 @@ export function describeBrief(
     boughtMediaSheet === undefined || boughtMediaSheet.trim() === ''
       ? ''
       : `Ce que le média qu’il a acheté montre, d’après sa description : compare avec ce qu’il en dit.\n${wrapUntrusted('bought_media', boughtMediaSheet)}`,
-    herAccountsBlock(herAccounts),
+    herAccountsBlock(openAccounts),
     maxBubbles === undefined ? '' : bubblesLine(maxBubbles),
   ]
     .filter((block) => block !== '')

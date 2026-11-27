@@ -249,7 +249,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           input.fantasy,
           input.currentStepSheet,
           input.boughtMediaSheet,
-          input.herAccounts,
+          input.openAccounts,
         ),
         canary,
       });

@@ -7,7 +7,7 @@ import { desireMoved } from '../domain/desire';
 import { wantsHumiliation } from '../domain/fantasy-match';
 import { isBlocked } from '../domain/guards';
 import type { LanguageDecision } from '../domain/language';
-import { ownAccountsForVoice } from '../domain/own-accounts';
+import { openAccountsForVoice } from '../domain/own-accounts';
 import { screenMedia } from '../domain/traps';
 import { quietBriefOf } from '../domain/turn-briefs';
 import { guardContextOf } from '../domain/turn-history';
@@ -82,7 +82,7 @@ export async function composeTurn(
   // Her own accounts (Charles 27/11): what he asked opens one, never under care or a trap (ADR 0143 § 16).
   const ownAccountsOpen =
     care || decided.trap.isTrap ? { closed: true } : (guardContext.ownAccountsOpen ?? { closed: true });
-  const herAccounts = ownAccountsForVoice(persona.guardSettings.ownAccounts, ownAccountsOpen);
+  const openAccounts = openAccountsForVoice(persona.guardSettings.ownAccounts, ownAccountsOpen);
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...prepared.base,
@@ -96,7 +96,7 @@ export async function composeTurn(
       ...(sexting.currentStepSheet !== undefined && { currentStepSheet: sexting.currentStepSheet }),
       ...(decided.complaint &&
         sexting.boughtMediaSheet !== undefined && { boughtMediaSheet: sexting.boughtMediaSheet }),
-      ...(herAccounts.length > 0 && { herAccounts }),
+      ...(openAccounts.length > 0 && { openAccounts }),
     },
     prepared.exampleIds,
   );

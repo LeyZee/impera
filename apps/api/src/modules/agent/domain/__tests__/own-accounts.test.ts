@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { checkVoiceOutput, DEFAULT_GUARD_SETTINGS, type GuardContext } from '../guards';
-import { asksHerInstagram, ownAccountsForVoice, ownAccountsOpenedBy, speaksOfLives } from '../own-accounts';
+import {
+  ACCOUNT_TOKENS,
+  asksHerInstagram,
+  maskOwnHandles,
+  openAccountsForVoice,
+  ownAccountsOpenedBy,
+  resolveAccountTokens,
+  speaksOfLives,
+} from '../own-accounts';
 import { guardContextOf } from '../turn-history';
 
 // Invented handles only (CLAUDE.md): never a real account, in a test or anywhere in the repository.
@@ -116,16 +124,55 @@ describe('her own accounts (Charles 27/11)', () => {
     ).toContain('contact_info');
   });
 
-  it('gives the voice only what his messages open', () => {
+  it('tells the voice only which accounts his messages open, never a handle', () => {
     const handles = { instagram: INSTA, tiktok: TIKTOK };
-    expect(ownAccountsForVoice(handles, ownAccountsOpenedBy(['ta wishlist stp']))).toEqual([
-      { platform: 'instagram', handle: INSTA },
+    expect(openAccountsForVoice(handles, ownAccountsOpenedBy(['ta wishlist stp']))).toEqual(['instagram']);
+    expect(openAccountsForVoice(handles, ownAccountsOpenedBy(['ton prochain live c’est quand ?']))).toEqual([
+      'tiktok',
     ]);
-    expect(ownAccountsForVoice(handles, ownAccountsOpenedBy(['ton prochain live c’est quand ?']))).toEqual([
-      { platform: 'tiktok', handle: TIKTOK },
+    expect(openAccountsForVoice(handles, ownAccountsOpenedBy(['salut']))).toEqual([]);
+    expect(openAccountsForVoice(handles, { instagram: true, closed: true })).toEqual([]);
+    expect(openAccountsForVoice({ tiktok: TIKTOK }, { instagram: true })).toEqual([]);
+    expect(openAccountsForVoice(undefined, { instagram: true })).toEqual([]);
+  });
+
+  it('puts her handle in place of the token of an open account, after the voice (Sécurité, 27/11)', () => {
+    const handles = { instagram: INSTA, tiktok: TIKTOK };
+    expect(
+      resolveAccountTokens([`mon insta c’est ${ACCOUNT_TOKENS.instagram} 😘`], handles, { instagram: true }),
+    ).toEqual([`mon insta c’est @${INSTA} 😘`]);
+    expect(resolveAccountTokens([`@${ACCOUNT_TOKENS.instagram}`], handles, { instagram: true })).toEqual([
+      `@${INSTA}`,
     ]);
-    expect(ownAccountsForVoice(handles, ownAccountsOpenedBy(['salut']))).toEqual([]);
-    expect(ownAccountsForVoice(handles, { instagram: true, closed: true })).toEqual([]);
-    expect(ownAccountsForVoice(undefined, { instagram: true })).toEqual([]);
+    expect(resolveAccountTokens([`j’étais en live, ${ACCOUNT_TOKENS.tiktok}`], handles, {})).toEqual([
+      `j’étais en live, @${TIKTOK}`,
+    ]);
+  });
+
+  it('leaves the token of a closed account, or of one with no handle typed, and the guard blocks it', () => {
+    const closed = resolveAccountTokens([`mon insta ${ACCOUNT_TOKENS.instagram}`], { instagram: INSTA }, {});
+    expect(closed).toEqual([`mon insta ${ACCOUNT_TOKENS.instagram}`]);
+    const none = resolveAccountTokens(
+      [`mon insta ${ACCOUNT_TOKENS.instagram}`],
+      { tiktok: TIKTOK },
+      { instagram: true },
+    );
+    expect(none).toEqual([`mon insta ${ACCOUNT_TOKENS.instagram}`]);
+    for (const bubbles of [closed, none, ['tiens {{son_snap}}']])
+      expect(
+        checkVoiceOutput(bubbles, settings, { ownAccountsOpen: { instagram: true } }).map((v) => v.code),
+      ).toContain('contact_info');
+  });
+
+  it('masks her handles wherever they are written, and in a guard’s match', () => {
+    const handles = { instagram: INSTA, tiktok: TIKTOK };
+    expect(maskOwnHandles(`suis-moi @${INSTA.toUpperCase()}. et ${TIKTOK}`, handles)).toBe(
+      `suis-moi ${ACCOUNT_TOKENS.instagram}. et ${ACCOUNT_TOKENS.tiktok}`,
+    );
+    expect(maskOwnHandles(`@${INSTA}x`, handles)).toBe(`@${INSTA}x`);
+    const matches = checkVoiceOutput([`mon insta c’est @${INSTA}`], settings, {})
+      .map((v) => v.match ?? '')
+      .join(' ');
+    expect(matches).not.toContain(INSTA);
   });
 });

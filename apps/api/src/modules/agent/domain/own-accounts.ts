@@ -108,16 +108,77 @@ export function withoutOwnAccounts(
 }
 
 /**
- * Her accounts the voice is given this turn (`<her_accounts>`): only what his messages open, never under care or a
- * trap. The guard still reads her answer: a handle the voice was not given never passes.
+ * The fixed tokens the voice writes where it gives an account (Sécurité, 27/11): her handle never enters a prompt, so it
+ * never reaches the models' journal. Code puts the handle in their place, from her active version.
  */
-export function ownAccountsForVoice(
+export const ACCOUNT_TOKENS: Readonly<Record<OwnAccountPlatform, string>> = {
+  instagram: '{{son_instagram}}',
+  tiktok: '{{son_tiktok}}',
+};
+
+const PLATFORMS: readonly OwnAccountPlatform[] = ['instagram', 'tiktok'];
+
+/** Whether code opens this account for her answer: his ask for Instagram; his lives or hers for TikTok. */
+function isOpenFor(
+  platform: OwnAccountPlatform,
+  bubbles: readonly string[],
+  open: OwnAccountsOpen | undefined,
+): boolean {
+  if (open?.closed === true) return false;
+  return platform === 'instagram'
+    ? open?.instagram === true
+    : open?.tiktok === true || bubbles.some(speaksOfLives);
+}
+
+/**
+ * Her accounts the voice is told it may give this turn (`<her_accounts>`): the platforms his messages open and whose
+ * handle the owner typed, never the handle itself; never under care or a trap.
+ */
+export function openAccountsForVoice(
   handles: OwnAccountHandles | undefined,
   open: OwnAccountsOpen | undefined,
-): readonly { readonly platform: OwnAccountPlatform; readonly handle: string }[] {
+): readonly OwnAccountPlatform[] {
   if (handles === undefined || open === undefined || open.closed === true) return [];
-  return (['instagram', 'tiktok'] as const).flatMap((platform) => {
+  return PLATFORMS.filter((platform) => handles[platform] !== undefined && open[platform] === true);
+}
+
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
+/**
+ * Her answer with each token of an open account replaced by her handle (`@handle`), from her active version. A token of
+ * an account closed now, or with no handle typed, stays as written: the guards block it (`contact_info`), it is never
+ * sent as is.
+ */
+export function resolveAccountTokens(
+  bubbles: readonly string[],
+  handles: OwnAccountHandles | undefined,
+  open: OwnAccountsOpen | undefined,
+): readonly string[] {
+  let out = bubbles;
+  for (const platform of PLATFORMS) {
+    const handle = handles?.[platform];
+    if (handle === undefined || !isOpenFor(platform, bubbles, open)) continue;
+    const token = new RegExp(`@?${escaped(ACCOUNT_TOKENS[platform])}`, 'gu');
+    out = out.map((bubble) => bubble.replace(token, `@${handle}`));
+  }
+  return out;
+}
+
+/**
+ * A text with her handles put back as their tokens: what reaches a prompt (the conversation, her bio, her notes) or a
+ * guard's journaled match never carries them (Sécurité, 27/11).
+ */
+export function maskOwnHandles(text: string, handles: OwnAccountHandles | undefined): string {
+  if (handles === undefined) return text;
+  let out = text;
+  for (const platform of PLATFORMS) {
     const handle = handles[platform];
-    return handle !== undefined && open[platform] === true ? [{ platform, handle }] : [];
-  });
+    if (handle === undefined) continue;
+    out = out.replace(TOKEN, (token) => {
+      if (!isHandle(token, handle)) return token;
+      const dots = /\.+$/u.exec(token)?.[0] ?? '';
+      return `${ACCOUNT_TOKENS[platform]}${dots}`;
+    });
+  }
+  return out;
 }

@@ -872,7 +872,8 @@ export function RulesTab({ value: r, onChange }: TabProps<PersonaAgentRules>): J
           <TextInput
             id={`${id}-own-${item.platform}`}
             value={r.own_accounts?.[item.platform] ?? ''}
-            maxLength={31}
+            // Long enough to show a pasted link whole: the schema refuses it, never the field.
+            maxLength={120}
             placeholder="Son pseudo, sans lien"
             onChange={(typed) => {
               const handle = typed.trim() === '' ? null : typed.trim();

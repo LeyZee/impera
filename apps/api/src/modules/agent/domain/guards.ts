@@ -11,7 +11,12 @@ import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
 import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
 import { INTIMATE_PARTS } from './intimate-words';
 import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
-import { withoutOwnAccounts, type OwnAccountHandles, type OwnAccountsOpen } from './own-accounts';
+import {
+  maskOwnHandles,
+  withoutOwnAccounts,
+  type OwnAccountHandles,
+  type OwnAccountsOpen,
+} from './own-accounts';
 import { refundInDraft } from './refund';
 
 /**
@@ -466,6 +471,9 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     ),
   },
   { code: 'contact_info', pattern: /\b(https?:\/\/|www\.)\S+/ },
+  // A token the voice writes for one of her accounts (« {{son_instagram}} ») that code did not replace: the account is
+  // closed now or has no handle typed (Sécurité, 27/11). Never sent as is; any other « {{…}} » neither.
+  { code: 'contact_info', pattern: /\{\{[^{}]{0,40}\}\}/ },
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
   // A street address, in numbers and a street (Charles 27/11): « 12 rue des Lilas », « 4 bis avenue Foch ». « Mon
@@ -1501,7 +1509,10 @@ export function checkVoiceOutput(
     );
   violations.push(...closeOnlyWords(bubbles, settings, context.meetingTier));
   violations.push(...refundViolations(bubbles, context.fanAskedRefund));
-  return violations;
+  // Her handles never leave in a match, which drafts and journals keep (Sécurité, 27/11): their tokens instead.
+  return violations.map((v) =>
+    v.match === undefined ? v : { ...v, match: maskOwnHandles(v.match, settings.ownAccounts) },
+  );
 }
 
 /**

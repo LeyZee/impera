@@ -5,6 +5,7 @@ import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 import type { DesireMap } from '../domain/fantasy-match';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
+import { maskOwnHandles } from '../domain/own-accounts';
 import { paidWaiting } from '../domain/script-run';
 import { withDiscountAsked } from '../domain/turn-briefs';
 import {
@@ -78,7 +79,11 @@ export async function askBrain(
       : { order: input.customOrder.order, grid: input.customOrder.grid ?? null };
   const brain = await gateway.brain({
     ...base,
-    fanNotes: [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
+    // Her handles never enter a prompt (Sécurité, 27/11).
+    fanNotes: maskOwnHandles(
+      [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
+      persona.guardSettings.ownAccounts,
+    ),
     ...(input.alerts !== undefined && input.alerts.length > 0 && { alerts: input.alerts }),
     ...(brainScripts.length > 0 && { scripts: brainScripts }),
     ...(stepWaiting && { scriptStepWaiting: true }),
