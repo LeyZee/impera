@@ -28,7 +28,7 @@ export function readDownReason(error: ConnectorError): ConnectionDownReason {
 }
 
 /** A read this long after the last one comes after a stop (a session dead, the breaker, the PC asleep). */
-export const READ_BACK_AFTER_GAP_MS = 5 * 60_000;
+const READ_BACK_AFTER_GAP_MS = 5 * 60_000;
 
 /**
  * Does this successful read end a stop? After the breaker (`pausedUntil` still set until the read succeeds), the
