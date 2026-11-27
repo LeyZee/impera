@@ -337,6 +337,11 @@ export interface ChannelPostInput {
 export interface InstagramCommentInput {
   readonly creatorName: string;
   readonly personaSheet: string;
+  /**
+   * The public part of the agency's base style (ADR 0173, `publicBaseStyleOf`), in the system before her sheet, as
+   * data; absent or empty: none. The private part never reaches a public reply.
+   */
+  readonly publicStyle?: string;
   /** Her validated replies of the bank « commentaire »; empty: none. */
   readonly examples: readonly string[];
   /** Her most recent replies, so that she does not write the same one twice; empty: none. */

@@ -15,8 +15,6 @@ export interface WeekSettings {
   readonly sessionsPerWeek: number;
   /** Short videos for Reveal's public video feed a week (Charles, 20/11: one a day). */
   readonly videosPerWeek: number;
-  /** Stories a week (ADR 0136: one a day). */
-  readonly storiesPerWeek: number;
   /** A script is asked when none arrived for this many days and none is asked already (Charles, 20/11: two weeks). */
   readonly scriptEveryDays: number;
   /** Photos kept from each session for the gifts to the whales, never published, never nude (Charles, 20/11). */
@@ -29,8 +27,8 @@ export interface WeekSettings {
 }
 
 /**
- * Charles's rhythm (20/11): 3 boudoir sessions, a video a day for the public feed, a story a day, a script every two
- * weeks. Chosen by common sense and told to him: two days of 4 h; a script 1 h 30, a session 1 h, a video or a story
+ * Charles's rhythm (20/11): 3 boudoir sessions, a video a day for the public feed, a script every two weeks; no story
+ * of her own since 27/11, her Reveal story is the feed's video (ADR 0136 § 11). Chosen by common sense and told to him: two days of 4 h; a script 1 h 30, a session 1 h, a video or a story
  * 5 min; 2 gift photos a session.
  */
 export const WEEK_DEFAULTS: WeekSettings = {
@@ -38,7 +36,6 @@ export const WEEK_DEFAULTS: WeekSettings = {
   capacityMinutes: 240,
   sessionsPerWeek: 3,
   videosPerWeek: 7,
-  storiesPerWeek: 7,
   scriptEveryDays: 14,
   giftsPerSession: 2,
   minutes: { script: 90, feed_shoot: 60, feed_video: 5, mass_dm: 0, idea: 45, reveal_story: 5 },
@@ -75,7 +72,6 @@ const SHEETS = {
   next_script: 'Un nouveau script à tourner : l’agence t’envoie ses étapes avant ton jour de tournage.',
   feed_video:
     'Courtes et sexy, une par jour, pour le feed vidéo public de Reveal : c’est ce qui fait venir de nouveaux fans. Jamais sur Instagram, c’est trop chaud pour lui.',
-  reveal_story: 'Des moments simples de ta journée, pour une story Reveal par jour.',
 } as const;
 
 /** A boudoir session's sheet: everything it feeds, so that she brings back each piece in one sitting. */
@@ -90,7 +86,7 @@ const sessionSheet = (gifts: number): string =>
       : `• ${String(gifts)} jolies photos sexy rien que pour les cadeaux, jamais publiées, jamais nues.`,
   ].join('\n');
 
-/** « 7 stories », « 1 vidéo du jour »: the label of a line cut by count. */
+/** « 1 vidéo du jour », « 7 vidéos du jour »: the label of a line cut by count (a story line of an older week too). */
 function countLabel(need: WeekNeed, count: number): string {
   if (need === 'feed_video') return count === 1 ? '1 vidéo du jour' : `${String(count)} vidéos du jour`;
   return count === 1 ? '1 story' : `${String(count)} stories`;
@@ -99,7 +95,7 @@ function countLabel(need: WeekNeed, count: number): string {
 /**
  * What there is to shoot for the week (§ 4), in the order a full week keeps them (§ 5): each script asked, or the next
  * script when none arrived for `scriptEveryDays`; the boudoir sessions the stock lacks; the videos of the public feed as
- * one line; the stories as one line. A session feeds its Mass DM and the gifts too, said on its sheet. The ideas join
+ * one line. No story: her Reveal story is the feed's video. A session feeds its Mass DM and the gifts too, said on its sheet. The ideas join
  * when they do: none is ever made up here.
  */
 export function weekNeeds(
@@ -136,21 +132,17 @@ export function weekNeeds(
       count: 1,
       requestId: null,
     });
-  for (const [need, wanted, stock] of [
-    ['feed_video', settings.videosPerWeek, facts.stock.videos],
-    ['reveal_story', settings.storiesPerWeek, facts.stock.stories],
-  ] as const) {
-    const count = Math.min(50, Math.max(0, wanted - stock));
-    if (count > 0)
-      items.push({
-        need,
-        label: countLabel(need, count),
-        sheet: SHEETS[need],
-        minutes: settings.minutes[need] * count,
-        count,
-        requestId: null,
-      });
-  }
+  // Her Reveal story is the feed's video with a caption of its own (Charles, 27/11): never a line of its own.
+  const videos = Math.min(50, Math.max(0, settings.videosPerWeek - facts.stock.videos));
+  if (videos > 0)
+    items.push({
+      need: 'feed_video',
+      label: countLabel('feed_video', videos),
+      sheet: SHEETS.feed_video,
+      minutes: settings.minutes.feed_video * videos,
+      count: videos,
+      requestId: null,
+    });
   // Stable: the order within a rank is the order above (the oldest script first).
   return items
     .map((item, index) => ({ item, index }))
