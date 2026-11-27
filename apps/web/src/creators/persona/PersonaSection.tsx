@@ -988,8 +988,8 @@ function Moves({
   return (
     <details className="nv-disclosure ps-moves">
       <summary>
-        <span className="nv-disclosure__title">Passage à la nouvelle fiche</span>
-        <span className="nv-disclosure__sum">{plural(count, 'réponse déplacée', 'réponses déplacées')}</span>
+        <span className="nv-disclosure__title">Réponses à relire</span>
+        <span className="nv-disclosure__sum">{`${plural(count, 'réponse placée', 'réponses placées')} dans une autre question`}</span>
       </summary>
       <div className="nv-disclosure__body ps-moves__body">
         <p className="ps-muted">{lead}</p>

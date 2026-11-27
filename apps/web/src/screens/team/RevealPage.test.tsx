@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 
 import { RevealPage } from './RevealPage';
 
-import { openList, valuesOf } from '@/test/select';
+import { chooseValue, openList, valuesOf } from '@/test/select';
 
 const id = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const mid = (n: number): TeamMemberId => TeamMemberIdSchema.parse(id(n));
@@ -350,7 +350,8 @@ describe('Équipe › Comptes Reveal (ADR 0076)', () => {
     // A manager invites a chatter (ADR 0076 § 3): no role to choose.
     expect(within(dialog).queryByRole('radiogroup', { name: 'Rôle' })).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Continuer' }));
-    fireEvent.click(await within(dialog).findByRole('button', { name: 'Continuer' }));
+    chooseValue(await within(dialog).findByRole('combobox', { name: 'Pays' }), 'BJ');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Continuer' }));
     const presets = await within(dialog).findByRole('radiogroup', { name: 'Préréglage de commission' });
     // A preset of the owner's only, never a rate by hand.
     expect(within(presets).queryByRole('radio', { name: /Autre/u })).toBeNull();
@@ -388,7 +389,8 @@ describe('Équipe › Comptes Reveal (ADR 0076)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Inviter Nora Test' }));
     const dialog = await screen.findByRole('dialog', { name: 'Inviter Nora Test' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Continuer' }));
-    fireEvent.click(await within(dialog).findByRole('button', { name: 'Continuer' }));
+    chooseValue(await within(dialog).findByRole('combobox', { name: 'Pays' }), 'BJ');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Continuer' }));
     fireEvent.click(await within(dialog).findByRole('radio', { name: /Débutant/u }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Inviter Nora' }));
     expect(

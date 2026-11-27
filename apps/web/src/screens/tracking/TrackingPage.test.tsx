@@ -613,6 +613,53 @@ describe('TrackingPage', () => {
     expect(screen.queryByRole('button', { name: /Voir les/u })).toBeNull();
   });
 
+  it('gives the agent its hand back for every fan of an outage at once (recette 27/11, G14)', async () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const down = (n: number): DashboardTodo => ({
+      ...first,
+      tone: 'warn',
+      kind: 'llm_unavailable',
+      id: `down-${String(n)}`,
+      waitingMinutes: 30 + n,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000010${String(n)}`),
+    });
+    const posted = serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      dashboard: { status: 200, body: apiDashboard({ todos: [down(1), down(2), down(3)] }) },
+      command: () => ({ status: 204 }),
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent (3)' }));
+    expect(await screen.findByText('Main rendue à 3 fans.')).toBeDefined();
+    expect(posted.map(({ action }) => action)).toEqual(['release', 'release', 'release']);
+  });
+
+  it('never offers it to a chatter, who gives back only his own hand', async () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      dashboard: {
+        status: 200,
+        body: apiDashboard({
+          todos: [1, 2].map((n) => ({
+            ...first,
+            tone: 'warn' as const,
+            kind: 'llm_unavailable' as const,
+            id: `down-${String(n)}`,
+            conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000010${String(n)}`),
+          })),
+        }),
+      },
+    });
+    renderPage('/suivi', true, true, true);
+    await screen.findByRole('list', { name: 'À traiter' });
+    expect(screen.queryByRole('button', { name: /Rendre la main à l’agent \(/u })).toBeNull();
+  });
+
   it('says where a conversation opens while none is', async () => {
     serve({ ...ONE, conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } } });
     renderPage();

@@ -1,4 +1,5 @@
 import type { BillingRegime, InvoiceListItem, Me } from '@impera/contracts';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { JSX, ReactNode } from 'react';
 
@@ -13,6 +14,7 @@ import { platformName, swapShiftLine } from '@/scheduling/model';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
+import { fetchExtensionLinks } from '@/security/extension-links';
 import { Panel } from '@/shell/layout';
 import './today.css';
 import '@/reports/reports.css';
@@ -20,7 +22,8 @@ import '@/reports/reports.css';
 /**
  * Aujourd'hui's « À faire » (D-03): everything that waits on the chatter in one list and one shape, the reports first
  * (a report to make, one sent back), then the invoices to accept or contest before their delay ends, then what his
- * file still asks for (a text to accept, a document to file or renew). Each line says what, when, and where it is done.
+ * file still asks for (a text to accept, a document to file or renew), and the extension while no browser is linked
+ * (recette 27/11, G6: it is his tool of work, and the guide sat in Aide). Each line says what, when, and where it is done.
  * Shown only when something waits: the day's shift stays first, and an empty card would be noise.
  */
 export function TodoCard({
@@ -44,6 +47,9 @@ export function TodoCard({
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const zone = me?.timeZone ?? readerZone();
   const now = useNow();
+  // His linked browsers: none yet, and the extension joins the list. A read that fails says nothing.
+  const links = useQuery({ queryKey: ['extension-links'], queryFn: fetchExtensionLinks, retry: false });
+  const unlinked = links.data?.length === 0;
 
   const list = reports.list;
   const accounts = new Map((list?.accounts ?? []).map((account) => [account.id, account]));
@@ -58,7 +64,7 @@ export function TodoCard({
       : // The texts, once read, join the documents: a texts' read that fails never hides the rest.
         fileToDos(file.data, regimeOf(file.data, regimes.data.regimes), texts.data?.texts ?? [])),
   ];
-  if (toDo.length + invoices.length + fromFile.length === 0) return null;
+  if (toDo.length + invoices.length + fromFile.length === 0 && !unlinked) return null;
 
   let index = 0;
   return (
@@ -107,6 +113,16 @@ export function TodoCard({
         {fromFile.map((one) => (
           <FileLine key={one.key} index={index++} toDo={one} />
         ))}
+        {unlinked ? (
+          <Line
+            index={index++}
+            tone="due"
+            title="Installer et relier l’extension"
+            sub="Ton outil de travail pendant le shift : à faire une fois sur ton ordinateur, avant ton premier shift."
+            go="Installer"
+            to="/aide/extension"
+          />
+        ) : null}
       </ul>
     </Panel>
   );
@@ -138,7 +154,7 @@ function Line({
   sub: ReactNode;
   note?: string | null;
   go: string;
-  to?: '/commissions/factures' | '/moi/dossier';
+  to?: '/commissions/factures' | '/moi/dossier' | '/aide/extension';
   onClick?: () => void;
 }): JSX.Element {
   const body = (
