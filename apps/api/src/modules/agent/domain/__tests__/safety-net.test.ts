@@ -109,6 +109,34 @@ describe('safetySigns (recette AGT-01)', () => {
       expect(safetySigns(text), text).toContain('minor_suspected');
   });
 
+  it('hears a minor’s class said now or soon, without « je suis » (Sécurité, #1043)', () => {
+    for (const text of [
+      'moi en première',
+      'en première cette année',
+      'en terminale et toi ?',
+      'je passe en terminale',
+      'je rentre en première',
+      'j’entre en seconde en septembre',
+      'je passe le brevet',
+    ])
+      expect(safetySigns(text), text).toContain('minor_suspected');
+    for (const text of [
+      'je passe le bac',
+      'en première',
+      'mon fils passe en seconde',
+      'j’ai le brevet de secourisme',
+    ])
+      expect(safetySigns(text), text).not.toContain('minor_suspected');
+  });
+
+  it('reads « en première » alone as his class only after she asked what he does or his age', () => {
+    const now = new Date('2026-11-27T12:00:00Z');
+    expect(safetySigns('en première', now, 'et toi tu fais quoi dans la vie ?')).toContain('minor_suspected');
+    expect(safetySigns('seconde', now, 't’as quel âge ?')).toContain('minor_suspected');
+    expect(safetySigns('en première', now, 'tu préfères la mer ?')).not.toContain('minor_suspected');
+    expect(safetySigns('en première ligne au taf', now, 'tu fais quoi ?')).not.toContain('minor_suspected');
+  });
+
   it('lets a set phrase about death through, and still hears distress (Sécurité, #1043)', () => {
     for (const text of [
       'j’ai envie de mourir de rire',

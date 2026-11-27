@@ -1128,6 +1128,26 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     ]);
   });
 
+  it('reads « en première » as his class only after she asked what he does (Sécurité, #1043)', async () => {
+    const answers = (asked: string): AgentComposeInput => ({
+      ...INPUT,
+      history: [
+        { direction: 'outbound', text: asked, at: new Date('2026-10-17T09:59:00Z') },
+        { direction: 'inbound', text: 'en première', at: new Date('2026-10-17T09:59:30Z') },
+      ],
+    });
+    const asked = composer({}, undefined, limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' }).limits);
+    expect(await asked.draftComposer.compose(answers('et toi tu fais quoi dans la vie ?'))).toMatchObject({
+      kind: 'held',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_suspected'],
+    });
+    const other = composer({}, undefined, limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' }).limits);
+    expect(await other.draftComposer.compose(answers('t’étais où dans la course ?'))).not.toMatchObject({
+      detail: ['safety_net', 'minor_suspected'],
+    });
+  });
+
   it('hands a fantasy of his on minors to a human before any model, as a doubt on his age (Charles 26/11 at 23:45)', async () => {
     const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
     const { draftComposer, seen } = composer({}, undefined, minor.limits);

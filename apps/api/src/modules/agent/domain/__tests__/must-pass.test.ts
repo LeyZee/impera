@@ -227,6 +227,16 @@ describe('permitted phrases that must always pass, input nets', () => {
     'mon enfance à la campagne',
     'je suis au lycée, je suis prof',
     'je suis mineur de fond',
+    'j’étais en première quand je t’ai découverte',
+    'ma fille est en terminale',
+    'en première année de droit',
+    'en première année de médecine',
+    'en première classe dans le train',
+    'en première ligne au taf',
+    'arrivé en première… au marathon',
+    'en seconde main',
+    'première fois que je fais ça',
+    'je passe le bac',
   ])('safetySigns finds no minor in « %s »', (text) => {
     expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).not.toContain('minor_suspected');
   });

@@ -67,6 +67,45 @@ function bornMinor(text: string, year: number): boolean {
   const born = /\bnee? en ((?:19|20)\d\d)\b/u.exec(text)?.[1];
   return born !== undefined && Number(born) >= year - 18 && Number(born) <= year;
 }
+// A minor's class, said of himself now or soon, without « je suis » (Sécurité, #1043): « moi en première », « en
+// terminale et toi ? », « je passe en terminale », « j'entre en seconde en septembre ». Not a year of study, a rank,
+// a train class or a second-hand thing (« en première année de droit », « arrivé en première au marathon », « en
+// seconde main »). « Seconde » and « première » alone count with a word of his (moi, je, cette année, et toi) or
+// right after she asked what he does or his age.
+const CLASS = '(?:(?:6|5|4|3)e?(?:me)?|sixieme|cinquieme|quatrieme|troisieme|seconde|premiere|terminale)';
+const NOT_A_CLASS =
+  "(?!\\s*(?:annee|annees|an\\b|classe|ligne|main|fois|place|position|rang|partie|vitesse|etage|div|zone|chance|round|periode|mi-temps|semaine|jour|de |d'|des |du ))";
+const NOT_A_RANK =
+  '(?<!arrivee? |fini |finie |termine |terminee |sorti |sortie |classee? |passee? la ligne |ranked )';
+const CLASS_OF_HIS = new RegExp(
+  `${NOT_A_RANK}\\ben (?:(?:6|5|4|3)e?(?:me)?|sixieme|cinquieme|quatrieme|troisieme|terminale)\\b${NOT_A_CLASS}|\\b(?:moi|je (?:passe|rentre|vais|serai|redouble|suis toujours|suis encore)|j'?(?:passe|rentre|entre|redouble)|je vais (?:passer|rentrer|entrer)|cette annee|l'?an prochain|a la rentree)\\b[^.!?]{0,20}\\ben ${CLASS}\\b${NOT_A_CLASS}|\\ben ${CLASS}\\b${NOT_A_CLASS}[^.!?]{0,25}\\b(?:cette annee|l'?an prochain|a la rentree|en septembre|et toi|toi\\b|aussi)`,
+  'u',
+);
+// A short answer, « en première » or « seconde », after she asked what he does or his age.
+const BARE_CLASS = new RegExp(`^\\s*(?:en )?${CLASS}\\b${NOT_A_CLASS}[^.!?]{0,15}[.!?]*\\s*$`, 'u');
+const ASKS_WHAT_HE_DOES =
+  /\b(?:tu fais quoi|tu fais koi|tu bosses|tu travailles|tu taffes|ton taf|ton metier|ton boulot|tu etudies|tes etudes|t'?es en quoi|tu es en quoi|quel age|t'?as quel age|tu as quel age|ton age|t'?es etudiant|tu es etudiant|tu fais des etudes|t'?es en quelle classe|en quelle classe)\b/u;
+// He sits the brevet, a middle-school exam: « je passe le brevet ». The bac proves nothing.
+const BREVET =
+  /\b(?:je passe|j'?passe|je vais passer|je prepare|je revise|je revise pour|j'?ai) (?:le|mon) brevet\b(?! (?:de |d'|du |des (?!colleges)))/u;
+// Not him now: a third person or a past time in the same sentence.
+const NOT_HIM_NOW =
+  /\b(?:il|elle|ils|elles|lui|eux) (?:est|sont|passe|passent|rentre|rentrent|entre|entrent|sera|seront|va|vont)\b|\bj'?(?:etais|avais|allais|faisais)\b|\b(?:je|tu|on) (?!vais|sais|fais|fait|sait|vait|plais|plait|connais|reconnais|tais|tait|mais|nait)[a-z]+(?:ais|ait)\b|\b(?:l'?an dernier|l'?annee derniere|a l'?epoque|quand j|il y a \d+ ans|y a \d+ ans)\b/u;
+
+/** A minor's class or the brevet, his, now or soon: sentence by sentence, never a third person's or his past. */
+function classOfHis(text: string, herLastTurn: string | undefined): boolean {
+  const asked = herLastTurn !== undefined && ASKS_WHAT_HE_DOES.test(normalise(herLastTurn));
+  return text
+    .split(/[.!?\n]+/u)
+    .some(
+      (sentence) =>
+        !NOT_HIM_NOW.test(sentence) &&
+        clausesOfHis(sentence).some(
+          (clause) =>
+            CLASS_OF_HIS.test(clause) || BREVET.test(clause) || (asked && BARE_CLASS.test(clause.trim())),
+        ),
+    );
+}
 // His trade at a school or a minor's word that is a trade: « je suis prof », « je bosse au lycée », « surveillant ».
 const HIS_TRADE =
   /\b(?:je suis|j'?suis|jsuis|chui|je bosse|je travaille|je taffe)(?: (?:comme|en tant que))? (?:prof|professeur|professeure|enseignant|enseignante|surveillant|surveillante|cpe|proviseur|principal|principale|documentaliste|aed|instit|maitre|maitresse|agent|cuisinier|cuisiniere|infirmier|infirmiere)\b|\b(?:je bosse|je travaille|je taffe|j'?enseigne) (?:au|dans un|dans une|en) (?:lycee|college|ecole)\b/u;
@@ -185,7 +224,7 @@ function minorFantasy(fanText: string): boolean {
  * The signs his own words carry, the gravest first; none when nothing is written plainly. A birth year is read
  * against `now`'s year.
  */
-export function safetySigns(fanText: string, now: Date = new Date()): SafetySign[] {
+export function safetySigns(fanText: string, now: Date = new Date(), herLastTurn?: string): SafetySign[] {
   const text = normalise(fanText);
   const signs: SafetySign[] = [];
   const his = clausesOfHis(text);
@@ -199,7 +238,8 @@ export function safetySigns(fanText: string, now: Date = new Date()): SafetySign
         his.some(
           (clause) =>
             MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
-        )))
+        ) ||
+        classOfHis(text, herLastTurn)))
   )
     signs.push('minor_suspected');
   if (minorFantasy(fanText)) signs.push('minor_fantasy');
