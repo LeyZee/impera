@@ -39,6 +39,7 @@ import {
   type CreatorTabName,
 } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
+import { ChannelWeekSection } from './telegram/week/ChannelWeekSection';
 import { VaultPage } from './vault/VaultPage';
 import './sheet.css';
 
@@ -404,6 +405,7 @@ export function CreatorsPage({
           </div>
           <div id={accountCardId('telegram')} className="cr-account__card">
             <TelegramChannelSection creatorId={current.id} onDirty={setTelegramDirty} />
+            <ChannelWeekSection creatorId={current.id} timeZone={current.timezone} />
           </div>
         </div>
       );

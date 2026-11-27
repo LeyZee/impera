@@ -1,0 +1,328 @@
+/* « La semaine du canal » (ADR 0162 § 3): the answer first, the week by kind, her seven days, a post opened in place. */
+.cw-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
+}
+
+.cw-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.cw-head__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.cw-head__dates {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+}
+.cw-head__weeks {
+  display: flex;
+  gap: var(--nv-space-2);
+  flex: none;
+}
+
+/* The answer, said big, with its gesture beside it; the ring says how far the reading went. */
+.cw-answer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-4);
+}
+.cw-answer__ring {
+  --_c: var(--nv-series-1);
+}
+.cw-answer__ring b {
+  font-size: var(--nv-text-headline);
+}
+.cw-answer__ring span {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+}
+.cw-answer__words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.cw-answer__big {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  letter-spacing: var(--nv-text-title-1-tracking);
+  font-weight: 700;
+}
+.cw-answer__line {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.cw-said {
+  margin: 0;
+  color: var(--nv-success);
+  font-size: var(--nv-text-footnote);
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.cw-said--warn {
+  color: var(--nv-warning);
+}
+
+.cw-kinds {
+  --nv-donut-size: 112px;
+}
+
+/* Her seven days: the day's number, and one dot per post in its kind's colour, hollow while it waits for a read. */
+.cw-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+}
+.cw-day {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: var(--nv-space-2) 0;
+  border: 1px solid transparent;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  color: var(--nv-ink-muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.cw-day:hover {
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--nv-ink) 6%, transparent);
+}
+.cw-day:active {
+  transform: scale(0.96);
+}
+.cw-day[aria-pressed='true'] {
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--nv-ink) 10%, transparent);
+}
+.cw-day[data-today] {
+  border-color: color-mix(in srgb, var(--nv-series-1) 45%, transparent);
+}
+.cw-day__name {
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.cw-day__number {
+  font-size: var(--nv-text-headline);
+  font-weight: 650;
+}
+.cw-day__dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  max-width: 34px;
+}
+.cw-day__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--_c);
+}
+.cw-day__dots i[data-read] {
+  background: var(--_c);
+}
+
+.cw-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.cw-empty {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+}
+
+/* One post: its hour, its kind in its colour, its words and who read it. */
+.cw-post {
+  border-radius: var(--nv-radius-lg);
+  background: color-mix(in srgb, var(--_c) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--_c) 22%, transparent);
+  animation: nv-enter var(--nv-dur-slow) var(--nv-ease-spring) both;
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
+  transition:
+    border-color var(--nv-dur-fast) var(--nv-ease-out),
+    background var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cw-post:hover:not([data-state='removed']) {
+  border-color: color-mix(in srgb, var(--_c) 45%, transparent);
+}
+.cw-post[data-state='removed'] {
+  background: transparent;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--nv-ink) 16%, transparent);
+}
+.cw-post[data-state='sent'] {
+  opacity: 0.72;
+}
+.cw-post__head {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nv-space-3);
+  width: 100%;
+  padding: var(--nv-space-4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cw-post__head:disabled {
+  cursor: default;
+}
+.cw-post__when {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.cw-post__when b {
+  color: var(--nv-ink);
+  font-size: var(--nv-text-title-2);
+  letter-spacing: var(--nv-text-title-2-tracking);
+}
+.cw-post__when span {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+}
+.cw-post__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.cw-post__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.cw-post__theme {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+}
+.cw-post__text {
+  color: var(--nv-ink);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  overflow-wrap: anywhere;
+}
+.cw-post:not([data-open]) .cw-post__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.cw-post__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+.cw-post__state[data-tone='ok'] {
+  color: var(--_c);
+}
+.cw-post__state[data-tone='warn'] {
+  color: var(--nv-warning);
+}
+.cw-post__chev {
+  width: 10px;
+  height: 10px;
+  margin-top: 8px;
+  border-right: 2px solid var(--nv-ink-faint);
+  border-bottom: 2px solid var(--nv-ink-faint);
+  transform: rotate(45deg);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.cw-post[data-open] .cw-post__chev {
+  transform: rotate(225deg);
+}
+
+/* Opened in place: why this visual, when it goes, and the gestures, the main one in neon. */
+.cw-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 0 var(--nv-space-4) var(--nv-space-4) calc(56px + var(--nv-space-3) + var(--nv-space-4));
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.cw-open__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cw-open__options li {
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--_c) 12%, transparent);
+  font-size: var(--nv-text-callout);
+}
+.cw-open__why,
+.cw-open__when {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.cw-open__gestures,
+.cw-open__row {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.cw-open__row > .nv-field {
+  flex: 1 1 200px;
+}
+.cw-open__advice,
+.cw-open__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.cw-open__area {
+  resize: vertical;
+}
+.cw-open__remove {
+  align-self: flex-start;
+}
+
+@media (max-width: 640px) {
+  .cw-answer {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .cw-answer__go {
+    grid-column: 1 / -1;
+  }
+  .cw-open {
+    padding-left: var(--nv-space-4);
+  }
+}
