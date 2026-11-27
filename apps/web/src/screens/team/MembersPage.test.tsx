@@ -507,6 +507,17 @@ describe('adding a member', () => {
     expect(screen.getByLabelText('Prénom').getAttribute('aria-invalid')).toBe('true');
   });
 
+  it('comes with no country and asks for one (Charles, 27/11: a chatter may live anywhere)', async () => {
+    serve();
+    renderPage();
+    await open();
+    who();
+    const country = await screen.findByRole('combobox', { name: 'Pays' });
+    expect(country.textContent).toContain('Choisir son pays');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    expect(await screen.findByText('Choisis son pays.')).toBeDefined();
+  });
+
   it('goes through the three steps, creates the member, then hands over his link', async () => {
     const posted = serve({
       post: (path) =>
@@ -582,7 +593,8 @@ describe('adding a member', () => {
     renderPage();
     await open();
     who();
-    fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
+    chooseValue(await screen.findByRole('combobox', { name: 'Pays' }), 'BJ');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Confirmé/u }));
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
     expect(await screen.findByRole('heading', { name: 'Kofi est dans l’équipe' })).toBeDefined();
@@ -600,7 +612,8 @@ describe('adding a member', () => {
     renderPage();
     await open();
     who();
-    fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
+    chooseValue(await screen.findByRole('combobox', { name: 'Pays' }), 'BJ');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Autre/u }));
     fill('Taux à la main, en %', '12,5');
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
@@ -613,7 +626,8 @@ describe('adding a member', () => {
     renderPage();
     await open();
     who();
-    fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
+    chooseValue(await screen.findByRole('combobox', { name: 'Pays' }), 'BJ');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Confirmé/u }));
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
     expect(await screen.findByText('Un compte utilise déjà cet e-mail.')).toBeDefined();
