@@ -246,6 +246,35 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
   });
 
+  it('never says a share above 100 % when the buyers outnumber the new subscribers read (recette 27/11, C1)', async () => {
+    serve([CREATOR], {
+      steering: {
+        status: 200,
+        body: {
+          ...STEERING,
+          traffic: {
+            newSubscribers: 1,
+            wrote: 20,
+            firstPurchase: 15,
+            regular: 0,
+            previous: { newSubscribers: 0, wrote: 0, firstPurchase: 0, regular: 0 },
+          },
+        },
+      },
+    });
+    show(agencyPage);
+    await screen.findByText('fans ont acheté pour la première fois');
+    const path = document.querySelector('.stg-traffic');
+    expect(path?.textContent).not.toMatch(/\d{3,} ?%/u);
+    expect(Array.from(path?.querySelectorAll('.nv-funnel__rate') ?? [], (rate) => rate.textContent)).toEqual([
+      '',
+      '',
+      '75 %',
+      '0 %',
+    ]);
+    expect(screen.getByText(/ce ne sont pas les mêmes fans/u)).toBeTruthy();
+  });
+
   it('names the payers who stopped, and opens the conversation of one Impera reads (ADR 0092 § 3)', async () => {
     serve();
     show(agencyPage);
