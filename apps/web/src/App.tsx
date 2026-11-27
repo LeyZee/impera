@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
+import { FirstWelcome, welcomeRoleOf } from './auth/FirstWelcome';
 import { ForgottenPasswordPage, PASSWORD_CHANGED_NOTICE } from './auth/ForgottenPasswordPage';
 import { NewPasswordPage } from './auth/NewPasswordPage';
 import { SecondFactorPage } from './auth/SecondFactorPage';
@@ -56,6 +57,8 @@ export function App(): JSX.Element {
   // A new password just chosen from the « mot de passe oublié » link: the sign-in page says so (SEC-05 lot 3).
   // Holds the account's address, so the sign-in page has it filled in.
   const [passwordChanged, setPasswordChanged] = useState<string | null>(null);
+  // The second factor just activated: this sign-in is the account's first, and the welcome comes before the app (P1).
+  const [isFirst, setIsFirst] = useState(false);
   const isRechecking = useRef(false);
   // A sign-out she asked for: a screen's 401 in flight meanwhile is not a session that ended (relecture #538).
   const isLeaving = useRef(false);
@@ -217,12 +220,20 @@ export function App(): JSX.Element {
     );
   }
   if (session.status === 'second_factor_required') {
-    return <SecondFactorPage onActivated={refresh} onSignOut={leave} />;
+    return (
+      <SecondFactorPage
+        onActivated={() => {
+          setIsFirst(true);
+          refresh();
+        }}
+        onSignOut={leave}
+      />
+    );
   }
   return (
     <>
       {/* The same user kept offline then read again keeps the same app: only another user makes a new one. */}
-      <SignedIn key={JSON.stringify(session.user)} user={session.user} onSignOut={leave} />
+      <SignedIn key={JSON.stringify(session.user)} user={session.user} onSignOut={leave} isFirst={isFirst} />
       {signOutFailed ? (
         <p className="nv-signout-failed nv-glass nv-glass--thick" role="alert">
           La déconnexion n’a pas abouti : réessaie.
@@ -233,8 +244,10 @@ export function App(): JSX.Element {
 }
 
 /** The dashboard itself: one router per signed-in user, so a new session starts on a clean state. */
-function SignedIn({ user, onSignOut }: RouterContext): JSX.Element {
+function SignedIn({ user, onSignOut, isFirst = false }: RouterContext & { isFirst?: boolean }): JSX.Element {
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
+  // Shown once, at the account's first sign-in; any step, or « plus tard », opens the app on its page.
+  const [welcome, setWelcome] = useState(() => (isFirst ? welcomeRoleOf(user) : null));
   const [queryClient] = useState(createQueryClient);
   // The page's own errors go to the API while signed in (OPS-18), each with the template of the route it happened on.
   useEffect(() => listenForErrors(() => router.state.matches.at(-1)?.fullPath), [router]);
@@ -248,7 +261,18 @@ function SignedIn({ user, onSignOut }: RouterContext): JSX.Element {
   );
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} context={{ user, onSignOut }} />
+      {welcome === null ? (
+        <RouterProvider router={router} context={{ user, onSignOut }} />
+      ) : (
+        <FirstWelcome
+          user={user}
+          role={welcome}
+          onGo={(to) => {
+            router.history.replace(to);
+            setWelcome(null);
+          }}
+        />
+      )}
     </QueryClientProvider>
   );
 }
