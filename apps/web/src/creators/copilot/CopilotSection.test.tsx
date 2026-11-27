@@ -79,6 +79,6 @@ describe('Créatrices › IA › Copilote dans l’extension (trous béants, 21/
     await waitFor(() => {
       expect(checked(screen.getByRole('switch', { name: 'Fiche du fan : éteinte' }))).toBe(false);
     });
-    expect(screen.getByText(/Copilote éteint/u).dataset['tone']).toBe('off');
+    expect(screen.getByText(/Rien d’allumé/u).dataset['tone']).toBe('off');
   });
 });
