@@ -7,8 +7,11 @@ import {
 import type { Transaction } from '@impera/db';
 
 import { contractorReadsForInvoicing as fileReads } from '../../contractors';
-import { taxResidenceOf, treatyNeedsResidence } from '../../contractors/pure';
-import { issueDecision } from '../domain/billing';
+import { regimeOn, taxResidenceOf, treatyNeedsResidence } from '../../contractors/pure';
+import { issueGaps, type IssueFacts } from '../domain/billing';
+
+/** A gap before the first invoice or transfer: every reason the validation or the transfer would give, but a credit note's. */
+export type BillingGap = Exclude<InvoiceNotIssuedReason, 'no_invoice_to_credit'>;
 
 /**
  * Whether an invoice of `memberId` could go out on `day` if his fortnight brought something to invoice, and its
@@ -20,7 +23,16 @@ export async function invoiceReadiness(
   tx: Transaction,
   memberId: string,
   day: string,
-): Promise<Exclude<InvoiceNotIssuedReason, 'no_invoice_to_credit'> | null> {
+): Promise<BillingGap | null> {
+  return (await invoiceGaps(tx, memberId, day))[0] ?? null;
+}
+
+/**
+ * Every gap at once (recette PARC-01), the first being `invoiceReadiness`'s: what the validation would refuse in turn
+ * (`issueGaps`), then, under a tax treaty, the residence certificate the transfer waits for. Read as things stand now,
+ * never as a past run said it (recette PARC-05).
+ */
+export async function invoiceGaps(tx: Transaction, memberId: string, day: string): Promise<BillingGap[]> {
   const mandate = await fileReads.mandateOf(tx, memberId);
   const profile = await fileReads.profileOf(tx, memberId);
   const settings = await fileReads.settings(tx);
@@ -30,7 +42,7 @@ export async function invoiceReadiness(
     validUntil: one.validUntil,
     review: one.review,
   }));
-  const decision = issueDecision({
+  const facts: IssueFacts = {
     day,
     mandate: {
       acceptedVersion: mandate.accepted?.version ?? null,
@@ -68,14 +80,19 @@ export async function invoiceReadiness(
     documents,
     // Something to invoice: the question is what stands in its way, not whether the fortnight brought anything.
     exclVatMinor: 1,
-  });
-  if (decision.kind === 'issue') {
-    // Under a tax treaty the invoice goes out, but the transfer waits for a residence certificate of its year (ADR 0041,
-    // `payoutDecision`): a chatter abroad would be paid late. Said with the same reasons the transfer would give.
-    if (!treatyNeedsResidence(decision.regime)) return null;
+  };
+  const gaps: BillingGap[] = issueGaps(facts);
+  // Under a tax treaty the invoice goes out, but the transfer waits for a residence certificate of its year (ADR 0041,
+  // `payoutDecision`): a chatter abroad would be paid late. Said with the same reasons the transfer would give, after
+  // what the invoice waits for.
+  const assignment = regimeOn(facts.assignments, day);
+  const regime =
+    assignment === null ? undefined : facts.regimes.find((one) => one.id === assignment.regimeId);
+  if (regime !== undefined && treatyNeedsResidence(regime)) {
     const residence = taxResidenceOf(documents, day.slice(0, 4));
-    if (residence.state === 'covered') return null;
-    return residence.state === 'missing' ? 'tax_residence_missing' : 'tax_residence_unverified';
+    if (residence.state !== 'covered') {
+      gaps.push(residence.state === 'missing' ? 'tax_residence_missing' : 'tax_residence_unverified');
+    }
   }
-  return decision.reason === 'nothing_to_invoice' ? null : decision.reason;
+  return gaps;
 }

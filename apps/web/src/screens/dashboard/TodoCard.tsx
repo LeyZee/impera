@@ -4,13 +4,14 @@ import { useState, type JSX } from 'react';
 import { MessagesTodo } from './MessagesTodo';
 import { backupBannerOf, useBackupStatus } from './backups';
 import { paperworkLines } from './paperwork';
-import { reportItems, TODO_SHOWN, todoItems, type TodoItem } from './todo';
+import { firstPayoutItem, reportItems, TODO_SHOWN, todoItems, type TodoItem } from './todo';
 
 import { usePendingDocuments } from '@/contractors/api';
 import { useInvoices } from '@/invoices/api';
 import { useReports } from '@/reports/api';
 import { useNow } from '@/scheduling/useNow';
 import { useWaitingMessages } from '@/screens/today/to-agency/api';
+import { useFirstPayoutGaps } from '@/setup/FirstPayoutCard';
 
 /**
  * « À faire » (pilotage 12/11, W3): one card for what waits on the reader, in place of a banner per subject. The
@@ -33,6 +34,8 @@ export function TodoCard({
   // What her creators wrote to the agency (trous béants n° 13): the owner answers, an active manager reads.
   const written = useWaitingMessages(forOwner || reviewsReports).data?.messages ?? [];
   const now = useNow();
+  // What would hold the first transfer back, every gap at once (recette PARC-01): the owner's.
+  const firstPayout = useFirstPayoutGaps(forOwner);
   // The most pressing lines first; the rest one tap away, so the figures stay close on a busy day.
   const [isOpen, setIsOpen] = useState(false);
 
@@ -42,6 +45,7 @@ export function TodoCard({
       ? paperworkLines(dues.data?.documents ?? [], contests.data?.documents ?? [], pending.data ?? null)
       : [],
     reviewsReports && open.data !== undefined ? reportItems(open.data.reports, now) : [],
+    firstPayoutItem(firstPayout),
   );
   if (items.length === 0 && written.length === 0) return null;
   const count = items.length + written.length;

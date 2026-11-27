@@ -329,8 +329,9 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
   it('tells the owner once of an invoice it cannot issue, the statement staying validated', async () => {
     expect((await team.validate(team.owner, lea, Q1)).statusCode).toBe(200);
     const id = await statementId(lea, Q1);
-    // Before the invoicing ran, her transfer waits for its documents, and no reason is said yet.
-    expect(await heldOf(lea, Q1, team.owner)).toEqual(held(null));
+    // Before the invoicing ran, her transfer waits for its documents, and what stands is already said, as it stands
+    // now (recette PARC-01).
+    expect(await heldOf(lea, Q1, team.owner)).toEqual(held('no_mandate'));
     const outcome = await issue(id);
     const { commissionMinor, status } = await team.statementOf(lea, Q1);
     expect(outcome).toMatchObject({
@@ -444,6 +445,9 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     // Léa's first half has no invoice (no mandate then); her second half owes a credit note on it.
     expect(await adjust(lea, -200, Q1, 'Vente remboursée par la plateforme')).toMatchObject({ period: Q2 });
     await invoicing.acceptMandate(lea);
+    // Her mandate accepted, her first half no longer says it is missing, though the run before said so (recette
+    // PARC-05): nothing stands now, its invoice waits only for the next run.
+    expect(await heldOf(lea, Q1, team.owner)).toEqual(held(null));
     await team.recalculate(Q2);
     expect((await team.validate(team.owner, lea, Q2)).statusCode).toBe(200);
     const q1 = await statementId(lea, Q1);
@@ -544,7 +548,8 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
 
     // The file filled again: a change of identity cleared the owner's check, so nothing goes out until he checks it.
     await db().update(profile).set(company).where(eq(profile.memberId, lea.id));
-    expect(await heldOf(lea, Q6, leaCookie)).toEqual(held('identity_incomplete'));
+    // Said as it stands now, before any rerun (recette PARC-05): her identity is complete, it waits for the check.
+    expect(await heldOf(lea, Q6, leaCookie)).toEqual(held('identity_unverified'));
     expect(await issue(id)).toMatchObject({
       issued: [],
       notIssued: [{ document: 'invoice', reason: 'identity_unverified' }],

@@ -108,3 +108,29 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (facts.prefix === null) return none('prefix_missing');
   return { kind: 'issue', regime, warnings };
 }
+
+/** What stands in the way of an invoice: every reason `issueDecision` would give in turn, once the one before is settled. */
+export type IssueGap = Exclude<NoInvoiceReason, 'nothing_to_invoice'>;
+
+/**
+ * Every gap at once, in the order `issueDecision` gives them (recette PARC-01): the owner sees the whole list before his
+ * first transfer, not one gap at a time. The first is always the reason `issueDecision` gives; empty when it issues. What
+ * needs a regime to be judged (its country, the identity it prints) is judged only once there is one.
+ */
+export function issueGaps(facts: IssueFacts): IssueGap[] {
+  const gaps: IssueGap[] = [];
+  if (facts.agency === null) gaps.push('agency_missing');
+  if (facts.mandate.currentVersion === 0) gaps.push('mandate_unpublished');
+  else if (facts.mandate.acceptedVersion === null) gaps.push('no_mandate');
+  const assignment = regimeOn(facts.assignments, facts.day);
+  const regime =
+    assignment === null ? null : (facts.regimes.find((one) => one.id === assignment.regimeId) ?? null);
+  if (regime === null) gaps.push('no_regime');
+  else {
+    if (!facts.regimesOfCountry.has(regime.id)) gaps.push('regime_country_mismatch');
+    if (!identityComplete(facts.identity, regime)) gaps.push('identity_incomplete');
+  }
+  if (!facts.identityVerified) gaps.push('identity_unverified');
+  if (facts.prefix === null) gaps.push('prefix_missing');
+  return gaps;
+}

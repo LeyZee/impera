@@ -281,6 +281,7 @@ export function createDrizzlePayrollReadStore(
                 gate.notIssuedReasonsUnscoped(
                   admin,
                   unissued.map((row) => ({ memberId: row.memberId, statementId: row.id })),
+                  today,
                 ),
               );
 

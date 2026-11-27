@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TodoCard } from './TodoCard';
 
 import { documentOf } from '@/test/contractors';
-import { invoiceOf, LOU, OCT1, OCT2, THEO } from '@/test/pay';
+import { invoiceOf, LOU, MEMBERS, OCT1, OCT2, THEO } from '@/test/pay';
 import { PAST, sent, WITHIN } from '@/test/reports';
 
 const reads: string[] = [];
@@ -79,6 +79,9 @@ const NOTHING = {
   '/v1/payroll/contractors/documents?review=pending': { documents: [], more: false },
   '/v1/backups/status': BACKUP_OK,
   '/v1/creator-messages/waiting': { messages: [] },
+  '/v1/dashboard/setup/members': { members: [] },
+  '/v1/payroll/payout-destinations': { destinations: [] },
+  '/v1/team/members': { members: MEMBERS },
 };
 
 describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
@@ -146,7 +149,7 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(true);
     await screen.findByText('Dashboard');
     await vi.waitFor(() => {
-      expect(reads).toHaveLength(5);
+      expect(reads).toHaveLength(8);
     });
     expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
     cleanup();
@@ -154,6 +157,44 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(false);
     await screen.findByText('Dashboard');
     expect(reads).toEqual([]);
+  });
+
+  it('says what would hold the first transfer back in one amber line, then who else has some (recette PARC-01)', async () => {
+    serve({
+      ...NOTHING,
+      '/v1/dashboard/setup/members': {
+        members: [
+          {
+            memberId: THEO.id,
+            teamRole: 'chatter',
+            steps: [
+              {
+                key: 'billing',
+                state: 'todo',
+                note: {
+                  kind: 'billing',
+                  reason: 'mandate_unpublished',
+                  reasons: ['mandate_unpublished', 'prefix_missing'],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      '/v1/payroll/payout-destinations': {
+        destinations: [{ memberId: THEO.id, method: null, changedAt: null }],
+      },
+    });
+    renderCard(true);
+    const card = (await screen.findByRole('heading', { name: 'À faire' })).closest('section');
+    if (card === null) throw new Error('No card');
+    const line = await within(card).findByRole('link', {
+      name: /^Avant ton premier versement : 3 choses à régler/u,
+    });
+    expect(line.getAttribute('href')).toBe('/paie/quinzaine');
+    expect(line.closest('li')?.dataset['tone']).toBe('warn');
+    expect(line.textContent).toContain('Le mandat de facturation n’est pas publié');
+    expect(line.textContent).toContain('Pour Théo');
   });
 
   it('gives the reviewer of the reports their lines only, without reading the owner’s lists (ADR 0073)', async () => {

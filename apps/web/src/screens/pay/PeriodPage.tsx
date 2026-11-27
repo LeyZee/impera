@@ -106,6 +106,7 @@ import { addDays, dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import '@/screens/team/team.css';
 import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
+import { FirstPayoutCard, useFirstPayoutGaps } from '@/setup/FirstPayoutCard';
 import { Dialog } from '@/shell/Dialog';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
@@ -166,6 +167,8 @@ function PeriodView({
   const read = usePayPeriod(period);
   const before = usePayPeriod(period === null ? null : previousPeriod(period));
   const names = usePayNames(period, true);
+  // Every gap before the first transfer, on top of Paie (recette PARC-01): the owner's alone.
+  const firstPayout = useFirstPayoutGaps(owner);
   const data = read.data?.period === period ? read.data : undefined;
   const previous =
     before.data?.period === (period === null ? null : previousPeriod(period)) ? before.data : undefined;
@@ -452,6 +455,7 @@ function PeriodView({
     <Page>
       {head}
       <div className="py-board">
+        {firstPayout === null ? null : <FirstPayoutCard gaps={firstPayout} />}
         <Summary
           data={data}
           stale={computing !== null}

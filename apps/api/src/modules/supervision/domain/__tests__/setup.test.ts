@@ -147,7 +147,7 @@ const readyMember: MemberSetupFacts = {
   creators: 1,
   hasShift: true,
   paid: true,
-  billing: null,
+  billing: [],
 };
 
 describe('memberSetup', () => {
@@ -160,7 +160,7 @@ describe('memberSetup', () => {
     creators: 2,
     hasShift: true,
     paid: true,
-    billing: null,
+    billing: [],
   };
 
   it('gives a chatter seven steps, his invoicing last', () => {
@@ -186,12 +186,14 @@ describe('memberSetup', () => {
     expect(memberSetup({ ...chatter, teamRole: 'manager' }).map((step) => step.key)).toContain('billing');
   });
 
-  it('says what stops his first invoice', () => {
-    const billing = memberSetup({ ...chatter, billing: 'no_mandate' }).find((step) => step.key === 'billing');
+  it('says what stops his first invoice, and every gap at once (recette PARC-01)', () => {
+    const billing = memberSetup({ ...chatter, billing: ['no_mandate', 'prefix_missing'] }).find(
+      (step) => step.key === 'billing',
+    );
     expect(billing).toEqual({
       key: 'billing',
       state: 'todo',
-      note: { kind: 'billing', reason: 'no_mandate' },
+      note: { kind: 'billing', reason: 'no_mandate', reasons: ['no_mandate', 'prefix_missing'] },
     });
   });
 
@@ -213,7 +215,7 @@ describe('memberSetup', () => {
       creators: 0,
       hasShift: false,
       paid: true,
-      billing: 'no_mandate',
+      billing: ['no_mandate'],
     });
     expect(steps.map((step) => step.state)).toEqual([
       'waiting',

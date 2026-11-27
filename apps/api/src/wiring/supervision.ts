@@ -10,7 +10,7 @@ import {
   type ConnectorsModule,
 } from '../modules/connectors';
 import type { ConversationsModule } from '../modules/conversations';
-import { invoiceReadiness } from '../modules/invoicing';
+import { invoiceGaps, type BillingGap } from '../modules/invoicing';
 import type { PayrollModule } from '../modules/payroll';
 import type { SchedulingModule } from '../modules/scheduling';
 import { createSupervisionModule, type SupervisionModule } from '../modules/supervision';
@@ -52,11 +52,11 @@ export function wireSupervision(
       const { coverage } = await telegram.overview();
       return new Map(coverage.map((c) => [c.creatorId, c.urgentReachable] as const));
     },
-    // « Facturation »: the very reason the validation of the 16th would give, read in one admin transaction.
+    // « Facturation »: every gap the validation of the 16th would give in turn, read in one admin transaction.
     billingReadiness: (memberIds, day) =>
       withAdmin(adminDb, async (tx) => {
-        const reasons = new Map<(typeof memberIds)[number], Awaited<ReturnType<typeof invoiceReadiness>>>();
-        for (const memberId of memberIds) reasons.set(memberId, await invoiceReadiness(tx, memberId, day));
+        const reasons = new Map<(typeof memberIds)[number], BillingGap[]>();
+        for (const memberId of memberIds) reasons.set(memberId, await invoiceGaps(tx, memberId, day));
         return reasons;
       }),
     requireRole,

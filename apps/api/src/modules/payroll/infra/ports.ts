@@ -24,14 +24,16 @@ export interface PayoutGate {
     paidOn: string,
   ): Promise<ReadonlyMap<string, PayoutVerdict>>;
   /**
-   * Why a document each statement of `statements` makes due is not issued, as the invoicing said it last
-   * (`invoice_not_issued`); a statement it said nothing for is left out. Read in an admin transaction: those events are
-   * the agency's, they carry no creator. Only a reason comes out, of statements the caller already read under its own
-   * policies (recette EQP-04).
+   * Why a document each statement of `statements` makes due is not issued: what stands in its way on `day`, read as
+   * things stand now (recette PARC-05: never « mandate not published » once it is), else what the invoicing said last
+   * when nothing stands any more but a credit note no invoice can take. A statement with neither is left out. Read in an
+   * admin transaction: those events are the agency's, they carry no creator. Only a reason comes out, of statements
+   * the caller already read under its own policies (recette EQP-04).
    */
   notIssuedReasonsUnscoped(
     adminTx: Transaction,
     statements: readonly { readonly memberId: string; readonly statementId: string }[],
+    day: string,
   ): Promise<ReadonlyMap<string, InvoiceNotIssuedReason>>;
 }
 
