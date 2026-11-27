@@ -1,5 +1,6 @@
 import type {
   Currency,
+  NotificationKinds,
   NotificationInboxItem,
   NotificationPreferences,
   NotificationRequest,
@@ -7,6 +8,7 @@ import type {
   PushSubscriptionInput,
 } from '@impera/contracts';
 
+import type { CreatorNotice } from './creator-notices';
 import type { NotificationDecision } from './policy';
 
 /** The server's current VAPID key pair (CR-01): made once, sealed in base, never typed by anyone (ADR 0016). */
@@ -45,6 +47,9 @@ export interface SubscriptionStore {
 export interface PreferencesStore {
   get(userId: string): Promise<NotificationPreferences | null>;
   put(userId: string, preferences: NotificationPreferences): Promise<void>;
+  /** Her sorts on and off (ADR 0150 § 16 ter); a sort with no row is on. */
+  kinds(userId: string): Promise<NotificationKinds>;
+  putKinds(userId: string, kinds: NotificationKinds): Promise<void>;
 }
 
 export type DeliveryOutcome = 'sent' | 'gone' | 'retry' | 'refused';
@@ -101,4 +106,12 @@ export interface CreatorSale {
 export interface CreatorSaleSource {
   /** The `sale_detected` of that id, read by the job's role; null when there is none. */
   saleOf(eventId: string): Promise<CreatorSale | null>;
+}
+
+export interface CreatorNoticeSource {
+  /**
+   * What the agency asked of the creators not archived between `from` and `to`, read by the job's role: requests for
+   * content still open, propositions of the agency still undecided, weeks validated. Each with her zone and accounts.
+   */
+  between(from: Date, to: Date): Promise<readonly CreatorNotice[]>;
 }

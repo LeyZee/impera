@@ -55,7 +55,10 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
 export function ExtensionLinkPage(): JSX.Element {
   // The popup's own words: a host in full, or this computer (ADR 0067, amendement du 19/11 § 3).
   const host = window.location.hostname;
-  const crm = host === 'localhost' || host === '127.0.0.1' ? 'au CRM de cet ordinateur' : `à ${host}`;
+  const local = host === 'localhost' || host === '127.0.0.1';
+  const crm = local ? 'au CRM de cet ordinateur' : `à ${host}`;
+  // This computer's CRM in http is allowed at the install: the browser asks nothing (EXT-09).
+  const asks = !(local && window.location.protocol === 'http:');
   return (
     <Page width="narrow">
       <PageHeader
@@ -83,8 +86,8 @@ export function ExtensionLinkPage(): JSX.Element {
           </PanelSection>
           <PanelSection>
             <p className="nv-ext-link__then">
-              L’extension te demande « Relier l’extension {crm} ? ». Clique « Relier », puis accepte la
-              question du navigateur.
+              L’extension te demande « Relier l’extension {crm} ? ». Clique « Relier »
+              {asks ? ', puis accepte la question du navigateur.' : '.'}
             </p>
           </PanelSection>
         </Panel>

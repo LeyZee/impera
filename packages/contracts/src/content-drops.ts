@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ReadyVideoIdSchema } from './custom-prices';
 import {
   ContentDropFileIdSchema,
   ContentDropIdSchema,
@@ -461,6 +462,11 @@ export const CreateContentDropBodySchema = z.strictObject({
   category: DropCategorySchema,
   sentence: DropSentenceSchema.nullable().default(null),
   requestId: ContentRequestIdSchema.nullable().default(null),
+  /**
+   * The type of a video to sell (`sale_video`): a line of the owner's « Vidéos déjà tournées », still offered. Asked
+   * of that category alone; any other category takes none (422 `content_drop_ready_video_unprocessable`).
+   */
+  readyVideoId: ReadyVideoIdSchema.nullable().default(null),
   files: z.array(DeclaredDropFileSchema).min(1).max(60),
 });
 export type CreateContentDropBody = z.infer<typeof CreateContentDropBodySchema>;
@@ -656,6 +662,8 @@ export const CONTENT_DROP_ID_CONFLICT = 'content_drop_id_conflict';
 export const CONTENT_DROP_FORMAT_UNPROCESSABLE = 'content_drop_format_unprocessable';
 export const CONTENT_DROP_SCRIPT_UNPROCESSABLE = 'content_drop_script_unprocessable';
 export const CONTENT_DROP_REQUEST_UNPROCESSABLE = 'content_drop_request_unprocessable';
+/** A video to sell without a type still offered, or a type given to another category (ADR 0163 § 7). */
+export const CONTENT_DROP_READY_VIDEO_UNPROCESSABLE = 'content_drop_ready_video_unprocessable';
 export const CONTENT_DROP_SETTLED_CONFLICT = 'content_drop_settled_conflict';
 export const CONTENT_DROP_FORBIDDEN = 'content_drop_forbidden';
 /** The slot named is not one of her script's (SC-02 lot b). */

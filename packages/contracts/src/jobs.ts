@@ -64,12 +64,14 @@ export const JOB_NAMES = [
   'notifications.recap',
   'alerts.route',
   'notifications.creator_sale',
+  'notifications.creator_notices',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
   'creator_week.plan',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
+  'scheduling.check_uncovered',
   'scheduling.check_reports',
   'scheduling.remind_reports',
   'scheduling.notify_incident',
@@ -151,12 +153,14 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.recap': 'Récapitulatif des notifications',
   'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
+  'notifications.creator_notices': 'Demandes, propositions et semaine dites à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
   'creator_week.plan': 'Semaine de la créatrice',
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
+  'scheduling.check_uncovered': 'Comptes sans personne',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
@@ -333,6 +337,12 @@ export const JOB_PAYLOADS = {
    */
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   /**
+   * Every five minutes (trou 9 du 21/11): what the agency asked of a creator in the last half hour (a request for
+   * content, a script, a proposition for her agenda, her week validated) told to her accounts, once each, on the sort
+   * she may turn off. A run missed is caught by the next one within the half hour.
+   */
+  'notifications.creator_notices': z.object({}),
+  /**
    * The reminder she chose for a task at an hour (CR-05 lot b3): enqueued with the task's write under the key
    * `creator_tasks.remind:<taskId>`, at its start less her minutes. `startsAt` is the start it was scheduled for: a
    * move replaces the job, and a job left from before rings nothing.
@@ -367,6 +377,12 @@ export const JOB_PAYLOADS = {
    * It writes nothing else.
    */
   'scheduling.check_agency_shares': z.object({}),
+  /**
+   * Every five minutes (ADR 0094 § 1, lot a): the créneaux that began with no chatter in post and the agent not in
+   * Automatique, on an account a fan wrote to in the 24 hours before; `account_uncovered` once per account and créneau.
+   * It writes nothing else.
+   */
+  'scheduling.check_uncovered': z.object({}),
   'scheduling.check_reports': z.object({}),
   /**
    * Every five minutes (ADR 0077): the member of a shift ended without its report is reminded on his phone, 15 minutes
@@ -670,6 +686,8 @@ export const JOB_MAX_ATTEMPTS = {
   'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
+  // Every five minutes, and each notification rings once: the next run is the retry.
+  'notifications.creator_notices': 1,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
@@ -680,6 +698,8 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
   'scheduling.check_agency_shares': 3,
+  // Every five minutes, looking back a quarter of an hour: the next run is the retry, the event is published once.
+  'scheduling.check_uncovered': 1,
   'scheduling.check_reports': 1,
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,

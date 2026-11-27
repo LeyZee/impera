@@ -375,7 +375,9 @@ function History({
               : 'Cette alerte n’a pas encore sonné.'
             : unseen
               ? 'Tout est vu.'
-              : 'Aucune alerte n’a encore sonné. Elles se règlent dans Réglages › Alertes.'}
+              : isOwner
+                ? 'Aucune alerte n’a encore sonné. Elles se règlent dans Réglages › Alertes.'
+                : 'Aucune alerte n’a encore sonné.'}
         </p>
       ) : (
         <div className="nv-scroll">

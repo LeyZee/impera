@@ -1,4 +1,4 @@
-import type { CreatorOverview, CreatorTodoCount } from '@impera/contracts';
+import type { CreatorOverview, CreatorSetup, CreatorTodoCount } from '@impera/contracts';
 
 import { clockAt } from '@/scheduling/time';
 import { categoryName, dueOf } from '@/screens/content/model';
@@ -8,6 +8,15 @@ import { eur } from '@/screens/dashboard/logic';
  * What a card of the list of Créatrices says (« ok liste-créatrices », 06/11), in words: pure, so that the card only
  * lays it out and the tests read it without a browser. Red is kept for what is urgent, amber for what waits.
  */
+
+/**
+ * Whether she has an active persona, read from her « Mise en route » (its step « persona »): `undefined` when it is not
+ * read, or not the reader's to read (the owner's alone), so that her switch says her mode alone then (PRO1-03).
+ */
+export function hasActivePersonaOf(setup: CreatorSetup | undefined): boolean | undefined {
+  const step = setup?.steps.find((one) => one.key === 'persona');
+  return step === undefined ? undefined : step.state === 'done';
+}
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'calm';
 
@@ -40,7 +49,7 @@ export function salesOf(sales: CreatorOverview['sales']): {
   readonly value: string;
   readonly note: string;
 } {
-  if (sales === null) return { value: '—', note: 'Registre des ventes non relié' };
+  if (sales === null) return { value: '—', note: 'Ventes : pas encore reliées' };
   const period = fortnightOf(sales.from, sales.to);
   return {
     value: eur(sales.revenueMinor / 100),

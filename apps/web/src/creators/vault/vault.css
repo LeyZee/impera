@@ -435,3 +435,27 @@
     transition: opacity var(--nv-dur-fast) linear;
   }
 }
+
+/* A description on a media's sheet, and the say on it (REV-02). */
+.vx-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vx-review__text {
+  min-height: 110px;
+  resize: vertical;
+}
+.vx-review__said {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.vx-review__said--warn {
+  color: var(--nv-warning);
+}
+.vx-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

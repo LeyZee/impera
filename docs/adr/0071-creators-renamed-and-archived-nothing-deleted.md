@@ -1,5 +1,13 @@
 # 0071. Une créatrice se renomme et s'archive, sans rien supprimer, et l'e-mail d'un accès pas encore utilisé se corrige
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0089 · Les vignettes d'une créatrice archivée sont effacées 90 jours après son archivage](0089-archived-creator-thumbnails-erased-after-90-days.md) : Amende : l'ADR 0071 § 2 (« Rien n'est supprimé […] médias […] intacts »), pour les seules vignettes. Précise : l'ADR 0030 § 4 (on garde le minimum) et l'ADR 0044 § 2 (effacement des originaux). Ne remplace rien d'autre.
+>
+> Toutes les décisions du même sujet : [`docs/regles/creatrice-et-contenu.md`](../regles/creatrice-et-contenu.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 05/11/2026, 20 h 22, « ok 0071 » ; recette du 05/11, constat PRO-14 et recommandation 23, validée par « go recos » : « renommer oui, archiver oui, sans rien supprimer »)
 Date : 2026-11-05
 Précise : l'ADR 0042 § 1 (compte de la créatrice) et l'ADR 0069 § 5 (rien ne se supprime). Ne remplace rien.

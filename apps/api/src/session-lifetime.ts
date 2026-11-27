@@ -47,11 +47,21 @@ export const LONGEST_IDLE_MS = Math.max(
   ...Object.values(LONG_LIFETIMES).map((lifetime) => lifetime.idleMs),
 );
 
+/**
+ * How often a session in use is refreshed (Better Auth's `updateAge`), its last activity (`session.updated_at`) written
+ * then: at most one write a minute per session in use, and an idle time read within the minute (PRO2-10). Once an
+ * hour, a chatter active up to 59 minutes after a refresh was closed after 11 hours of real inactivity.
+ */
+export const ACTIVITY_REFRESH_MS = 60 * 1000;
+
 export interface SessionTimes {
   /** The account's role as stored, unvalidated. */
   readonly role: unknown;
   readonly createdAt: Date;
-  /** Its last refresh (`session.updated_at`), which Better Auth writes at most once per `updateAge` of use. */
+  /**
+   * Its last refresh (`session.updated_at`), which Better Auth writes at most once per `ACTIVITY_REFRESH_MS` of use: its
+   * last request was less than that later.
+   */
   readonly lastActiveAt: Date;
 }
 

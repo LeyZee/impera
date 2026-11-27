@@ -25,7 +25,14 @@ export async function notifyCreatorSale(
   for (const userId of sale.accounts) {
     outcomes.push(
       await deps.notify(
-        { userId, reason: 'sale', objectKey: sale.saleId, timeZone: sale.timeZone, message },
+        {
+          userId,
+          reason: 'sale',
+          objectKey: sale.saleId,
+          timeZone: sale.timeZone,
+          message,
+          kind: 'earnings',
+        },
         at,
       ),
     );

@@ -384,6 +384,63 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     expect(document.querySelector('.ag-ring .nv-ring__value')).toBeNull();
   });
 
+  it('never says « Rien à faire » nor « bravo » while her day’s essentials are left (MOD-01, MOD-02)', async () => {
+    const herDay = (done: number) => ({
+      day: WEDNESDAY,
+      today: WEDNESDAY,
+      lines: [1, 2, 3].map((n) => ({
+        item: ['reveal_story', 'reveal_video', 'insta_cta_story'][n - 1],
+        platform: n === 3 ? 'instagram' : 'reveal',
+        label: `Essentiel ${String(n)}`,
+        sheet: 'Une phrase.',
+        target: 1,
+        done: n <= done ? 1 : 0,
+        essential: true,
+      })),
+    });
+    const withDay = (done: number): void => {
+      serve(() => true, SHIFTS, agendaOf({ tasks: [], suggestions: [] }));
+      const others = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string, init?: RequestInit) =>
+          url === '/v1/creator-space/day'
+            ? Promise.resolve(new Response(JSON.stringify(herDay(done)), { status: 200 }))
+            : others(url, init),
+        ),
+      );
+    };
+    const glance = (): string => document.querySelector('.ag-glance__text')?.textContent ?? '';
+    withDay(1);
+    show();
+    // The ring and the title speak of her essentials, the empty agenda goes below (Design, 27/11).
+    expect(await screen.findByText('2 choses à faire aujourd’hui')).toBeDefined();
+    expect(glance()).toContain('Rien d’autre à l’agenda');
+    expect(glance()).not.toContain('Rien à faire');
+    expect(document.querySelector('.ag-glance .ag-ring')?.textContent).toContain('1/3');
+    cleanup();
+    withDay(3);
+    show();
+    expect(await screen.findByText('Profite de ta journée.')).toBeDefined();
+    expect(glance()).toContain('Rien à faire');
+  });
+
+  it('says what is left of a day gone by as not done, never « à faire » (MOD-13)', async () => {
+    serve(() => true);
+    show('day', '2026-11-02');
+    expect(await screen.findByText('1 chose pas faite')).toBeDefined();
+    expect(screen.queryByText(/à faire$/u)).toBeNull();
+  });
+
+  it('says a free time up to midnight « minuit », never « 0 h » (H-06)', async () => {
+    serve(() => true);
+    show();
+    await screen.findByRole('heading', { name: 'Programme' });
+    const free = [...document.querySelectorAll('.ag-free')].map((one) => one.textContent);
+    expect(free.some((one) => one.includes('– minuit'))).toBe(true);
+    expect(free.some((one) => /–\s0\sh/u.test(one))).toBe(false);
+  });
+
   it('titles the suggestions of the day like « Sans date », with their count (CRE-07)', async () => {
     const dated = CreatorSuggestionSchema.parse({
       ...agendaOf().suggestions[0],
@@ -398,6 +455,46 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     expect(screen.getByRole('region', { name: 'Proposé pour aujourd’hui' }).textContent).toContain(
       'Story coulisses',
     );
+  });
+
+  // Choice of 21/11 (MOD-05): a day of a week still to accept is accepted with the week, nowhere else.
+  it('shows a day of her week still to accept without « Accepter » nor « Non merci » of its own', async () => {
+    const dated = CreatorSuggestionSchema.parse({
+      ...agendaOf().suggestions[0],
+      id: '01936f00-0000-7000-8000-000000000932',
+      when: { kind: 'day', day: WEDNESDAY },
+      title: 'Jour de tournage',
+    });
+    serve(() => true, SHIFTS, agendaOf({ suggestions: [dated] }));
+    const others = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url.startsWith('/v1/creator-space/week?')
+          ? Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  week: dated.week,
+                  toAccept: true,
+                  shootDays: [
+                    { suggestionId: dated.id, taskId: null, state: 'suggested', day: WEDNESDAY, items: [] },
+                  ],
+                  delivery: null,
+                }),
+                { status: 200 },
+              ),
+            )
+          : others(url, init),
+      ),
+    );
+    show();
+    expect(await screen.findByRole('button', { name: 'Accepter ma semaine' })).toBeDefined();
+    const region = screen.getByRole('region', { name: 'Proposé pour aujourd’hui' });
+    await waitFor(() => {
+      expect(region.textContent).toContain('tu l’acceptes avec « Accepter ma semaine »');
+    });
+    expect(within(region).queryByRole('button', { name: 'Accepter' })).toBeNull();
+    expect(within(region).queryByRole('button', { name: 'Non merci' })).toBeNull();
   });
 
   it('writes a task without a purpose by its title alone: its category is the tag (CRE-19)', async () => {

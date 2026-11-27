@@ -1,5 +1,15 @@
 # 0050. Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0084 · La quinzaine vérifiée peut être la première payée sur les ventes Reveal](0084-checked-fortnight-paid-on-platform-net.md) : Amende : l'ADR 0050 § 8, pour deux phrases : « posée à une frontière de période et jamais rétroactive » et « sur une quinzaine passée couverte par le registre […] La bascule se fait ensuite à une frontière de période ». Amende aussi la règle de départ des règles de paie (EQ-03 : de nouvelles règles partent d'une quinzaine qui n'a pas commencé). Ne change ni la vérification (CRM-02, `isCleanMatch`), ni le calcul (CRM-03), ni l'attribution d'une vente (ADR 0050 § 5).
+>
+> - [0101 · Une vente donnée, entière ou partagée, au chatteur qui a été décisif](0101-sale-given-to-the-decisive-chatter.md) : Amende : 0050 § 5 (une décision donne la vente à l'auteur Reveal ou à personne) et la phrase « Never another member » de la décision sur une vente (CRM-03 lot b3).
+>
+> Toutes les décisions du même sujet : [`docs/regles/reveal.md`](../regles/reveal.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour ; § 4 et part de la créatrice au § 8 : ses messages du même jour ; règles de paie d'Équipe aux §§ 5, 7 et 8 : « ok relecture », le même jour ; § 8 amendé le 11/11/2026 : le dashboard de Reveal n'offre pas d'export, la vérification se fait sur le registre et les statistiques par jour, l'export devient facultatif ; carte « Deux sources » et « ok phrases 0050 », 18 h 24)
 Date : 2026-11-02
 Complète : l'ADR 0008, dont la phrase « attendre une API officielle : il n'y en aura pas » est dépassée pour les ventes et les chiffres ; sa stratégie reste celle de tout le reste.

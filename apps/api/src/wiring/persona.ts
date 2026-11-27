@@ -20,6 +20,7 @@ export interface WiredPersona {
 export function wirePersona(shared: Shared): WiredPersona {
   const module = createPersonaModule({
     db: shared.db,
+    adminDb: shared.adminDb,
     requireRole: shared.requireRole,
     recentLogin: shared.recentLogin,
     // An example the voice imitates never teaches what a hard guard blocks (P5-01).

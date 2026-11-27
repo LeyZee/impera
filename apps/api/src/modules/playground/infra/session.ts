@@ -625,7 +625,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       const voice = await gateway.voice(input);
       const written = voice.ok ? voice.value.output.bubbles : [];
       const violations = checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history));
-      const bubbles = asSent(written, deps.splitMessages);
+      const bubbles = asSent(written, deps.splitMessages, deps.guardSettings.form);
       return {
         bubbles,
         violations,
@@ -849,11 +849,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         }
       }
       const read = composed.desireRead;
+      // A first score of 0 is not stored (it moved nothing): the next message still reads from it, never as a
+      // second « première note » (IA-10).
+      const earlier = desireTrail.slice(0, -1).findLast((r) => r !== undefined);
       const reading: PlaygroundDesireReading | undefined =
         read === undefined
           ? undefined
           : {
-              before: read.before,
+              before: read.before ?? earlier?.score ?? null,
               score: read.score,
               band: desireBandOf(read.score),
               signals: read.signals,

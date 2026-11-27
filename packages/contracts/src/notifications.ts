@@ -140,13 +140,40 @@ export const NOTIFICATION_REASONS = [
    */
   'owner_change',
   /**
-   * A question put to a creator on her « À décider » card (ADR 0164 § 9): once per question, held in the quiet hours,
-   * within the daily cap like a reminder.
+   * A question put to a creator on her « À décider » card (ADR 0164 § 9), or something the agency asked of her (a
+   * request for content, a script, a proposition for her agenda, her week validated; trou 9 du 21/11): once per thing
+   * asked, held in the quiet hours, within the daily cap like a reminder.
    */
   'decision',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
+
+/**
+ * The sorts of notification a creator chooses herself in Moi › Notifications (ADR 0150 § 16 ter): an agency request
+ * (a task of her agenda coming, a request for content, a script asked, a proposition for her agenda), the week to
+ * validate (her week validated by the owner, for her to accept), her earnings (her part of a sale), her lives. Each one is on until she
+ * turns it off; the agency neither reads nor changes these choices, and they touch no alert of the team.
+ */
+export const NOTIFICATION_KINDS = ['agency_request', 'week_to_validate', 'earnings', 'lives'] as const;
+export const NotificationKindSchema = z.enum(NOTIFICATION_KINDS);
+export type NotificationKind = z.infer<typeof NotificationKindSchema>;
+
+/** `GET` and `PUT /v1/notifications/kinds`: every sort, on or off. */
+export const NotificationKindsSchema = z.strictObject({
+  agency_request: z.boolean(),
+  week_to_validate: z.boolean(),
+  earnings: z.boolean(),
+  lives: z.boolean(),
+});
+export type NotificationKinds = z.infer<typeof NotificationKindsSchema>;
+
+export const DEFAULT_NOTIFICATION_KINDS: NotificationKinds = {
+  agency_request: true,
+  week_to_validate: true,
+  earnings: true,
+  lives: true,
+};
 
 /**
  * A notification asked by another module: once only for an account, its reason and its object (`objectKey`: a sale's
@@ -158,6 +185,8 @@ export const NotificationRequestSchema = z.object({
   objectKey: z.string().min(1).max(200),
   timeZone: z.string().min(1),
   message: PushMessageSchema,
+  /** The sort she may turn off (ADR 0150 § 16 ter); turned off, it is kept silent, never rung. */
+  kind: NotificationKindSchema.optional(),
 });
 export type NotificationRequest = z.infer<typeof NotificationRequestSchema>;
 

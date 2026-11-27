@@ -1,5 +1,13 @@
 # 0054. Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule
 
+<!-- bandeau-rangement-2026-11-27 -->
+> **Changée en partie depuis.** Le texte ci-dessous est d’origine et reste valable, sauf pour les passages qu’une décision plus récente remplace. Ce qu’elle dit remplacer, avec ses propres mots :
+>
+> - [0157 · « Ta part » montre tout le chemin de ses ventes : ce que ses fans ont payé, la TVA, Reveal, l'agence et elle, avec son pourcentage](0157-creator-sees-the-whole-path-of-her-sales.md) : Remplace : dans la fiche CR-04 et le contrat `CreatorEarnings`, la règle « elle voit sa part seulement » (décision de Charles du 17/11, reprise le 20/11 dans la première version de « Ta part »).
+>
+> Toutes les décisions du même sujet : [`docs/regles/creatrice-et-contenu.md`](../regles/creatrice-et-contenu.md).
+<!-- /bandeau-rangement-2026-11-27 -->
+
 Statut : accepted (Charles, 03/11/2026 09h45, « ok 0054 », sur les mots exacts de la phrase du § 1 ; décision du même jour à 09h32, « ok recos », recommandation 4 de la fiche CRM-04). Amendée : § 4 à § 8 (« ok phrases 0054 », 14/11/2026, 12 h 43, fil « Afficher parts modèle, agence et TVA »), qui précisent le § 2 : la part de l'agence se lit chez Reveal, le pourcentage devient facultatif.
 Date : 2026-11-03
 Remplace : dans l'ADR 0042 § 6, la phrase « La source des ventes est celle de la paie pour ce compte (ADR 0023, ADR 0043) : les ventes saisies par les chatteurs, puis les ventes détectées. »

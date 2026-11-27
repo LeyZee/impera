@@ -7,7 +7,14 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { fetchMarkableCreators, sendCaptures, sendReadings, type Fetch } from './api';
+import {
+  fetchLinkHolder,
+  fetchMarkableCreators,
+  linkCode,
+  sendCaptures,
+  sendReadings,
+  type Fetch,
+} from './api';
 
 const ORIGIN = 'http://localhost:5173';
 // Shaped like a link (43 base64url characters), plainly not one.
@@ -108,5 +115,38 @@ describe('sendCaptures', () => {
       await sendCaptures(ORIGIN, TOKEN, body, answer(404, errorBody('trend_capture_reading_not_found'))),
     ).toBe('failed');
     expect(await sendCaptures(ORIGIN, TOKEN, body, answer(401, errorBody('x')))).toBe('revoked');
+  });
+});
+
+describe('linkCode (EXT-01)', () => {
+  const deps = (check: Fetch) => ({
+    check: (token: string) => fetchLinkHolder(ORIGIN, token, check),
+    save: vi.fn(() => Promise.resolve()),
+    watch: vi.fn(() => Promise.resolve()),
+  });
+
+  it('keeps a chatter’s code without asking the watch’s doors, closed to him', async () => {
+    const fetchFn = answer(200, { watch: false });
+    const chatter = deps(fetchFn);
+    expect(await linkCode(TOKEN, chatter)).toBe('linked');
+    expect(vi.mocked(fetchFn).mock.calls[0]?.[0]).toBe(`${ORIGIN}/v1/trends/extension-links/holder`);
+    expect(chatter.save).toHaveBeenCalledWith(TOKEN);
+    expect(chatter.watch).not.toHaveBeenCalled();
+  });
+
+  it('draws the watch’s menu for a holder of the watch', async () => {
+    const manager = deps(answer(200, { watch: true }));
+    expect(await linkCode(TOKEN, manager)).toBe('linked');
+    expect(manager.watch).toHaveBeenCalledWith(TOKEN);
+  });
+
+  it('keeps nothing for a code that names nobody, nor while the CRM does not answer', async () => {
+    const unknown = deps(answer(401, errorBody('extension_link_unauthenticated')));
+    expect(await linkCode(TOKEN, unknown)).toBe('refused');
+    const down = deps(answer(503, errorBody('x')));
+    expect(await linkCode(TOKEN, down)).toBe('unreachable');
+    const busy = deps(answer(429, errorBody('x')));
+    expect(await linkCode(TOKEN, busy)).toBe('busy');
+    for (const one of [unknown, down, busy]) expect(one.save).not.toHaveBeenCalled();
   });
 });

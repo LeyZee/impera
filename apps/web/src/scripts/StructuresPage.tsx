@@ -25,13 +25,31 @@ import { Failure } from '@/shell/states';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
 
+type StructuresTab = 'library' | 'queues';
+
 /**
  * Créatrices › Structures (SC-01 lot c), the owner's: the agency's library of script structures, the starter to copy,
  * and the workshop where a structure is written stage by stage with its card beside it. Leaving with changes not saved
- * asks first.
+ * asks first. The view shown is in the address (`?vue=files`), so a reload or « retour » keeps it (recette COUV-09).
  */
-export function StructuresPage(): JSX.Element {
-  return <Structures embedded={false} />;
+export function StructuresPage({
+  queues,
+  onQueues,
+}: {
+  readonly queues: boolean;
+  readonly onQueues: (queues: boolean) => void;
+}): JSX.Element {
+  return (
+    <Structures
+      embedded={false}
+      shown={{
+        tab: queues ? 'queues' : 'library',
+        setTab: (tab) => {
+          onQueues(tab === 'queues');
+        },
+      }}
+    />
+  );
 }
 
 /**
@@ -42,11 +60,20 @@ export function StructuresView(): JSX.Element {
   return <Structures embedded />;
 }
 
-function Structures({ embedded }: { embedded: boolean }): JSX.Element {
+function Structures({
+  embedded,
+  shown,
+}: {
+  embedded: boolean;
+  /** The view held by the address; the sheet's embedded library holds it itself. */
+  shown?: { readonly tab: StructuresTab; readonly setTab: (tab: StructuresTab) => void };
+}): JSX.Element {
   const structures = useStructures();
   const starters = useStarters();
   const creators = useCreators();
-  const [tab, setTab] = useState<'library' | 'queues'>('library');
+  const [ownTab, setOwnTab] = useState<StructuresTab>('library');
+  const tab = shown?.tab ?? ownTab;
+  const setTab = shown?.setTab ?? setOwnTab;
   const [open, setOpen] = useState<WorkshopStart | null>(null);
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);

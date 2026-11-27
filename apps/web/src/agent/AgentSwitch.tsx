@@ -38,7 +38,8 @@ export function AgentSwitch({
   const [asking, setAsking] = useState<'pause' | 'cut' | null>(null);
   const now = new Date();
   const state = agentStateOf(input, zone, now);
-  const running = state.kind === 'on' || state.kind === 'out';
+  // An expired session holds nothing she chose: her AI may still be paused or cut while it is captured again.
+  const running = state.kind === 'on' || state.kind === 'out' || state.kind === 'expired';
   const stopped = state.kind === 'paused' || state.kind === 'off';
   const choices = pauseChoices(zone, now, state.kind === 'out' ? (input.hoursNow?.changesAt ?? null) : null);
 

@@ -1718,3 +1718,33 @@ body {
     bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Reduced motion: the bars stand, the steps and pads are there, the flash and the pop are skipped, the skeleton
+   holds still (DS-12). */
+@media (prefers-reduced-motion: reduce) {
+  .se-stairs i,
+  .se-step,
+  .se-step__pad,
+  .se-branch[data-flash],
+  .se-choice[aria-checked='true'] .se-radio::after,
+  .se-skel i {
+    animation: none;
+  }
+}
+
+/* A price typed that is not one (PRO1-08): said under the field, on its own line of the foot. */
+.se-price-hint {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  color: var(--nv-danger);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+/* Where each media is in her Reveal vault, under the tiles (REV-09). */
+.se-copy__places {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}

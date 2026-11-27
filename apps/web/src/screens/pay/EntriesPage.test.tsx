@@ -334,7 +334,9 @@ describe('Paie › Primes et malus', () => {
       expect(entry('Théo', 'Prime').dataset['cancelled']).toBe('true');
     });
     expect(writes).toEqual([{ path: `/v1/payroll/bonuses/${THEO_BONUS.id}/cancel`, body: {} }]);
-    expect(text(entry('Théo', 'Prime'))).toContain('annulé par Charles le jeu. 12 nov.');
+    expect(text(entry('Théo', 'Prime'))).toContain('annulée par Charles le jeu. 12 nov.');
+    // A prime is feminine (recette MAN-06): its chip agrees, a malus's stays « Annulé ».
+    expect(text(entry('Théo', 'Prime'))).toContain('PrimeAnnulée');
   });
 
   it('adds a penalty in two steps, never for oneself, the same entry sent again after a refusal', async () => {

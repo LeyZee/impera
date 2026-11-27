@@ -27,21 +27,29 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/invoicing': 12,
   'modules/mcp': 1,
   'modules/media': 10,
-  'modules/notifications': 3,
+  // +1 (trou 9 du 21/11): what the agency asked of each creator (requests, propositions, weeks validated) and her own
+  // accounts, across creators, a half-hour window, read only.
+  'modules/notifications': 4,
   'modules/payroll': 10,
+  // The agent reads the agency's active base style (ADR 0173) out of any session: one row, read only, no creator's data.
+  'modules/persona': 1,
   'modules/providers': 7,
   'modules/redirect-links': 2,
   'modules/rewards': 7,
   // +1 (EQ-23): the incident notice reads its facts and the agency's recipients across creators, under withAdmin.
   // +1 for the light feedback (ADR 0170, 26/11): each member's last opened shift and whether it has its feedback,
   // across creators, bounded to the members named; read only.
-  'modules/scheduling': 30,
+  // +1 for « compte sans personne » (ADR 0094 § 1): its job reads every creator's planning, agent and last fan
+  // message to publish one event per account and créneau.
+  'modules/scheduling': 31,
   'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,
   'modules/telegram': 10,
   'modules/trends': 8,
-  root: 52,
+  // +2 for a live worker freeing its own locks on jobs whose completion was lost (recette COUV-14): Graphile's tables,
+  // closed to the app role, as the release of dead workers' locks.
+  root: 54,
   scripts: 1,
   wiring: 7,
 };

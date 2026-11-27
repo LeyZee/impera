@@ -1,4 +1,10 @@
-import { CreatorIdSchema, type CreatorId, type Me } from '@impera/contracts';
+import {
+  CreatorIdSchema,
+  PreparedScriptIdSchema,
+  type CreatorId,
+  type Me,
+  type PreparedScriptId,
+} from '@impera/contracts';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -17,7 +23,19 @@ export interface CreatorsSearch {
    * longer lists shows the folders. Kept by nothing else: a tab or a creator changed leaves it out.
    */
   readonly dossier?: string;
+  /**
+   * The script in preparation open in Scripts (`script`, its id), so that a reload or a step back lands on it (PRO1-06);
+   * one the list no longer holds shows the list. Kept by nothing else, like `dossier`.
+   */
+  readonly script?: PreparedScriptId;
 }
+
+/**
+ * What an address that names a creator the list does not hold says once it has led back to the list (PRO1-16): an
+ * archived one, or one that is not the reader's; the owner reopens an archived one from « Archivées ».
+ */
+export const CREATOR_GONE =
+  'Créatrice archivée ou introuvable : une archivée se rouvre depuis « Archivées ».';
 
 /** The seven tabs of a creator's sheet, in their order (ADR 0149 § 1). Her links are Trafic's (`/trafic`). */
 export const CREATOR_TABS = ['persona', 'ai', 'media', 'scripts', 'agenda', 'alerts', 'account'] as const;
@@ -163,6 +181,7 @@ const VIEWS_OF: Partial<
 export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSearch {
   const creator = CreatorIdSchema.safeParse(search['creatrice']);
   const folder = search['dossier'];
+  const script = PreparedScriptIdSchema.safeParse(search['script']);
   const tab = isTabSlug(search['onglet']) ? search['onglet'] : undefined;
   const view = tab === undefined ? undefined : VIEWS_OF[tab]?.find((one) => one === search['vue']);
   return {
@@ -176,6 +195,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     folder.length <= FOLDER_ID_MAX
       ? { dossier: folder }
       : {}),
+    ...(tab === TAB_SLUGS.scripts && view === undefined && script.success ? { script: script.data } : {}),
   };
 }
 
@@ -214,6 +234,11 @@ export function creatorsSearch(
     ...(creatorId === null ? {} : { creatrice: creatorId }),
     ...(sheet === 'vault' && folderId !== null ? { dossier: folderId } : {}),
   };
+}
+
+/** The address of one of her scripts open in Scripts (PRO1-06); `null`, her list of scripts. */
+export function scriptSearch(creatorId: CreatorId, scriptId: PreparedScriptId | null): CreatorsSearch {
+  return { ...creatorsSearch('scripts', creatorId), ...(scriptId === null ? {} : { script: scriptId }) };
 }
 
 /**
